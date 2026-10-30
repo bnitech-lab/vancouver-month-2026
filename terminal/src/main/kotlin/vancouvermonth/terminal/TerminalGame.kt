@@ -123,7 +123,7 @@ class TerminalGame(
                 is Event.SkillUp -> line("  ${skillName(event.skill)} 실력이 올랐어요. ${skillName(event.skill)} ${event.level}/${Month.MAX_SKILL}")
                 is Event.Applied -> line(applied(event.interview))
                 is Event.Rested -> line("  푹 쉬었어요. 체력 ${event.energy}/${Month.MAX_ENERGY}")
-                is Event.InterviewHeld -> line(interviewResult(event))
+                is Event.InterviewHeld -> line(interviewResult(event, month.canStillApplyThisMonth))
                 is Event.LivingCost -> line("  생활비 -${money(event.amount)}, 잔고 ${money(month.balance)}")
             }
         }
@@ -218,11 +218,13 @@ private fun applied(interview: Interview?): String =
         "  연락이 왔어요! ${stageName(interview.stage)}이 ${date(interview.day)}에 잡혔어요."
     }
 
-private fun interviewResult(event: Event.InterviewHeld): String {
+/** [canApplyAgain] is false late in the month, when applications have closed. */
+fun interviewResult(event: Event.InterviewHeld, canApplyAgain: Boolean): String {
     val stage = stageName(event.stage)
     val next = event.next
     return when {
-        !event.passed -> "  ${stage}에서 떨어졌어요. 다시 지원할 수 있어요."
+        !event.passed && canApplyAgain -> "  ${stage}에서 떨어졌어요. 다시 지원할 수 있어요."
+        !event.passed -> "  ${stage}에서 떨어졌어요. 9월 안에는 다시 지원할 수 없어요."
         next != null -> "  $stage 통과! ${stageName(next.stage)}이 ${date(next.day)}이에요."
         else -> "  $stage 통과!"
     }

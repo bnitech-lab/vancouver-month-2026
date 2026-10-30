@@ -6,7 +6,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import vancouvermonth.core.Ending
+import vancouvermonth.core.Event
 import vancouvermonth.core.FirstMinute
+import vancouvermonth.core.InterviewStage
 import vancouvermonth.core.Room
 import vancouvermonth.core.Zone
 
@@ -73,6 +75,13 @@ class TerminalGameTest {
             "9월이 끝났어요. 제안은 없었지만 10월 총비용 \$1,175는 낼 수 있어요 (잔고 \$1,300).",
             endingLine(Ending.SURVIVED, 30, 1_175, 1_300),
         )
+    }
+
+    @Test
+    fun `a failed interview says whether the player can still apply`() {
+        val failed = Event.InterviewHeld(InterviewStage.PHONE_SCREEN, passed = false, next = null)
+        assertEquals("  1차 영어 면접에서 떨어졌어요. 다시 지원할 수 있어요.", interviewResult(failed, canApplyAgain = true))
+        assertEquals("  1차 영어 면접에서 떨어졌어요. 9월 안에는 다시 지원할 수 없어요.", interviewResult(failed, canApplyAgain = false))
     }
 
     @Test
