@@ -5,7 +5,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import vancouvermonth.core.Ending
+import vancouvermonth.core.Event
 import vancouvermonth.core.FirstMinute
+import vancouvermonth.core.InterviewStage
 import vancouvermonth.core.Room
 import vancouvermonth.core.Zone
 
@@ -38,10 +41,58 @@ class TerminalGameTest {
             .first { it.exists() }
             .readText()
         val sample = readme.substringAfter("```\nBNI Tech").substringBefore("```")
-        val (_, screen) = playWith(1011, "2", "1300", "n")
+        val (_, screen) = playWith(1011, "2", "1300", "2")
         val expectedLines = ("BNI Tech" + sample).lines().map { it.trimEnd() }.filter { it.isNotBlank() }
         val shownLines = screen.lines().map { it.trimEnd() }.filter { it.isNotBlank() }
-        assertEquals(expectedLines, shownLines)
+        // The README stops after the first day; the screen goes on to the next day's question.
+        assertEquals(expectedLines, shownLines.take(expectedLines.size))
+    }
+
+    @Test
+    fun `a whole month of rest ends on the 30th and offers another run`() {
+        val answers = arrayOf("3", "1165") + Array(29) { "5" } + arrayOf("y")
+        val (again, screen) = playWith(1011, *answers)
+        assertTrue("[9월 30일] 남은 날 1일" in screen)
+        assertTrue("9월이 끝났어요." in screen)
+        assertTrue(again)
+    }
+
+    @Test
+    fun `an action the player cannot take is explained and asked again`() {
+        val (_, screen) = playWith(1011, "3", "1165", "1", "1", "1", "1", "1", "1")
+        assertTrue("체력 0/5" in screen)
+        assertTrue("지금은 못 해요. 체력이 없어요. 쉬어야 해요." in screen)
+    }
+
+    @Test
+    fun `each ending says what happened with the right amounts`() {
+        assertEquals("축하해요! 9월 19일에 취업 제안을 받았어요.", endingLine(Ending.OFFER, 19, 1_175, 900))
+        assertEquals(
+            "9월이 끝났어요. 10월 총비용 \$1,175를 내기엔 \$510 모자라요 (잔고 \$665).",
+            endingLine(Ending.CANNOT_PAY_RENT, 30, 1_175, 665),
+        )
+        assertEquals(
+            "9월이 끝났어요. 제안은 없었지만 10월 총비용 \$1,175는 낼 수 있어요 (잔고 \$1,300).",
+            endingLine(Ending.SURVIVED, 30, 1_175, 1_300),
+        )
+    }
+
+    @Test
+    fun `a failed interview says whether the player can still apply`() {
+        val failed = Event.InterviewHeld(InterviewStage.PHONE_SCREEN, passed = false, next = null)
+        assertEquals("  1차 영어 면접에서 떨어졌어요. 다시 지원할 수 있어요.", interviewResult(failed, canApplyAgain = true))
+        assertEquals("  1차 영어 면접에서 떨어졌어요. 9월 안에는 다시 지원할 수 없어요.", interviewResult(failed, canApplyAgain = false))
+    }
+
+    @Test
+    fun `dates, percentages and Korean columns`() {
+        assertEquals("9월 2일", date(2))
+        assertEquals("10월 1일", date(31))
+        assertEquals("27%", percent(0.27))
+        assertEquals("50%", percent(0.05 + 0.09 * 5))
+        assertEquals("29%", percent(0.05 + 0.08 * 3))
+        assertEquals("쉬기          ", padToColumns("쉬기", 14))
+        assertEquals("지원서 넣기   ", padToColumns("지원서 넣기", 14))
     }
 
     @Test
@@ -59,7 +110,7 @@ class TerminalGameTest {
         val (_, screen) = playWith(4821, "${cheapest + 1}", "${game.lowestTotal}", "n")
         assertTrue("총비용이 가장 싼 방을 골랐어요.   +100" in screen)
         assertTrue("짐작이 정확해요.   +100" in screen)
-        assertTrue("이번 판 점수 200 / 200" in screen)
+        assertTrue("방 고르기 점수 200 / 200" in screen)
     }
 
     @Test
@@ -84,12 +135,6 @@ class TerminalGameTest {
         assertTrue("1부터 3 사이의 번호로 골라 주세요." in screen)
         assertTrue("숫자로 적어 주세요." in screen)
         assertTrue("한 달 총비용  " in screen)
-    }
-
-    @Test
-    fun `y asks for another round`() {
-        val (again, _) = playWith(4821, "3", "1000", "y")
-        assertTrue(again)
     }
 
     @Test
