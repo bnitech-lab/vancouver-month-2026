@@ -5,8 +5,8 @@ import kotlin.random.Random
 /** `--seed 4821` (or `--seed=4821`) replays the same rooms in the first round. */
 fun main(args: Array<String>) {
     val game = TerminalGame(
-        readLine = ::readlnOrNull,
-        write = { text ->
+        input = ::readlnOrNull,
+        output = { text ->
             print(text)
             System.out.flush()
         },

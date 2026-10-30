@@ -11,9 +11,10 @@ class TerminalGameTest {
     private fun playWith(seed: Int, vararg answers: String): Pair<Boolean, String> {
         val input = answers.iterator()
         val output = StringBuilder()
+        // Each answer is echoed after its prompt, the way a terminal shows what the player typed.
         val again = TerminalGame(
-            readLine = { if (input.hasNext()) input.next() else null },
-            write = { output.append(it) },
+            input = { if (input.hasNext()) input.next().also { output.append(it + "\n") } else null },
+            output = { output.append(it) },
         ).play(seed)
         return again to output.toString()
     }
@@ -23,9 +24,22 @@ class TerminalGameTest {
         val (again, screen) = playWith(4821, "1", "1200", "n")
         val total = FirstMinute(4821).rooms[0].totalMonthlyCost
         assertFalse(again)
-        assertTrue(screen.lines().first { it.isNotBlank() } == "BNI Tech")
+        assertEquals("BNI Tech", screen.lines().first { it.isNotBlank() })
         assertTrue("판 번호 4821" in screen)
         assertTrue("한 달 총비용  ${money(total)}" in screen)
+    }
+
+    @Test
+    fun `seed 1011 plays exactly as the README shows`() {
+        val readme = generateSequence(java.io.File("").absoluteFile) { it.parentFile }
+            .map { java.io.File(it, "README.md") }
+            .first { it.exists() }
+            .readText()
+        val sample = readme.substringAfter("```\nBNI Tech").substringBefore("```")
+        val (_, screen) = playWith(1011, "2", "1150", "n")
+        val expectedLines = ("BNI Tech" + sample).lines().map { it.trimEnd() }.filter { it.isNotBlank() }
+        val shownLines = screen.lines().map { it.trimEnd() }.filter { it.isNotBlank() }
+        assertEquals(expectedLines, shownLines)
     }
 
     @Test

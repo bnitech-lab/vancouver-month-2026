@@ -6,11 +6,11 @@ import vancouvermonth.core.Room
 
 /**
  * Plays one first minute as text. Input and output are passed in, so a test can play a whole round.
- * [readLine] returns null when the input ends (Ctrl+D), which ends the game.
+ * [input] returns null when the input ends (Ctrl+D), which ends the game.
  */
 class TerminalGame(
-    private val readLine: () -> String?,
-    private val write: (String) -> Unit,
+    private val input: () -> String?,
+    private val output: (String) -> Unit,
 ) {
     /** Plays one round and returns true when the player wants another. */
     fun play(seed: Int): Boolean {
@@ -41,14 +41,13 @@ class TerminalGame(
         val room = reveal.room
         line()
         line("  한 달 총비용  ${money(room.totalMonthlyCost)}")
-        line("  월세 ${room.rent} + 공과금 ${room.utilities} + 교통 ${room.zone.monthlyPass}")
+        line("  월세 ${money(room.rent)} + 공과금 ${money(room.utilities)} + 교통 ${money(room.zone.monthlyPass)}")
         line("  내 짐작과 차이 ${money(reveal.guessGap)}")
         line()
         if (reveal.pickedCheapest) {
             line("  총비용이 가장 싼 방을 골랐어요.")
         } else {
-            val cheapest = game.cheapestRoomIndex
-            line("  총비용이 가장 싼 방은 ${cheapest + 1}번이었어요 (${money(game.rooms[cheapest].totalMonthlyCost)}).")
+            line("  총비용이 가장 싼 방은 ${game.cheapestRoomIndex + 1}번이었어요 (${money(game.lowestTotal)}).")
         }
         line("  첫 달을 내고 남은 잔고 ${money(reveal.balanceAfterFirstMonth)}")
         line()
@@ -76,11 +75,11 @@ class TerminalGame(
     }
 
     private fun ask(prompt: String): String? {
-        write(prompt)
-        return readLine()
+        output(prompt)
+        return input()
     }
 
-    private fun line(text: String = "") = write(text + "\n")
+    private fun line(text: String = "") = output(text + "\n")
 }
 
 private fun describe(room: Room): String {

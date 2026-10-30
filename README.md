@@ -12,34 +12,36 @@ Needs Java 21.
 
 ```sh
 ./play                # new rooms
-./play --seed 4821    # the same rooms again
+./play --seed 1011    # the same rooms again
 ```
 
-The game text is in Korean for now. This is `./play --seed 4821`, picking the room with the lowest rent:
+The game text is in Korean for now. This is `./play --seed 1011`, picking the room with the lowest rent:
 
 ```
 BNI Tech
 
-밴쿠버 한 달 (가제)                판 번호 4821
+밴쿠버 한 달 (가제)                판 번호 1011
 잔고 $3,000 · 9월 1일
 
 방 세 개가 나왔어요. 보이는 건 월세와 단서 둘뿐이에요.
-  1) 월세 $1,140   교통 1구역   공과금 포함
-  2) 월세 $1,010   교통 2구역   공과금 별도
-  3) 월세   $930   교통 3구역   공과금 별도
+  1) 월세 $1,070   교통 1구역   공과금 포함
+  2) 월세   $970   교통 3구역   공과금 별도
+  3) 월세 $1,020   교통 2구역   공과금 포함
 
-어느 방? (1-3) > 3
-이 방의 한 달 총비용을 맞혀 보세요 ($) > 1050
+어느 방? (1-3) > 2
+이 방의 한 달 총비용을 맞혀 보세요 ($) > 1150
 
-  한 달 총비용  $1,275
-  월세 930 + 공과금 150 + 교통 195
-  내 짐작과 차이 $225
+  한 달 총비용  $1,345
+  월세 $970 + 공과금 $180 + 교통 $195
+  내 짐작과 차이 $195
 
-  총비용이 가장 싼 방은 1번이었어요 ($1,245).
-  첫 달을 내고 남은 잔고 $1,725
+  총비용이 가장 싼 방은 3번이었어요 ($1,165).
+  첫 달을 내고 남은 잔고 $1,655
 
-한 판 더? (y/n) >
+한 판 더? (y/n) > n
 ```
+
+A test plays this seed and checks that the screen still matches this sample.
 
 ## How it is built
 
