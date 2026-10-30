@@ -11,9 +11,11 @@ the money runs out.
 2. **September 2nd to 30th: one action a day.** Work a café shift, study English, practise coding, send an
    application, or rest. Every day costs living money, and every action but rest costs energy.
 3. **Interviews.** An application may book a phone screen (passed on English), and passing it books a technical
-   interview (passed on coding). Passing both is a job offer and ends the game.
+   interview (passed on coding). Passing both is a job offer and ends the game. Applications close after the
+   27th, so both interviews always fit in September.
 4. **The end.** No offer by the 30th means October's total for the same room is due: you either can pay it or you
-   cannot. Running out of money earlier ends the game at once.
+   cannot. What is left after the first room always covers September's living cost, so October's total is where
+   the money runs short.
 
 ## Play
 
@@ -93,7 +95,8 @@ included, so the room with the lowest rent has the lowest total in only a bit mo
 
 The month is balanced by bots that play 2,000 runs with the real rules (`BalanceTest`). A bot that rests when
 tired, works when the rent is at risk, studies and applies lands an offer in about 43% of runs; a bot that picks
-at random lands one in about 20%; a bot that only rests never does.
+at random lands one in about 24%; a bot that only rests never does. (Measured on seeds 1 to 2,000 with Kotlin
+2.4.21; the test itself only checks a range.)
 
 ## Who wrote what
 

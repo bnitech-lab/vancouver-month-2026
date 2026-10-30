@@ -1,6 +1,7 @@
 package vancouvermonth.terminal
 
 import java.util.Locale
+import kotlin.math.roundToInt
 import vancouvermonth.core.Action
 import vancouvermonth.core.Ending
 import vancouvermonth.core.Event
@@ -130,15 +131,8 @@ class TerminalGame(
     }
 
     private fun showEnding(month: Month, reveal: Reveal) {
-        val rent = money(month.room.totalMonthlyCost)
-        val balance = money(month.balance)
-        when (month.ending) {
-            Ending.OFFER -> line("축하해요! ${date(month.day)}에 취업 제안을 받았어요.")
-            Ending.BROKE -> line("${date(month.day)}, 생활비를 낼 돈이 떨어졌어요.")
-            Ending.CANNOT_PAY_RENT -> line("9월이 끝났어요. 10월 1일에 낼 총비용 ${rent}가 모자라요 (잔고 $balance).")
-            Ending.SURVIVED -> line("9월이 끝났어요. 제안은 없었지만 10월 총비용 ${rent}는 낼 수 있어요 (잔고 $balance).")
-            null -> error("The month is not over")
-        }
+        val ending = checkNotNull(month.ending) { "The month is not over" }
+        line(endingLine(ending, month.day, month.room.totalMonthlyCost, month.balance))
         line("  방 고르기 점수 ${reveal.score}/${FirstMinute.MAX_SCORE} · 영어 ${month.english}/${Month.MAX_SKILL} · 코딩 ${month.coding}/${Month.MAX_SKILL}")
         line()
     }
@@ -202,9 +196,18 @@ private fun describe(action: Action, month: Month): String {
     return padToColumns(name, 14) + effect + note
 }
 
+/** The first line of the ending screen. [rent] is October's total for the same room. */
+fun endingLine(ending: Ending, day: Int, rent: Int, balance: Int): String = when (ending) {
+    Ending.OFFER -> "축하해요! ${date(day)}에 취업 제안을 받았어요."
+    Ending.CANNOT_PAY_RENT ->
+        "9월이 끝났어요. 10월 총비용 ${money(rent)}를 내기엔 ${money(rent - balance)} 모자라요 (잔고 ${money(balance)})."
+    Ending.SURVIVED -> "9월이 끝났어요. 제안은 없었지만 10월 총비용 ${money(rent)}는 낼 수 있어요 (잔고 ${money(balance)})."
+}
+
 private fun whyNot(action: Action, month: Month): String = when {
     action != Action.REST && month.energy == 0 -> "체력이 없어요. 쉬어야 해요."
     action == Action.APPLY && month.interview != null -> "면접이 잡혀 있어요."
+    action == Action.APPLY && !month.canStillApplyThisMonth -> "지금 지원하면 9월 안에 면접을 다 볼 수 없어요."
     else -> "오늘은 할 수 없어요."
 }
 
@@ -238,7 +241,7 @@ private fun skillName(skill: Skill): String = when (skill) {
 /** Day 2 is "9월 2일". A day past the 30th falls in October. */
 fun date(day: Int): String = if (day <= Month.LAST_DAY) "9월 ${day}일" else "10월 ${day - Month.LAST_DAY}일"
 
-fun percent(chance: Double): String = "${(chance * 100).toInt()}%"
+fun percent(chance: Double): String = "${(chance * 100).roundToInt()}%"
 
 /** Pads [text] to [columns] terminal columns, counting each Hangul syllable as two. */
 fun padToColumns(text: String, columns: Int): String {

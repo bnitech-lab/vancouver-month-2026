@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import vancouvermonth.core.Ending
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.Room
 import vancouvermonth.core.Zone
@@ -62,10 +63,25 @@ class TerminalGameTest {
     }
 
     @Test
+    fun `each ending says what happened with the right amounts`() {
+        assertEquals("축하해요! 9월 19일에 취업 제안을 받았어요.", endingLine(Ending.OFFER, 19, 1_175, 900))
+        assertEquals(
+            "9월이 끝났어요. 10월 총비용 \$1,175를 내기엔 \$510 모자라요 (잔고 \$665).",
+            endingLine(Ending.CANNOT_PAY_RENT, 30, 1_175, 665),
+        )
+        assertEquals(
+            "9월이 끝났어요. 제안은 없었지만 10월 총비용 \$1,175는 낼 수 있어요 (잔고 \$1,300).",
+            endingLine(Ending.SURVIVED, 30, 1_175, 1_300),
+        )
+    }
+
+    @Test
     fun `dates, percentages and Korean columns`() {
         assertEquals("9월 2일", date(2))
         assertEquals("10월 1일", date(31))
         assertEquals("27%", percent(0.27))
+        assertEquals("50%", percent(0.05 + 0.09 * 5))
+        assertEquals("29%", percent(0.05 + 0.08 * 3))
         assertEquals("쉬기          ", padToColumns("쉬기", 14))
         assertEquals("지원서 넣기   ", padToColumns("지원서 넣기", 14))
     }
