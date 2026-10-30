@@ -16,9 +16,6 @@ enum class Ending {
     /** A job offer before the month ran out. */
     OFFER,
 
-    /** The money ran out during the month. */
-    BROKE,
-
     /** The month ended without an offer, and next month's total cannot be paid. */
     CANNOT_PAY_RENT,
 
@@ -39,7 +36,8 @@ sealed interface Event {
 /**
  * September in Vancouver, one action a day, after the room was picked on September 1st.
  * The goal is a job offer by September 30th. On October 1st the room's total monthly cost is due again.
- * All numbers are invented.
+ * Every day, the offer day included, costs living money; what is left after the first room always covers it,
+ * so the money pressure is October's total. All numbers are invented.
  */
 class Month(
     val room: Room,
@@ -79,11 +77,15 @@ class Month(
         InterviewStage.TECHNICAL -> min(MAX_CHANCE, TECHNICAL_BASE + TECHNICAL_PER_CODING * coding)
     }
 
+    /** False from the day an application could no longer get both interviews done by the 30th. */
+    val canStillApplyThisMonth: Boolean
+        get() = day + PHONE_SCREEN_DELAY.first <= LAST_PHONE_SCREEN_DAY
+
     fun canTake(action: Action): Boolean = when {
         isOver || hasInterviewToday -> false
         action == Action.REST -> true
         energy == 0 -> false
-        action == Action.APPLY -> interview == null
+        action == Action.APPLY -> interview == null && canStillApplyThisMonth
         else -> true
     }
 
@@ -109,7 +111,8 @@ class Month(
             Action.APPLY -> {
                 energy -= 1
                 if (dice.succeeds(applyChance)) {
-                    interview = Interview(InterviewStage.PHONE_SCREEN, day + dice.daysLater(PHONE_SCREEN_DELAY))
+                    val phoneScreenDay = min(LAST_PHONE_SCREEN_DAY, day + dice.daysLater(PHONE_SCREEN_DELAY))
+                    interview = Interview(InterviewStage.PHONE_SCREEN, phoneScreenDay)
                 }
                 Event.Applied(interview)
             }
@@ -127,23 +130,21 @@ class Month(
         check(today != null && hasInterviewToday) { "No interview on day $day" }
         val passed = dice.succeeds(passChance(today.stage))
         val next = if (passed && today.stage == InterviewStage.PHONE_SCREEN) {
-            Interview(InterviewStage.TECHNICAL, day + dice.daysLater(TECHNICAL_DELAY))
+            // A phone screen is never later than the 29th, so the technical interview still fits in September.
+            Interview(InterviewStage.TECHNICAL, min(LAST_DAY, day + dice.daysLater(TECHNICAL_DELAY)))
         } else {
             null
         }
         interview = next
         val held = Event.InterviewHeld(today.stage, passed, next)
-        if (passed && today.stage == InterviewStage.TECHNICAL) {
-            ending = Ending.OFFER
-            return listOf(held)
-        }
-        return listOf(held) + endDay()
+        val offer = passed && today.stage == InterviewStage.TECHNICAL
+        return listOf(held) + endDay(offer)
     }
 
-    private fun endDay(): List<Event> {
+    private fun endDay(offer: Boolean = false): List<Event> {
         balance -= DAILY_LIVING_COST
         when {
-            balance < 0 -> ending = Ending.BROKE
+            offer -> ending = Ending.OFFER
             day == LAST_DAY -> ending = if (balance >= room.totalMonthlyCost) Ending.SURVIVED else Ending.CANNOT_PAY_RENT
             else -> day += 1
         }
@@ -154,6 +155,9 @@ class Month(
         /** September 1st goes to picking a room, so the month starts on the 2nd. */
         const val FIRST_DAY = 2
         const val LAST_DAY = 30
+
+        /** The latest phone screen, leaving the 30th for the technical interview. */
+        const val LAST_PHONE_SCREEN_DAY = LAST_DAY - 1
 
         const val DAILY_LIVING_COST = 40
         const val WORK_PAY = 110

@@ -29,14 +29,20 @@ class MonthTest {
     }
 
     @Test
-    fun `study raises a skill one step at a time up to the top`() {
+    fun `study raises a skill one step at a time and stops at the top`() {
         val month = month(balance = 5_000)
-        repeat(12) {
-            if (month.energy == 0) month.take(Action.REST) else month.take(Action.STUDY_ENGLISH)
+        val levels = mutableListOf<Int>()
+        while (!month.isOver) {
+            if (month.energy == 0) {
+                month.take(Action.REST)
+            } else {
+                val event = month.take(Action.STUDY_ENGLISH).first() as Event.SkillUp
+                levels += event.level
+            }
         }
-        assertTrue(month.english in Month.START_ENGLISH + 1..Month.MAX_SKILL)
-        val events = month.take(if (month.energy == 0) Action.REST else Action.PRACTISE_CODING)
-        assertTrue(events.last() is Event.LivingCost)
+        assertEquals((Month.START_ENGLISH + 1..Month.MAX_SKILL).toList(), levels.take(Month.MAX_SKILL - Month.START_ENGLISH))
+        assertTrue(levels.size > Month.MAX_SKILL - Month.START_ENGLISH, "the month should outlast the climb")
+        assertEquals(Month.MAX_SKILL, month.english)
     }
 
     @Test
@@ -93,9 +99,49 @@ class MonthTest {
         month.take(Action.REST)
         val balanceBefore = month.balance
         val second = month.attendInterview()
-        assertEquals(listOf<Event>(Event.InterviewHeld(InterviewStage.TECHNICAL, passed = true, next = null)), second)
+        assertEquals(
+            listOf(
+                Event.InterviewHeld(InterviewStage.TECHNICAL, passed = true, next = null),
+                Event.LivingCost(Month.DAILY_LIVING_COST),
+            ),
+            second,
+        )
         assertEquals(Ending.OFFER, month.ending)
-        assertEquals(balanceBefore, month.balance)
+        assertEquals(balanceBefore - Month.DAILY_LIVING_COST, month.balance)
+    }
+
+    @Test
+    fun `applications stop once both interviews could not finish in September`() {
+        val month = Month(room, 5_000, FixedDice(lucky = true, days = 4))
+        while (month.day < Month.LAST_PHONE_SCREEN_DAY - Month.PHONE_SCREEN_DELAY.first) month.take(Action.REST)
+        assertEquals(27, month.day)
+        assertTrue(month.canTake(Action.APPLY))
+
+        month.take(Action.APPLY)
+        assertEquals(Interview(InterviewStage.PHONE_SCREEN, Month.LAST_PHONE_SCREEN_DAY), month.interview)
+        month.take(Action.REST)
+        assertFalse(month.canStillApplyThisMonth)
+
+        month.attendInterview()
+        assertEquals(Interview(InterviewStage.TECHNICAL, Month.LAST_DAY), month.interview)
+        month.attendInterview()
+        assertEquals(Ending.OFFER, month.ending)
+    }
+
+    @Test
+    fun `no interview is ever booked after the 30th`() {
+        for (seed in 1..500) {
+            val game = FirstMinute(seed)
+            val month = game.startMonth(0)
+            while (!month.isOver) {
+                if (month.hasInterviewToday) {
+                    month.attendInterview()
+                } else {
+                    month.take(if (month.canTake(Action.APPLY)) Action.APPLY else Action.REST)
+                }
+                month.interview?.let { assertTrue(it.day <= Month.LAST_DAY, "seed $seed: $it") }
+            }
+        }
     }
 
     @Test
@@ -128,11 +174,13 @@ class MonthTest {
     }
 
     @Test
-    fun `running out of money ends the month early`() {
-        val month = month(balance = Month.DAILY_LIVING_COST * 3 - 1)
-        while (!month.isOver) month.take(Action.REST)
-        assertEquals(Ending.BROKE, month.ending)
-        assertEquals(Month.FIRST_DAY + 2, month.day)
+    fun `what is left after any first room covers the month's living cost`() {
+        val livingCost = Month.DAILY_LIVING_COST * (Month.LAST_DAY - Month.FIRST_DAY + 1)
+        for (seed in 1..2_000) {
+            for (room in RoomDealer.deal(seed)) {
+                assertTrue(FirstMinute.STARTING_BALANCE - room.totalMonthlyCost >= livingCost, "seed $seed: $room")
+            }
+        }
     }
 
     @Test
