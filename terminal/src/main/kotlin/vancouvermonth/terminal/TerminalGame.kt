@@ -15,8 +15,10 @@ class TerminalGame(
     private val output: (String) -> Unit,
 ) {
     /** Plays one round and returns true when the player wants another. */
-    fun play(seed: Int): Boolean {
-        val game = FirstMinute(seed)
+    fun play(seed: Int): Boolean = play(FirstMinute(seed))
+
+    /** Plays one round of a game that is already set up, which lets a test hand in tied rooms. */
+    fun play(game: FirstMinute): Boolean {
         showRooms(game)
 
         val roomIndex = askRoom(game.rooms.size) ?: return false
@@ -33,13 +35,14 @@ class TerminalGame(
         line("밴쿠버 한 달 (가제)                판 번호 ${game.seed}")
         line("잔고 ${money(game.startingBalance)} · 9월 1일")
         line()
+        // Hangul takes two columns in a terminal, so the indents below count "할 일: " as 7 and "공과금" as 6.
         line("할 일: 한 달 총비용이 가장 싼 방을 고르세요.")
-        line("      한 달 총비용 = 월세 + 공과금 + 교통 정기권")
+        line("       한 달 총비용 = 월세 + 공과금 + 교통 정기권")
         line()
         line("요금표")
         line("  교통 정기권   " + Zone.entries.joinToString(" · ") { "${it.number}구역 ${money(it.monthlyPass)}" })
         val utilities = RoomDealer.UTILITIES_RANGE
-        line("  공과금       포함이면 ${money(0)}, 별도면 한 달 ${money(utilities.first)}~${money(utilities.last)} (방마다 다름)")
+        line("  공과금        포함이면 ${money(0)}, 별도면 한 달 ${money(utilities.first)}~${money(utilities.last)} (방마다 다름)")
         line()
         game.rooms.forEachIndexed { index, room -> line("  ${index + 1}) ${describe(room)}") }
         line()
@@ -55,8 +58,8 @@ class TerminalGame(
         if (reveal.pickedCheapest) {
             line("  총비용이 가장 싼 방을 골랐어요.   +${reveal.cheapestPoints}")
         } else {
-            val cheapest = "${game.cheapestRoomIndex + 1}번이었어요 (${money(game.lowestTotal)})"
-            line("  총비용이 가장 싼 방은 $cheapest.   +${reveal.cheapestPoints}")
+            val rooms = game.cheapestRoomIndices.joinToString(", ") { "${it + 1}번" }
+            line("  총비용이 가장 싼 방은 ${rooms}이었어요 (${money(game.lowestTotal)}).   +${reveal.cheapestPoints}")
         }
         if (reveal.guessGap == 0) {
             line("  짐작이 정확해요.   +${reveal.guessPoints}")
