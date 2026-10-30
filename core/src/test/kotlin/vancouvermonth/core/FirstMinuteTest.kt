@@ -64,6 +64,36 @@ class FirstMinuteTest {
     }
 
     @Test
+    fun `the cheapest room and an exact guess score the full 200`() {
+        val game = FirstMinute(seed = 4821)
+        val reveal = game.reveal(game.cheapestRoomIndex, game.lowestTotal)
+        assertEquals(100, reveal.cheapestPoints)
+        assertEquals(100, reveal.guessPoints)
+        assertEquals(FirstMinute.MAX_SCORE, reveal.score)
+    }
+
+    @Test
+    fun `a guess loses one point per dollar and never goes below zero`() {
+        val game = FirstMinute(seed = 4821)
+        val total = game.rooms[0].totalMonthlyCost
+        assertEquals(55, game.reveal(0, total + 45).guessPoints)
+        assertEquals(55, game.reveal(0, total - 45).guessPoints)
+        assertEquals(0, game.reveal(0, total + 100).guessPoints)
+        assertEquals(0, game.reveal(0, total + 900).guessPoints)
+    }
+
+    @Test
+    fun `a dearer room earns no points for the pick`() {
+        for (seed in 1..200) {
+            val game = FirstMinute(seed)
+            for (index in game.rooms.indices) {
+                val reveal = game.reveal(index, 0)
+                assertEquals(if (reveal.pickedCheapest) 100 else 0, reveal.cheapestPoints, "seed $seed, room $index")
+            }
+        }
+    }
+
+    @Test
     fun `included utilities cannot cost extra`() {
         assertFailsWith<IllegalArgumentException> {
             Room(rent = 1_000, zone = Zone.ONE, utilitiesIncluded = true, utilities = 150)
