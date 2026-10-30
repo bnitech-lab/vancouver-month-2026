@@ -41,8 +41,18 @@ class FirstMinute(
         )
     }
 
+    /** September after picking [roomIndex], with the first month's total already paid. */
+    fun startMonth(roomIndex: Int, dice: Dice = RandomDice(seed xor MONTH_DICE_SALT)): Month {
+        require(roomIndex in rooms.indices) { "No room at index $roomIndex" }
+        val room = rooms[roomIndex]
+        return Month(room, startingBalance - room.totalMonthlyCost, dice)
+    }
+
     companion object {
         const val STARTING_BALANCE = 3_000
+
+        /** Keeps the month's luck apart from the luck that dealt the rooms. */
+        private const val MONTH_DICE_SALT = 0x5EED
 
         /** Points for picking the cheapest room, and the most a guess can earn: one point off per dollar missed. */
         const val MAX_POINTS_EACH = 100
