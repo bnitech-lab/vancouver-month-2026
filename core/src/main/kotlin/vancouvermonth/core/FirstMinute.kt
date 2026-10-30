@@ -19,9 +19,14 @@ class FirstMinute(
     val cheapestRoomIndex: Int
         get() = rooms.indexOfFirst { it.totalMonthlyCost == lowestTotal }
 
-    /** [roomIndex] counts from 0. */
+    /** Every room with the lowest total: usually one, two or three when totals tie. */
+    val cheapestRoomIndices: List<Int>
+        get() = rooms.indices.filter { rooms[it].totalMonthlyCost == lowestTotal }
+
+    /** [roomIndex] counts from 0. [guess] is in dollars and cannot be negative. */
     fun reveal(roomIndex: Int, guess: Int): Reveal {
         require(roomIndex in rooms.indices) { "No room at index $roomIndex" }
+        require(guess >= 0) { "A guess cannot be negative: $guess" }
         val room = rooms[roomIndex]
         val pickedCheapest = room.totalMonthlyCost == lowestTotal
         val guessGap = abs(guess - room.totalMonthlyCost)

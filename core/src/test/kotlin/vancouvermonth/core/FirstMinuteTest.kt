@@ -58,9 +58,18 @@ class FirstMinuteTest {
         )
         val game = FirstMinute(seed = 0, rooms = rooms)
         assertEquals(1_245, game.lowestTotal)
+        assertEquals(listOf(0, 2), game.cheapestRoomIndices)
         assertTrue(game.reveal(0, 1_000).pickedCheapest)
         assertTrue(game.reveal(2, 1_000).pickedCheapest)
         assertFalse(game.reveal(1, 1_000).pickedCheapest)
+        assertEquals(200, game.reveal(0, 1_245).score)
+        assertEquals(200, game.reveal(2, 1_245).score)
+        assertEquals(0, game.reveal(1, 1_000).cheapestPoints)
+    }
+
+    @Test
+    fun `a negative guess is refused`() {
+        assertFailsWith<IllegalArgumentException> { FirstMinute(seed = 1).reveal(0, -1) }
     }
 
     @Test
@@ -78,7 +87,9 @@ class FirstMinuteTest {
         val total = game.rooms[0].totalMonthlyCost
         assertEquals(55, game.reveal(0, total + 45).guessPoints)
         assertEquals(55, game.reveal(0, total - 45).guessPoints)
+        assertEquals(1, game.reveal(0, total + 99).guessPoints)
         assertEquals(0, game.reveal(0, total + 100).guessPoints)
+        assertEquals(0, game.reveal(0, total + 101).guessPoints)
         assertEquals(0, game.reveal(0, total + 900).guessPoints)
     }
 
