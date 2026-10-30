@@ -38,10 +38,36 @@ class TerminalGameTest {
             .first { it.exists() }
             .readText()
         val sample = readme.substringAfter("```\nBNI Tech").substringBefore("```")
-        val (_, screen) = playWith(1011, "2", "1300", "n")
+        val (_, screen) = playWith(1011, "2", "1300", "2")
         val expectedLines = ("BNI Tech" + sample).lines().map { it.trimEnd() }.filter { it.isNotBlank() }
         val shownLines = screen.lines().map { it.trimEnd() }.filter { it.isNotBlank() }
-        assertEquals(expectedLines, shownLines)
+        // The README stops after the first day; the screen goes on to the next day's question.
+        assertEquals(expectedLines, shownLines.take(expectedLines.size))
+    }
+
+    @Test
+    fun `a whole month of rest ends on the 30th and offers another run`() {
+        val answers = arrayOf("3", "1165") + Array(29) { "5" } + arrayOf("y")
+        val (again, screen) = playWith(1011, *answers)
+        assertTrue("[9월 30일] 남은 날 1일" in screen)
+        assertTrue("9월이 끝났어요." in screen)
+        assertTrue(again)
+    }
+
+    @Test
+    fun `an action the player cannot take is explained and asked again`() {
+        val (_, screen) = playWith(1011, "3", "1165", "1", "1", "1", "1", "1", "1")
+        assertTrue("체력 0/5" in screen)
+        assertTrue("지금은 못 해요. 체력이 없어요. 쉬어야 해요." in screen)
+    }
+
+    @Test
+    fun `dates, percentages and Korean columns`() {
+        assertEquals("9월 2일", date(2))
+        assertEquals("10월 1일", date(31))
+        assertEquals("27%", percent(0.27))
+        assertEquals("쉬기          ", padToColumns("쉬기", 14))
+        assertEquals("지원서 넣기   ", padToColumns("지원서 넣기", 14))
     }
 
     @Test
@@ -59,7 +85,7 @@ class TerminalGameTest {
         val (_, screen) = playWith(4821, "${cheapest + 1}", "${game.lowestTotal}", "n")
         assertTrue("총비용이 가장 싼 방을 골랐어요.   +100" in screen)
         assertTrue("짐작이 정확해요.   +100" in screen)
-        assertTrue("이번 판 점수 200 / 200" in screen)
+        assertTrue("방 고르기 점수 200 / 200" in screen)
     }
 
     @Test
@@ -84,12 +110,6 @@ class TerminalGameTest {
         assertTrue("1부터 3 사이의 번호로 골라 주세요." in screen)
         assertTrue("숫자로 적어 주세요." in screen)
         assertTrue("한 달 총비용  " in screen)
-    }
-
-    @Test
-    fun `y asks for another round`() {
-        val (again, _) = playWith(4821, "3", "1000", "y")
-        assertTrue(again)
     }
 
     @Test
