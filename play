@@ -1,0 +1,8 @@
+#!/bin/sh
+# Builds the terminal game if needed and plays it in this terminal.
+# Usage: ./play            new rooms
+#        ./play --seed 4821   the same rooms again
+set -e
+cd "$(dirname "$0")"
+./gradlew -q --console=plain :terminal:installDist
+exec terminal/build/install/terminal/bin/terminal "$@"
