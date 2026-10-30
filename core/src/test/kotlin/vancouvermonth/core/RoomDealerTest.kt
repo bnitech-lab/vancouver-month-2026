@@ -8,6 +8,13 @@ class RoomDealerTest {
     private val seeds = 1..1_000
 
     @Test
+    fun `price limits are multiples of 10, so the price board matches what is dealt`() {
+        assertEquals(0, RoomDealer.UTILITIES_RANGE.first % 10)
+        assertEquals(0, RoomDealer.UTILITIES_RANGE.last % 10)
+        assertEquals(0, RoomDealer.RENT_SPREAD % 10)
+    }
+
+    @Test
     fun `the same seed deals the same rooms`() {
         assertEquals(RoomDealer.deal(4821), RoomDealer.deal(4821))
     }

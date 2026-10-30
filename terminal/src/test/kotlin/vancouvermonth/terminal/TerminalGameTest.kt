@@ -6,6 +6,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import vancouvermonth.core.FirstMinute
+import vancouvermonth.core.Room
+import vancouvermonth.core.Zone
 
 class TerminalGameTest {
     private fun playWith(seed: Int, vararg answers: String): Pair<Boolean, String> {
@@ -36,10 +38,44 @@ class TerminalGameTest {
             .first { it.exists() }
             .readText()
         val sample = readme.substringAfter("```\nBNI Tech").substringBefore("```")
-        val (_, screen) = playWith(1011, "2", "1150", "n")
+        val (_, screen) = playWith(1011, "2", "1300", "n")
         val expectedLines = ("BNI Tech" + sample).lines().map { it.trimEnd() }.filter { it.isNotBlank() }
         val shownLines = screen.lines().map { it.trimEnd() }.filter { it.isNotBlank() }
         assertEquals(expectedLines, shownLines)
+    }
+
+    @Test
+    fun `the first screen says what to do and shows the prices`() {
+        val (_, screen) = playWith(4821)
+        assertTrue("할 일: 한 달 총비용이 가장 싼 방을 고르세요." in screen)
+        assertTrue("1구역 \$105 · 2구역 \$145 · 3구역 \$195" in screen)
+        assertTrue("별도면 한 달 \$120~\$190" in screen)
+    }
+
+    @Test
+    fun `the reveal shows the points and the score`() {
+        val game = FirstMinute(4821)
+        val cheapest = game.cheapestRoomIndex
+        val (_, screen) = playWith(4821, "${cheapest + 1}", "${game.lowestTotal}", "n")
+        assertTrue("총비용이 가장 싼 방을 골랐어요.   +100" in screen)
+        assertTrue("짐작이 정확해요.   +100" in screen)
+        assertTrue("이번 판 점수 200 / 200" in screen)
+    }
+
+    @Test
+    fun `every room tied for the lowest total is named`() {
+        val rooms = listOf(
+            Room(rent = 1_140, zone = Zone.ONE, utilitiesIncluded = true, utilities = 0),
+            Room(rent = 1_050, zone = Zone.TWO, utilitiesIncluded = false, utilities = 150),
+            Room(rent = 930, zone = Zone.THREE, utilitiesIncluded = false, utilities = 120),
+        )
+        val answers = listOf("2", "1300", "n").iterator()
+        val screen = StringBuilder()
+        TerminalGame(
+            input = { if (answers.hasNext()) answers.next() else null },
+            output = { screen.append(it) },
+        ).play(FirstMinute(seed = 0, rooms = rooms))
+        assertTrue("총비용이 가장 싼 방은 1번, 3번이었어요 (\$1,245).   +0" in screen)
     }
 
     @Test

@@ -3,6 +3,8 @@ package vancouvermonth.terminal
 import java.util.Locale
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.Room
+import vancouvermonth.core.RoomDealer
+import vancouvermonth.core.Zone
 
 /**
  * Plays one first minute as text. Input and output are passed in, so a test can play a whole round.
@@ -13,8 +15,10 @@ class TerminalGame(
     private val output: (String) -> Unit,
 ) {
     /** Plays one round and returns true when the player wants another. */
-    fun play(seed: Int): Boolean {
-        val game = FirstMinute(seed)
+    fun play(seed: Int): Boolean = play(FirstMinute(seed))
+
+    /** Plays one round of a game that is already set up, which lets a test hand in tied rooms. */
+    fun play(game: FirstMinute): Boolean {
         showRooms(game)
 
         val roomIndex = askRoom(game.rooms.size) ?: return false
@@ -31,7 +35,15 @@ class TerminalGame(
         line("밴쿠버 한 달 (가제)                판 번호 ${game.seed}")
         line("잔고 ${money(game.startingBalance)} · 9월 1일")
         line()
-        line("방 세 개가 나왔어요. 보이는 건 월세와 단서 둘뿐이에요.")
+        // Hangul takes two columns in a terminal, so the indents below count "할 일: " as 7 and "공과금" as 6.
+        line("할 일: 한 달 총비용이 가장 싼 방을 고르세요.")
+        line("       한 달 총비용 = 월세 + 공과금 + 교통 정기권")
+        line()
+        line("요금표")
+        line("  교통 정기권   " + Zone.entries.joinToString(" · ") { "${it.number}구역 ${money(it.monthlyPass)}" })
+        val utilities = RoomDealer.UTILITIES_RANGE
+        line("  공과금        포함이면 ${money(0)}, 별도면 한 달 ${money(utilities.first)}~${money(utilities.last)} (방마다 다름)")
+        line()
         game.rooms.forEachIndexed { index, room -> line("  ${index + 1}) ${describe(room)}") }
         line()
     }
@@ -42,13 +54,20 @@ class TerminalGame(
         line()
         line("  한 달 총비용  ${money(room.totalMonthlyCost)}")
         line("  월세 ${money(room.rent)} + 공과금 ${money(room.utilities)} + 교통 ${money(room.zone.monthlyPass)}")
-        line("  내 짐작과 차이 ${money(reveal.guessGap)}")
         line()
         if (reveal.pickedCheapest) {
-            line("  총비용이 가장 싼 방을 골랐어요.")
+            line("  총비용이 가장 싼 방을 골랐어요.   +${reveal.cheapestPoints}")
         } else {
-            line("  총비용이 가장 싼 방은 ${game.cheapestRoomIndex + 1}번이었어요 (${money(game.lowestTotal)}).")
+            val rooms = game.cheapestRoomIndices.joinToString(", ") { "${it + 1}번" }
+            line("  총비용이 가장 싼 방은 ${rooms}이었어요 (${money(game.lowestTotal)}).   +${reveal.cheapestPoints}")
         }
+        if (reveal.guessGap == 0) {
+            line("  짐작이 정확해요.   +${reveal.guessPoints}")
+        } else {
+            line("  내 짐작과 차이 ${money(reveal.guessGap)}   +${reveal.guessPoints}")
+        }
+        line("  이번 판 점수 ${reveal.score} / ${FirstMinute.MAX_SCORE}")
+        line()
         line("  첫 달을 내고 남은 잔고 ${money(reveal.balanceAfterFirstMonth)}")
         line()
     }
@@ -63,7 +82,7 @@ class TerminalGame(
 
     private fun askAmount(): Int? {
         while (true) {
-            val answer = ask("이 방의 한 달 총비용을 맞혀 보세요 ($) > ") ?: return null
+            val answer = ask("이 방의 한 달 총비용은 얼마일까요? ($) > ") ?: return null
             parseAmount(answer)?.let { return it }
             line("숫자로 적어 주세요. 예: 1200")
         }
