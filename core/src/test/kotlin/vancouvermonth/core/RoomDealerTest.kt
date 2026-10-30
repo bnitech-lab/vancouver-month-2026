@@ -25,7 +25,7 @@ class RoomDealerTest {
         for (seed in seeds) {
             for (room in RoomDealer.deal(seed)) {
                 val middle = RoomDealer.BASE_RENT - room.zone.number * RoomDealer.RENT_DROP_PER_ZONE
-                val allowed = (middle - RoomDealer.RENT_SPREAD - 5)..(middle + RoomDealer.RENT_SPREAD + 5)
+                val allowed = (middle - RoomDealer.RENT_SPREAD)..(middle + RoomDealer.RENT_SPREAD)
                 assertTrue(room.rent in allowed, "seed $seed: rent ${room.rent} for zone ${room.zone.number}")
                 assertEquals(0, room.rent % 10, "seed $seed")
             }
@@ -40,6 +40,7 @@ class RoomDealerTest {
                     assertEquals(0, room.utilities, "seed $seed")
                 } else {
                     assertTrue(room.utilities in 120..190, "seed $seed: utilities ${room.utilities}")
+                    assertEquals(0, room.utilities % 10, "seed $seed")
                 }
             }
         }
