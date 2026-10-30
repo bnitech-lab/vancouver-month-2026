@@ -31,10 +31,12 @@ class FirstMinuteTest {
 
     @Test
     fun `picking the cheapest room is recognised and any other room is not`() {
-        val game = FirstMinute(seed = 4821)
-        for (index in game.rooms.indices) {
-            val reveal = game.reveal(index, 1_000)
-            if (index == game.cheapestRoomIndex) assertTrue(reveal.pickedCheapest) else assertFalse(reveal.pickedCheapest)
+        for (seed in 1..200) {
+            val game = FirstMinute(seed)
+            for (index in game.rooms.indices) {
+                val isCheapest = game.rooms[index].totalMonthlyCost == game.lowestTotal
+                assertEquals(isCheapest, game.reveal(index, 1_000).pickedCheapest, "seed $seed, room $index")
+            }
         }
     }
 
@@ -44,6 +46,27 @@ class FirstMinuteTest {
             val game = FirstMinute(seed)
             val lowest = game.rooms.minOf { it.totalMonthlyCost }
             assertEquals(lowest, game.rooms[game.cheapestRoomIndex].totalMonthlyCost, "seed $seed")
+        }
+    }
+
+    @Test
+    fun `picking either of two tied cheapest rooms counts as the cheapest`() {
+        val rooms = listOf(
+            Room(rent = 1_140, zone = Zone.ONE, utilitiesIncluded = true, utilities = 0),
+            Room(rent = 1_050, zone = Zone.TWO, utilitiesIncluded = false, utilities = 150),
+            Room(rent = 930, zone = Zone.THREE, utilitiesIncluded = false, utilities = 120),
+        )
+        val game = FirstMinute(seed = 0, rooms = rooms)
+        assertEquals(1_245, game.lowestTotal)
+        assertTrue(game.reveal(0, 1_000).pickedCheapest)
+        assertTrue(game.reveal(2, 1_000).pickedCheapest)
+        assertFalse(game.reveal(1, 1_000).pickedCheapest)
+    }
+
+    @Test
+    fun `included utilities cannot cost extra`() {
+        assertFailsWith<IllegalArgumentException> {
+            Room(rent = 1_000, zone = Zone.ONE, utilitiesIncluded = true, utilities = 150)
         }
     }
 

@@ -17,6 +17,10 @@ data class Room(
     /** What utilities add each month: 0 when they are included in the rent. */
     val utilities: Int,
 ) {
+    init {
+        require(!utilitiesIncluded || utilities == 0) { "Included utilities cannot cost extra" }
+    }
+
     val totalMonthlyCost: Int
         get() = rent + utilities + zone.monthlyPass
 }

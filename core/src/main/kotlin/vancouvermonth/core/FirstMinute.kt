@@ -4,14 +4,20 @@ import kotlin.math.abs
 
 /**
  * The first minute of a run: three rooms showing rent and two clues, a guess at the total monthly cost,
- * then the real total.
+ * then the real total. [rooms] can be given directly, which lets a test build a tie.
  */
-class FirstMinute(val seed: Int, val startingBalance: Int = STARTING_BALANCE) {
-    val rooms: List<Room> = RoomDealer.deal(seed)
+class FirstMinute(
+    val seed: Int,
+    val rooms: List<Room> = RoomDealer.deal(seed),
+    val startingBalance: Int = STARTING_BALANCE,
+) {
+    /** The lowest total monthly cost among the rooms. More than one room can have it. */
+    val lowestTotal: Int
+        get() = rooms.minOf { it.totalMonthlyCost }
 
-    /** Index of the room with the lowest total monthly cost. */
+    /** Index of the first room with the lowest total. */
     val cheapestRoomIndex: Int
-        get() = rooms.indices.minBy { rooms[it].totalMonthlyCost }
+        get() = rooms.indexOfFirst { it.totalMonthlyCost == lowestTotal }
 
     /** [roomIndex] counts from 0. */
     fun reveal(roomIndex: Int, guess: Int): Reveal {
@@ -21,7 +27,7 @@ class FirstMinute(val seed: Int, val startingBalance: Int = STARTING_BALANCE) {
             room = room,
             guess = guess,
             guessGap = abs(guess - room.totalMonthlyCost),
-            pickedCheapest = roomIndex == cheapestRoomIndex,
+            pickedCheapest = room.totalMonthlyCost == lowestTotal,
             balanceAfterFirstMonth = startingBalance - room.totalMonthlyCost,
         )
     }
@@ -35,6 +41,7 @@ data class Reveal(
     val room: Room,
     val guess: Int,
     val guessGap: Int,
+    /** True when no room was cheaper, ties included. */
     val pickedCheapest: Boolean,
     val balanceAfterFirstMonth: Int,
 )
