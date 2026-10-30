@@ -36,10 +36,28 @@ class TerminalGameTest {
             .first { it.exists() }
             .readText()
         val sample = readme.substringAfter("```\nBNI Tech").substringBefore("```")
-        val (_, screen) = playWith(1011, "2", "1150", "n")
+        val (_, screen) = playWith(1011, "2", "1300", "n")
         val expectedLines = ("BNI Tech" + sample).lines().map { it.trimEnd() }.filter { it.isNotBlank() }
         val shownLines = screen.lines().map { it.trimEnd() }.filter { it.isNotBlank() }
         assertEquals(expectedLines, shownLines)
+    }
+
+    @Test
+    fun `the first screen says what to do and shows the prices`() {
+        val (_, screen) = playWith(4821)
+        assertTrue("할 일: 한 달 총비용이 가장 싼 방을 고르세요." in screen)
+        assertTrue("1구역 \$105 · 2구역 \$145 · 3구역 \$195" in screen)
+        assertTrue("별도면 한 달 \$120~\$190" in screen)
+    }
+
+    @Test
+    fun `the reveal shows the points and the score`() {
+        val game = FirstMinute(4821)
+        val cheapest = game.cheapestRoomIndex
+        val (_, screen) = playWith(4821, "${cheapest + 1}", "${game.lowestTotal}", "n")
+        assertTrue("총비용이 가장 싼 방을 골랐어요.   +100" in screen)
+        assertTrue("짐작이 정확해요.   +100" in screen)
+        assertTrue("이번 판 점수 200 / 200" in screen)
     }
 
     @Test
