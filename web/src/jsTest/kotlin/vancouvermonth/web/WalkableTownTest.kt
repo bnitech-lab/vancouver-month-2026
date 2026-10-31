@@ -67,10 +67,19 @@ class WalkableTownTest {
     private val root = (document.createElement("main") as HTMLElement).also { document.body!!.appendChild(it) }
     private var town: NeighbourhoodScene? = null
 
+    /**
+     * The page's own style sheet, put on the page for a test that checks the layout as it is published, and the rule
+     * that pins the cards over the town to a phone's size, as the town itself is pinned.
+     */
+    private var pageStyle: HTMLElement? = null
+    private var phoneStyle: HTMLElement? = null
+
     @AfterTest
     fun removeScreen() {
         town?.close()
         root.remove()
+        pageStyle?.remove()
+        phoneStyle?.remove()
         for (left in document.querySelectorAll(".walk-town").asList()) (left as HTMLElement).remove()
     }
 
@@ -1173,6 +1182,86 @@ class WalkableTownTest {
                 // While the talk covers the town, it does not grow under it.
                 map.click()
                 assertFalse(map.classList.contains("large"))
+            },
+        )
+    }
+
+    /** Lays the page out with its own style sheet, as it is published (web/karma.config.d/style.js hands it over). */
+    private fun usePageStyle() {
+        val style = document.createElement("style") as HTMLElement
+        style.textContent = js("window.__karma__.config.pageStyle") as String
+        document.head!!.appendChild(style)
+        pageStyle = style
+    }
+
+    /** Pins the town and the cards over it to a phone [width] by [height] points, in the test browser's window. */
+    private fun pinPhone(town: NeighbourhoodScene, width: Int, height: Int) {
+        town.element.style.width = "${width}px"
+        town.element.style.height = "${height}px"
+        val style = phoneStyle ?: (document.createElement("style") as HTMLElement).also {
+            document.head!!.appendChild(it)
+            phoneStyle = it
+        }
+        style.textContent = ".over-town { inset: auto; left: 0; top: 0; width: ${width}px; height: ${height}px; }"
+    }
+
+    private fun rectOf(selector: String) =
+        assertNotNull(root.querySelector(selector), "no $selector: $screen").getBoundingClientRect()
+
+    /** A finger's press, lift and click at [x], [y] on whatever the page has there, as the browser would send them. */
+    private fun pressAt(x: Double, y: Double): HTMLElement {
+        val hit = assertNotNull(document.elementFromPoint(x, y), "nothing at $x, $y") as HTMLElement
+        for (type in listOf("pointerdown", "pointerup")) {
+            hit.dispatchEvent(PointerEvent(type, PointerEventInit(pointerId = 1, isPrimary = true, clientX = x.toInt(),
+                clientY = y.toInt(), bubbles = true)))
+        }
+        hit.click()
+        return hit
+    }
+
+    @Test
+    fun `laid out as published, the small map sits under the cards and the day's log, above a talk, and takes its taps`():
+        Promise<Unit> {
+        usePageStyle()
+        val town = startInTown(night = 50.0)
+        pinPhone(town, 375, 812)
+        val map = town.minimapElement
+        fun clearOfTheCards(phone: String) {
+            val frame = map.getBoundingClientRect()
+            val log = rectOf(".over-town .log")
+            val talk = rectOf(".talk")
+            assertTrue(frame.top >= log.bottom, "$phone: the map's top ${frame.top} is over the log, which ends at ${log.bottom}")
+            assertTrue(frame.bottom <= talk.top, "$phone: the map's bottom ${frame.bottom} is over the talk at ${talk.top}")
+        }
+        return play(
+            Step("the first morning", { town.isStill }) {
+                val frame = map.getBoundingClientRect()
+                assertTrue(frame.top >= rectOf(".hud").bottom, "the map's top ${frame.top} is over the top card")
+                // A finger at the map's middle lands on the map, not the town under it: it grows, and nobody walks.
+                val hit = pressAt(frame.left + frame.width / 2, frame.top + frame.height / 2)
+                assertTrue(map.contains(hit), "a finger on the map lands on ${hit.tagName}.${hit.className}")
+                assertTrue(map.classList.contains("large"), "the tap did not show the map larger")
+                assertNull(town.markerSpot, "a tap on the map walked the character")
+                val larger = map.getBoundingClientRect()
+                pressAt(larger.left + larger.width / 2, larger.top + larger.height / 2)
+                assertFalse(map.classList.contains("large"))
+                assertNull(town.markerSpot, "a tap on the larger map walked the character")
+                talkTo(Place.HOME)
+                spendButton().click()
+            },
+            Step("the morning after, with the day's log", { !town.isChangingDay && town.isStill }) {
+                val frame = map.getBoundingClientRect()
+                val log = rectOf(".over-town .log")
+                assertTrue(frame.top >= log.bottom, "the map's top ${frame.top} is over the log, which ends at ${log.bottom}")
+                talkTo(Place.HOME)
+            },
+            Step("with a talk open under the log", { town.isStill }) {
+                clearOfTheCards("375 by 812")
+                pinPhone(town, 320, 568)
+            },
+            Step("on a 320 by 568 phone", { town.isStill && map.getBoundingClientRect().top < 300.0 }) {
+                assertTrue(rectOf(".talk").bottom <= 568.0, "the talk runs off the small phone")
+                clearOfTheCards("320 by 568")
             },
         )
     }
