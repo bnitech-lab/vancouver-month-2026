@@ -1,8 +1,8 @@
 package vancouvermonth.web
 
-import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import vancouvermonth.core.Action
 
@@ -84,12 +84,44 @@ class TownMapTest {
     }
 
     @Test
-    fun `neighbouring names stay apart on the narrowest phone`() {
-        // At 320 points wide the town is 288 by 162 points, and a name is up to about 44 points wide, 20 tall.
-        val names = buildings.map { TownCamera.framePoint(it.labelAnchor) }
-        for ((west, east) in names.zipWithNext()) {
-            val apart = abs(east.left - west.left) * 288 >= 44 || abs(east.top - west.top) * 162 >= 20
-            assertTrue(apart, "$west and $east")
+    fun `no two names cover each other, even at their widest, on the narrowest phones`() {
+        // As style.css draws them: bold, 11px with 4px each side under 360 points wide, else 12px with 6px.
+        // The town is the screen's width less 16 points each side and its 1-point border.
+        for ((screen, font, padding) in listOf(Triple(320, 11.0, 4.0), Triple(360, 12.0, 6.0))) {
+            val frameWidth = screen - 2 * 16 - 2.0
+            val frameHeight = frameWidth / TownCamera.ASPECT
+            // Each name is centred over its anchor and sits on it, as the CSS places it.
+            val boxes = buildings.map { building ->
+                val anchor = TownCamera.framePoint(building.labelAnchor)
+                val width = widestName(building.place.label, font, padding)
+                val left = anchor.left * frameWidth - width / 2
+                val bottom = anchor.top * frameHeight
+                NameBox(building.place.label, left, left + width, bottom - font * LINE_HEIGHT, bottom)
+            }
+            for (box in boxes) {
+                assertTrue(box.left >= 0 && box.right <= frameWidth && box.top >= 0, "$box is cut at $screen points")
+            }
+            for ((index, first) in boxes.withIndex()) {
+                for (second in boxes.drop(index + 1)) {
+                    val covers = first.left < second.right && second.left < first.right &&
+                        first.top < second.bottom && second.top < first.bottom
+                    assertFalse(covers, "$first and $second at $screen points")
+                }
+            }
         }
+    }
+
+    /**
+     * The most room [name] can take. The system font draws a Hangul syllable about 0.86em wide, so 1.15em is
+     * a safe upper bound for the font a phone may use instead, and a space is under 0.5em.
+     */
+    private fun widestName(name: String, font: Double, padding: Double): Double =
+        2 * padding + name.count { it != ' ' } * font * 1.15 + name.count { it == ' ' } * font * 0.5
+
+    private data class NameBox(val name: String, val left: Double, val right: Double, val top: Double, val bottom: Double)
+
+    private companion object {
+        /** style.css gives the names a line height of 1.6. */
+        const val LINE_HEIGHT = 1.6
     }
 }
