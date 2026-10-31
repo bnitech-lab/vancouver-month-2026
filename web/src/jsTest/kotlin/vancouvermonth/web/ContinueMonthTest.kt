@@ -148,6 +148,21 @@ class ContinueMonthTest {
         assertTrue(skills in hud, hud)
         assertTrue("${date(month.day - 1)}에 있었던 일" in text(".over-town .log"))
         assertNull(root.querySelector(".guide-card"), "The guide opened again")
+        assertSame(root.querySelector(".over-town .log"), document.activeElement, "The focus is not on the log")
+    }
+
+    @Test
+    fun `continued on the first day, the town has its hint and the focus is on its top card`() {
+        open(town = QuietTown())
+        startSeed1011(root)
+        root.button(Guide.START).click()
+
+        open(town = QuietTown())
+        assertEquals(continueFrom(Month.FIRST_DAY, played().balance), text(".kept-from"))
+        root.button(Continue.CONTINUE).click()
+        assertNull(root.querySelector(".over-town .log"))
+        assertNotNull(root.querySelector(".town-hint"))
+        assertSame(root.querySelector(".hud"), document.activeElement, "The focus is not on the top card")
     }
 
     @Test

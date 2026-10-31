@@ -358,6 +358,8 @@ class PhoneGame private constructor(
         for (choice in record.days) {
             met += personAt(if (choice is Choice.Take) placeFor(choice.action) else INTERVIEW_PLACE)
         }
+        // In the town, the focus lands where a day ends: on the day before's log, or on the top card on the first day.
+        focusNext = if (record.days.isEmpty()) ".hud" else ".over-town .log"
         beginMonth(month, record)
     }
 
