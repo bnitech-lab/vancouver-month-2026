@@ -352,6 +352,35 @@ object Neighbourhood {
         return last?.let { grid.centreOf(it) } ?: from
     }
 
+    /** Where the line the mountains stand behind runs at the middle of each stretch of the north shore's forest. */
+    private val northShoreLine = DoubleArray((NORTH_SHORE_TO - NORTH_SHORE_FROM) / NORTH_SHORE_STEP + 1) {
+        zAlong(RealVancouver.mountains, (NORTH_SHORE_FROM + it * NORTH_SHORE_STEP).toDouble())
+    }
+
+    /**
+     * Whether the spot [x], [z] lies on the dark band of forest the town lays along the north shore across the inlet,
+     * in front of the mountains. The small map paints it where the town lays it, asking for every pixel past the grid.
+     */
+    fun isNorthShore(x: Double, z: Double): Boolean {
+        // Only two stretches can reach x: the last whose middle is within half a stretch of it, and the one before.
+        val last = floor((x + NORTH_SHORE_HALF - NORTH_SHORE_FROM) / NORTH_SHORE_STEP).toInt()
+        for (stretch in last - 1..last) {
+            if (stretch < 0 || stretch >= northShoreLine.size) continue
+            val middle = NORTH_SHORE_FROM + stretch * NORTH_SHORE_STEP
+            if (x < middle - NORTH_SHORE_HALF || x >= middle + NORTH_SHORE_HALF) continue
+            val shore = northShoreLine[stretch]
+            if (z >= shore - NORTH_SHORE_FAR && z < shore - NORTH_SHORE_NEAR) return true
+        }
+        return false
+    }
+
+    /** Where [line] runs at [x], carried on level past its ends. */
+    private fun zAlong(line: List<Spot>, x: Double): Double {
+        if (x <= line.first().x) return line.first().z
+        val (a, b) = line.zipWithNext().firstOrNull { (_, b) -> x <= b.x } ?: return line.last().z
+        return a.z + (b.z - a.z) * (x - a.x) / (b.x - a.x)
+    }
+
     /** The squares a box stands on. A box from x = 6.0 to 13.0 stands on columns 6 to 12. */
     private fun cellsUnder(box: Block): List<Cell> {
         val cells = mutableListOf<Cell>()
@@ -385,6 +414,18 @@ object Neighbourhood {
     /** How far past the grid the land goes on, and the mountains past the line across the inlet. */
     private const val LAND_BEYOND = 200.0
     private const val MOUNTAINS_BACK = 52.0
+
+    /**
+     * The north shore's band of forest ([isNorthShore]): a stretch every [NORTH_SHORE_STEP] squares along x from
+     * [NORTH_SHORE_FROM] to [NORTH_SHORE_TO], [NORTH_SHORE_HALF] each side of its middle, from [NORTH_SHORE_FAR] to
+     * [NORTH_SHORE_NEAR] squares behind the line the mountains stand behind.
+     */
+    private const val NORTH_SHORE_FROM = -90
+    private const val NORTH_SHORE_TO = 360
+    private const val NORTH_SHORE_STEP = 26
+    private const val NORTH_SHORE_HALF = 14.0
+    private const val NORTH_SHORE_FAR = MOUNTAINS_BACK - 4
+    private const val NORTH_SHORE_NEAR = 14.0
 
     /** How many trees of the park's forest are drawn in full, nearest 내 방; the rest are simpler. */
     private const val FULL_TREES = 60
@@ -546,14 +587,16 @@ object Neighbourhood {
         }
 
         /**
-         * The north shore across the inlet: a dark band of forest past the line in the middle of the inlet, and
-         * stepped peaks behind it, forest, rock, then snow on top, pushed well back as the real ones stand.
+         * The north shore across the inlet: a dark band of forest past the line in the middle of the inlet
+         * ([isNorthShore]), and stepped peaks behind it, forest, rock, then snow on top, pushed well back as the real
+         * ones stand.
          */
         fun addMountains() {
             val line = RealVancouver.mountains
-            for ((index, x) in (-90..360 step 26).withIndex()) {
+            for ((index, x) in (NORTH_SHORE_FROM..NORTH_SHORE_TO step NORTH_SHORE_STEP).withIndex()) {
                 val shore = zAlong(line, x.toDouble())
-                lay(x - 14.0, -0.5, shore - MOUNTAINS_BACK + 4, 28.0, 1.2, MOUNTAINS_BACK - 18, FOREST_DARK)
+                val depth = NORTH_SHORE_FAR - NORTH_SHORE_NEAR
+                lay(x - NORTH_SHORE_HALF, -0.5, shore - NORTH_SHORE_FAR, 2 * NORTH_SHORE_HALF, 1.2, depth, FOREST_DARK)
                 val height = 30.0 + (index * 7) % 17
                 val z = shore - MOUNTAINS_BACK - (index * 11) % 20
                 val colours = listOf(FOREST, FOREST, FOREST_DARK, ROCK, ROCK_LIGHT, SNOW)
@@ -563,13 +606,6 @@ object Neighbourhood {
                     lay(x - width / 2, level * step - 0.6, z - width / 3, width, step, width / 1.5, colour)
                 }
             }
-        }
-
-        /** Where [line] runs at [x], carried on level past its ends. */
-        private fun zAlong(line: List<Spot>, x: Double): Double {
-            if (x <= line.first().x) return line.first().z
-            val (a, b) = line.zipWithNext().firstOrNull { (_, b) -> x <= b.x } ?: return line.last().z
-            return a.z + (b.z - a.z) * (x - a.x) / (b.x - a.x)
         }
 
         /** A building: walls, a door, windows on every side, a roof, and what marks the place out. */
