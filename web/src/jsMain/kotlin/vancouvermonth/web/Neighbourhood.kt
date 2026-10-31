@@ -98,8 +98,12 @@ object Neighbourhood {
         listOf(venue.door, venue.talkSpot).any { hypot(it.x - spot.x, it.z - spot.z) <= REACH }
     }?.place
 
-    /** Every box to draw except the people and the lights; [glowing] holds the windows, lamps and the fire. */
+    /**
+     * Every box to draw except the people. [ground] holds what is too flat or too far to cast a shadow (the ground,
+     * the street, the water and the mountains), [glowing] the windows, lamps and fire, and [blocks] the rest.
+     */
     val blocks: List<Block>
+    val ground: List<Block>
     val glowing: List<Block>
 
     /** What stands on the ground and blocks the way: a footprint for each building, trunk, fence, bench and lamp. */
@@ -122,6 +126,7 @@ object Neighbourhood {
         town.addNeighbours()
         town.addFlowers()
         blocks = town.blocks
+        ground = town.ground
         glowing = town.glowing
         footprints = town.footprints
         walls = venues.map { Wall(it.box, it.place) } + town.otherWalls.map { Wall(it, null) }
@@ -148,6 +153,7 @@ object Neighbourhood {
     /** Collects the boxes while the town is laid out. */
     private class Builder {
         val blocks = mutableListOf<Block>()
+        val ground = mutableListOf<Block>()
         val glowing = mutableListOf<Block>()
         val footprints = mutableListOf<Block>()
         val otherWalls = mutableListOf<Block>()
@@ -155,6 +161,11 @@ object Neighbourhood {
 
         fun add(x: Double, y: Double, z: Double, width: Double, height: Double, depth: Double, colour: Int) {
             blocks.add(Block(x, y, z, width, height, depth, colour))
+        }
+
+        /** A box that casts no shadow: flat, like the street, or far away, like the mountains. */
+        fun lay(x: Double, y: Double, z: Double, width: Double, height: Double, depth: Double, colour: Int) {
+            ground.add(Block(x, y, z, width, height, depth, colour))
         }
 
         /** A box that also blocks the way, such as a trunk or a fence. */
@@ -169,7 +180,7 @@ object Neighbourhood {
 
         /** The water north of the town, and stepped peaks across it: forest, rock, then snow on top. */
         fun addWaterAndMountains() {
-            add(-140.0, -0.7, -170.0, 330.0, 0.3, 170.0, WATER)
+            lay(-140.0, -0.7, -170.0, 330.0, 0.3, 170.0, WATER)
             for ((index, x) in (-90..140 step 23).withIndex()) {
                 val height = 20.0 + (index * 7) % 13
                 val z = -95.0 - (index * 11) % 25
@@ -177,28 +188,28 @@ object Neighbourhood {
                 val step = height / colours.size
                 for ((level, colour) in colours.withIndex()) {
                     val width = 34.0 * (1 - level / 6.5)
-                    add(x - width / 2, level * step - 0.6, z - width / 3, width, step, width / 1.5, colour)
+                    lay(x - width / 2, level * step - 0.6, z - width / 3, width, step, width / 1.5, colour)
                 }
             }
         }
 
         /** The grass, the seawall path with its railing, the street and the pavements, all reaching past the grid. */
         fun addGround() {
-            add(-140.0, -0.4, 0.0, 330.0, 0.4, 150.0, GRASS)
-            add(-140.0, -0.7, -0.4, 330.0, 0.72, 0.4, SEAWALL_EDGE)
-            add(-140.0, 0.0, 0.0, 330.0, 0.03, 2.0, SEAWALL)
+            lay(-140.0, -0.4, 0.0, 330.0, 0.4, 150.0, GRASS)
+            lay(-140.0, -0.7, -0.4, 330.0, 0.72, 0.4, SEAWALL_EDGE)
+            lay(-140.0, 0.0, 0.0, 330.0, 0.03, 2.0, SEAWALL)
             for (x in -40..90 step 2) add(x - 0.05, 0.0, -0.3, 0.1, 0.6, 0.1, WOOD_DARK)
             add(-40.0, 0.5, -0.32, 130.0, 0.08, 0.14, WOOD)
-            add(-140.0, 0.0, 10.0, 330.0, 0.05, 2.0, BRICK)
-            add(-140.0, 0.0, 12.0, 330.0, 0.04, 3.0, STONE_STREET)
-            add(-140.0, 0.0, 15.0, 330.0, 0.05, 2.0, BRICK)
+            lay(-140.0, 0.0, 10.0, 330.0, 0.05, 2.0, BRICK)
+            lay(-140.0, 0.0, 12.0, 330.0, 0.04, 3.0, STONE_STREET)
+            lay(-140.0, 0.0, 15.0, 330.0, 0.05, 2.0, BRICK)
             // Kerbs, and a light seam of stone down the middle of the street.
-            add(-140.0, 0.0, 11.9, 330.0, 0.08, 0.1, KERB)
-            add(-140.0, 0.0, 15.0, 330.0, 0.08, 0.1, KERB)
-            for (i in -30..80 step 3) add(i.toDouble(), 0.04, 13.45, 1.6, 0.01, 0.1, STONE_LIGHT)
-            // Two crossings from one row to the other.
+            lay(-140.0, 0.0, 11.9, 330.0, 0.08, 0.1, KERB)
+            lay(-140.0, 0.0, 15.0, 330.0, 0.08, 0.1, KERB)
+            for (i in -30..80 step 3) lay(i.toDouble(), 0.04, 13.45, 1.6, 0.01, 0.1, STONE_LIGHT)
+            // Two crossings from one row to the other, five bands each.
             for (crossing in listOf(7.0, 28.0)) {
-                for (stripe in 0..4) add(crossing + stripe * 0.5, 0.045, 12.2, 0.28, 0.01, 2.6, STONE_LIGHT)
+                for (band in 0..4) lay(crossing + band * 0.5, 0.045, 12.2, 0.28, 0.01, 2.6, STONE_LIGHT)
             }
         }
 
@@ -325,13 +336,13 @@ object Neighbourhood {
         fun addPark() {
             addSolid(21.0, 0.0, 17.0, 6.5, 0.6, 0.15, WOOD)
             addSolid(30.5, 0.0, 17.0, 17.5, 0.6, 0.15, WOOD)
-            add(28.0, 0.0, 17.0, 2.0, 0.035, 15.0, STONE_PATH)
-            add(21.0, 0.0, 23.0, 27.0, 0.035, 1.5, STONE_PATH)
-            add(34.0, 0.0, 24.6, 4.0, 0.04, 2.8, WATER)
-            add(33.8, 0.0, 24.4, 4.4, 0.08, 0.2, STONE)
-            add(33.8, 0.0, 27.4, 4.4, 0.08, 0.2, STONE)
-            add(33.8, 0.0, 24.4, 0.2, 0.08, 3.2, STONE)
-            add(38.0, 0.0, 24.4, 0.2, 0.08, 3.2, STONE)
+            lay(28.0, 0.0, 17.0, 2.0, 0.035, 15.0, STONE_PATH)
+            lay(21.0, 0.0, 23.0, 27.0, 0.035, 1.5, STONE_PATH)
+            lay(34.0, 0.0, 24.6, 4.0, 0.04, 2.8, WATER)
+            lay(33.8, 0.0, 24.4, 4.4, 0.08, 0.2, STONE)
+            lay(33.8, 0.0, 27.4, 4.4, 0.08, 0.2, STONE)
+            lay(33.8, 0.0, 24.4, 0.2, 0.08, 3.2, STONE)
+            lay(38.0, 0.0, 24.4, 0.2, 0.08, 3.2, STONE)
             footprints.add(Block(34.0, 0.0, 24.6, 4.0, 0.2, 2.8, WATER))
             val trees = listOf(
                 23.5 to 19.5, 26.0 to 21.5, 23.0 to 27.0, 26.5 to 29.5, 32.0 to 19.5, 36.0 to 21.0,

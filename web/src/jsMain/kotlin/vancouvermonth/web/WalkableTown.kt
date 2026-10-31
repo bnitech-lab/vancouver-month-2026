@@ -195,6 +195,10 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     }
 
     private fun addTown() {
+        // The ground, the street, the water and the mountains take shadows but cast none, which saves the phone work.
+        val ground = boxes(Neighbourhood.ground, material)
+        ground.castShadow = false
+        scene.add(ground)
         scene.add(boxes(Neighbourhood.blocks, material))
         scene.add(boxes(Neighbourhood.glowing, glowMaterial))
     }
