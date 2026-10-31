@@ -44,15 +44,20 @@ class FiguresTest {
     }
 
     @Test
-    fun `a wave lifts the left hand above the head, and leaves the rest where it was`() {
+    fun `a wave lifts the left hand out beside the head, where it shows, and leaves the rest where it was`() {
         val parts = Figures.townsperson(Townsperson.GRANDMA)
         val rest = Figures.place(parts, Pose(Spot(0.0, 0.0), 0.0))
-        val waving = Figures.place(parts, Pose(Spot(0.0, 0.0), 0.0, wave = 2.6))
-        for ((index, part) in parts.withIndex()) {
-            if (part.limb == Limb.LEFT_ARM) {
-                if (part.block.y < -0.4) assertTrue(middle(waving[index]).y > 1.0, "the hand is at ${middle(waving[index])}")
-            } else {
-                assertTrue(rest[index].contentEquals(waving[index]), "${part.limb} moved")
+        val head = 0.37 * k
+        for (wave in listOf(Greeter.WAVE_RAISE - Greeter.WAVE_SWAY, Greeter.WAVE_RAISE + Greeter.WAVE_SWAY)) {
+            val waving = Figures.place(parts, Pose(Spot(0.0, 0.0), 0.0, wave = wave))
+            for ((index, part) in parts.withIndex()) {
+                if (part.limb != Limb.LEFT_ARM) {
+                    assertTrue(rest[index].contentEquals(waving[index]), "${part.limb} moved")
+                } else if (part.block.y < -0.4) {
+                    val hand = middle(waving[index])
+                    assertTrue(hand.x < -head - 0.05, "the hand is hidden by the head: $hand")
+                    assertTrue(hand.y > Figures.SHOULDER * k, "the hand is not up: $hand")
+                }
             }
         }
     }

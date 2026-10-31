@@ -43,14 +43,14 @@ class GreeterTest {
         assertTrue(run(greeter, 0.0, 1_000.0, far).none { it.wave != 0.0 })
         val near = Spot(spot.x, spot.z + 2.0)
         val wave = run(greeter, 1_000.0, Greeter.WAVE_MILLIS - 100, near)
-        assertTrue(wave.all { it.wave > 2.0 }, "the arm is not up")
+        assertTrue(wave.all { it.wave > 1.0 }, "the arm is not up")
         val after = run(greeter, 1_000.0 + Greeter.WAVE_MILLIS + 100, 3_000.0, near)
         assertTrue(after.all { it.wave == 0.0 }, "waved on and on")
         // Away and back: a second wave.
         run(greeter, 5_000.0, 500.0, far)
         assertFalse(greeter.isWaving(5_500.0))
         val again = run(greeter, 5_500.0, 500.0, near)
-        assertTrue(again.all { it.wave > 2.0 }, "no wave when the player came back")
+        assertTrue(again.all { it.wave > 1.0 }, "no wave when the player came back")
     }
 
     @Test

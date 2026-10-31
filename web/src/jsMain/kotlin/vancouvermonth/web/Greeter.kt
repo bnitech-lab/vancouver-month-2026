@@ -49,9 +49,12 @@ class Greeter(val spot: Spot, val facing: Double, private val phase: Double) {
         const val WAVE_DISTANCE = 3.5
         const val WAVE_MILLIS = 1_400.0
 
-        /** A wave lifts the arm up beside the head and sways it a little. */
-        const val WAVE_RAISE = 2.6
-        const val WAVE_SWAY = 0.3
+        /**
+         * A wave lifts the arm out to the side, a little above level, and sways it. Higher, the short arm would end
+         * beside the big head and be hidden by it.
+         */
+        const val WAVE_RAISE = 2.0
+        const val WAVE_SWAY = 0.35
 
         /** While nobody is near they look this far to each side of the street, slowly. */
         const val LOOK_AROUND = 0.45
