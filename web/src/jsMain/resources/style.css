@@ -106,6 +106,7 @@ h2 {
 /* Title */
 
 .title {
+  position: relative;
   padding: 12px 0 0;
 }
 
@@ -709,6 +710,39 @@ html:has(.walk-town) {
   color: var(--muted);
 }
 
+/* The day's skills on the left, the sound switch on the right. */
+.hud-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.hud-line .hud-stats {
+  margin-top: 0;
+}
+
+.hud-controls {
+  display: flex;
+  flex: none;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.hud .sound-switch {
+  position: relative;
+  min-height: 30px;
+  font-size: 12px;
+}
+
+/* Small to look at, easier to hit: the tap area reaches a little past the button. */
+.hud .sound-switch::after {
+  content: "";
+  position: absolute;
+  inset: -7px -2px;
+}
+
 .over-town .log {
   padding: 8px 12px;
   background: color-mix(in srgb, var(--surface) 90%, transparent);
@@ -888,6 +922,35 @@ html:has(.walk-town) {
 .ending-word {
   font-weight: 600;
   color: var(--accent);
+}
+
+/* The sound switch: a small pill that says what a tap does, filled while the sound is on. */
+.sound-switch {
+  min-height: 36px;
+  padding: 2px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--accent);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+}
+
+.sound-switch[aria-pressed="true"] {
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+.title .sound-switch,
+.topbar .sound-switch {
+  position: absolute;
+  top: 10px;
+  right: 16px;
+}
+
+.title .sound-switch {
+  right: 0;
 }
 
 /* Read by a screen reader, not shown. */

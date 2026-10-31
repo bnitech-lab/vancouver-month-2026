@@ -107,6 +107,9 @@ class PhoneGame private constructor(
     /** What takes the focus once the screen is drawn again: a talk that opened, or the day's log after an answer. */
     private var focusNext: String? = null
 
+    /** The sound switch, and the sounds of a talk and of the change of day; null for a game with no sound. */
+    internal var sound: Sound? = null
+
     fun show() {
         stopTyping()
         val current = month
@@ -244,6 +247,7 @@ class PhoneGame private constructor(
             figure("남은 날", "${month.daysLeft}일")
             figure("잔고", money(month.balance))
             figure("10월 1일에 낼 총비용", money(month.room.totalMonthlyCost))
+            sound?.button(this)
         }
         val shownTown = town
         if (shownTown == null) {
@@ -337,6 +341,7 @@ class PhoneGame private constructor(
             child("p", "brand", "BNI Tech")
             child("h1", text = "밴쿠버 한 달 (가제)")
             child("p", "run", if (today == null) "판 번호 ${game.seed}" else "${todaysRunName(today)} · 판 번호 ${game.seed}")
+            sound?.button(this)
         }
     }
 
@@ -361,6 +366,7 @@ class PhoneGame private constructor(
         if (month.isOver) {
             closeTown()
         } else {
+            sound?.chime()
             town?.walkTo(place)
             val walking = walkable
             if (walking != null) {
@@ -406,6 +412,7 @@ class PhoneGame private constructor(
             met.add(person)
             talkOpened = window.performance.now()
             focusNext = ".talk"
+            sound?.blip()
         }
         show()
     }
@@ -431,12 +438,15 @@ class PhoneGame private constructor(
                     figure("잔고", money(month.balance))
                     figure("10월 총비용", money(month.room.totalMonthlyCost))
                 }
-                child(
-                    "p",
-                    "hud-stats",
-                    "영어 ${month.english}/${Month.MAX_SKILL} · 코딩 ${month.coding}/${Month.MAX_SKILL} · " +
-                        "체력 ${month.energy}/${Month.MAX_ENERGY}",
-                )
+                child("div", "hud-line") {
+                    child(
+                        "p",
+                        "hud-stats",
+                        "영어 ${month.english}/${Month.MAX_SKILL} · 코딩 ${month.coding}/${Month.MAX_SKILL} · " +
+                            "체력 ${month.energy}/${Month.MAX_ENERGY}",
+                    )
+                    townControls()
+                }
                 val interview = month.interview
                 when {
                     month.hasInterviewToday -> child("p", "hud-note", "오늘은 면접 날이에요. 회사로 가세요.")
@@ -461,6 +471,14 @@ class PhoneGame private constructor(
         // A keyboard or a screen reader follows what happens: into a talk that opens, to the log after an answer.
         focusNext?.let { (root.querySelector(it) as? HTMLElement)?.focus() }
         focusNext = null
+    }
+
+    /** The sound switch, at the end of the town's top card. */
+    private fun HTMLElement.townControls() {
+        val sound = sound ?: return
+        child("div", "hud-controls") {
+            sound.button(this)
+        }
     }
 
     /** The talk with [place]'s person: who they are, their line typed out, and what the player can answer. */
@@ -548,6 +566,7 @@ class PhoneGame private constructor(
         typing = window.setInterval({
             shown += 1
             element.textContent = line.take(shown)
+            if (line.getOrNull(shown - 1)?.isWhitespace() == false) sound?.tick()
             if (shown >= line.length) stopTyping()
         }, TYPE_MILLIS)
     }
