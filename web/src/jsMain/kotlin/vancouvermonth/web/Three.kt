@@ -1,5 +1,4 @@
 @file:JsModule("three")
-@file:JsNonModule
 
 package vancouvermonth.web
 

@@ -5,6 +5,8 @@ plugins {
 
 kotlin {
     js {
+        // ES modules let webpack leave out the parts of Three.js the town does not use, about a quarter of it.
+        useEsModules()
         browser {
             commonWebpackConfig {
                 outputFileName = "vancouver-month.js"
