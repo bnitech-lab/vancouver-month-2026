@@ -104,6 +104,9 @@ class PhoneGame private constructor(
     /** True from an answer until the town's morning: meanwhile no talk opens. */
     private var dayChanging = false
 
+    /** What takes the focus once the screen is drawn again: a talk that opened, or the day's log after an answer. */
+    private var focusNext: String? = null
+
     fun show() {
         stopTyping()
         val current = month
@@ -361,8 +364,9 @@ class PhoneGame private constructor(
             town?.walkTo(place)
             val walking = walkable
             if (walking != null) {
-                // Until the morning, the town takes no input and no talk opens.
+                // Until the morning, the town takes no input and no talk opens. The day's log takes the focus.
                 dayChanging = true
+                focusNext = ".over-town .log"
                 walking.endDay(place)
             }
         }
@@ -401,6 +405,7 @@ class PhoneGame private constructor(
             talkLine = greeting(person, current, firstMeeting = person !in met, yesterday = lastEvents)
             met.add(person)
             talkOpened = window.performance.now()
+            focusNext = ".talk"
         }
         show()
     }
@@ -419,6 +424,7 @@ class PhoneGame private constructor(
         town.mark(if (month.hasInterviewToday) INTERVIEW_PLACE else null)
         root.child("div", "over-town") {
             child("header", "hud") {
+                setAttribute("tabindex", "-1")
                 child("div", "hud-figures") {
                     figure("오늘", date(month.day))
                     figure("남은 날", "${month.daysLeft}일")
@@ -443,6 +449,7 @@ class PhoneGame private constructor(
                 }
             }
             showLog(this)
+            querySelector(".log")?.setAttribute("tabindex", "-1")
             val talking = talkingAt
             if (talking != null) {
                 talk(month, talking)
@@ -451,13 +458,18 @@ class PhoneGame private constructor(
                 child("p", "town-hint", "땅을 누르면 걷고, 두 번 누르면 달려요. 사람이나 건물을 누르면 말을 걸어요.")
             }
         }
+        // A keyboard or a screen reader follows what happens: into a talk that opens, to the log after an answer.
+        focusNext?.let { (root.querySelector(it) as? HTMLElement)?.focus() }
+        focusNext = null
     }
 
     /** The talk with [place]'s person: who they are, their line typed out, and what the player can answer. */
     private fun HTMLElement.talk(month: Month, place: Place) {
         val person = personAt(place)
         child("section", "talk") {
+            setAttribute("role", "dialog")
             setAttribute("aria-label", person.title)
+            setAttribute("tabindex", "-1")
             // The tap that opened the talk can land on it a moment later, as the second tap of a double tap or a
             // finger lifted late. For a short while after the talk opens, taps on it do nothing.
             addEventListener("click", { event ->
@@ -489,12 +501,14 @@ class PhoneGame private constructor(
                     onclick = {
                         talkLine = smallTalk(person, month, smallTalks)
                         smallTalks += 1
+                        focusNext = ".talk"
                         show()
                     }
                 }
                 button("keyword", text = "그만") {
                     onclick = {
                         talkingAt = null
+                        focusNext = ".hud"
                         show()
                     }
                 }

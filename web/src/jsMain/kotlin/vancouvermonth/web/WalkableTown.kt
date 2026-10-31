@@ -632,13 +632,19 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         sun.target.position.set(focus.x, 0.0, focus.z)
     }
 
-    /** Lays each building's name over the picture, just above its roof; a name behind the camera hides. */
+    /**
+     * Lays each building's name over the picture, just above its roof. A name behind the camera or off the screen
+     * hides, and cannot be reached with the Tab key or by a screen reader until it shows again.
+     */
     private fun placeLabels() {
         val width = canvas.clientWidth.toDouble()
         val height = canvas.clientHeight.toDouble()
         for ((place, label) in labels) {
             val point = view.screenPoint(Neighbourhood.venue(place).labelAnchor)
-            label.classList.toggle("behind", point == null)
+            val shown = point != null && point.left in 0.0..1.0 && point.top in 0.0..1.0
+            label.classList.toggle("behind", !shown)
+            label.tabIndex = if (shown) 0 else -1
+            if (shown) label.removeAttribute("aria-hidden") else label.setAttribute("aria-hidden", "true")
             if (point != null) {
                 val left = point.left * width
                 val top = point.top * height
