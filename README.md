@@ -125,8 +125,10 @@ different runs.
 On the phone screen, the days of September show a small town under the top bar, drawn in 3D with
 [Three.js](https://threejs.org) from boxes only, with no image files: 내 방, 카페, 도서관, 코워킹 and 회사 in a row
 along a road, a SkyTrain station on an elevated guideway with a train, trees, the water, and the North Shore
-mountains across it. The character starts at 내 방. Each tap sends it walking to the day's building, in under a
-second, while the day's log appears, and it stays there until the next day:
+mountains across it. The day's buttons come right under the town, then the day's log, so even a 375x667 phone
+shows the town and every button at once. The character starts at 내 방, whose name is marked. Each tap sends it
+walking to the day's building, in under a second, while the day's log appears, and it stays there until the next
+day:
 
 | Tap | Building |
 |---|---|
@@ -136,15 +138,18 @@ second, while the day's log appears, and it stays there until the next day:
 | 지원서 넣기, 면접 보기 | 회사 |
 | 쉬기 | 내 방 |
 
-The town is drawn only while something moves, so a screen left alone costs nothing, and at most two pixels per
-point however sharp the phone. The room screen and the ending have no town.
+The town draws no frames while nothing moves, and at most two pixels per point however sharp the phone. Where the
+phone asks for less motion, the character is simply at the building, with no walk. The town is made when
+September starts, so the room screen does not wait for it, and at the ending it lets go of its drawing; the room
+screen and the ending have no town.
 
-Where the browser has no WebGL 2, which Three.js needs, or Three.js fails, the town is left out and the game
-plays exactly as before. A test forces that path.
+Where the browser has no WebGL 2, which Three.js needs, the town is left out and the game plays exactly as before,
+in the same order as before. If Three.js fails, the town is left out too, and the error goes to the console. A
+test forces the path without WebGL.
 
 The layout, the building for each tap, the walk and the camera are plain Kotlin with tests (`TownMap`, `Walk` and
 `TownCamera` in `web`). `TownScene` draws them, and `Three.kt` declares only the parts of Three.js the town uses.
-Three.js makes the page's script about 570 KB instead of 70 KB (about 145 KB instead of 24 KB gzipped).
+Three.js makes the page's script about 575 KB instead of 70 KB (about 145 KB instead of 24 KB gzipped).
 
 ## How it is built
 
@@ -160,7 +165,8 @@ Three.js makes the page's script about 570 KB instead of 70 KB (about 145 KB ins
 ./gradlew :core:jvmTest --tests '*MonthTest*'   # one test class, on the JVM only
 ```
 
-The browser tests run in Chrome, so `./gradlew test` needs Chrome installed. `./gradlew test` does not take
+The browser tests run in Chrome, so `./gradlew test` needs Chrome installed. The web tests draw the real town
+with WebGL on SwiftShader, Chrome's software renderer, set up in `web/karma.config.d`. `./gradlew test` does not take
 `--tests`: to run some tests only, name the module's JVM test task, which is `jvmTest` in `core` and `text`
 and `test` in `terminal` (for example `./gradlew :terminal:test --tests '*TerminalGameTest*'`).
 
@@ -191,5 +197,5 @@ Dawn plays the first version of the 3D town and decides what it shows next.
 MIT. See [LICENSE](LICENSE).
 
 The phone screen bundles [Three.js](https://github.com/mrdoob/three.js) 0.169.0, which is also under the MIT
-licence (Copyright © 2010-2024 three.js authors). The build keeps its licence notice next to the script, in
-`vancouver-month.js.LICENSE.txt`.
+licence (Copyright © 2010-2024 three.js authors). The build copies its full licence text next to the script, as
+`three-LICENSE.txt`.
