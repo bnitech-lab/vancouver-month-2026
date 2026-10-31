@@ -34,7 +34,8 @@ data class Point(val x: Double, val y: Double, val z: Double)
 
 /**
  * One box of the town. [x], [y] and [z] are its west, bottom and north sides, so it fills x to x + [width],
- * y to y + [height] and z to z + [depth]. [colour] is 0xRRGGBB, as in CSS.
+ * y to y + [height] and z to z + [depth]. [colour] is 0xRRGGBB, as in CSS. A box can be [turn]ed about the
+ * vertical through its middle, in radians as Three.js counts them (a quarter turn takes east to north); most are not.
  */
 data class Block(
     val x: Double,
@@ -44,6 +45,7 @@ data class Block(
     val height: Double,
     val depth: Double,
     val colour: Int,
+    val turn: Double = 0.0,
 )
 
 /** A building on the grid: its west and north sides and its size in grid squares, then its height and colours. */
