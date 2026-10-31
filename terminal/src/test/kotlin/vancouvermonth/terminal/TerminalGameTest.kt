@@ -89,9 +89,16 @@ class TerminalGameTest {
     }
 
     @Test
-    fun `today's run comes from this computer's date`() {
-        assertEquals(TodaysRun(2026, 10, 30), todaysRun(LocalDate.of(2026, 10, 30)))
-        assertEquals(TodaysRun(2027, 1, 1), todaysRun(LocalDate.of(2027, 1, 1)))
+    fun `--today may name a date`() {
+        assertEquals("", parseToday(arrayOf("--today")))
+        assertEquals("2026-10-29", parseToday(arrayOf("--today=2026-10-29")))
+        assertEquals("2026-10-29", parseToday(arrayOf("--today", "2026-10-29")))
+        assertEquals("", parseToday(arrayOf("--today", "--seed", "1011")))
+        assertNull(parseToday(arrayOf("--seed", "1011")))
+        assertNull(parseToday(arrayOf()))
+        // A bare --today reads this computer's date in the form LocalDate writes it.
+        assertEquals(TodaysRun(2026, 10, 30), TodaysRun.parse(LocalDate.of(2026, 10, 30).toString()))
+        assertEquals(TodaysRun(2027, 1, 1), TodaysRun.parse(LocalDate.of(2027, 1, 1).toString()))
     }
 
     @Test

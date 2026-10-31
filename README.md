@@ -104,11 +104,12 @@ number, no link and nothing about the player:
 The other two endings read `9월을 버팀` and `10월 총비용 모자람`.
 
 ```sh
-./play --today        # today's run, from this computer's date
+./play --today              # today's run, from this computer's date
+./play --today 2026-10-29   # that date's run (also --today=2026-10-29), any real date from 2000 to 2099
 ```
 
-The terminal prints the line under `결과 한 줄 (복사해서 붙여 넣으세요)`. `--today` and `--seed` together are
-refused.
+The terminal prints the line under `결과 한 줄 (복사해서 붙여 넣으세요)`. `--today` with a `--seed` number is
+refused, and so is a date that does not exist.
 
 On the phone screen, tap `오늘의 판` on any ending screen, or open the page with `?today`. The page reads the
 browser's date and writes it into the address (`?today=2026-10-30`), so a reload or a shared link replays that

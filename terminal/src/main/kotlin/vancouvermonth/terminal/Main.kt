@@ -7,13 +7,21 @@ import vancouvermonth.core.TodaysRun
 
 /**
  * `--seed 4821` (or `--seed=4821`) replays the same rooms in the first round.
- * `--today` plays today's run, from this computer's date. Asking for both is an error.
+ * `--today` plays today's run, from this computer's date, and `--today 2026-10-29` (or `--today=2026-10-29`)
+ * plays that date's run. Asking for both a seed and today's run, or for a date that does not exist, is an error.
  */
 fun main(args: Array<String>) {
     val seed = parseSeed(args)
-    val today = "--today" in args
-    if (today && seed != null) {
+    val todayText = parseToday(args)
+    if (todayText != null && seed != null) {
         System.err.println("--today와 --seed는 함께 쓸 수 없어요. 하나만 골라 주세요.")
+        exitProcess(2)
+    }
+    // A bare --today means this computer's date, which LocalDate writes as "2026-10-30".
+    val dateText = if (todayText == "") LocalDate.now().toString() else todayText
+    val today = dateText?.let { TodaysRun.parse(it) }
+    if (dateText != null && today == null) {
+        System.err.println("날짜를 읽지 못했어요: $dateText. 2000~2099년의 날짜로 적어 주세요. 예: --today=2026-10-30")
         exitProcess(2)
     }
 
@@ -25,7 +33,7 @@ fun main(args: Array<String>) {
         },
     )
 
-    var again = if (today) game.play(todaysRun(LocalDate.now())) else game.play(seed ?: newSeed())
+    var again = if (today != null) game.play(today) else game.play(seed ?: newSeed())
     while (again) {
         again = game.play(newSeed())
     }
@@ -40,5 +48,17 @@ fun parseSeed(args: Array<String>): Int? {
     return if (at >= 0) joined.getOrNull(at + 1)?.toIntOrNull() else null
 }
 
-/** Today's run for a date on this computer's calendar. */
-fun todaysRun(date: LocalDate): TodaysRun = TodaysRun(date.year, date.monthValue, date.dayOfMonth)
+/**
+ * The date after `--today`, as in `--today=2026-10-29` or `--today 2026-10-29`: "" for a bare `--today`,
+ * and null when there is no `--today` at all.
+ */
+fun parseToday(args: Array<String>): String? {
+    for ((index, arg) in args.withIndex()) {
+        if (arg.startsWith("--today=")) return arg.removePrefix("--today=")
+        if (arg == "--today") {
+            val next = args.getOrNull(index + 1)
+            return if (next == null || next.startsWith("--")) "" else next
+        }
+    }
+    return null
+}

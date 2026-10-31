@@ -3,6 +3,7 @@
 # Usage: ./play            new rooms
 #        ./play --seed 4821   the same rooms again
 #        ./play --today       today's run: the same rooms for everyone on this date
+#        ./play --today 2026-10-29   that date's run
 set -e
 cd "$(dirname "$0")"
 ./gradlew -q --console=plain :terminal:installDist
