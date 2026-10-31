@@ -116,8 +116,9 @@ browser's date and writes it into the address (`?today=2026-10-30`), so a reload
 date's run, even on another day. The ending shows the line with a `결과 복사` button; where the browser does not
 allow copying, the line is selected for copying by hand. `?seed` wins over `?today`.
 
-The date is each player's own, so near midnight two time zones can be on different runs. The date in the line
-says which run it was.
+The date is each player's own, so near midnight two time zones can be on different runs. The line names the
+month and day but not the year, so the same date in two different years reads the same, although those are two
+different runs.
 
 ## How it is built
 
