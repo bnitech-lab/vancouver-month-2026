@@ -28,6 +28,8 @@ class MonthRecordTest {
     private val scooter = Spend(Spending.E_SCOOTER, 550)
     private val sharedBike = Spend(Spending.SHARED_BIKE_RIDE, 3)
     private val sharedScooter = Spend(Spending.SHARED_E_SCOOTER_RIDE, 4)
+    private val waterBus = Spend(Spending.WATER_BUS_RIDE, 4)
+    private fun taxi(fare: Int) = Spend(Spending.TAXI_RIDE, fare)
 
     /** Everything a player can see of a month, and what decides how it goes on. */
     private fun Month.state(): List<Any?> =
@@ -100,6 +102,46 @@ class MonthRecordTest {
             "2|1011||2|1165|Eb+350RA",
         )
         for (text in bad) assertNull(MonthRecord.decode(text), "Read as a record: $text")
+    }
+
+    @Test
+    fun `water bus and taxi fares are kept as w and t with their amounts, and replay off the balance alone`() {
+        val moves = listOf(english, waterBus, taxi(12), work, taxi(4), waterBus, coding, taxi(60))
+        val record = MonthRecord(1011, null, 2, 1165, moves)
+        assertEquals("2|1011||2|1165|Ew4t12Wt4w4Ct60", record.encode())
+        assertEquals(record, MonthRecord.decode(record.encode()))
+        assertEquals(listOf(english, work, coding), record.days)
+        val replayed = assertNotNull(record.replay())
+        val plain = assertNotNull(MonthRecord(1011, null, 2, 1165, listOf(english, work, coding)).replay())
+        assertEquals(plain.month.balance - 4 - 12 - 4 - 4 - 60, replayed.month.balance)
+        assertEquals(plain.month.day, replayed.month.day)
+        assertEquals(listOf(Event.Spent(Spending.TAXI_RIDE, 60)), replayed.spentToday)
+        assertEquals(
+            listOf(Event.Spent(Spending.TAXI_RIDE, 4), Event.Spent(Spending.WATER_BUS_RIDE, 4)),
+            replayed.lastEvents.filterIsInstance<Event.Spent>(),
+        )
+        // A line kept before the water bus and the taxi still reads, as the version did not change.
+        assertNotNull(MonthRecord.decode("2|1011||2|1165|Eq4Wb350Cs3")?.replay())
+    }
+
+    @Test
+    fun `a tampered fare does not replay, and a fare with no amount is not read`() {
+        val tampered = mapOf(
+            "a water bus for $5" to Spend(Spending.WATER_BUS_RIDE, 5),
+            "a water bus for nothing" to Spend(Spending.WATER_BUS_RIDE, 0),
+            "a taxi under its base fare" to taxi(3),
+            "a taxi past what its meter shows" to taxi(61),
+            "a taxi for nothing" to taxi(0),
+        )
+        for ((why, spend) in tampered) {
+            val record = MonthRecord(1011, null, 2, 1165, listOf(english, spend, work))
+            val line = record.encode()
+            assertEquals(record, MonthRecord.decode(line), why)
+            assertNull(record.replay(), "Replayed: $why ($line)")
+        }
+        for (text in listOf("2|1011||2|1165|EwW", "2|1011||2|1165|EtW", "2|1011||2|1165|Et012W", "2|1011||2|1165|ET12W")) {
+            assertNull(MonthRecord.decode(text), "Read as a record: $text")
+        }
     }
 
     @Test
@@ -221,16 +263,22 @@ class MonthRecordTest {
         assertEquals(Ending.entries.toSet(), endings)
     }
 
-    /** Money to spend before today's day, about one time in four: mostly a ride, sometimes something to keep. */
+    /**
+     * Money to spend before today's day, about one time in four: mostly a ride's fare (a taxi's anything its meter can
+     * show), sometimes something to keep.
+     */
     private fun randomSpend(month: Month, random: Random): Spend? {
         if (random.nextInt(4) != 0) return null
         val kind = when (random.nextInt(10)) {
             0 -> Spending.BIKE
             1 -> Spending.E_SCOOTER
-            in 2..5 -> Spending.SHARED_BIKE_RIDE
-            else -> Spending.SHARED_E_SCOOTER_RIDE
+            in 2..4 -> Spending.SHARED_BIKE_RIDE
+            in 5..6 -> Spending.SHARED_E_SCOOTER_RIDE
+            7 -> Spending.WATER_BUS_RIDE
+            else -> Spending.TAXI_RIDE
         }
-        return Spend(kind, kind.price).takeIf { month.canSpend(kind, kind.price) }
+        val amount = if (kind == Spending.TAXI_RIDE) random.nextInt(kind.price, kind.most + 1) else kind.price
+        return Spend(kind, amount).takeIf { month.canSpend(kind, amount) }
     }
 
     /** A legal choice for today, leaning on applications so that many months have interviews. */

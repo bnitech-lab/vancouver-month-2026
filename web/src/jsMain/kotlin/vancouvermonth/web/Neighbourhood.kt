@@ -305,9 +305,11 @@ object Neighbourhood {
         town.addShop()
         town.addHomeGarden()
         town.addSkyTrain()
+        town.addStations()
         town.addCity()
         town.addTrees()
         town.addStreetLife()
+        town.addStops()
         blocks = town.blocks
         ground = town.ground
         glowing = town.glowing
@@ -786,16 +788,69 @@ object Neighbourhood {
             addSolid(mouth.x, mouth.y, mouth.z, mouth.width, mouth.height, mouth.depth, mouth.colour)
             otherWalls.add(mouth)
             add(start.x - 0.07, deck + 0.35, start.z - 0.6, 0.05, 1.5, 1.2, TUNNEL)
-            // Pillars from past the station all along, on into the haze.
+            // Pillars from past the station all along, on into the haze; a station up on the line stands on its own.
             along = STATION_LENGTH + 4.0
             while (along < guideway.length) {
                 val spot = guideway.spotAt(along)
                 if (spot.x > COLUMNS + HAZE_FAR) break
+                if (TransitLines.stations.any { it.entrance != null && !it.underground && abs(it.along - along) < 5.0 }) {
+                    along += PILLAR_GAP
+                    continue
+                }
                 val pillar = Block(spot.x - 0.3, 0.0, spot.z - 0.3, 0.6, deck, 0.6, PILLAR)
                 blocks.add(pillar)
                 if (spot.x < COLUMNS) footprints.add(pillar)
                 along += PILLAR_GAP
             }
+        }
+
+        /**
+         * The SkyTrain's other stations: an entrance on the ground with a glass door to the south and the line's sign
+         * over it; up on the line, a lift up to a platform either side of the deck under a roof on two posts. The
+         * station under downtown has its entrance alone. The first station, under the deck by the tunnel's mouth, is
+         * the one [addSkyTrain] builds, with a sign by its door.
+         */
+        fun addStations() {
+            for (station in TransitLines.stations) {
+                val lot = station.entrance
+                val doorX = station.door.x
+                if (lot == null) {
+                    val door = station.door
+                    add(door.x + 1.25, 0.0, door.z - 0.2, 0.08, 2.2, 0.08, IRON)
+                    add(door.x + 1.05, 1.7, door.z - 0.24, 0.5, 0.42, 0.08, SKYTRAIN_BLUE)
+                    continue
+                }
+                val x = lot.x + 0.2
+                val z = lot.z + 0.2
+                val width = lot.width - 0.4
+                val depth = lot.depth - 0.4
+                val tall = TransitLines.ENTRANCE_HEIGHT
+                addSolid(x, 0.0, z, width, tall, depth, STATION)
+                otherWalls.add(Block(x, 0.0, z, width, tall, depth, STATION))
+                add(x - 0.15, tall, z - 0.15, width + 0.3, 0.2, depth + 0.3, SKYTRAIN_BLUE)
+                add(doorX - 0.55, 0.0, z + depth, 1.1, 1.9, 0.05, DOOR_GLASS)
+                add(doorX - 0.75, 2.2, z + depth, 1.5, 0.5, 0.08, SKYTRAIN_BLUE)
+                add(doorX - 0.3, 2.32, z + depth + 0.07, 0.6, 0.26, 0.04, STATION)
+                if (station.underground) continue
+                val middle = guideway.spotAt(station.along)
+                val turn = guideway.turnAt(station.along)
+                add(middle.x - 0.45, tall + 0.2, middle.z - 0.45, 0.9, DECK_HEIGHT - tall - 0.3, 0.9, STATION)
+                val half = STATION_LENGTH / 2
+                blocks.add(Block(middle.x - half, DECK_HEIGHT - 0.1, middle.z - 1.4, 2 * half, 0.32, 2.8, STATION, turn))
+                blocks.add(
+                    Block(middle.x - half - 0.2, DECK_HEIGHT + 2.4, middle.z - 1.3, 2 * half + 0.4, 0.2, 2.6, SKYTRAIN_BLUE, turn),
+                )
+                for (end in listOf(-half + 0.2, half - 0.2)) {
+                    val postX = middle.x + end * kotlin.math.cos(turn)
+                    val postZ = middle.z - end * kotlin.math.sin(turn)
+                    add(postX - 0.1, DECK_HEIGHT + 0.4, postZ - 0.1, 0.2, 2.0, 0.2, PILLAR)
+                }
+            }
+        }
+
+        /** The bus stops' shelters and signs and the water bus's piers: in the town's still boxes, blocking nothing. */
+        fun addStops() {
+            blocks.addAll(TransitLines.scenery)
         }
 
         /**
@@ -805,7 +860,8 @@ object Neighbourhood {
          */
         fun addCity() {
             val start = guideway.points.first()
-            val kept = venues.map { lotFor(it) } + shop.lot +
+            val entrances = TransitLines.stations.mapNotNull { it.entrance }.map { Lot(it.x - 1, it.z - 1, it.width + 2, it.depth + 2) }
+            val kept = venues.map { lotFor(it) } + shop.lot + entrances +
                 Lot(floor(start.x).toInt() - 5, floor(start.z).toInt() - 4, STATION_LENGTH.toInt() + 8, 10)
             var lots = lotsOf(VancouverMapData.BLOCKS)
             for (hole in kept) lots = lots.flatMap { it.minus(hole) }

@@ -2,6 +2,7 @@ package vancouvermonth.web
 
 import kotlin.js.json
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.atan
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -29,6 +30,7 @@ import org.w3c.dom.events.WheelEvent
 import org.w3c.dom.pointerevents.PointerEvent
 import vancouvermonth.text.Passer
 import vancouvermonth.text.Shop
+import vancouvermonth.text.Transport
 import vancouvermonth.text.Weather
 
 /** What the phone screen needs from the town the player walks in. */
@@ -79,6 +81,43 @@ interface WalkableTown {
      * at walking pace. The game asks for this whenever a talk opens; the town does it itself when the day ends.
      */
     fun getOff()
+
+    /**
+     * Called when the character reaches a station, a bus stop or a dock the player tapped, with that stop: the game
+     * offers where to go from there.
+     */
+    var onStop: (Stop) -> Unit
+
+    /** Called when a ride on the SkyTrain, a bus, the water bus or a taxi is over: the character is on foot again. */
+    var onTravelled: () -> Unit
+
+    /**
+     * What the character travels on now (the SkyTrain, a bus, the water bus or a taxi), or null. Meanwhile the town
+     * takes no taps and no name opens a talk; the camera follows the vehicle.
+     */
+    val travelling: Transport?
+
+    /** How far a taxi from where the character stands drives to [to], along the streets; null when it cannot get there. */
+    fun taxiDistance(to: Spot): Double?
+
+    /**
+     * True when a ride on [transport] from stop [from] to stop [to] could start now: not by night, nor sitting by the
+     * fire, nor already travelling; the character at [from]; for a taxi ([from] -1), a way along the streets to the
+     * place [to] of [TransitLines.taxiStops]. The game pays a fare only when this is true.
+     */
+    fun canTravel(transport: Transport, from: Int, to: Int): Boolean
+
+    /**
+     * Sets off on [transport] from stop [from] to stop [to] (for a taxi, from where the character stands to the place
+     * [to]): off whatever the character rode, into the vehicle, and out at [to]'s stop, where [onTravelled] is called.
+     */
+    fun travel(transport: Transport, from: Int, to: Int)
+
+    /** Stops the walk under way where the character is, as for calling a taxi. */
+    fun standStill()
+
+    /** Gets out of the taxi where it is now: the character stands there on foot, and the taxi drives on. */
+    fun leaveTaxi()
 
     /** Called once if the town stops drawing, so the game can go on with buttons. */
     var onFail: () -> Unit
@@ -166,6 +205,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     override var onPasserby: (Passer) -> Unit = {}
     override var onShop: () -> Unit = {}
     override var onRent: (Ride) -> Unit = {}
+    override var onStop: (Stop) -> Unit = {}
+    override var onTravelled: () -> Unit = {}
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
     override var onSounds: (Double, Double, Double) -> Unit = { _, _, _ -> }
@@ -337,6 +378,65 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private var rentAt = -1
     private var renting = -1
 
+    /** The station, stop or dock the character is on its way to, by its place in [TransitLines.tapStops]; -1 for none. */
+    private var stopAt = -1
+
+    /**
+     * The buses, the water buses and the taxi, in one draw: the bus and the water bus that run their loops on their own,
+     * and the one of each the character rides, with the taxi, shown only for a ride.
+     */
+    private lateinit var vehicles: InstancedMesh
+    private val busRun = LoopRun(
+        TransitLines.busLoop,
+        DoubleArray(TransitLines.busStops.size) { TransitLines.busStops[it].along },
+        Journey.BUS_SPEED,
+        Journey.BUS_RAMP,
+        BUS_DWELL,
+    )
+    private val boatRun = LoopRun(
+        TransitLines.boatLoop,
+        DoubleArray(TransitLines.docks.size) { TransitLines.docks[it].along },
+        Journey.BOAT_SPEED,
+        Journey.BOAT_RAMP,
+        BOAT_DWELL,
+    )
+
+    /**
+     * The ride under way and when it began; and the vehicle going on after the character got out, and when its ride
+     * began. For the SkyTrain, the train itself is the ride's until it has gone on out of the way, and then the line's
+     * own train comes back, faded in from when [trainBackAt].
+     */
+    private var journey: Journey? = null
+    private var journeyStarted = 0.0
+    private var leaving: Journey? = null
+    private var leavingStarted = 0.0
+    private var trainRide: Journey? = null
+    private var trainRideStarted = 0.0
+    private var trainFadesIn = true
+    private var trainBackAt = Double.NEGATIVE_INFINITY
+
+    /** Which ride's vehicle is drawn, so it is hidden once, when it is gone. */
+    private var vehicleShown: Transport? = null
+
+    /** How high the camera looks: at the character, or up at the train on its guideway. */
+    private var focusHeight = FOCUS_HEIGHT
+
+    /** True while the camera follows the train under downtown, at the station there, rather than on the line. */
+    private var focusUnderground = false
+
+    /**
+     * Where a ride's vehicle, and the loop's bus or boat, are worked out in place, as x, z and the turn: nothing new is
+     * made for them each frame.
+     */
+    private val ridePlace = DoubleArray(3)
+    private val loopPlace = DoubleArray(3)
+    private val trainPlace = DoubleArray(3)
+
+    /** Where the character stands on the water bus, worked out each frame of the ride. */
+    private var aboardX = 0.0
+    private var aboardY = 0.0
+    private var aboardZ = 0.0
+
     /** Where the camera was when the names were last laid out, and whether the town was resized since. */
     private var labelsEye: Point? = null
     private var labelsFocus: Point? = null
@@ -469,6 +569,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         addWeather()
         addCharacter()
         addRides()
+        addVehicles()
         addPeople()
         addMarker()
         addLabels()
@@ -591,6 +692,14 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         scene.add(mount)
     }
 
+    /** The buses, water buses and the taxi in one draw, placed again as they move; the ones ridden hidden until a ride. */
+    private fun addVehicles() {
+        val models = listOf(TransitLines.bus, TransitLines.bus, TransitLines.boat, TransitLines.boat, TransitLines.taxi)
+        vehicles = movingBoxes(models.flatten(), material)
+        for (slot in listOf(RIDE_BUS, RIDE_BOAT, TAXI)) hideVehicle(slot)
+        placeLoopVehicles(lifeNow)
+    }
+
     /**
      * Each place's person by the door, and the passersby on their loops: all the townspeople in one draw and all the
      * passersby in another, every box placed again each frame of the town's life.
@@ -683,7 +792,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             label.style.top = "0"
             label.onclick = {
                 touched()
-                if (nightFell == null) goTalk(venue.place, dash = false)
+                if (nightFell == null && journey == null) goTalk(venue.place, dash = false)
             }
             element.appendChild(label)
             labels[venue.place] = label
@@ -696,7 +805,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         shopLabel.style.top = "0"
         shopLabel.onclick = {
             touched()
-            if (nightFell == null) goToShop(dash = false)
+            if (nightFell == null && journey == null) goToShop(dash = false)
         }
         element.appendChild(shopLabel)
     }
@@ -777,7 +886,9 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         touched()
         // The ride ends with the day: a shared one goes back, and the next morning starts on foot.
         getOff()
+        endJourney()
         rentAt = -1
+        stopAt = -1
         trip = null
         marker.visible = false
         pointers.clear()
@@ -805,7 +916,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         get() = ride
 
     override fun canRide(ride: Ride): Boolean {
-        if (sitting || nightFell != null || this.ride != null) return false
+        if (sitting || nightFell != null || this.ride != null || journey != null) return false
         // A shared one only as the character reaches it, and of its kind.
         return !ride.shared || (renting >= 0 && Rides.shared[renting].vehicle == ride.vehicle)
     }
@@ -837,6 +948,342 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         goOnFromHere()
         touched()
         askForFrame()
+    }
+
+    override val travelling: Transport?
+        get() = journey?.transport
+
+    /** The taxi's way from where the character stands to each place, worked out once while it stands there. */
+    private var taxiFrom: Spot? = null
+    private val taxiWays = mutableMapOf<Spot, List<Spot>?>()
+
+    /** The way along the streets from where the character stands to [to], or null when it cannot get there. */
+    private fun taxiWay(to: Spot): List<Spot>? {
+        if (taxiFrom != spot) {
+            taxiFrom = spot
+            taxiWays.clear()
+        }
+        return taxiWays.getOrPut(to) {
+            val route = Neighbourhood.grid.route(spot, to)
+            route.takeIf { it.size >= 2 && it.last() == to && distanceBetween(spot, to) > TAXI_NOT_NEEDED }
+        }
+    }
+
+    override fun taxiDistance(to: Spot): Double? =
+        taxiWay(to)?.zipWithNext { a, b -> distanceBetween(a, b) }?.sum()
+
+    override fun canTravel(transport: Transport, from: Int, to: Int): Boolean {
+        if (sitting || nightFell != null || journey != null) return false
+        if (to !in 0 until TransitLines.count(transport) || to == from) return false
+        if (transport == Transport.TAXI) return from == -1 && taxiWay(TransitLines.taxiStops[to].second) != null
+        if (from !in 0 until TransitLines.count(transport)) return false
+        return distanceBetween(spot, TransitLines.waitAt(Stop(transport, from))) <= TransitLines.STOP_REACH
+    }
+
+    override fun travel(transport: Transport, from: Int, to: Int) {
+        if (!canTravel(transport, from, to)) return
+        val made = journeyFor(transport, from, to) ?: return
+        // Off whatever the character rode, a shared one back to its dock, and no walk, rental or talk on the way.
+        getOff()
+        stopChatting()
+        trip = null
+        marker.visible = false
+        rentAt = -1
+        stopAt = -1
+        // A vehicle still going on from the last ride gives way to this one, rather than stand still in the street.
+        if (leaving != null) {
+            leaving = null
+            hideRideVehicle()
+        }
+        val now = window.performance.now()
+        journey = made
+        journeyStarted = now
+        if (transport == Transport.SKYTRAIN) {
+            val stand = Neighbourhood.TRAIN_STOP + Neighbourhood.TRAIN_LENGTH / 2
+            val scheduled = SkyTrainRun.shiftAt(lifeNow) + stand
+            // The line's own train already standing at the station is the one boarded; elsewhere it comes in faded.
+            trainFadesIn = abs(scheduled - made.railFrom) > 0.5 || !SkyTrainRun.isShownAt(lifeNow) ||
+                trainBackAt + TRAIN_FADE > now
+            trainRide = made
+            trainRideStarted = now
+        }
+        touched()
+        askForFrame()
+    }
+
+    /** The ride on [transport] from stop [from] to stop [to], or for a taxi from here to place [to]. */
+    private fun journeyFor(transport: Transport, from: Int, to: Int): Journey? = when (transport) {
+        Transport.SKYTRAIN -> {
+            val start = TransitLines.stations[from].along
+            val end = TransitLines.stations[to].along
+            val way = Journey.wayOn(Neighbourhood.guideway, start, end, TRAIN_GOING_ON)
+            Journey(
+                transport, way, abs(end - start), TransitLines.stations[to].door, Journey.TRAIN_SPEED,
+                Journey.TRAIN_RAMP, start, if (end >= start) 1.0 else -1.0,
+            )
+        }
+        Transport.BUS -> {
+            val stops = TransitLines.busStops
+            val (way, distance) = Journey.roundLoop(TransitLines.busLoop, stops[from].along, stops[to].along, Journey.GOING_ON)
+            Journey(transport, way, distance, stops[to].wait, Journey.BUS_SPEED, Journey.BUS_RAMP)
+        }
+        Transport.WATER_BUS -> {
+            val docks = TransitLines.docks
+            val (way, distance) = Journey.roundLoop(TransitLines.boatLoop, docks[from].along, docks[to].along, Journey.GOING_ON)
+            Journey(
+                transport, way, distance, docks[to].wait, Journey.BOAT_SPEED, Journey.BOAT_RAMP,
+                from = docks[from].wait,
+            )
+        }
+        Transport.TAXI -> taxiWay(TransitLines.taxiStops[to].second)?.let { route ->
+            val there = route.zipWithNext { a, b -> distanceBetween(a, b) }.sum()
+            // After dropping the character, the taxi turns back down the street it came along.
+            val back = alongFor(route.reversed(), Journey.GOING_ON)
+            Journey(transport, RailLine(route + back.drop(1)), there, route.last(), Journey.TAXI_SPEED, Journey.TAXI_RAMP)
+        }
+    }
+
+    /** The first [length] units of [points]: its points up to there, and where it reaches. */
+    private fun alongFor(points: List<Spot>, length: Double): List<Spot> {
+        val kept = mutableListOf(points.first())
+        var left = length
+        for ((a, b) in points.zipWithNext()) {
+            val step = distanceBetween(a, b)
+            if (step >= left) {
+                kept.add(Spot(a.x + (b.x - a.x) * left / step, a.z + (b.z - a.z) * left / step))
+                return kept
+            }
+            left -= step
+            kept.add(b)
+        }
+        return kept
+    }
+
+    override fun standStill() {
+        trip = null
+        marker.visible = false
+        rentAt = -1
+        stopAt = -1
+        askForFrame()
+    }
+
+    override fun leaveTaxi() {
+        val going = journey ?: return
+        if (going.transport != Transport.TAXI) return
+        // Out where the taxi is, on the street; it drives on to where it was going, and away.
+        journey = null
+        leaving = going
+        leavingStarted = journeyStarted
+        stepOut(going.way.spotAt(going.travelled(window.performance.now() - journeyStarted)))
+    }
+
+    /** The character stands at [at] on foot, the camera at ground level again, and the game is told. */
+    private fun stepOut(at: Spot) {
+        spot = at
+        focusHeight = FOCUS_HEIGHT
+        if (focusUnderground) view.jumpTo(Point(at.x, FOCUS_HEIGHT, at.z))
+        focusUnderground = false
+        character.visible = true
+        touched()
+        askForFrame()
+        onTravelled()
+    }
+
+    /** Ends any ride at once, as the day does: the character is on foot, and every vehicle of a ride is gone. */
+    private fun endJourney() {
+        if (journey == null && leaving == null && trainRide == null) return
+        journey = null
+        leaving = null
+        if (trainRide != null) trainBackAt = window.performance.now()
+        trainRide = null
+        focusHeight = FOCUS_HEIGHT
+        focusUnderground = false
+        character.visible = true
+        hideRideVehicle()
+    }
+
+    /**
+     * Moves the ride under way on to [now]: the character with the vehicle, out at its stop at the end; and the vehicle
+     * of the last ride on out of the way. True while either moves.
+     */
+    private fun stepJourney(now: Double): Boolean {
+        val going = journey
+        if (going != null) {
+            val elapsed = now - journeyStarted
+            if (going.isOverAfter(elapsed)) {
+                journey = null
+                leaving = going
+                leavingStarted = journeyStarted
+                heading = (going.way.turnAt(going.stopAt) + PI / 2)
+                stepOut(going.out)
+            } else {
+                followRide(going, elapsed)
+            }
+        }
+        val drawn = journey ?: leaving
+        if (drawn != null) {
+            val since = now - if (drawn === journey) journeyStarted else leavingStarted
+            if (drawn === leaving && drawn.isGoneAfter(since)) {
+                leaving = null
+                hideRideVehicle()
+            } else if (drawn.transport != Transport.SKYTRAIN) {
+                placeRideVehicle(drawn, since)
+            }
+        }
+        stepTrainRide(now)
+        return journey != null || leaving != null || trainRide != null
+    }
+
+    /** The character, and the camera's subject, where the vehicle is [elapsed] into [going]. */
+    private fun followRide(going: Journey, elapsed: Double) {
+        val place = ridePlace
+        if (going.transport == Transport.SKYTRAIN) {
+            val along = going.alongAt(elapsed)
+            val underground = along < UNDER_DOWNTOWN
+            if (underground) {
+                spot = DOWNTOWN_DOOR
+                focusHeight = FOCUS_HEIGHT
+            } else {
+                Neighbourhood.guideway.placeAt(along, place)
+                spot = Spot(place[0], place[1])
+                heading = place[2] + PI / 2
+                focusHeight = Neighbourhood.DECK_HEIGHT + TRAIN_FOCUS
+            }
+            if (underground != focusUnderground) {
+                focusUnderground = underground
+                // Into or out of the tunnel the camera cuts to the other end, as a ride underground does.
+                if (elapsed > Journey.BOARD_MILLIS) view.jumpTo(Point(spot.x, focusHeight, spot.z))
+            }
+            return
+        }
+        going.way.placeAt(going.travelled(elapsed), place)
+        spot = Spot(place[0], place[1])
+        heading = place[2] + PI / 2
+        focusHeight = FOCUS_HEIGHT
+        if (going.transport == Transport.WATER_BUS) standAboard(going, elapsed, place[0], place[1], place[2])
+    }
+
+    /**
+     * Where the character stands on the water bus at [x], [z] turned [turn]: on the open deck ahead of the cabin; while
+     * getting on, along the pier from the dock to there, and while stepping out, from there to the dock it gets out at.
+     */
+    private fun standAboard(going: Journey, elapsed: Double, x: Double, z: Double, turn: Double) {
+        val deckX = x + TransitLines.BOAT_STAND * cos(turn)
+        val deckZ = z - TransitLines.BOAT_STAND * sin(turn)
+        val from = going.from
+        val off = elapsed - (going.millis - Journey.ALIGHT_MILLIS)
+        val share: Double
+        val startX: Double
+        val startZ: Double
+        val endX: Double
+        val endZ: Double
+        if (elapsed < Journey.BOARD_MILLIS && from != null) {
+            share = elapsed / Journey.BOARD_MILLIS
+            startX = from.x
+            startZ = from.z
+            endX = deckX
+            endZ = deckZ
+        } else if (off > 0) {
+            share = off / Journey.ALIGHT_MILLIS
+            startX = deckX
+            startZ = deckZ
+            endX = going.out.x
+            endZ = going.out.z
+        } else {
+            aboardX = deckX
+            aboardY = TransitLines.DECK
+            aboardZ = deckZ
+            return
+        }
+        val eased = share.coerceIn(0.0, 1.0)
+        aboardX = startX + (endX - startX) * eased
+        aboardZ = startZ + (endZ - startZ) * eased
+        // Down from the pier onto the deck, and back up.
+        val onDeck = if (off > 0) 1 - eased else eased
+        aboardY = TransitLines.DECK * onDeck
+    }
+
+    /** Draws the vehicle of [going] where it is [elapsed] into the ride. */
+    private fun placeRideVehicle(going: Journey, elapsed: Double) {
+        val place = ridePlace
+        going.way.placeAt(going.travelled(elapsed), place)
+        val slot = when (going.transport) {
+            Transport.BUS -> RIDE_BUS
+            Transport.WATER_BUS -> RIDE_BOAT
+            else -> TAXI
+        }
+        val model = when (going.transport) {
+            Transport.BUS -> TransitLines.bus
+            Transport.WATER_BUS -> TransitLines.boat
+            else -> TransitLines.taxi
+        }
+        if (vehicleShown != null && vehicleShown != going.transport) hideRideVehicle()
+        vehicleShown = going.transport
+        VehicleBoxes.write(model, slot, place[0], 0.0, place[1], place[2], false, vehicles.instanceMatrix.array)
+        vehicles.instanceMatrix.needsUpdate = true
+    }
+
+    /** Hides the vehicle of the last ride, if one is drawn. */
+    private fun hideRideVehicle() {
+        val shown = vehicleShown ?: return
+        vehicleShown = null
+        hideVehicle(
+            when (shown) {
+                Transport.BUS -> RIDE_BUS
+                Transport.WATER_BUS -> RIDE_BOAT
+                else -> TAXI
+            },
+        )
+    }
+
+    /** Shrinks the vehicle whose boxes start at [slot] to nothing. */
+    private fun hideVehicle(slot: Int) {
+        val model = when (slot) {
+            RIDE_BUS, BUS_ON_LOOP -> TransitLines.bus
+            RIDE_BOAT, BOAT_ON_LOOP -> TransitLines.boat
+            else -> TransitLines.taxi
+        }
+        VehicleBoxes.write(model, slot, 0.0, 0.0, 0.0, 0.0, true, vehicles.instanceMatrix.array)
+        vehicles.instanceMatrix.needsUpdate = true
+    }
+
+    /**
+     * Moves the train of a SkyTrain ride on to [now]: in at the station it is boarded at, along the line, and on out of
+     * the way after the character got out, faded out at the end; then the line's own train comes back.
+     */
+    private fun stepTrainRide(now: Double) {
+        val ride = trainRide ?: return
+        val elapsed = now - trainRideStarted
+        if (ride.isGoneAfter(elapsed)) {
+            trainRide = null
+            trainBackAt = now
+            return
+        }
+        val stand = Neighbourhood.TRAIN_STOP + Neighbourhood.TRAIN_LENGTH / 2
+        trainShift = ride.alongAt(elapsed) - stand
+        placeTrain(trainShift)
+        val fadeIn = if (trainFadesIn) (elapsed / Journey.BOARD_MILLIS).coerceIn(0.0, 1.0) else 1.0
+        val fadeOut = ((ride.goneMillis - elapsed) / TRAIN_FADE).coerceIn(0.0, 1.0)
+        val shown = minOf(fadeIn, fadeOut)
+        trainMaterial.opacity = shown
+        trainGlowMaterial.opacity = shown
+        trainCars.visible = shown > 0.0
+        trainWindows.visible = shown > 0.0
+        trainRideSpeed = ride.speedAt(elapsed)
+    }
+
+    /** How fast the ridden train goes now, for its rumble. */
+    private var trainRideSpeed = 0.0
+
+    /** The bus and the water bus on their loops, where the town's clock at [millis] has them. It makes nothing new. */
+    private fun placeLoopVehicles(millis: Double) {
+        val array = vehicles.instanceMatrix.array
+        val place = loopPlace
+        TransitLines.busLoop.placeAt(busRun.alongAt(millis), place)
+        VehicleBoxes.write(TransitLines.bus, BUS_ON_LOOP, place[0], 0.0, place[1], place[2], false, array)
+        TransitLines.boatLoop.placeAt(boatRun.alongAt(millis), place)
+        VehicleBoxes.write(TransitLines.boat, BOAT_ON_LOOP, place[0], 0.0, place[1], place[2], false, array)
+        vehicles.instanceMatrix.needsUpdate = true
     }
 
     /** A trip on its way goes on from where the character is, at the pace it now goes. */
@@ -963,6 +1410,26 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     /** True when the ride [each] is drawn under the character. For tests. */
     internal fun isRideDrawn(each: Ride): Boolean = rideMeshes[each.ordinal].visible
 
+    /** True while the character is drawn: not while it is in the train, a bus or a taxi. For tests. */
+    internal val isCharacterShown: Boolean
+        get() = character.visible
+
+    /** Where the vehicle of the ride on [transport] is drawn, or null when none is. For tests and screenshots. */
+    internal fun vehicleAt(transport: Transport): Spot? {
+        if (vehicleShown != transport) return null
+        val slot = when (transport) {
+            Transport.BUS -> RIDE_BUS
+            Transport.WATER_BUS -> RIDE_BOAT
+            else -> TAXI
+        }
+        val numbers = vehicles.instanceMatrix.array
+        return Spot(numbers[slot * 16 + 12].toDouble(), numbers[slot * 16 + 14].toDouble())
+    }
+
+    /** True while the train is a ride's, not the line's own. For tests. */
+    internal val isTrainRidden: Boolean
+        get() = trainRide != null
+
     /** The bike shop's name, floating over it. For tests. */
     internal val shopName: HTMLButtonElement
         get() = shopLabel
@@ -978,7 +1445,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
      * and no building still folding or rising. The town's own life may still move. For tests.
      */
     internal val isStill: Boolean
-        get() = framesDrawn > 0 && !urgent && !gliding && trip == null && nightFell == null && !cutaway.isMoving
+        get() = framesDrawn > 0 && !urgent && !gliding && trip == null && nightFell == null && !cutaway.isMoving &&
+            journey == null
 
     /** True when the [index]th of [Neighbourhood.foldables] is folded down out of the way, or folding. For tests. */
     internal fun isFolded(index: Int): Boolean = cutaway.isFolding(index)
@@ -1125,19 +1593,21 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
      */
     private fun tap(x: Double, y: Double) {
         val frame = canvas.getBoundingClientRect()
-        if (frame.width == 0.0 || frame.height == 0.0 || nightFell != null) return
+        if (frame.width == 0.0 || frame.height == 0.0 || nightFell != null || journey != null) return
         val dash = taps.isDouble(window.performance.now(), x, y)
         // The passersby can be tapped while they are out.
         val boxes = if (crowd.visible) passersby.map { Passerby.boxAround(it.spot) } else emptyList()
         // The shared bikes and e-scooters can be tapped to rent one, on foot.
         val vehicles = if (ride == null && !sitting) Rides.tapBoxes else emptyList()
         val left = (x - frame.left) / frame.width
-        val picked = view.pick(left, (y - frame.top) / frame.height, boxes, cutaway, vehicles)
+        val stops = if (sitting) emptyList() else TransitLines.tapBoxes
+        val picked = view.pick(left, (y - frame.top) / frame.height, boxes, cutaway, vehicles, stops)
         // A tap that lands on something else turns the player away from the passerby; a tap on the sky does not.
         if (picked != null && picked !is Picked.AtPasserby) stopChatting()
         when (picked) {
             is Picked.AtPasserby -> stopFor(passersby[picked.index], dash)
             is Picked.AtVehicle -> goRent(picked.index, dash)
+            is Picked.AtStop -> goToStop(picked.index, dash)
             Picked.AtShop -> {
                 if (dash) {
                     walkTo(Neighbourhood.shop.talkSpot, dash = true, opensOnArrival = false)
@@ -1221,6 +1691,25 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         rentAt = index
     }
 
+    /**
+     * Sends the character to the station, stop or dock [index] of [TransitLines.tapStops], where the game offers where
+     * to go, or offers it at once when the character stands there. Like a tap on the ground, it turns the player away
+     * from a talk.
+     */
+    private fun goToStop(index: Int, dash: Boolean) {
+        onPlace(null)
+        val stop = TransitLines.tapStops[index]
+        val there = TransitLines.waitAt(stop)
+        if (distanceBetween(spot, there) <= TransitLines.STOP_REACH || !walkTo(there, dash, opensOnArrival = false)) {
+            trip = null
+            marker.visible = false
+            stopAt = -1
+            onStop(stop)
+            return
+        }
+        stopAt = index
+    }
+
     /** At the shared one [index]: asks the game to pay its fare, which gets the character on it. */
     private fun askToRent(index: Int) {
         rentAt = -1
@@ -1233,6 +1722,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private fun walkTo(target: Spot, dash: Boolean, opensOnArrival: Boolean): Boolean {
         if (sitting) return false
         rentAt = -1
+        stopAt = -1
         val route = Neighbourhood.grid.route(spot, target)
         if (route.size < 2) return false
         tripDash = dash
@@ -1302,7 +1792,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private fun drawFrame(now: Double) {
         if (closed) return
         val hidden = pageHidden() || contextLost
-        val moving = urgent || trip != null || nightFell != null || gliding || cutaway.isMoving
+        val moving = urgent || trip != null || nightFell != null || gliding || cutaway.isMoving || journey != null ||
+            leaving != null || trainRide != null
         if (!pace.shouldDraw(now, moving, hidden)) {
             // Hidden or without WebGL, nothing more is asked for until that ends; otherwise the life waits its turn.
             if (!hidden) nextFrame()
@@ -1316,16 +1807,18 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         // moves on the beat only, even on frames drawn at the screen's full rate for the player.
         val still = lessMotion.matches
         var walking = false
+        var travelled = false
         var night = false
         var folding = false
         try {
             // Inside the try, so that if the walk, the change of day (which brings the new day's weather) or the life
             // ever failed, the town would hand over to the buttons, not freeze.
             walking = stepWalk(now)
+            travelled = stepJourney(now)
             night = stepNight(now)
             placeCharacter()
             val subject = if (sitting) Neighbourhood.benchSeat else spot
-            gliding = view.follow(Point(subject.x, FOCUS_HEIGHT, subject.z), millis)
+            gliding = view.follow(Point(subject.x, focusHeight, subject.z), millis)
             placeCamera()
             folding = foldBuildings(subject, millis, still)
             if (!still && pace.stepsLife) stepLife()
@@ -1357,7 +1850,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             }
         }
         framesDrawn += 1
-        if (walking || night || gliding || folding || !still) nextFrame()
+        if (walking || travelled || night || gliding || folding || !still) nextFrame()
     }
 
     /**
@@ -1376,7 +1869,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             aimedEyeZ = eye.z
             aimedHeadX = subject.x
             aimedHeadZ = subject.z
-            cutaway.aim(eye.x, eye.y, eye.z, subject.x, HEAD_HEIGHT, subject.z)
+            cutaway.aim(eye.x, eye.y, eye.z, subject.x, focusHeight + HEAD_HEIGHT - FOCUS_HEIGHT, subject.z)
         }
         val moving = cutaway.step(if (still) Cutaway.FOLD_MILLIS else millis)
         if (cutaway.changedCount > 0) placeFolds()
@@ -1475,13 +1968,19 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         // A fading figure would leave a solid shadow, so the passersby cast none until they are all there.
         crowd.castShadow = out >= 1.0
         placePassersby(millis, player)
-        trainShift = SkyTrainRun.shiftAt(now)
-        placeTrain(trainShift)
-        val trainShows = SkyTrainRun.opacityAt(now)
-        trainMaterial.opacity = trainShows
-        trainGlowMaterial.opacity = trainShows
-        trainCars.visible = trainShows > 0.0
-        trainWindows.visible = trainShows > 0.0
+        // The train of a ride is placed with the ride, every frame; otherwise the line's own runs, faded back in after
+        // a ride.
+        if (trainRide == null) {
+            trainShift = SkyTrainRun.shiftAt(now)
+            placeTrain(trainShift)
+            val back = ((window.performance.now() - trainBackAt) / TRAIN_FADE).coerceIn(0.0, 1.0)
+            val trainShows = SkyTrainRun.opacityAt(now) * back
+            trainMaterial.opacity = trainShows
+            trainGlowMaterial.opacity = trainShows
+            trainCars.visible = trainShows > 0.0
+            trainWindows.visible = trainShows > 0.0
+        }
+        placeLoopVehicles(now)
         val flicker = Campfire.flicker(now)
         val spread = 1 + (flicker - 1) * 0.4
         flames.scale.set(spread, flicker, spread)
@@ -1494,7 +1993,12 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         // How loud the train and the fire are where the player is: the train at the camera, the fire at the character.
         val night = if (nightFell == null) 0.0 else DayLight.at(nightProgress).glow
         val fire = Campfire.nearness(distanceBetween(player, Neighbourhood.campfire))
-        tellSounds(SkyTrainRun.rumbleAt(now, view.eye), fire, night)
+        val rumble = if (trainRide == null) {
+            SkyTrainRun.rumbleAt(now, view.eye)
+        } else {
+            SkyTrainRun.rumble(trainShift, trainRideSpeed, trainMaterial.opacity, view.eye)
+        }
+        tellSounds(rumble, fire, night)
     }
 
     /**
@@ -1526,10 +2030,13 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             val west = Neighbourhood.TRAIN_STOP + shift + car * Neighbourhood.CAR_SPACING
             val middle = west + Neighbourhood.CAR_LENGTH / 2
             val inTunnel = middle + Neighbourhood.CAR_LENGTH / 2 < 0
-            val spot = Neighbourhood.guideway.spotAt(middle)
-            val turn = Neighbourhood.guideway.turnAt(middle)
-            TrainCars.write(Neighbourhood.trainCar, car, spot, turn, inTunnel, trainCars.instanceMatrix.array)
-            TrainCars.write(Neighbourhood.trainCarWindows, car, spot, turn, inTunnel, trainWindows.instanceMatrix.array)
+            val place = trainPlace
+            Neighbourhood.guideway.placeAt(middle, place)
+            val x = place[0]
+            val z = place[1]
+            val turn = place[2]
+            TrainCars.write(Neighbourhood.trainCar, car, x, z, turn, inTunnel, trainCars.instanceMatrix.array)
+            TrainCars.write(Neighbourhood.trainCarWindows, car, x, z, turn, inTunnel, trainWindows.instanceMatrix.array)
         }
         trainCars.instanceMatrix.needsUpdate = true
         trainWindows.instanceMatrix.needsUpdate = true
@@ -1616,6 +2123,12 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private fun arrive(end: Spot) {
         if (rentAt >= 0 && ride == null) {
             askToRent(rentAt)
+            return
+        }
+        if (stopAt >= 0) {
+            val stop = TransitLines.tapStops[stopAt]
+            stopAt = -1
+            onStop(stop)
             return
         }
         if (Neighbourhood.isAtShop(end)) {
@@ -1710,6 +2223,24 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
      * or sitting on the bench. It makes nothing new, as it runs every frame.
      */
     private fun placeCharacter() {
+        val going = journey
+        if (going != null) {
+            // In the train, the bus or the taxi, out of sight; on the water bus, standing on its deck.
+            val aboard = going.transport == Transport.WATER_BUS
+            character.visible = aboard
+            mount.visible = false
+            if (aboard) {
+                character.position.set(aboardX, aboardY, aboardZ)
+                character.rotation.y = heading
+                leftLeg.rotation.x = 0.0
+                rightLeg.rotation.x = 0.0
+                leftArm.rotation.x = 0.0
+                rightArm.rotation.x = 0.0
+            }
+            return
+        }
+        character.visible = true
+        mount.visible = true
         if (sitting) {
             val seat = Neighbourhood.benchSeat
             // A little forward on the seat, toward the way the bench faces.
@@ -1878,6 +2409,38 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
         /** Within this distance of a passerby the character turns to them where it stands, instead of walking up. */
         const val CHAT_DISTANCE = 1.6
+
+        /** How long the bus and the water bus wait at each stop on their own loops, in milliseconds. */
+        const val BUS_DWELL = 2_500.0
+        const val BOAT_DWELL = 3_000.0
+
+        /** How far the train goes on along the line after a ride, out of the station, before it fades away. */
+        const val TRAIN_GOING_ON = 24.0
+
+        /** How long the train of a ride fades out at the end, and the line's own train back in after it. */
+        const val TRAIN_FADE = 700.0
+
+        /** How far above the guideway's deck the camera looks while it follows the train. */
+        const val TRAIN_FOCUS = 3.2
+
+        /**
+         * Below this far along the guideway the whole train is in the tunnel under downtown, and the camera waits at the
+         * station there.
+         */
+        val UNDER_DOWNTOWN = -(Neighbourhood.TRAIN_LENGTH / 2 + 1.0)
+
+        /** The door of the station under downtown, where the camera waits while the train is in the tunnel. */
+        val DOWNTOWN_DOOR = TransitLines.stations.first { it.underground }.door
+
+        /** A place this near needs no taxi. */
+        const val TAXI_NOT_NEEDED = 2.0
+
+        /** Where each vehicle's boxes start in the one draw of them all. */
+        val BUS_ON_LOOP = 0
+        val RIDE_BUS = TransitLines.bus.size
+        val BOAT_ON_LOOP = 2 * TransitLines.bus.size
+        val RIDE_BOAT = BOAT_ON_LOOP + TransitLines.boat.size
+        val TAXI = RIDE_BOAT + TransitLines.boat.size
 
         /** How far a bike goes for one turn of its pedals, and how far the legs swing with them, in radians. */
         const val PEDAL_LENGTH = 1.8

@@ -13,6 +13,7 @@ import org.w3c.dom.asList
 import org.w3c.dom.events.Event
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.text.Passer
+import vancouvermonth.text.Transport
 import vancouvermonth.text.Weather
 
 /** A town to walk in that draws nothing, whose nights pass at once. */
@@ -22,7 +23,13 @@ internal class QuietTown : WalkableTown {
     override var onPasserby: (Passer) -> Unit = {}
     override var onShop: () -> Unit = {}
     override var onRent: (Ride) -> Unit = {}
+    override var onStop: (Stop) -> Unit = {}
+    override var onTravelled: () -> Unit = {}
     override var riding: Ride? = null
+    override var travelling: Transport? = null
+
+    /** How far a taxi drives to any place, or null when none goes: the test's to set. */
+    var taxiSquares: Double? = 30.0
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
     override var isCovered = false
@@ -43,6 +50,33 @@ internal class QuietTown : WalkableTown {
 
     override fun getOff() {
         riding = null
+    }
+
+    override fun taxiDistance(to: Spot): Double? = taxiSquares
+
+    /** False to make the town refuse to set off, as by night or away from the stop. */
+    var canTravelNow = true
+
+    /** As the real town: not while already travelling. The character stands for one at any stop. */
+    override fun canTravel(transport: Transport, from: Int, to: Int): Boolean =
+        canTravelNow && travelling == null && from != to
+
+    override fun travel(transport: Transport, from: Int, to: Int) {
+        if (!canTravel(transport, from, to)) return
+        riding = null
+        travelling = transport
+    }
+
+    override fun standStill() {}
+
+    override fun leaveTaxi() {
+        if (travelling == Transport.TAXI) arrive()
+    }
+
+    /** The ride under way is over: the character is out at its stop. */
+    fun arrive() {
+        travelling = null
+        onTravelled()
     }
 
     override fun endDay(place: Place) {

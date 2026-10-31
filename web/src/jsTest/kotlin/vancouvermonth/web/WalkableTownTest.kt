@@ -39,6 +39,8 @@ import vancouvermonth.text.Continue
 import vancouvermonth.text.actionName
 import vancouvermonth.text.money
 import vancouvermonth.text.Passer
+import vancouvermonth.text.Transit
+import vancouvermonth.text.Transport
 import vancouvermonth.text.Weather
 import vancouvermonth.text.weatherOn
 import vancouvermonth.text.weatherWord
@@ -50,7 +52,13 @@ private class SilentTown : WalkableTown {
     override var onPasserby: (Passer) -> Unit = {}
     override var onShop: () -> Unit = {}
     override var onRent: (Ride) -> Unit = {}
+    override var onStop: (Stop) -> Unit = {}
+    override var onTravelled: () -> Unit = {}
     override var riding: Ride? = null
+    override var travelling: Transport? = null
+
+    /** How far a taxi drives to any place, or null when none goes: the test's to set. */
+    var taxiSquares: Double? = 30.0
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
     override var isCovered = false
@@ -71,6 +79,29 @@ private class SilentTown : WalkableTown {
 
     override fun getOff() {
         riding = null
+    }
+
+    override fun taxiDistance(to: Spot): Double? = taxiSquares
+
+    /** As the real town: not while already travelling. The character stands for one at any stop. */
+    override fun canTravel(transport: Transport, from: Int, to: Int): Boolean = travelling == null && from != to
+
+    override fun travel(transport: Transport, from: Int, to: Int) {
+        if (!canTravel(transport, from, to)) return
+        riding = null
+        travelling = transport
+    }
+
+    override fun standStill() {}
+
+    override fun leaveTaxi() {
+        if (travelling == Transport.TAXI) arrive()
+    }
+
+    /** The ride under way is over: the character is out at its stop. */
+    fun arrive() {
+        travelling = null
+        onTravelled()
     }
 
     override fun endDay(place: Place) = onMorning()
@@ -1321,8 +1352,51 @@ class WalkableTownTest {
             Step("on a 320 by 568 phone", { town.isStill && map.getBoundingClientRect().top < 300.0 }) {
                 assertTrue(rectOf(".talk").bottom <= 568.0, "the talk runs off the small phone")
                 clearOfTheCards("320 by 568")
+                button("그만").click()
+                tap(Transit.CALL_TAXI)
+            },
+            Step("the taxi's card on it", { town.isStill && chooserSettled() }) {
+                chooserFits("the taxi's card", map)
+                button("그만").click()
+                town.standAt(TransitLines.busStops[0].wait)
+                town.onStop(Stop(Transport.BUS, 0))
+            },
+            Step("the bus's card from 공원 입구 on it", { town.isStill && chooserSettled() }) {
+                assertTrue("다운타운 남쪽" in rectText(".chooser"), screen)
+                chooserFits("the bus's card", map)
             },
         )
+    }
+
+    private fun rectText(selector: String): String = root.querySelector(selector)?.textContent.orEmpty()
+
+    /** True once the chooser has risen into place: its opening animation is over. */
+    private fun chooserSettled(): Boolean {
+        val card = root.querySelector(".chooser") ?: return false
+        return (card.asDynamic().getAnimations().length as Int) == 0
+    }
+
+    /**
+     * On a 320 by 568 phone, the chooser [what] has each place on one line, its name and fare side by side; its
+     * bottom is on the screen; and the small [map] stays above it.
+     */
+    private fun chooserFits(what: String, map: HTMLElement) {
+        val card = rectOf(".chooser")
+        assertTrue(card.bottom <= 568.0, "$what runs off the screen: ${card.bottom}")
+        val frame = map.getBoundingClientRect()
+        assertTrue(frame.bottom <= card.top, "$what at ${card.top} covers the small map, which ends at ${frame.bottom}")
+        val choices = root.querySelectorAll(".chooser .go").asList().map { it as HTMLElement }
+        assertTrue(choices.isNotEmpty(), screen)
+        for (choice in choices) {
+            val name = assertNotNull(choice.querySelector(".action-name") as? HTMLElement).getBoundingClientRect()
+            val fare = assertNotNull(choice.querySelector(".action-effect") as? HTMLElement).getBoundingClientRect()
+            val line = window.getComputedStyle(choice).lineHeight.removeSuffix("px").toDoubleOrNull() ?: 24.0
+            assertTrue(name.height < line * 1.5, "$what: ${choice.textContent} breaks over two lines (${name.height})")
+            assertTrue(fare.height < line * 1.5, "$what: ${choice.textContent}'s fare breaks (${fare.height})")
+            assertTrue(kotlin.math.abs(name.top - fare.top) < 2.0, "$what: ${choice.textContent} on two rows")
+            assertTrue(name.right <= fare.left + 1.0, "$what: ${choice.textContent}'s name runs into its fare")
+            assertTrue(choice.getBoundingClientRect().right <= 320.0, "$what: ${choice.textContent} off the side")
+        }
     }
 
     @Test

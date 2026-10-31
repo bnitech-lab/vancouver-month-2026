@@ -194,6 +194,8 @@ nearest, as in "지도: 내 방 근처".
 | Tap the bike shop, its name or its keeper | The character goes to 벤, and his talk opens |
 | Tap a shared bike or e-scooter | The character walks up to it, pays its fare and rides off on it |
 | Tap 자전거 타기 or 퀵보드 타기 on the top card, once bought | The character gets on; 내리기 gets off |
+| Tap a SkyTrain station, a bus stop or a water bus dock | The character walks there, and a card offers where to go from it |
+| Tap 택시 부르기 on the top card | A card offers every place a taxi goes, each with its fare, before anything is paid |
 | Tap the small map | It shows larger; a tap or Escape brings it back |
 
 The city's buildings never get in the way. One that stands between the camera and the character, or fills the view
@@ -233,6 +235,28 @@ talk gets the character off first, and the day's end too, so each morning starts
 a ride that starts. The money spent during a day heads that day's log, in two lines at most ("그 밖에 5건 -$15" for the
 rest), and on a small phone the log gives up its last lines before a talk would leave the screen. Every price is invented, and no shop, brand or bike-share or scooter company is real. On the
 button screen there is no shop and no riding.
+
+The SkyTrain, a bus, a water bus and taxis take the character across town, still without spending a day. The SkyTrain
+has four stations, named for their part of town: 다운타운역 under downtown, 터널 입구역 (the station by the tunnel's mouth,
+as before), 크릭 끝역 past the head of False Creek, and 동쪽역 out east, each up on the line with an entrance on the
+ground under its platform, but the first, whose entrance stands on a downtown street. A tap on a station's building
+walks the character to its door, and a card lists the other stations; the train comes in, the camera follows it along
+the guideway (under downtown it waits at the entrance and cuts to the train as it leaves the tunnel), and the character
+steps out at the station chosen. A bus runs a loop on its own along the West End's and downtown's streets, with five
+stops (공원 입구, 쇼핑 거리, 다운타운, 다운타운 남쪽, 웨스트엔드), each a shelter and a sign; a tap on one offers the
+others, and a bus takes the character there the shorter way round. Both are free with the month's pass, which the room's
+total already pays. A water bus crosses False Creek between three docks (카페 앞 by the café, 남쪽 기슭 on the far shore,
+크릭 끝 near its head) for $4 a ride, the character standing on its open deck. 택시 부르기 on the top card, whenever the
+character is on foot and no talk is open, lists the five places, the bike shop and the four stations with each fare: $4 and $1.50 for every ten squares
+along the streets, to the dollar (the meter would stop at $60, which no trip in town reaches); a taxi appears where the
+character stands and drives there fast, and its 내리기 lets the character out on the way. A fare is paid through core
+when the ride sets off and only then, heads that day's log ("수상버스를 탔어요. -$4", "택시를 탔어요. -$12"), is kept
+in the record (w and t, the record's version unchanged, so a month kept before still goes on), and is refused with the
+reason, as a purchase is, when what would be left could not pay September's living cost. While riding, the town takes no
+taps and no talk opens, so no day can end mid-ride; the camera follows the vehicle, the buildings in its way fold and
+the small map's arrow moves with it. The small map marks the stations, stops and docks, and the bike shop. Every
+station, stop, dock, colour and price is invented; no real station, transit company or taxi company is named. On the
+button screen there is no transport.
 
 The town lives on its own. Four more people, invented too (올리버, 미나, 프리야 and 테오), stroll slow loops along the English Bay
 seawall, a West End street near 내 방, the big park's edge and the square in front of the station. One stops when the
@@ -281,7 +305,9 @@ console. Tests force each of these.
 The town's rules are plain Kotlin with tests: `Neighbourhood` (the layout on the real map, the people, which place a
 spot belongs to), `VancouverMap` (the map's squares and lines, read from the generated `VancouverMapData`), `RailLine`
 (the guideway the train follows), `Grid` (the A* search for the way around things), `Trip` (a walk or a dash, and the
-double tap), `Rides` (the bikes and e-scooters, their speeds, and where the shared ones stand), `FollowCamera`
+double tap), `Rides` (the bikes and e-scooters, their speeds, and where the shared ones stand), `Transit` (the stations,
+the bus's loop and stops, the water bus's docks and way over the water, the places a taxi goes, and each ride's glide
+along its way), `FollowCamera`
 (turning, zooming, keeping out of the places' walls, and what a tap lands on), `Cutaway`
 (which of the city's buildings fold down out of the camera's way, and how far), `Minimap` (where the grid lies on the
 small map turned north up, and which place is nearest), `DayLight` (the light
@@ -290,9 +316,10 @@ stopping for the character), `Greeter` (the five turning and waving), `TownLife`
 rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, all worked out from the time) and
 `FramePace` (which frames are drawn). The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`, and
 `Passersby.kt` for the passersby's), and so are each day's weather (`Weather.kt`) and the bike shop's and riding's
-words (`Shop.kt`). `WalkableTown` draws all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the map included, is about 846 KB
-(about 229 KB gzipped).
+words (`Shop.kt`), and the SkyTrain's, the bus's, the water bus's and the taxi's (`Transit.kt`). `WalkableTown` draws
+all of it, and
+`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the map included, is about 874 KB
+(about 238 KB gzipped).
 
 ### Sound and the first-run guide
 

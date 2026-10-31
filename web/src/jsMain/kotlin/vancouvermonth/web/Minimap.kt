@@ -120,8 +120,9 @@ class MinimapProjection(val width: Double, val height: Double) {
  * A small map of the whole town in a corner, so the player always knows roughly where the character is. It lies with
  * real north up, as a paper map of the city does, and never turns ([MinimapProjection]); a small N and arrow at its
  * top say so. The land, water, park, seawall and the city's blocks are painted once from the grid, already turned;
- * over them it draws the five places (내 방 a square in its roof's red, the others dots, the place of an interview day
- * in the colour its name takes), the camera's view as a pale wedge, and the character as an arrow the way it faces.
+ * over them it draws the SkyTrain's stations, the bus stops, the water bus's docks and the bike shop as small marks,
+ * the five places (내 방 a square in its roof's red, the others dots, the place of an interview day in the colour its
+ * name takes), the camera's view as a pale wedge, and the character as an arrow the way it faces.
  * It is drawn again only when asked, as the character or the camera moves, and makes nothing new each time. A tap on
  * it shows it larger, about four fifths of the screen wide, with the places' names; a tap or Escape brings it back. It
  * is a picture: a screen reader hears only which place the character is nearest.
@@ -240,8 +241,13 @@ internal class Minimap {
         c.lineWidth = 0.8
         c.strokeStyle = WEDGE_EDGE
         c.stroke()
-        // The five places: 내 방 a square in its roof's red, the others round.
         val scale = if (large) LARGE_SCALE else 1.0
+        // The ways about town and the bike shop, small under the five places: stations square, the rest round.
+        for (at in MARK_X.indices) {
+            val fill = MARK_FILLS[MARK_KIND[at]]
+            dot(map.left(MARK_X[at], MARK_Z[at]), map.top(MARK_X[at], MARK_Z[at]), MARK * scale, fill, MARK_KIND[at] == 0)
+        }
+        // The five places: 내 방 a square in its roof's red, the others round.
         val venues = Neighbourhood.venues
         for (at in 0 until venues.size) {
             val venue = venues[at]
@@ -346,6 +352,21 @@ internal class Minimap {
     }
 
     companion object {
+        /**
+         * The small marks, worked out once: each station's door (kind 0), bus stop (1) and dock (2), and the bike shop's
+         * door (3), with the colour of each kind.
+         */
+        private val MARKS: List<Pair<Spot, Int>> = TransitLines.stations.map { it.door to 0 } +
+            TransitLines.busStops.map { it.wait to 1 } + TransitLines.docks.map { it.wait to 2 } +
+            (Neighbourhood.shop.door to 3)
+        private val MARK_X = DoubleArray(MARKS.size) { MARKS[it].first.x }
+        private val MARK_Z = DoubleArray(MARKS.size) { MARKS[it].first.z }
+        private val MARK_KIND = IntArray(MARKS.size) { MARKS[it].second }
+        private val MARK_FILLS = arrayOf("#3c6cb4", "#3f8e6a", "#d9673f", "#e0a43a")
+
+        /** How many marks of each kind the map draws, for tests. */
+        fun marksOf(kind: Int): Int = MARK_KIND.count { it == kind }
+
         /** Where each place's door is, worked out once, so finding the nearest makes nothing new. */
         private val DOOR_X = DoubleArray(Neighbourhood.venues.size) { Neighbourhood.venues[it].door.x }
         private val DOOR_Z = DoubleArray(Neighbourhood.venues.size) { Neighbourhood.venues[it].door.z }
@@ -465,6 +486,9 @@ internal class Minimap {
         private const val DOT = 2.6
         private const val BIG_DOT = 3.6
         private const val ARROW = 5.5
+
+        /** The small marks' size, under the places' dots. */
+        private const val MARK = 1.7
         private const val LARGE_SCALE = 1.6
 
         /** Where the north arrow's tip is, from the map's right edge and its top, and its half width and height. */

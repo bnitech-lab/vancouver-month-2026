@@ -18,16 +18,75 @@ class SpendTest {
 
     @Test
     fun `the prices are the plan's, and only a bike and an e-scooter are kept`() {
-        assertEquals(listOf(350, 550, 3, 4), Spending.entries.map { it.price })
+        assertEquals(listOf(350, 550, 3, 4, 4, 4), Spending.entries.map { it.price })
         assertEquals(Item.BIKE, Spending.BIKE.buys)
         assertEquals(Item.E_SCOOTER, Spending.E_SCOOTER.buys)
-        assertNull(Spending.SHARED_BIKE_RIDE.buys)
-        assertNull(Spending.SHARED_E_SCOOTER_RIDE.buys)
-        for (kind in Spending.entries) {
+        for (kind in Spending.entries - Spending.BIKE - Spending.E_SCOOTER) assertNull(kind.buys, "$kind")
+        for (kind in Spending.entries - Spending.TAXI_RIDE) {
+            assertEquals(kind.price, kind.most, "$kind")
             assertTrue(kind.costs(kind.price), "$kind")
             assertFalse(kind.costs(kind.price + 1), "$kind")
             assertFalse(kind.costs(0), "$kind")
         }
+    }
+
+    @Test
+    fun `a water bus ride is $4 each time, and keeps nothing`() {
+        val month = month()
+        val before = month.rest()
+        repeat(3) { assertEquals(Event.Spent(Spending.WATER_BUS_RIDE, 4), month.spend(Spending.WATER_BUS_RIDE)) }
+        assertEquals(1_800 - 12, month.balance)
+        assertEquals(emptySet(), month.owned)
+        assertEquals(before, month.rest())
+        assertFalse(month.canSpend(Spending.WATER_BUS_RIDE, 5))
+        assertFailsWith<IllegalArgumentException> { month.spend(Spending.WATER_BUS_RIDE, 3) }
+    }
+
+    @Test
+    fun `a taxi's fare is $4 and $1·50 for every ten squares, to the dollar, and the meter stops at $60`() {
+        assertEquals(4, TaxiFare.forDistance(0.0))
+        assertEquals(4, TaxiFare.forDistance(3.0))
+        assertEquals(5, TaxiFare.forDistance(4.0))
+        assertEquals(6, TaxiFare.forDistance(10.0))
+        assertEquals(7, TaxiFare.forDistance(20.0))
+        assertEquals(19, TaxiFare.forDistance(100.0))
+        assertEquals(60, TaxiFare.forDistance(372.0))
+        assertEquals(60, TaxiFare.forDistance(5_000.0))
+        assertEquals(4, TaxiFare.forDistance(-5.0))
+        var last = TaxiFare.BASE
+        for (squares in 0..400) {
+            val fare = TaxiFare.forDistance(squares.toDouble())
+            assertTrue(fare >= last && Spending.TAXI_RIDE.costs(fare), "$squares squares: $fare")
+            last = fare
+        }
+    }
+
+    @Test
+    fun `any fare the taxi's meter can show is paid, and no other`() {
+        val month = month()
+        assertEquals(TaxiFare.BASE, Spending.TAXI_RIDE.price)
+        assertEquals(TaxiFare.MOST, Spending.TAXI_RIDE.most)
+        assertEquals(Event.Spent(Spending.TAXI_RIDE, 12), month.spend(Spending.TAXI_RIDE, 12))
+        assertEquals(Event.Spent(Spending.TAXI_RIDE, 60), month.spend(Spending.TAXI_RIDE, 60))
+        assertEquals(1_800 - 72, month.balance)
+        for (wrong in listOf(0, 3, 61, -12)) {
+            assertFalse(month.canSpend(Spending.TAXI_RIDE, wrong), "$wrong")
+            assertFailsWith<IllegalArgumentException>("$wrong") { month.spend(Spending.TAXI_RIDE, wrong) }
+        }
+        assertEquals(1_800 - 72, month.balance)
+    }
+
+    @Test
+    fun `a fare that would leave too little for September's living cost is refused, as a purchase is`() {
+        // On the 2nd, 29 days of living cost are still to come: $1,160.
+        val living = 29 * Month.DAILY_LIVING_COST
+        val month = month(balance = living + 10)
+        assertNull(month.spendBlockedBy(Spending.TAXI_RIDE, 10))
+        assertEquals(SpendBlocked.LIVING_COST, month.spendBlockedBy(Spending.TAXI_RIDE, 11))
+        assertNull(month.spendBlockedBy(Spending.WATER_BUS_RIDE))
+        month.spend(Spending.TAXI_RIDE, 7)
+        assertEquals(SpendBlocked.LIVING_COST, month.spendBlockedBy(Spending.WATER_BUS_RIDE))
+        assertEquals(living + 3, month.balance)
     }
 
     @Test

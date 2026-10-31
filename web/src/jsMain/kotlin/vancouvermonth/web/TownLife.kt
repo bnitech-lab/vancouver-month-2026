@@ -67,19 +67,26 @@ object SkyTrainRun {
     const val TOP_SPEED = 2 * REACH / LEAVE * 1_000
 
     /** How far [ear] is from the nearest part of the train at [millis], the train taken every half unit along it. */
-    fun distanceTo(millis: Double, ear: Point): Double {
-        val west = Neighbourhood.TRAIN_STOP + shiftAt(millis)
+    fun distanceTo(millis: Double, ear: Point): Double = distanceAt(shiftAt(millis), ear)
+
+    /** How far [ear] is from the nearest part of the train [shift] from its stop at the station. */
+    fun distanceAt(shift: Double, ear: Point): Double {
+        val west = Neighbourhood.TRAIN_STOP + shift
         val up = ear.y - (Neighbourhood.DECK_HEIGHT + 0.9)
         var nearest = Double.MAX_VALUE
         val steps = (Neighbourhood.TRAIN_LENGTH / 0.5).toInt()
+        val place = alongLine
         for (step in 0..steps) {
-            val spot = Neighbourhood.guideway.spotAt(west + Neighbourhood.TRAIN_LENGTH * step / steps)
-            val across = ear.x - spot.x
-            val side = ear.z - spot.z
+            Neighbourhood.guideway.placeAt(west + Neighbourhood.TRAIN_LENGTH * step / steps, place)
+            val across = ear.x - place[0]
+            val side = ear.z - place[1]
             nearest = minOf(nearest, sqrt(across * across + up * up + side * side))
         }
         return nearest
     }
+
+    /** Where a point of the train is, worked out in place: nothing new is made for each one. */
+    private val alongLine = DoubleArray(3)
 
     /** How loud a rumble [distance] away sounds: 1.0 right by it, half as loud [RUMBLE_NEAR] away, little far off. */
     fun loudnessAt(distance: Double): Double = 1 / (1 + square(distance / RUMBLE_NEAR))
@@ -89,10 +96,16 @@ object SkyTrainRun {
      * and once it is under way, as loud as its distance lets it be. It is silent while it stands at the station and
      * while it is away, and fades with it far down the line.
      */
-    fun rumbleAt(millis: Double, ear: Point): Double {
-        val underWay = (speedAt(millis) / (TOP_SPEED * UNDER_WAY)).coerceIn(0.0, 1.0)
+    fun rumbleAt(millis: Double, ear: Point): Double = rumble(shiftAt(millis), speedAt(millis), opacityAt(millis), ear)
+
+    /**
+     * How loud a train [shift] from its stop at the station, going [speed] units a second and [shown] from 0.0 to 1.0,
+     * rumbles to an ear at [ear], as [rumbleAt] works it out for the line's own train: for the train of a ride too.
+     */
+    fun rumble(shift: Double, speed: Double, shown: Double, ear: Point): Double {
+        val underWay = (abs(speed) / (TOP_SPEED * UNDER_WAY)).coerceIn(0.0, 1.0)
         if (underWay == 0.0) return 0.0
-        return opacityAt(millis) * underWay * loudnessAt(distanceTo(millis, ear))
+        return shown * underWay * loudnessAt(distanceAt(shift, ear))
     }
 
     /** Half as loud this far from the train. */
@@ -472,7 +485,11 @@ object TrainCars {
      * Writes [boxes], car number [car]'s, turned by [turn] about the vertical and set down at [spot], into their
      * slots of [into]: from car times the number of boxes on. A car [hidden] in the tunnel is shrunk to nothing.
      */
-    fun write(boxes: List<Block>, car: Int, spot: Spot, turn: Double, hidden: Boolean, into: Float32Array) {
+    fun write(boxes: List<Block>, car: Int, spot: Spot, turn: Double, hidden: Boolean, into: Float32Array) =
+        write(boxes, car, spot.x, spot.z, turn, hidden, into)
+
+    /** As the other [write], set down at [x], [z]: it makes nothing new. */
+    fun write(boxes: List<Block>, car: Int, x: Double, z: Double, turn: Double, hidden: Boolean, into: Float32Array) {
         val across = cos(turn)
         val toward = sin(turn)
         for ((index, box) in boxes.withIndex()) {
@@ -487,9 +504,9 @@ object TrainCars {
             into[at + 5] = box.height.toFloat()
             into[at + 8] = (toward * box.depth).toFloat()
             into[at + 10] = (across * box.depth).toFloat()
-            into[at + 12] = (spot.x + middleX * across + middleZ * toward).toFloat()
+            into[at + 12] = (x + middleX * across + middleZ * toward).toFloat()
             into[at + 13] = (box.y + box.height / 2).toFloat()
-            into[at + 14] = (spot.z - middleX * toward + middleZ * across).toFloat()
+            into[at + 14] = (z - middleX * toward + middleZ * across).toFloat()
         }
     }
 }
