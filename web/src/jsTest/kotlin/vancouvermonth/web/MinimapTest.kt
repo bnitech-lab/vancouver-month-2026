@@ -30,6 +30,15 @@ class MinimapTest {
     private val eastX = cos(turn)
     private val eastZ = -sin(turn)
 
+    /** Every square of the grid the character could stand on: all but the water. */
+    private val standable = RealVancouver.map.let { ground ->
+        (0 until ground.rows).flatMap { z -> (0 until ground.columns).map { x -> Cell(x, z) } }
+            .filter { ground.terrainAt(it) != Terrain.WATER }
+    }
+
+    private fun cornersOf(cell: Cell): List<Pair<Double, Double>> = listOf(0 to 0, 1 to 0, 0 to 1, 1 to 1)
+        .map { (across, down) -> (cell.x + across).toDouble() to (cell.z + down).toDouble() }
+
     private val shown = mutableListOf<HTMLElement>()
 
     @AfterTest
@@ -68,25 +77,41 @@ class MinimapTest {
     }
 
     @Test
-    fun `the map shows the coast with a little water round it, filling the map`() {
+    fun `the map shows all the ground the character can stand on, with a little round it`() {
         val projection = MinimapProjection(AREA_WIDTH.toDouble(), AREA_HEIGHT.toDouble())
         assertEquals(1.0, projection.scale, 1e-9)
         var left = Double.MAX_VALUE
         var right = -Double.MAX_VALUE
         var top = Double.MAX_VALUE
         var bottom = -Double.MAX_VALUE
-        for (cell in RealVancouver.map.cellsOf(Terrain.SHORE)) {
-            left = minOf(left, projection.left(cell.x + 0.5, cell.z + 0.5))
-            right = maxOf(right, projection.left(cell.x + 0.5, cell.z + 0.5))
-            top = minOf(top, projection.top(cell.x + 0.5, cell.z + 0.5))
-            bottom = maxOf(bottom, projection.top(cell.x + 0.5, cell.z + 0.5))
+        for (cell in standable) {
+            for ((x, z) in cornersOf(cell)) {
+                left = minOf(left, projection.left(x, z))
+                right = maxOf(right, projection.left(x, z))
+                top = minOf(top, projection.top(x, z))
+                bottom = maxOf(bottom, projection.top(x, z))
+            }
         }
-        // Six to seven squares of margin on each side of the coast, so the map is not mostly empty corners.
+        // Six to seven squares of margin on each side, so the map is not mostly empty corners.
         for (margin in listOf(left, projection.width - right, top, projection.height - bottom)) {
             assertTrue(margin in 6.0..7.0, "a margin of $margin squares")
         }
-        // A little taller than wide, as the coast from the park's tip to False Creek is.
-        assertTrue(AREA_HEIGHT.toDouble() / AREA_WIDTH in 1.0..1.1, "$AREA_WIDTH by $AREA_HEIGHT")
+        // Taller than wide, as the grid's land turned north up is.
+        assertTrue(AREA_HEIGHT.toDouble() / AREA_WIDTH in 1.0..1.2, "$AREA_WIDTH by $AREA_HEIGHT")
+    }
+
+    @Test
+    fun `wherever the character can stand, it is on the small map`() {
+        val narrowest = MinimapProjection(80.0, 80.0 * AREA_HEIGHT / AREA_WIDTH)
+        for (projection in listOf(map, narrowest)) {
+            for (cell in standable) {
+                for ((x, z) in cornersOf(cell)) {
+                    val left = projection.left(x, z)
+                    val top = projection.top(x, z)
+                    assertTrue(left in 0.0..projection.width && top in 0.0..projection.height, "$cell at $left, $top")
+                }
+            }
+        }
     }
 
     @Test
@@ -203,7 +228,7 @@ class MinimapTest {
         // The character's arrow, in its own gold, where the character stands, pointing straight up.
         assertEquals(standLeft, minimap.dotLeft, 1e-9)
         assertEquals(standTop, minimap.dotTop, 1e-9)
-        assertEquals(0xFFD23F, colourAt(standLeft, standTop - 2.0))
+        assertEquals(0xFFD23F, colourAt(standLeft, standTop - 1.0))
         // The north arrow in ink at the top right.
         assertEquals(0x3B2F25, colourAt(AREA_WIDTH - Minimap.NORTH_INSET + 0.5, Minimap.NORTH_TOP + 3.5))
         // 내 방 in its roof's red, the others dark; on an interview day 회사 takes the colour its name does.

@@ -29,9 +29,9 @@ import vancouvermonth.web.MinimapProjection.Companion.AREA_WIDTH
 /**
  * Where a spot of the town lies on a small map [width] by [height] pixels, laid with real north up. The game map is
  * the real city turned [VancouverMapData.TURN_DEGREES] counter-clockwise, so downtown's streets run along x and z; the
- * small map turns it back as much clockwise, so x east runs right and down, z south runs down and left. It shows the
- * area round the coast, [AREA_WIDTH] by [AREA_HEIGHT] squares, as large as fits, the same scale both ways, in the
- * middle.
+ * small map turns it back as much clockwise, so x east runs right and down, z south runs down and left. It shows all
+ * the ground the character can stand on, [AREA_WIDTH] by [AREA_HEIGHT] squares, as large as fits, the same scale both
+ * ways, in the middle.
  */
 class MinimapProjection(val width: Double, val height: Double) {
     /** How many pixels a square of the grid takes on the map, across and down alike. */
@@ -53,12 +53,13 @@ class MinimapProjection(val width: Double, val height: Double) {
         private val COS = cos(TURN)
         private val SIN = sin(TURN)
 
-        /** How many squares of water or land past the coast the map shows on each side. */
+        /** How many squares of water or land past the ground the character can stand on the map shows on each side. */
         private const val MARGIN = 6
 
         /**
-         * The area the map shows, in squares of the grid turned north up: the coast from the park's tip to the head of
-         * the inlet and across False Creek, with [MARGIN] squares more on each side. Worked out once from the map.
+         * The area the map shows, in squares of the grid turned north up: every square of the grid that is not water,
+         * corner to corner, so the character's arrow is always on the map, with [MARGIN] squares more on each side.
+         * Worked out once from the map.
          */
         val AREA_LEFT: Int
         val AREA_TOP: Int
@@ -73,13 +74,17 @@ class MinimapProjection(val width: Double, val height: Double) {
             var bottom = -Double.MAX_VALUE
             for (z in 0 until map.rows) {
                 for (x in 0 until map.columns) {
-                    if (map.terrainAt(x, z) != Terrain.SHORE) continue
-                    val across = turnedAcross(x + 0.5, z + 0.5)
-                    val down = turnedDown(x + 0.5, z + 0.5)
-                    left = min(left, across)
-                    right = max(right, across)
-                    top = min(top, down)
-                    bottom = max(bottom, down)
+                    if (map.terrainAt(x, z) == Terrain.WATER) continue
+                    for (corner in 0 until 4) {
+                        val cornerX = (x + corner % 2).toDouble()
+                        val cornerZ = (z + corner / 2).toDouble()
+                        val across = turnedAcross(cornerX, cornerZ)
+                        val down = turnedDown(cornerX, cornerZ)
+                        left = min(left, across)
+                        right = max(right, across)
+                        top = min(top, down)
+                        bottom = max(bottom, down)
+                    }
                 }
             }
             AREA_LEFT = floor(left).toInt() - MARGIN
@@ -464,8 +469,8 @@ internal class Minimap {
         private const val WEDGE_PAST = 14.0
 
         /**
-         * How wide the map is: small, about 94 points on a 375-point phone and a little taller than wide, as the area
-         * round the coast is, so it takes about as much of the screen as the wider map unturned did; or larger, four
+         * How wide the map is: small, about 94 points on a 375-point phone and a little taller than wide, as the ground
+         * turned north up is, so it takes about as much of the screen as the wider map unturned did; or larger, four
          * fifths of the town.
          */
         private const val SMALL_WIDTH = "clamp(80px, 25vw, 100px)"
