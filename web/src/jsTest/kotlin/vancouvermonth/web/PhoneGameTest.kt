@@ -179,6 +179,23 @@ class PhoneGameTest {
     }
 
     @Test
+    fun `the address picks the run, and is rewritten to name it`() {
+        val now = Date(2026, 9, 30) // October 30th
+        val today = TodaysRun(2026, 10, 30)
+        val earlier = TodaysRun(2026, 10, 29)
+        assertEquals(Opening(1011, null, null), openingFor("?seed=1011", now, newSeed = 4242))
+        assertEquals(Opening(1011, null, null), openingFor("?seed=1011&today", now, newSeed = 4242))
+        assertEquals(Opening(4242, null, "?seed=4242"), openingFor("", now, newSeed = 4242))
+        assertEquals(Opening(4242, null, "?seed=4242"), openingFor("?seed=abc", now, newSeed = 4242))
+        val todays = Opening(today.seed, today, "?today=2026-10-30")
+        assertEquals(todays, openingFor("?today", now, newSeed = 4242))
+        assertEquals(todays, openingFor("?today=2026-02-30", now, newSeed = 4242))
+        val earliers = Opening(earlier.seed, earlier, "?today=2026-10-29")
+        assertEquals(earliers, openingFor("?today=2026-10-29", now, newSeed = 4242))
+        assertEquals(Opening(4242, null, "?seed=4242"), openingFor("?today", Date(2100, 0, 1), newSeed = 4242))
+    }
+
+    @Test
     fun `the address names the date of today's run`() {
         assertEquals("?today=2026-10-30", todayQuery(TodaysRun(2026, 10, 30)))
         assertEquals("?today=2027-01-05", todayQuery(TodaysRun(2027, 1, 5)))

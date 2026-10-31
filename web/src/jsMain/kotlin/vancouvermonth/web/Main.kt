@@ -8,25 +8,33 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.url.URLSearchParams
 import vancouvermonth.core.TodaysRun
 
-/**
- * `?seed=1011` replays the same rooms and the same luck. Without it, the page picks a new seed and writes it
- * into the address, so a reload or a shared link replays the same run.
- * `?today` plays today's run from the browser's date and writes the date into the address, as in
- * `?today=2026-10-30`, so a reload or a shared link replays that date's run. `?seed` wins over `?today`.
- */
+/** Plays the run the address asks for (see [openingFor]), then makes the address name that run. */
 fun main() {
     val root = document.getElementById("app") as? HTMLElement ?: return
-    val query = window.location.search
-    val fromQuery = seedFrom(query)
-    val today = if (fromQuery == null) todayFrom(query, Date()) else null
-    val seed = fromQuery ?: today?.seed ?: newSeed()
+    val opening = openingFor(window.location.search, Date(), newSeed())
     val playAgain = { window.location.search = "?seed=${newSeed()}" }
-    val game = if (today != null) PhoneGame(root, today, playAgain) else PhoneGame(root, seed, playAgain)
+    val today = opening.today
+    val game = if (today != null) PhoneGame(root, today, playAgain) else PhoneGame(root, opening.seed, playAgain)
     game.show()
-    when {
-        today != null -> window.history.replaceState(null, "", todayQuery(today))
-        fromQuery == null -> window.history.replaceState(null, "", "?seed=$seed")
-    }
+    // The game is drawn first, so the screen does not depend on the address changing.
+    opening.address?.let { window.history.replaceState(null, "", it) }
+}
+
+/** The run a page plays, today's run when it is one, and the address to write, or null to keep the address. */
+data class Opening(val seed: Int, val today: TodaysRun?, val address: String?)
+
+/**
+ * What a page opened with [query] plays. `?seed=1011` wins and keeps its address, so a link replays that run.
+ * `?today` or `?today=2026-10-30` plays that date's run (the browser's date, [now], when none reads) and writes
+ * the date into the address, so a reload or a shared link replays it even on another day. Anything else plays
+ * [newSeed] and writes it into the address.
+ */
+fun openingFor(query: String, now: Date, newSeed: Int): Opening {
+    val seed = seedFrom(query)
+    if (seed != null) return Opening(seed, null, null)
+    val today = todayFrom(query, now)
+    if (today != null) return Opening(today.seed, today, todayQuery(today))
+    return Opening(newSeed, null, "?seed=$newSeed")
 }
 
 /** The seed in a query such as "?seed=1011", or null when there is none. */
