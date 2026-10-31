@@ -60,7 +60,7 @@ data class Building(
 
     /** Where the name sits: just above the middle of the roof. */
     val labelAnchor: Point
-        get() = Point(x + width / 2.0, height + TownMap.ROOF + 0.2, z + depth / 2.0)
+        get() = Point(x = x + width / 2.0, y = height + TownMap.ROOF + 0.2, z = z + depth / 2.0)
 }
 
 /**
