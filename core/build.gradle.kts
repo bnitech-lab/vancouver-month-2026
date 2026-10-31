@@ -1,16 +1,22 @@
-// The game rules. Kotlin standard library only, so the same code can later run in a browser or on a server.
+// The game rules. Kotlin standard library only, so the same code runs on the JVM (terminal) and in a browser (web).
 plugins {
-    kotlin("jvm")
+    kotlin("multiplatform")
 }
 
 kotlin {
     jvmToolchain(21)
+    jvm()
+    js {
+        browser()
+    }
+
+    sourceSets {
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+        }
+    }
 }
 
-dependencies {
-    testImplementation(kotlin("test"))
-}
-
-tasks.test {
+tasks.named<Test>("jvmTest") {
     useJUnitPlatform()
 }
