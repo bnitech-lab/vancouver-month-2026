@@ -246,6 +246,9 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     /** True when the end of the walk should open the place there: a walk the player sent by tapping the ground. */
     private var opensOnArrival = false
 
+    /** True once the player has turned or zoomed the camera since the walk began; then it is left as they set it. */
+    private var cameraMovedOnWalk = false
+
     /** When the change of day began, or null outside one. While it lasts, the town takes no input. */
     private var nightFell: Double? = null
     private var nightProgress = 0.0
@@ -771,12 +774,14 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             val gap = gap()
             if (pinchGap > 0 && gap > 0) view.zoom(pinchGap / gap)
             pinchGap = gap
+            cameraMovedOnWalk = true
             askForFrame()
             return
         }
         if (!dragged && hypot(event.x - pressX, event.y - pressY) > TAP_SLOP) dragged = true
         if (dragged && !pinched) {
             view.orbit(event.x - last.first, event.y - last.second)
+            cameraMovedOnWalk = true
             askForFrame()
         }
     }
@@ -792,6 +797,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         touched()
         if (nightFell != null) return
         view.zoom(exp(event.deltaY * WHEEL_ZOOM))
+        cameraMovedOnWalk = true
         askForFrame()
     }
 
@@ -825,7 +831,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             }
             is Picked.OnGround -> {
                 onPlace(null)
-                walkTo(picked.spot, dash, opensOnArrival = true)
+                walkTo(Neighbourhood.landing(spot, picked.spot), dash, opensOnArrival = true)
             }
             null -> {}
         }
@@ -877,6 +883,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         trip = Trip(route, if (dash) Trip.DASH_SPEED else Trip.WALK_SPEED)
         tripStarted = window.performance.now()
         this.opensOnArrival = opensOnArrival
+        cameraMovedOnWalk = false
         val end = route.last()
         marker.position.set(end.x, 0.0, end.z)
         marker.visible = true
@@ -1122,13 +1129,19 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         return false
     }
 
-    /** At a place's person the character turns to them; at the end of a walk the player sent, the place opens. */
+    /**
+     * At a place's person the character turns to them; at the end of a walk the player sent, the place opens. Unless
+     * the player moved the camera on the way, it comes round to the street side of the place's door, looking at its
+     * front along the street rather than down between the towers.
+     */
     private fun arrive(end: Spot) {
         val place = Neighbourhood.placeAt(end) ?: return
         val venue = Neighbourhood.venue(place)
         if (distanceBetween(end, venue.talkSpot) <= Neighbourhood.REACH) {
             heading = atan2(venue.person.x - end.x, venue.person.z - end.z)
         }
+        val streetSide = if (venue.doorFacesSouth) 0.0 else PI
+        if (!cameraMovedOnWalk) view.aim(streetSide, FollowCamera.ARRIVAL_TILT, view.distance)
         if (opensOnArrival) onPlace(place)
     }
 

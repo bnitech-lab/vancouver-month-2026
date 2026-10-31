@@ -5,6 +5,7 @@ import kotlin.math.abs
 import kotlin.math.atan
 import kotlin.math.cos
 import kotlin.math.exp
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.round
@@ -47,6 +48,16 @@ class FollowCamera(subject: Point) {
     private var shownYaw = yaw
     private var shownPitch = pitch
     private var shownDistance = distance
+
+    /**
+     * The walls near the subject, by their number in [WALLS], and the ground they were gathered round. Set before
+     * [eye], which is worked out from them.
+     */
+    private var near = IntArray(64)
+    private var nearCount = 0
+    private var nearX = Double.NaN
+    private var nearZ = Double.NaN
+    private var nearReach = -1.0
 
     /** Where the camera has followed the character to: the point it keeps in sight. */
     var subject: Point = subject
@@ -135,9 +146,10 @@ class FollowCamera(subject: Point) {
         val ray = rayThrough(left, top)
         var nearest = Double.MAX_VALUE
         var wallHit: Wall? = null
-        for (wall in Neighbourhood.walls + Neighbourhood.people) {
+        for (wall in TAPPABLE) {
             val hit = distanceToBox(eye, ray, wall.box) ?: continue
-            if (hit < nearest) {
+            // A building or a person no nearer than the farthest ground a tap reaches is too far to walk to.
+            if (hit < nearest && hit <= MAX_TAP_DISTANCE) {
                 nearest = hit
                 wallHit = wall
             }
@@ -179,21 +191,85 @@ class FollowCamera(subject: Point) {
 
     /**
      * Behind and above the character at the shown turn, tilt and distance, with nothing between them: a wall in the
-     * way pulls the camera in front of it, and when that would bring it too close, it rises over the wall instead.
+     * way pulls the camera in front of it. Downtown, where a slanting look meets a wall at once, it first looks along
+     * one of the two streets either side of its turn, if that keeps it [ALONG_A_STREET] away or more; and when it would
+     * still come too close, it rises over the wall instead. It makes nothing new on the way, as it runs every frame
+     * the camera glides.
      */
     private fun eyeFor(): Point {
-        val near = wallsNear(subject, shownDistance)
+        refreshNear(subject, shownDistance)
+        var yaw = shownYaw
         var tilt = shownPitch
-        while (true) {
-            val out = Point(cos(tilt) * sin(shownYaw), sin(tilt), cos(tilt) * cos(shownYaw))
-            var reach = shownDistance
-            for (box in near) {
-                val hit = distanceToBox(subject, out, box) ?: continue
-                reach = min(reach, max(0.0, hit - WALL_GAP))
+        var reach = reachAlong(yaw, tilt)
+        if (reach < ALONG_A_STREET && reach < shownDistance) {
+            val below = floor(shownYaw / QUARTER) * QUARTER
+            val above = below + QUARTER
+            // Already along a street, there is no other to try.
+            if (shownYaw - below > AXIS_SLACK && above - shownYaw > AXIS_SLACK) {
+                val nearer = if (shownYaw - below <= above - shownYaw) below else above
+                val other = if (nearer == below) above else below
+                val alongNearer = reachAlong(nearer, tilt)
+                if (alongNearer >= ALONG_A_STREET) {
+                    yaw = nearer
+                    reach = alongNearer
+                } else {
+                    val alongOther = reachAlong(other, tilt)
+                    if (alongOther >= ALONG_A_STREET) {
+                        yaw = other
+                        reach = alongOther
+                    }
+                }
             }
-            if (reach >= CLOSEST || tilt >= HIGHEST_TILT) return subject + out * reach
-            tilt = min(HIGHEST_TILT, tilt + 0.1)
         }
+        while (reach < CLOSEST && tilt < HIGHEST_TILT) {
+            tilt = min(HIGHEST_TILT, tilt + 0.1)
+            reach = reachAlong(yaw, tilt)
+        }
+        return Point(
+            subject.x + cos(tilt) * sin(yaw) * reach,
+            subject.y + sin(tilt) * reach,
+            subject.z + cos(tilt) * cos(yaw) * reach,
+        )
+    }
+
+    /**
+     * Gathers the walls within [reach] of [from] on the ground, with room to spare, unless those gathered last time
+     * still cover them: the subject has moved less than a square and the camera has come no farther.
+     */
+    private fun refreshNear(from: Point, reach: Double) {
+        val still = abs(from.x - nearX) <= NEAR_SLACK && abs(from.z - nearZ) <= NEAR_SLACK
+        if (still && reach <= nearReach - 1.5 * NEAR_SLACK) return
+        nearX = from.x
+        nearZ = from.z
+        nearReach = reach + 3 * NEAR_SLACK
+        nearCount = 0
+        val walls = WALLS
+        for (index in 0 until walls.size / 6) {
+            val at = index * 6
+            val dx = max(0.0, max(walls[at] - from.x, from.x - walls[at + 3]))
+            val dz = max(0.0, max(walls[at + 2] - from.z, from.z - walls[at + 5]))
+            if (dx * dx + dz * dz > nearReach * nearReach) continue
+            if (nearCount == near.size) near = near.copyOf(nearCount * 2)
+            near[nearCount++] = index
+        }
+    }
+
+    /** How far the camera can be from the subject turned [yaw] and tilted [tilt], short of a wall, at most as asked. */
+    private fun reachAlong(yaw: Double, tilt: Double): Double {
+        val dx = cos(tilt) * sin(yaw)
+        val dy = sin(tilt)
+        val dz = cos(tilt) * cos(yaw)
+        var reach = shownDistance
+        val walls = WALLS
+        for (n in 0 until nearCount) {
+            val at = near[n] * 6
+            val hit = enterAt(
+                subject.x, subject.y, subject.z, dx, dy, dz,
+                walls[at], walls[at + 1], walls[at + 2], walls[at + 3], walls[at + 4], walls[at + 5],
+            )
+            if (hit >= 0.0) reach = min(reach, max(0.0, hit - WALL_GAP))
+        }
+        return reach
     }
 
     companion object {
@@ -205,7 +281,10 @@ class FollowCamera(subject: Point) {
         const val START_PITCH = 0.45
         const val START_DISTANCE = 21.0
 
-        /** The walls within [reach] of [from] on the ground: the only ones a camera that far off can meet. */
+        /**
+         * The walls within [reach] of [from] on the ground: the only ones a camera that far off can meet. For tests and
+         * one-off checks; the camera itself keeps its own list.
+         */
         fun wallsNear(from: Point, reach: Double): List<Block> = Neighbourhood.walls.mapNotNull { wall ->
             val box = wall.box
             val dx = max(0.0, max(box.x - from.x, from.x - box.x - box.width))
@@ -227,8 +306,39 @@ class FollowCamera(subject: Point) {
         private const val CLOSEST = 3.5
         private const val HIGHEST_TILT = 1.5
 
+        /** How far the camera looks down when it comes round to a place's door as the character arrives there. */
+        const val ARRIVAL_TILT = 0.6
+
+        /** Pulled in nearer than this, the camera tries looking along a street instead. */
+        const val ALONG_A_STREET = 8.0
+        private const val QUARTER = PI / 2
+        private const val AXIS_SLACK = 1e-6
+
+        /** How far the subject may move before the walls near it are gathered again. */
+        private const val NEAR_SLACK = 1.0
+
+        /** Every wall's box as six numbers, its low and high corners, gathered once. */
+        private val WALLS: DoubleArray by lazy {
+            val walls = Neighbourhood.walls
+            DoubleArray(walls.size * 6).also { numbers ->
+                for ((index, wall) in walls.withIndex()) {
+                    val box = wall.box
+                    numbers[index * 6] = box.x
+                    numbers[index * 6 + 1] = box.y
+                    numbers[index * 6 + 2] = box.z
+                    numbers[index * 6 + 3] = box.x + box.width
+                    numbers[index * 6 + 4] = box.y + box.height
+                    numbers[index * 6 + 5] = box.z + box.depth
+                }
+            }
+        }
+
+        /** What a tap can land on: every building and wall, and the five places' people, gathered once. */
+        private val TAPPABLE: List<Wall> by lazy { Neighbourhood.walls + Neighbourhood.people }
+
         const val NEAR_PLANE = 0.1
-        const val FAR_PLANE = 420.0
+        /** Past the haze nothing shows, so nothing past it is drawn: a little beyond [Neighbourhood.HAZE_FAR]. */
+        const val FAR_PLANE = Neighbourhood.HAZE_FAR + 20.0
 
         /** Taps farther away than this, near the horizon, are ignored. */
         const val MAX_TAP_DISTANCE = 120.0
@@ -254,22 +364,50 @@ class FollowCamera(subject: Point) {
  * A ray that starts inside the box enters it at once, at 0.
  */
 fun distanceToBox(origin: Point, direction: Point, box: Block): Double? {
-    val (nearX, farX) = slab(origin.x, direction.x, box.x, box.x + box.width) ?: return null
-    val (nearY, farY) = slab(origin.y, direction.y, box.y, box.y + box.height) ?: return null
-    val (nearZ, farZ) = slab(origin.z, direction.z, box.z, box.z + box.depth) ?: return null
-    val enter = maxOf(nearX, nearY, nearZ, 0.0)
-    val leave = minOf(farX, farY, farZ)
-    return if (enter <= leave) enter else null
+    val enter = enterAt(
+        origin.x, origin.y, origin.z, direction.x, direction.y, direction.z,
+        box.x, box.y, box.z, box.x + box.width, box.y + box.height, box.z + box.depth,
+    )
+    return if (enter >= 0.0) enter else null
 }
 
-/** Along a ray, where it is between [low] and [high] on one axis: from, to. Null when it never is. */
-private fun slab(origin: Double, direction: Double, low: Double, high: Double): Pair<Double, Double>? {
-    if (direction == 0.0) {
-        return if (origin in low..high) Pair(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY) else null
+/**
+ * How far along the ray from [ox], [oy], [oz] going [dx], [dy], [dz] it enters the box from its low corner to its high
+ * corner, or -1 when it misses: the slabs between each pair of faces, worked out in place so nothing new is made.
+ */
+private fun enterAt(
+    ox: Double, oy: Double, oz: Double,
+    dx: Double, dy: Double, dz: Double,
+    lowX: Double, lowY: Double, lowZ: Double,
+    highX: Double, highY: Double, highZ: Double,
+): Double {
+    var enter = 0.0
+    var leave = Double.POSITIVE_INFINITY
+    if (dx == 0.0) {
+        if (ox < lowX || ox > highX) return -1.0
+    } else {
+        val a = (lowX - ox) / dx
+        val b = (highX - ox) / dx
+        enter = max(enter, min(a, b))
+        leave = min(leave, max(a, b))
     }
-    val first = (low - origin) / direction
-    val second = (high - origin) / direction
-    return Pair(min(first, second), max(first, second))
+    if (dy == 0.0) {
+        if (oy < lowY || oy > highY) return -1.0
+    } else {
+        val a = (lowY - oy) / dy
+        val b = (highY - oy) / dy
+        enter = max(enter, min(a, b))
+        leave = min(leave, max(a, b))
+    }
+    if (dz == 0.0) {
+        if (oz < lowZ || oz > highZ) return -1.0
+    } else {
+        val a = (lowZ - oz) / dz
+        val b = (highZ - oz) / dz
+        enter = max(enter, min(a, b))
+        leave = min(leave, max(a, b))
+    }
+    return if (enter <= leave) enter else -1.0
 }
 
 private operator fun Point.plus(other: Point) = Point(x + other.x, y + other.y, z + other.z)

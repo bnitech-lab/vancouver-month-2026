@@ -98,20 +98,23 @@ class FollowCameraTest {
     @Test
     fun `a tap on a person or a building opens its place`() {
         for (venue in Neighbourhood.venues) {
-            // Stand where the player talks, and look at the person from the street, close in, as the city's other
-            // buildings stand across the street.
+            // Stand where the player talks, and look at the person from the street, as far off as the camera starts.
             val yaw = if (venue.doorFacesSouth) 0.0 else PI
-            val camera = camera(Point(venue.talkSpot.x, 1.0, venue.talkSpot.z), yaw)
-            camera.zoom(0.35)
-            camera.jumpTo(Point(venue.talkSpot.x, 1.0, venue.talkSpot.z))
+            val spot = Point(venue.talkSpot.x, 1.0, venue.talkSpot.z)
+            val camera = camera(spot, yaw)
             val head = assertNotNull(camera.screenPoint(Point(venue.person.x, 1.2, venue.person.z)), "${venue.place}")
             assertEquals(Picked.AtPlace(venue.place), camera.pick(head.left, head.top), "${venue.place}")
+            // Its wall, halfway up, above the person and in line with the camera.
             val front = if (venue.doorFacesSouth) venue.z + venue.depth else venue.z
-            val wall = Point(venue.x + 0.6, venue.height - 0.5, front.toDouble())
-            val onWall = camera.screenPoint(wall)
-            if (onWall != null && onWall.left in 0.0..1.0 && onWall.top in 0.0..1.0) {
-                assertEquals(Picked.AtPlace(venue.place), camera.pick(onWall.left, onWall.top), "${venue.place}'s wall")
-            }
+            val x = venue.person.x.coerceIn(venue.x + 0.6, venue.x + venue.width - 0.6)
+            val wall = assertNotNull(camera.screenPoint(Point(x, venue.height / 2, front.toDouble())), "${venue.place}")
+            assertTrue(wall.left in 0.0..1.0 && wall.top in 0.0..1.0, "${venue.place}'s wall is at $wall")
+            assertEquals(Picked.AtPlace(venue.place), camera.pick(wall.left, wall.top), "${venue.place}'s wall")
+            // Close in, the person is still picked.
+            camera.zoom(0.35)
+            camera.jumpTo(spot)
+            val near = assertNotNull(camera.screenPoint(Point(venue.person.x, 1.2, venue.person.z)), "${venue.place}")
+            assertEquals(Picked.AtPlace(venue.place), camera.pick(near.left, near.top), "${venue.place}, near")
         }
     }
 
