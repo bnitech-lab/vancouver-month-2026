@@ -3,11 +3,13 @@
 A small turn-based game in Kotlin. You play a newcomer in Vancouver with one month to land a job offer before
 the money runs out.
 
-1. **September 1st: pick a room.** Three rooms show rent, a transit zone and whether utilities are included, next
-   to a price board. Pick the room you think is cheapest in total, guess what it really costs a month, and see the
-   real total and a score: 100 points for the cheapest room, and up to 100 for the guess, one point off per dollar
-   missed. The rule behind it: compare rooms by their total monthly cost (rent, utilities and a transit pass), not
-   by rent alone.
+1. **September 1st: pick a room.** You arrived the day before with $3,000, and the goal is a job offer by September
+   30th, so first you need a room for the month. Its total is paid now and again on October 1st. Three rooms show
+   rent, a transit zone and whether utilities are included, next to a price board. Pick the room you think is
+   cheapest in total, guess what it really costs a month, and see the real total and a score: 100 points for the
+   cheapest room, and up to 100 for the guess, one point off per dollar missed. One more line says how much more a
+   month the pick costs than the cheapest room. The rule behind it: compare rooms by their total monthly cost (rent,
+   utilities and a transit pass), not by rent alone.
 2. **September 2nd to 30th: one action a day.** Work a café shift, study English, practise coding, send an
    application, or rest. Every day costs living money, and every action but rest costs energy.
 3. **Interviews.** An application may book a phone screen (passed on English), and passing it books a technical
