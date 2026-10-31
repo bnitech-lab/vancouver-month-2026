@@ -67,8 +67,11 @@ object SkyTrainRun {
     const val TOP_SPEED = 2 * REACH / LEAVE * 1_000
 
     /** How far [ear] is from the nearest part of the train at [millis], the train taken every half unit along it. */
-    fun distanceTo(millis: Double, ear: Point): Double {
-        val west = Neighbourhood.TRAIN_STOP + shiftAt(millis)
+    fun distanceTo(millis: Double, ear: Point): Double = distanceAt(shiftAt(millis), ear)
+
+    /** How far [ear] is from the nearest part of the train [shift] from its stop at the station. */
+    fun distanceAt(shift: Double, ear: Point): Double {
+        val west = Neighbourhood.TRAIN_STOP + shift
         val up = ear.y - (Neighbourhood.DECK_HEIGHT + 0.9)
         var nearest = Double.MAX_VALUE
         val steps = (Neighbourhood.TRAIN_LENGTH / 0.5).toInt()
@@ -89,10 +92,16 @@ object SkyTrainRun {
      * and once it is under way, as loud as its distance lets it be. It is silent while it stands at the station and
      * while it is away, and fades with it far down the line.
      */
-    fun rumbleAt(millis: Double, ear: Point): Double {
-        val underWay = (speedAt(millis) / (TOP_SPEED * UNDER_WAY)).coerceIn(0.0, 1.0)
+    fun rumbleAt(millis: Double, ear: Point): Double = rumble(shiftAt(millis), speedAt(millis), opacityAt(millis), ear)
+
+    /**
+     * How loud a train [shift] from its stop at the station, going [speed] units a second and [shown] from 0.0 to 1.0,
+     * rumbles to an ear at [ear], as [rumbleAt] works it out for the line's own train: for the train of a ride too.
+     */
+    fun rumble(shift: Double, speed: Double, shown: Double, ear: Point): Double {
+        val underWay = (abs(speed) / (TOP_SPEED * UNDER_WAY)).coerceIn(0.0, 1.0)
         if (underWay == 0.0) return 0.0
-        return opacityAt(millis) * underWay * loudnessAt(distanceTo(millis, ear))
+        return shown * underWay * loudnessAt(distanceAt(shift, ear))
     }
 
     /** Half as loud this far from the train. */
