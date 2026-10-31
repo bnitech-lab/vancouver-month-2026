@@ -120,6 +120,25 @@ The date is each player's own, so near midnight two time zones can be on differe
 month and day but not the year, so the same date in two different years reads the same, although those are two
 different runs.
 
+### Continuing a month
+
+The phone screen keeps the month in progress in the browser's `localStorage`: a short record of the run (its seed, or
+today's run and its date), the room picked, the guess, and what each day was spent on. Nothing more is needed, since the
+same seed and the same choices always play out the same way. The record is written when the month starts and after every
+day, and emptied at any ending.
+
+Opened again for the same run, the page first offers that month: a card shows the day and the balance it goes on from,
+with 이어하기 and 새로 시작. 이어하기 rebuilds the month by playing the recorded days again through the same rules and goes
+straight to that day, in the town or on the button screen; 새로 시작 drops the record and shows the rooms. An address with
+no run (neither `?seed` nor `?today`) opens the kept month's run, and there 새로 시작 plays a new run instead. There is one
+slot: a page opened for another run leaves the kept month alone, its start card says that starting will drop the month
+kept on that day, and starting takes its place. Two tabs share the slot too, so the day last played in either is the one
+kept. A record that cannot be read or replayed (another version, or a day the rules refuse) is dropped without a word,
+and where the browser refuses storage there is no card and nothing is kept.
+
+A test replays a few kept lines to months written down by hand, so a change to the rules fails it until
+`MonthRecord.VERSION` goes up, which drops the older lines rather than continuing them into a different month.
+
 ### The 3D town
 
 On the phone screen, September is played in a small 3D town that fills the screen, drawn with
@@ -241,6 +260,7 @@ is the switch, `FirstRunGuide.kt` the card and `Memory.kt` the storage that may 
 | Part | What | Notes |
 |---|---|---|
 | `core` | The rules: rooms, the score, the month, interviews, endings, and the run number for a date | Kotlin Multiplatform, standard library only, so the same rules run on the JVM and in a browser. All luck goes through one `Dice` interface, so tests can control it |
+| `save` | A month in progress as a short record, and the month rebuilt from it by playing each day's choice again | Kotlin Multiplatform, core only, so the JVM tests it by replaying hundreds of random months beside the live ones |
 | `text` | The Korean lines both screens share (amounts, dates, actions, events, endings, today's result line, the townspeople's lines) and how a typed amount is read | Kotlin Multiplatform, no layout |
 | `terminal` | The text screen | Kotlin on the JVM |
 | `web` | The phone screen in a browser, with the 3D town to walk in | Kotlin/JS drawing the page with the DOM, plain CSS, no framework. The town is drawn with Three.js |
@@ -252,7 +272,7 @@ is the switch, `FirstRunGuide.kt` the card and `Memory.kt` the storage that may 
 
 The browser tests run in Chrome, so `./gradlew test` needs Chrome installed. The web tests draw the real town
 with WebGL on SwiftShader, Chrome's software renderer, set up in `web/karma.config.d`. `./gradlew test` does not take
-`--tests`: to run some tests only, name the module's JVM test task, which is `jvmTest` in `core` and `text`
+`--tests`: to run some tests only, name the module's JVM test task, which is `jvmTest` in `core`, `save` and `text`
 and `test` in `terminal` (for example `./gradlew :terminal:test --tests '*TerminalGameTest*'`).
 
 Rooms come from a seed. Farther zones have lower rent and a dearer pass, and utilities may or may not be
