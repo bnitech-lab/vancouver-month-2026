@@ -32,10 +32,31 @@ class PatchNote(
  */
 object PatchNotes {
     /** The newest version, shown by the title; it is [ALL]'s first entry. */
-    const val CURRENT = "0.12"
+    const val CURRENT = "0.13"
 
     /** Every update, newest first. */
     val ALL: List<PatchNote> = listOf(
+        PatchNote(
+            version = "0.13",
+            date = "2026-10-31",
+            headline = "스카이트레인·버스·수상버스·택시",
+            added = listOf(
+                "스카이트레인 역이 넷이 됐어요. 다운타운역은 땅 밑에 있어요.",
+                "역 건물을 누르면 걸어가서 갈 역을 골라요. 기차가 그 역까지 데려다줘요.",
+                "버스가 웨스트엔드와 다운타운을 돌아요. 정류장 다섯 곳에서 타요.",
+                "정류장을 누르고 내릴 정류장을 고르면 버스가 길을 따라 가요.",
+                "스카이트레인과 버스는 정기권으로 타서 요금이 따로 없어요.",
+                "폴스 크릭에 수상버스 선착장이 셋 있어요. 한 번에 \$4예요.",
+                "위 카드의 '택시 부르기'로 다섯 곳, 자전거 가게, 역 어디든 가요.",
+                "택시는 기본 \$4에 거리만큼 더 나와요. 요금을 먼저 보여 줘요.",
+                "타고 가는 동안에는 말을 걸 수 없고, 하루도 지나지 않아요.",
+                "택시는 가는 길에 '내리기'로 내릴 수 있어요.",
+                "미니맵에 역, 버스 정류장, 선착장, 자전거 가게가 작게 보여요.",
+            ),
+            improved = listOf(
+                "지난번에 하던 한 달도 그대로 이어할 수 있어요.",
+            ),
+        ),
         PatchNote(
             version = "0.12",
             date = "2026-10-31",
