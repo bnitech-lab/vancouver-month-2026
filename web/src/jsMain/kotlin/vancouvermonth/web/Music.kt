@@ -8,14 +8,14 @@ import kotlin.random.Random
  * the evening, and at night only a quiet bed of soft noise under a few slow notes. [level] is how loud the notes are,
  * [noise] how loud the bed of soft noise is (0 to 1), and [brightness] how much of the notes' high end is kept.
  */
-enum class Mood(val level: Double, val noise: Double, val brightness: Double) {
+internal enum class Mood(val level: Double, val noise: Double, val brightness: Double) {
     DAY(1.0, 0.0, 1.0),
     EVENING(0.7, 0.35, 0.55),
     NIGHT(0.45, 1.0, 0.3),
 }
 
 /** The mood for an hour (0 to 23) on the player's clock: day from 6:00, evening from 18:00, night from 22:00. */
-fun moodAt(hour: Int): Mood = when (hour) {
+internal fun moodAt(hour: Int): Mood = when (hour) {
     in 6..17 -> Mood.DAY
     in 18..21 -> Mood.EVENING
     else -> Mood.NIGHT
@@ -26,7 +26,7 @@ fun moodAt(hour: Int): Mood = when (hour) {
  * [length] of them. A pitch is a MIDI number (69 is the A above middle C), and a chord has several. [velocity] is how
  * hard it is struck, from 0 to 1.
  */
-data class Note(val step: Int, val length: Int, val pitches: List<Int>, val velocity: Double) {
+internal data class Note(val step: Int, val length: Int, val pitches: List<Int>, val velocity: Double) {
     val isRest: Boolean
         get() = pitches.isEmpty()
 
@@ -38,7 +38,8 @@ data class Note(val step: Int, val length: Int, val pitches: List<Int>, val velo
  * One loop of the village tune in one mood: a music-box [melody], soft [chords] under it, and a low [bass]. Each part
  * is a run of notes and rests that fills the loop from its first step to its last.
  */
-class Tune(val mood: Mood, val melody: List<Note>, val chords: List<Note>, val bass: List<Note>) {
+internal class Tune(val mood: Mood, val melody: List<Note>, val chords: List<Note>, val bass: List<Note>) {
+    /** The three parts in one list (for tests). */
     val parts: List<List<Note>>
         get() = listOf(melody, chords, bass)
 
@@ -46,7 +47,10 @@ class Tune(val mood: Mood, val melody: List<Note>, val chords: List<Note>, val b
     val notes: List<Note>
         get() = parts.flatten().filterNot { it.isRest }
 
-    /** A rough measure of how loud the loop is: each pitch counted by how hard it is struck and how long it lasts. */
+    /**
+     * A rough measure of how loud the loop is: each pitch counted by how hard it is struck and how long it lasts
+     * (for tests).
+     */
     val loudness: Double
         get() = mood.level * mood.level * notes.sumOf { it.velocity * it.velocity * it.length * it.pitches.size }
 }
@@ -58,7 +62,7 @@ class Tune(val mood: Mood, val melody: List<Note>, val chords: List<Note>, val b
  * again with the home ending. Its notes come from a seed, and each pass through the loop changes a few of them a
  * little, so the loop never sounds quite the same twice.
  */
-object VillageTune {
+internal object VillageTune {
     const val BEATS_PER_MINUTE = 70
     const val STEPS_PER_BEAT = 2
     const val STEPS_PER_BAR = 4 * STEPS_PER_BEAT
