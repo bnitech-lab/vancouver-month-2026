@@ -601,6 +601,7 @@ class PhoneGame private constructor(
         talkLine = passerLine(passer, current.day, count)
         talkOpened = window.performance.now()
         focusNext = ".talk"
+        sound?.blip()
         show()
     }
 

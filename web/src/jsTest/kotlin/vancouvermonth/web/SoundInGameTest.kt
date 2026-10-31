@@ -97,6 +97,22 @@ class SoundInGameTest {
     }
 
     @Test
+    fun `a small talk with a passerby opens with a blip too`() {
+        val town = QuietTown()
+        val game = PhoneGame(root, 1011, playAgain = {}, makeWalkableTown = { town })
+        game.sound = sound
+        game.talkSettleMillis = 0.0
+        game.show()
+        startSeed1011(root)
+        switchIn(assertNotNull(root.querySelector(".hud") as? HTMLElement)).click()
+
+        // The town tells the game the player stopped 미나 for a word, as a tap on her would.
+        town.onPasserby(Passer.MINA)
+        assertNotNull(root.querySelector(".talk"))
+        assertEquals(listOf("on", "blip"), speaker.asked.filter { it != "tick" })
+    }
+
+    @Test
     fun `a game with no sound has no switch anywhere`() {
         PhoneGame(root, 1011, playAgain = {}, makeWalkableTown = { QuietTown() }).show()
         startSeed1011(root)
