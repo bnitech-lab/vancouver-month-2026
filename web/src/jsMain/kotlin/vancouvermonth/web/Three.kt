@@ -24,6 +24,9 @@ external open class Object3D {
     /** Whether it is left out when it seems off screen; false for boxes that move about, whose bounds go stale. */
     var frustumCulled: Boolean
 
+    /** Where it comes among things drawn alike, lowest first; see-through things are drawn after solid ones. */
+    var renderOrder: Int
+
     /** Where it is, how it is turned and how big, all in one; [updateMatrix] works it out from those three. */
     val matrix: Matrix4
     fun updateMatrix()
@@ -55,6 +58,8 @@ external class Color(hex: Int) {
 /** Haze that fades far things into [color], from [near] to [far] away. */
 external class Fog(color: Int, near: Double, far: Double) {
     val color: Color
+    var near: Double
+    var far: Double
 }
 
 external class Scene : Object3D {
@@ -129,13 +134,27 @@ external class DataTexture(data: Uint8Array, width: Int, height: Int, format: In
     fun dispose()
 }
 
-/** The shape of a box. The town draws every box from one 1x1x1 box, stretched with `scale`. */
-external class BoxGeometry(width: Double, height: Double, depth: Double) {
+/** A shape made of triangles, shared by every copy drawn from it. */
+external open class BufferGeometry {
     fun dispose()
 }
 
+/** The shape of a box. The town draws every box from one 1x1x1 box, stretched with `scale`. */
+external class BoxGeometry(width: Double, height: Double, depth: Double) : BufferGeometry
+
+/** A flat square standing up, facing +z: two triangles where a box has twelve. Each streak of rain is one. */
+external class PlaneGeometry(width: Double, height: Double) : BufferGeometry
+
+/** For a material's `side`: drawn from both faces, as a flat square seen from behind must be. */
+external val DoubleSide: Int
+
 /** How a surface looks. Each kind below takes options such as `color`. */
 external open class Material {
+    /**
+     * True to draw a see-through surface seen from both sides in one pass. Otherwise three.js draws it twice a frame,
+     * back faces then front, switching its shader between the two.
+     */
+    var forceSinglePass: Boolean
     fun dispose()
 }
 
@@ -152,16 +171,32 @@ external class MeshToonMaterial(parameters: Json) : Material {
     var opacity: Double
 }
 
-external class Mesh(geometry: BoxGeometry, material: Material) : Object3D
+/**
+ * A plain colour that no light changes, as rain is. With the option `transparent`, `opacity` lets the town show
+ * through.
+ */
+external class MeshBasicMaterial(parameters: Json) : Material {
+    val color: Color
+}
+
+external class Mesh(geometry: BufferGeometry, material: Material) : Object3D
 
 /** Many copies of one shape drawn at once, each with its own place, size and colour: one draw for many boxes. */
-external class InstancedMesh(geometry: BoxGeometry, material: Material, count: Int) : Object3D {
+external class InstancedMesh(geometry: BufferGeometry, material: Material, count: Int) : Object3D {
     fun setMatrixAt(index: Int, matrix: Matrix4)
     fun setColorAt(index: Int, color: Color)
     fun dispose()
 
     /** Every copy's place, size and turn, sixteen numbers each, column by column, to change while it moves. */
     val instanceMatrix: InstanceMatrices
+
+    /** Every copy's colour, once [setColorAt] has given one; after a change, its `needsUpdate` sends them again. */
+    val instanceColor: InstanceColours?
+}
+
+/** The numbers behind [InstancedMesh.instanceColor]: [needsUpdate] sends changed colours to the graphics card. */
+external interface InstanceColours {
+    var needsUpdate: Boolean
 }
 
 /**

@@ -1,6 +1,8 @@
 package vancouvermonth.web
 
+import kotlin.math.max
 import kotlin.math.roundToInt
+import vancouvermonth.text.Weather
 
 /**
  * How the town is lit: the colour of the sky (and of the haze far away), the soft light from all round and its
@@ -78,6 +80,74 @@ object DayLight {
             sunColour = mix(start.sunColour, end.sunColour, share),
             glow = start.glow + (end.glow - start.glow) * share,
         )
+    }
+
+    /**
+     * [lighting] under [weather]'s sky. A sunny day keeps it as it is. A cloudy day greys the sky and softens the sun,
+     * so shadows are faint. A rainy day greys the sky more and darkens it, the sun is only a soft glow through the
+     * clouds and the light comes from all round, and the windows and lamps glow a little even by day.
+     */
+    fun weathered(lighting: Lighting, weather: Weather): Lighting = when (weather) {
+        Weather.SUNNY -> lighting
+        Weather.CLOUDY -> lighting.copy(
+            sky = grey(lighting.sky, 0.55, 0.97),
+            ambient = lighting.ambient * 1.05,
+            ambientColour = grey(lighting.ambientColour, 0.3, 1.0),
+            sun = lighting.sun * 0.55,
+            sunColour = grey(lighting.sunColour, 0.5, 1.0),
+        )
+        Weather.RAINY -> lighting.copy(
+            sky = grey(lighting.sky, 0.8, 0.82),
+            ambient = lighting.ambient * 1.02,
+            ambientColour = grey(lighting.ambientColour, 0.45, 0.95),
+            sun = lighting.sun * 0.3,
+            sunColour = grey(lighting.sunColour, 0.7, 1.0),
+            glow = max(lighting.glow, RAIN_GLOW),
+        )
+    }
+
+    /** How brightly the windows and lamps glow by day in the rain. */
+    const val RAIN_GLOW = 0.22
+
+    /** How near the haze starts and how far it hides everything under [weather]'s sky: nearer in the rain. */
+    fun haze(weather: Weather): Pair<Double, Double> = when (weather) {
+        Weather.SUNNY -> Neighbourhood.HAZE_NEAR to Neighbourhood.HAZE_FAR
+        Weather.CLOUDY -> 62.0 to 215.0
+        Weather.RAINY -> 48.0 to 190.0
+    }
+
+    /** The sea's colour under [weather]'s sky: darker and greyer in the rain. */
+    fun sea(weather: Weather): Int = when (weather) {
+        Weather.SUNNY -> Neighbourhood.WATER
+        Weather.CLOUDY -> grey(Neighbourhood.WATER, 0.35, 0.88)
+        Weather.RAINY -> grey(Neighbourhood.WATER, 0.5, 0.68)
+    }
+
+    /** How dull the glints on the water are under [weather]'s sky, as the night dulls them: not at all when sunny. */
+    fun dullness(weather: Weather): Double = when (weather) {
+        Weather.SUNNY -> 0.0
+        Weather.CLOUDY -> 0.5
+        Weather.RAINY -> 0.85
+    }
+
+    /** How strong a colour is, from 0.0 (grey) up: the gap between its strongest and weakest channel. */
+    fun saturation(colour: Int): Int {
+        val channels = listOf((colour shr 16) and 0xFF, (colour shr 8) and 0xFF, colour and 0xFF)
+        return channels.max() - channels.min()
+    }
+
+    /** How light a colour is, from 0 to 255, as the eye sees it. */
+    fun lightness(colour: Int): Double =
+        0.299 * ((colour shr 16) and 0xFF) + 0.587 * ((colour shr 8) and 0xFF) + 0.114 * (colour and 0xFF)
+
+    /** [colour] [share] of the way to the grey of its own lightness, then made [bright] times as light. */
+    private fun grey(colour: Int, share: Double, bright: Double): Int {
+        val level = lightness(colour)
+        fun channel(shift: Int): Int {
+            val value = (colour shr shift) and 0xFF
+            return ((value + (level - value) * share) * bright).roundToInt().coerceIn(0, 255) shl shift
+        }
+        return channel(16) or channel(8) or channel(0)
     }
 
     /** The colour [share] of the way from [from] to [to], each of red, green and blue blended on its own. */

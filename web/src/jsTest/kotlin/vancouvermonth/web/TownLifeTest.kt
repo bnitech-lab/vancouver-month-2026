@@ -5,6 +5,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+import org.khronos.webgl.Float32Array
+import org.khronos.webgl.get
+import vancouvermonth.text.Weather
 
 class TownLifeTest {
     /** The town's time every [step] milliseconds over [millis]. */
@@ -154,5 +157,225 @@ class TownLifeTest {
             }
             last = now
         }
+    }
+
+    @Test
+    fun `every streak of rain stays in its box of sky and falls, wherever the box is`() {
+        for ((centreX, centreZ) in listOf(0.0 to 0.0, 24.3 to 13.5, -37.2 to 51.9, 47.0 to -5.0)) {
+            val west = centreX - Rain.SPAN / 2
+            val north = centreZ - Rain.SPAN / 2
+            var falling = 0
+            var wrapped = 0
+            for (t in times(3_000.0, 40.0)) {
+                for (index in 0 until Rain.DROPS) {
+                    val drop = Rain.dropAt(index, t, centreX, centreZ)
+                    assertTrue(drop.x >= west && drop.x < west + Rain.SPAN, "streak $index at $t: x ${drop.x}")
+                    assertTrue(drop.z >= north && drop.z < north + Rain.SPAN, "streak $index at $t: z ${drop.z}")
+                    assertTrue(drop.y > 0.0 && drop.y <= Rain.TOP, "streak $index at $t: y ${drop.y}")
+                    val next = Rain.dropAt(index, t + 20.0, centreX, centreZ)
+                    when {
+                        next.y < drop.y -> {
+                            falling += 1
+                            // Down by about the speed of rain, and a little east with the wind, nothing more.
+                            val fall = drop.y - next.y
+                            assertTrue(fall in 20 * Rain.FALL * 0.85..20 * Rain.FALL * 1.15, "streak $index fell $fall")
+                            assertEquals(drop.z, next.z, "streak $index moved north or south")
+                        }
+                        else -> wrapped += 1
+                    }
+                }
+            }
+            // A streak goes back to the top only once a fall, about every second.
+            assertTrue(wrapped < falling / 40, "$wrapped went back up, $falling fell")
+        }
+    }
+
+    @Test
+    fun `rain stays put in the town as the box of sky moves with the camera`() {
+        // Moving the box by a little leaves every streak still in it exactly where it was.
+        for (index in 0 until Rain.DROPS) {
+            val here = Rain.dropAt(index, 500.0, 20.0, 13.0)
+            val there = Rain.dropAt(index, 500.0, 21.0, 13.5)
+            val inBoth = here.x >= 21.0 - Rain.SPAN / 2 && here.z >= 13.5 - Rain.SPAN / 2
+            if (!inBoth) continue
+            assertEquals(here.x, there.x, 1e-9, "streak $index")
+            assertEquals(here.y, there.y, 1e-9, "streak $index")
+            assertEquals(here.z, there.z, 1e-9, "streak $index")
+        }
+    }
+
+    @Test
+    fun `the rain written for drawing is the rain worked out, streaks and splashes`() {
+        val numbers = Float32Array((Rain.DROPS + Rain.SPLASHES) * 16)
+        Rain.write(1_234.0, 24.3, 13.5, numbers)
+        for (index in listOf(0, 17, Rain.DROPS - 1)) {
+            val drop = Rain.dropAt(index, 1_234.0, 24.3, 13.5)
+            val at = index * 16
+            // The streak's middle: half a streak under its top, half a lean east of it.
+            assertEquals(drop.x + Rain.SLANT * Rain.STREAK / 2, numbers[at + 12].toDouble(), 1e-4)
+            assertEquals(drop.y - Rain.STREAK / 2, numbers[at + 13].toDouble(), 1e-4)
+            assertEquals(drop.z, numbers[at + 14].toDouble(), 1e-4)
+            assertEquals(Rain.STREAK, numbers[at + 5].toDouble(), 1e-6)
+        }
+        for (index in 0 until Rain.SPLASHES) {
+            val splash = Rain.splashAt(index, 1_234.0, 24.3, 13.5)
+            val at = (Rain.DROPS + index) * 16
+            assertEquals(splash.x + splash.width / 2, numbers[at + 12].toDouble(), 1e-4)
+            assertEquals(splash.width, numbers[at].toDouble(), 1e-6)
+            // Laid flat: the square's up runs along the ground, its face up.
+            assertEquals(0f, numbers[at + 5])
+            assertEquals(splash.depth, -numbers[at + 6].toDouble(), 1e-6)
+            assertEquals(1f, numbers[at + 9])
+        }
+    }
+
+    @Test
+    fun `each streak stands up turned to the camera, thin across its view`() {
+        val numbers = Float32Array((Rain.DROPS + Rain.SPLASHES) * 16)
+        for (turn in listOf(0.0, 0.7, -2.1, kotlin.math.PI)) {
+            Rain.write(500.0, 10.0, 10.0, numbers, turn = turn)
+            for (index in listOf(0, 99, Rain.DROPS - 1)) {
+                val at = index * 16
+                // Its face points the way the camera looks from, across the ground.
+                assertEquals(kotlin.math.sin(turn), numbers[at + 8].toDouble(), 1e-6)
+                assertEquals(kotlin.math.cos(turn), numbers[at + 10].toDouble(), 1e-6)
+                assertEquals(0f, numbers[at + 9])
+                // Thin across, at right angles to its face, and long upright.
+                val acrossX = numbers[at].toDouble()
+                val acrossZ = numbers[at + 2].toDouble()
+                assertEquals(Rain.THIN, kotlin.math.hypot(acrossX, acrossZ), 1e-6)
+                assertEquals(0.0, acrossX * numbers[at + 8] + acrossZ * numbers[at + 10], 1e-6)
+                assertEquals(Rain.STREAK, numbers[at + 5].toDouble(), 1e-6)
+            }
+        }
+    }
+
+    @Test
+    fun `no streak of rain is drawn right by the camera, and the others are drawn as they fall`() {
+        val eye = Point(20.0, 9.0, 25.0)
+        val numbers = Float32Array((Rain.DROPS + Rain.SPLASHES) * 16)
+        var left = 0
+        for (t in times(2_000.0, 100.0)) {
+            Rain.write(t, 20.0, 18.0, numbers, eye)
+            for (index in 0 until Rain.DROPS) {
+                val drop = Rain.dropAt(index, t, 20.0, 18.0)
+                val middle = Point(drop.x + Rain.SLANT * Rain.STREAK / 2, drop.y - Rain.STREAK / 2, drop.z)
+                val near = kotlin.math.hypot(kotlin.math.hypot(middle.x - eye.x, middle.y - eye.y), middle.z - eye.z)
+                val at = index * 16
+                if (near < Rain.CLEAR) {
+                    left += 1
+                    for (offset in 0 until 15) assertEquals(0f, numbers[at + offset], "streak $index by the camera")
+                } else {
+                    assertEquals(Rain.STREAK, numbers[at + 5].toDouble(), 1e-6, "streak $index")
+                    assertEquals(middle.y, numbers[at + 13].toDouble(), 1e-4, "streak $index")
+                }
+            }
+        }
+        assertTrue(left > 0, "the camera was never in the rain")
+    }
+
+    @Test
+    fun `splashes flash on the ground or the sea for a moment, each time somewhere else`() {
+        var shown = 0
+        val spots = mutableSetOf<Pair<Int, Int>>()
+        for (t in times(Rain.SPLASH_MILLIS * 6, 25.0)) {
+            for (index in 0 until Rain.SPLASHES) {
+                val splash = Rain.splashAt(index, t, 24.3, 13.5)
+                assertTrue(splash.width <= Rain.SPLASH_SIZE * 1.4 + 1e-9, "$splash")
+                val onSea = splash.z + splash.depth / 2 < 0.0
+                assertTrue(splash.y == Rain.SPLASH_HEIGHT || onSea, "a splash in the air: $splash")
+                assertTrue(splash.x >= 24.3 - Rain.SPAN / 2 - 1.0 && splash.x <= 24.3 + Rain.SPAN / 2, "$splash")
+                if (splash.width > 0.01) {
+                    shown += 1
+                    spots += splash.x.toInt() to splash.z.toInt()
+                }
+            }
+        }
+        val share = shown.toDouble() / (Rain.SPLASHES * times(Rain.SPLASH_MILLIS * 6, 25.0).size)
+        assertTrue(share in Rain.SPLASH_SHOWS * 0.7..Rain.SPLASH_SHOWS * 1.3, "shown $share of the time")
+        assertTrue(spots.size > Rain.SPLASHES * 3, "splashes keep to the same spots: ${spots.size}")
+    }
+
+    @Test
+    fun `puddles lie flat on the street, the pavements or the seawall, just over the stone`() {
+        for (puddle in Rain.puddles) {
+            assertTrue(puddle.height < 0.02 && puddle.y in 0.03..0.07, "$puddle")
+            val onStreet =
+                puddle.z >= Neighbourhood.STREET_NORTH && puddle.z + puddle.depth <= Neighbourhood.STREET_SOUTH
+            val onSeawall = puddle.z >= 0.0 && puddle.z + puddle.depth <= 2.0
+            assertTrue(onStreet || onSeawall, "$puddle")
+        }
+    }
+
+    @Test
+    fun `the clouds grey with the weather`() {
+        assertEquals(0xFFFFFF, Clouds.colour(Weather.SUNNY))
+        assertTrue(DayLight.lightness(Clouds.colour(Weather.RAINY)) < DayLight.lightness(Clouds.colour(Weather.CLOUDY)))
+        assertTrue(DayLight.lightness(Clouds.colour(Weather.CLOUDY)) < DayLight.lightness(Clouds.colour(Weather.SUNNY)))
+    }
+
+    @Test
+    fun `the train's rumble is louder the nearer it is, and silent while it stands or is away`() {
+        // Loudness falls all the way with distance.
+        val far = (0..300).map { SkyTrainRun.loudnessAt(it.toDouble()) }
+        assertEquals(1.0, far.first())
+        assertTrue(far.zipWithNext().all { (a, b) -> b < a })
+        assertEquals(0.5, SkyTrainRun.loudnessAt(SkyTrainRun.RUMBLE_NEAR), 1e-9)
+        assertTrue(SkyTrainRun.loudnessAt(150.0) < 0.02)
+
+        // An ear above the station's plaza, where the camera often is.
+        val ear = Point(27.0, 12.0, 20.0)
+        for (t in times(SkyTrainRun.PERIOD, 50.0)) {
+            val level = SkyTrainRun.rumbleAt(t, ear)
+            assertTrue(level in 0.0..1.0, "at $t: $level")
+            if (SkyTrainRun.speedAt(t) == 0.0) assertEquals(0.0, level, "at $t it stands or is away, yet rumbles")
+            if (!SkyTrainRun.isShownAt(t)) assertEquals(0.0, level, "at $t it is away, yet rumbles")
+        }
+        // Once under way, coming in it grows louder as it comes nearer, and pulling out it fades as it goes.
+        val full = SkyTrainRun.TOP_SPEED * SkyTrainRun.UNDER_WAY
+        val coming = times(SkyTrainRun.PERIOD, 50.0).filter { t ->
+            SkyTrainRun.shiftAt(t) < 0 && SkyTrainRun.speedAt(t) >= full
+        }
+        val going = times(SkyTrainRun.PERIOD, 50.0).filter { t ->
+            SkyTrainRun.shiftAt(t) > 0 && SkyTrainRun.speedAt(t) >= full
+        }
+        assertTrue(coming.size > 20 && going.size > 20)
+        for ((a, b) in coming.zipWithNext()) {
+            assertTrue(SkyTrainRun.distanceTo(b, ear) < SkyTrainRun.distanceTo(a, ear))
+            assertTrue(SkyTrainRun.rumbleAt(b, ear) >= SkyTrainRun.rumbleAt(a, ear), "coming in at $b it got quieter")
+        }
+        for ((a, b) in going.zipWithNext()) {
+            assertTrue(SkyTrainRun.rumbleAt(b, ear) <= SkyTrainRun.rumbleAt(a, ear), "pulling out at $b it got louder")
+        }
+        // Loudest close by: well heard as it passes the plaza, hardly at all far down the line.
+        val loudest = times(SkyTrainRun.PERIOD, 50.0).maxOf { SkyTrainRun.rumbleAt(it, ear) }
+        assertTrue(loudest > 0.3, "loudest $loudest")
+        val distant = times(SkyTrainRun.PERIOD, 50.0).filter { SkyTrainRun.distanceTo(it, ear) > 120 }
+        assertTrue(distant.isNotEmpty() && distant.all { SkyTrainRun.rumbleAt(it, ear) < 0.02 })
+    }
+
+    @Test
+    fun `the train's speed matches how far it goes`() {
+        for (t in times(SkyTrainRun.PERIOD, 37.0)) {
+            val moved = abs(SkyTrainRun.shiftAt(t + 1) - SkyTrainRun.shiftAt(t - 1)) / 2 * 1_000
+            val boundary = listOf(SkyTrainRun.DWELL, SkyTrainRun.DWELL + SkyTrainRun.LEAVE).any { abs(t - it) < 2 }
+            if (!boundary) assertEquals(moved, SkyTrainRun.speedAt(t), 0.05, "at $t")
+            assertTrue(SkyTrainRun.speedAt(t) <= SkyTrainRun.TOP_SPEED + 1e-9)
+        }
+    }
+
+    @Test
+    fun `the fire crackles only after dark, and only near it`() {
+        assertEquals(1.0, Campfire.nearness(0.0))
+        assertEquals(0.0, Campfire.nearness(Campfire.HEARD_WITHIN))
+        assertEquals(0.0, Campfire.nearness(30.0))
+        val near = (0..100).map { Campfire.nearness(it / 10.0) }
+        assertTrue(near.zipWithNext().all { (a, b) -> b <= a })
+        // From the bench, at night, it is well heard; by day, or from the street, not at all.
+        val bench = distanceBetween(Neighbourhood.benchSeat, Neighbourhood.campfire)
+        assertTrue(Campfire.crackle(Campfire.nearness(bench), 1.0) > 0.5)
+        assertEquals(0.0, Campfire.crackle(Campfire.nearness(bench), 0.0))
+        val street = distanceBetween(Neighbourhood.venue(Place.CAFE).door, Neighbourhood.campfire)
+        assertEquals(0.0, Campfire.crackle(Campfire.nearness(street), 1.0))
     }
 }

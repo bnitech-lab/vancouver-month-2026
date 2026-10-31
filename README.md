@@ -147,8 +147,9 @@ cartoon shading, a warm sun with soft shadows, round-headed people, round trees 
 street lamps and a campfire. The five places stand on a stone street with brick pavements: 내 방 (the room picked on
 September 1st) with its garden, the 카페, the 도서관, 코워킹 and the 회사 tower, with a park and a pond, a seawall path by
 the water, a SkyTrain guideway with a station and a train, and mountains across the water. Each building's name floats
-over it. The day's figures sit thinly over the top of the screen. The month's first view looks down the street from
-its west end, high enough to show four of the buildings and their names.
+over it. The day's figures sit thinly over the top of the screen, and a name that would sit under them or the day's log
+hides there. The month's first view looks down the street from its west end, high enough to show four of the buildings
+and their names.
 
 | Do | What happens |
 |---|---|
@@ -179,6 +180,17 @@ The SkyTrain stands at the station, pulls out east and comes back in from the we
 station, with its windows lit at night. The campfire flickers and lights the bench after dark, light glints on the
 water, petals drift down from the blossom trees, and clouds drift high over the water.
 
+Each day has its weather, sunny, cloudy or rainy, worked out from the run's seed and the day, so a run always has the
+same skies and everyone who plays today's run gets the same weather. As in a Vancouver September, about three days in
+ten are rainy and two cloudy, a day often keeps the sky of the day before, and September 2nd, the first day in town, is
+never rainy. The weather is only for the eyes and the ears: no rule reads it, so money, energy and every chance are the
+same in any weather, and a test plays the same choices in rain and in sun to the same figures. The top card shows it in
+a word after the date, 맑음, 흐림 or 비, and so does the button screen. A cloudy day greys the sky and softens the light.
+On a rainy day the sky is greyer and the light softer still, the windows glow a little by day, the haze comes nearer,
+the sea darkens, thin rain falls slanted by a light wind with small splashes on the ground, puddles lie on the street,
+and 미나 and 프리야 walk under open umbrellas (올리버 runs on, and 테오 trusts his hat). Most of the townspeople and every
+passerby have a word about the rain. A new day's weather comes in the dark of the night.
+
 An answer that spends the day ends it: a golden evening, a night with the windows, lamps and campfire lit, and the
 morning, in 1.5 seconds, with the character back at 내 방's door and the day's log over the top of the screen. On a day
 of rest the character spends the night sitting on the bench by the campfire, with the camera come round to the far side
@@ -190,8 +202,9 @@ The town draws every frame the screen offers while the character walks, the came
 own life moves at most 30 times a second. While only that life moves, it draws at most 30 frames a second, and 15 once
 nobody has touched the town for 20 seconds or while a talk covers it; the sun's shadows are drawn again on every other
 of those frames. It draws nothing while the page is hidden. It draws at most two pixels per point however sharp the
-phone, and every box of a kind in one draw: all five townspeople in one, all four passersby in another. If the phone
-starts asking for less motion during the month, the town's own life stands still.
+phone, and every box of a kind in one draw: all five townspeople in one, all four passersby in another, and all the
+rain in one, moved on the same beat as the rest of the town's life. If the phone starts asking for less motion during
+the month, the town's own life stands still, the rain with it.
 
 Where the phone asks for less motion, the month is played with buttons, under the small fixed town of the first version,
 where the character simply appears at each day's building. Where the browser has no WebGL 2, which Three.js needs, there
@@ -201,11 +214,12 @@ console. Tests force each of these.
 The town's rules are plain Kotlin with tests: `Neighbourhood` (the layout, the people, which place a spot belongs to),
 `Grid` (the A* search for the way around things), `Trip` (a walk or a dash, and the double tap), `FollowCamera`
 (turning, zooming, keeping out of walls, and what a tap lands on), `DayLight` (the light through the change of day, and
-when the passersby are out), `Passersby` (their loops, and stopping for the character), `Greeter` (the five turning and
-waving), `TownLife` (the train's round, the fire's flicker, the glints, petals and clouds, all worked out from the time)
-and `FramePace` (which frames are drawn). The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`,
-and `Passersby.kt` for the passersby's). `WalkableTown` draws all of it, and `Three.kt` declares only the parts of
-Three.js in use. The page's script, Three.js included, is about 692 KB (about 185 KB gzipped).
+when the passersby are out, and how each weather greys it), `Passersby` (their loops, and stopping for the character),
+`Greeter` (the five turning and waving), `TownLife` (the train's round and how loud it rumbles, the fire's flicker and
+crackle, the glints, petals, clouds and rain, all worked out from the time) and `FramePace` (which frames are drawn).
+The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`, and `Passersby.kt` for the passersby's),
+and so is each day's weather (`Weather.kt`). `WalkableTown` draws all of it, and `Three.kt` declares only the parts of
+Three.js in use. The page's script, Three.js included, is about 717 KB (about 193 KB gzipped).
 
 ### Sound and the first-run guide
 
@@ -217,6 +231,12 @@ never repeats exactly. The player's own clock colours it: the whole tune by day 
 darker one in the evening (from 18:00), and at night (from 22:00) only a quiet bed of soft noise that rises and falls
 like the sea, under a few slow notes. A talk opens with a soft blip, a line types out with very quiet ticks (at most
 one every 110 ms), and the change of day rings a gentle chime.
+
+The town has sounds of its own, made from noise in code in the same way. On a rainy day a soft bed of rain plays under
+the tune, well below its loudest notes. The SkyTrain rumbles softly as it pulls out and comes in, louder the nearer it is
+to the camera and silent while it stands at the station. The campfire crackles quietly when the character is near it
+after dark, in the town's own night or late on the player's clock. They follow the same switch, fade and limiter as
+the tune.
 
 Sound is off until the player turns it on with the switch in the town's top card, at the top of the button screen, and
 by the title on the room and ending screens. It is a plain button whose words say what a tap does, 소리 켜기 or 소리 끄기;
@@ -232,8 +252,9 @@ month's goal, in the words the month's start uses. 시작 or Escape closes it, a
 The button screen has no card, since its buttons say what they do.
 
 `Music.kt` writes the tune as notes and is tested without sound; `Synth.kt` plays it, and the tests render it into an
-`OfflineAudioContext` to check it is heard, never clips, and is quietest at night; `Sound.kt` is the switch,
-`FirstRunGuide.kt` the card and `Memory.kt` the storage that may be refused. The words are in `text` (`Guide.kt`).
+`OfflineAudioContext` to check it is heard, never clips, is quietest at night, and keeps the rain under it; `Sound.kt`
+is the switch, `FirstRunGuide.kt` the card and `Memory.kt` the storage that may be refused. The words are in `text`
+(`Guide.kt`).
 
 ## How it is built
 

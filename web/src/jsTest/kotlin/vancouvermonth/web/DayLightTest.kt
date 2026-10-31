@@ -3,6 +3,7 @@ package vancouvermonth.web
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import vancouvermonth.text.Weather
 
 class DayLightTest {
     @Test
@@ -56,4 +57,37 @@ class DayLightTest {
     private fun red(colour: Int) = (colour shr 16) and 0xFF
 
     private fun blue(colour: Int) = colour and 0xFF
+
+    @Test
+    fun `a sunny day keeps the light, a cloudy day greys and softens it, and a rainy day more so`() {
+        for (progress in listOf(0.0, 0.25, 0.5, 0.85)) {
+            val light = DayLight.at(progress)
+            assertEquals(light, DayLight.weathered(light, Weather.SUNNY))
+            val cloudy = DayLight.weathered(light, Weather.CLOUDY)
+            val rainy = DayLight.weathered(light, Weather.RAINY)
+            // Greyer skies, and a weaker sun, so softer shadows.
+            assertTrue(DayLight.saturation(rainy.sky) < DayLight.saturation(cloudy.sky), "at $progress")
+            assertTrue(DayLight.saturation(cloudy.sky) < DayLight.saturation(light.sky), "at $progress")
+            assertTrue(rainy.sun < cloudy.sun && cloudy.sun < light.sun, "at $progress")
+            assertTrue(DayLight.lightness(rainy.sky) <= DayLight.lightness(cloudy.sky), "at $progress")
+            // The light from all round stays, so the town is soft, not dark.
+            assertTrue(rainy.ambient >= light.ambient && cloudy.ambient >= light.ambient, "at $progress")
+            assertTrue(rainy.glow >= DayLight.RAIN_GLOW && rainy.glow >= light.glow, "at $progress")
+            assertEquals(light.glow, cloudy.glow, "at $progress")
+        }
+    }
+
+    @Test
+    fun `rain brings the haze nearer and darkens the sea and its glints`() {
+        val (sunnyNear, sunnyFar) = DayLight.haze(Weather.SUNNY)
+        val (rainyNear, rainyFar) = DayLight.haze(Weather.RAINY)
+        assertEquals(Neighbourhood.HAZE_NEAR to Neighbourhood.HAZE_FAR, sunnyNear to sunnyFar)
+        assertTrue(rainyNear < sunnyNear && rainyFar < DayLight.haze(Weather.CLOUDY).second)
+        assertEquals(Neighbourhood.WATER, DayLight.sea(Weather.SUNNY))
+        val sea = Weather.entries.map { DayLight.lightness(DayLight.sea(it)) }
+        assertTrue(sea[2] < sea[1] && sea[1] < sea[0], "$sea")
+        assertEquals(0.0, DayLight.dullness(Weather.SUNNY))
+        assertTrue(DayLight.dullness(Weather.RAINY) > DayLight.dullness(Weather.CLOUDY))
+    }
+
 }

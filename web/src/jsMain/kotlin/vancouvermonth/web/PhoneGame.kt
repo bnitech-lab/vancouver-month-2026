@@ -9,6 +9,7 @@ import org.w3c.dom.HTMLFormElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.HTMLLabelElement
 import org.w3c.dom.Range
+import org.w3c.dom.asList
 import vancouvermonth.core.Action
 import vancouvermonth.core.Ending
 import vancouvermonth.core.Event
@@ -46,6 +47,9 @@ import vancouvermonth.text.todaysRunResult
 import vancouvermonth.text.Townsperson
 import vancouvermonth.text.utilitiesLabel
 import vancouvermonth.text.utilitiesPrices
+import vancouvermonth.text.Weather
+import vancouvermonth.text.weatherOn
+import vancouvermonth.text.weatherWord
 import vancouvermonth.text.whyNot
 
 /**
@@ -129,6 +133,9 @@ class PhoneGame private constructor(
     /** The card on how to play, shown the first time the town opens; null for none. */
     internal var guide: FirstRunGuide? = null
 
+    /** Each day's weather, from the run's seed: only for how the town looks and sounds. A test may set its own. */
+    internal var weatherOf: (Int) -> Weather = { day -> weatherOn(game.seed, day) }
+
     /**
      * Where the month in progress is kept between visits; null for a game that keeps nothing. The kept month is read
      * on the first [show] after this is set, so setting it again reads it again.
@@ -156,6 +163,8 @@ class PhoneGame private constructor(
     fun show() {
         stopTyping()
         val current = month
+        // Rain is heard on a rainy day of the month, and nowhere else.
+        sound?.weather(if (current != null && !current.isOver) weatherOf(current.day) else Weather.SUNNY)
         val walking = walkable
         if (current != null && !current.isOver && walking != null) {
             showTownDay(current, walking)
@@ -365,7 +374,7 @@ class PhoneGame private constructor(
 
     private fun showDay(month: Month) {
         root.child("header", "topbar") {
-            figure("오늘", date(month.day))
+            dayFigure(month.day, weatherOf(month.day))
             figure("남은 날", "${month.daysLeft}일")
             figure("잔고", money(month.balance))
             figure("10월 1일에 낼 총비용", money(month.room.totalMonthlyCost))
@@ -520,6 +529,7 @@ class PhoneGame private constructor(
         town.onPlace = { place -> if (!dayChanging && (place != talkingAt || chattingWith != null)) talkTo(place) }
         town.onPasserby = { passer -> if (!dayChanging) chatWith(passer) }
         town.onMorning = { dayChanging = false }
+        town.onSounds = { train, fire, night -> sound?.nearby(train, fire, night) }
         town.onFail = {
             walkable = null
             talkingAt = null
@@ -537,7 +547,7 @@ class PhoneGame private constructor(
         smallTalks = 0
         if (place != null) {
             val person = personAt(place)
-            talkLine = greeting(person, current, firstMeeting = person !in met, yesterday = lastEvents)
+            talkLine = greeting(person, current, person !in met, lastEvents, weatherOf(current.day))
             met.add(person)
             talkOpened = window.performance.now()
             focusNext = ".talk"
@@ -562,22 +572,28 @@ class PhoneGame private constructor(
         root.querySelector(".over-town")?.remove()
         town.mark(if (month.hasInterviewToday) INTERVIEW_PLACE else null)
         town.isCovered = isTownCovered()
+        town.weather = weatherOf(month.day)
         root.child("div", "over-town") {
             child("header", "hud") {
                 setAttribute("tabindex", "-1")
                 child("div", "hud-figures") {
-                    figure("오늘", date(month.day))
+                    dayFigure(month.day, weatherOf(month.day))
                     figure("남은 날", "${month.daysLeft}일")
                     figure("잔고", money(month.balance))
                     figure("10월 총비용", money(month.room.totalMonthlyCost))
                 }
                 child("div", "hud-line") {
-                    child(
-                        "p",
-                        "hud-stats",
-                        "영어 ${month.english}/${Month.MAX_SKILL} · 코딩 ${month.coding}/${Month.MAX_SKILL} · " +
+                    child("p", "hud-stats") {
+                        // On a narrow phone the line breaks between two skills, never inside one.
+                        listOf(
+                            "영어 ${month.english}/${Month.MAX_SKILL}",
+                            "코딩 ${month.coding}/${Month.MAX_SKILL}",
                             "체력 ${month.energy}/${Month.MAX_ENERGY}",
-                    )
+                        ).forEachIndexed { index, skill ->
+                            if (index > 0) appendChild(document.createTextNode(" · "))
+                            child("span", text = skill)
+                        }
+                    }
                     townControls()
                 }
                 val interview = month.interview
@@ -604,9 +620,18 @@ class PhoneGame private constructor(
                 child("p", "town-hint", "땅을 누르면 걷고, 두 번 누르면 빨리 가요. 사람이나 건물을 누르면 말을 걸어요.")
             }
         }
+        // The names of the buildings hide where the top card and the day's log cover the town.
+        town.coveredTop = { coverOf(town) }
         // A keyboard or a screen reader follows what happens: into a talk that opens, to the log after an answer.
         focusNext?.let { (root.querySelector(it) as? HTMLElement)?.focus() }
         focusNext = null
+    }
+
+    /** How far down from the top of [town] the top card and the day's log reach, in CSS pixels. */
+    private fun coverOf(town: WalkableTown): Double {
+        val top = town.element.getBoundingClientRect().top
+        return root.querySelectorAll(".over-town .hud, .over-town .log").asList()
+            .maxOfOrNull { (it as HTMLElement).getBoundingClientRect().bottom - top } ?: 0.0
     }
 
     /** The sound switch and the "?" that shows how to play again, at the end of the town's top card. */
@@ -710,7 +735,7 @@ class PhoneGame private constructor(
         val count = chats[passer] ?: 0
         chats[passer] = count + 1
         chattingWith = passer
-        talkLine = passerLine(passer, current.day, count)
+        talkLine = passerLine(passer, current.day, count, weatherOf(current.day))
         talkOpened = window.performance.now()
         focusNext = ".talk"
         sound?.blip()
@@ -813,6 +838,23 @@ private fun HTMLElement.figure(label: String, value: String) {
     child("div", "figure") {
         child("span", "figure-label", label)
         child("span", "figure-value", value)
+    }
+}
+
+/**
+ * Today's date with its weather in a word after it, which a screen reader hears as "9월 3일 날씨 비" and so on. The
+ * hidden label starts with a space, so the date and "날씨" are never read as one word.
+ */
+private fun HTMLElement.dayFigure(day: Int, weather: Weather) {
+    child("div", "figure") {
+        child("span", "figure-label", "오늘")
+        child("span", "figure-value") {
+            appendChild(document.createTextNode(date(day)))
+            child("span", "weather") {
+                child("span", "visually-hidden", " 날씨 ")
+                appendChild(document.createTextNode(weatherWord(weather)))
+            }
+        }
     }
 }
 

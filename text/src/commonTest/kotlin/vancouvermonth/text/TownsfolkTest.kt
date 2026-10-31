@@ -145,4 +145,51 @@ class TownsfolkTest {
         month.playUntil(15)
         for (person in Townsperson.entries) assertTrue(greeting(person, month, false, emptyList()).isNotBlank(), "$person")
     }
+
+    /** Each person's line for a rainy day; 수진 has none and goes on as on any day. */
+    private val rainLines = mapOf(
+        Townsperson.HANA to "오늘 같은 날엔 다들 따뜻한 걸 찾아. 손이 모자라.",
+        Townsperson.LEO to "비 오는 날엔... 자리가 금방 차요. 창가로 가요.",
+        Townsperson.MARCUS to "우산은 입구 통에 꽂아 주세요. 바닥이 미끄럽습니다.",
+        Townsperson.GRANDMA to "여기 비는 조용히 오지. 금방 익숙해져.",
+    )
+
+    @Test
+    fun `on a rainy day the people who have a rain line say it`() {
+        val month = month()
+        month.playUntil(15)
+        assertEquals(
+            listOf(Situation.RAINY, Situation.LOW_CODING, Situation.ORDINARY),
+            situations(month, false, emptyList(), Weather.RAINY),
+        )
+        for (person in Townsperson.entries) {
+            val rainy = greeting(person, month, false, emptyList(), Weather.RAINY)
+            assertEquals(rainLines[person] ?: greeting(person, month, false, emptyList()), rainy, "$person")
+        }
+        // What matters more still comes first: a first meeting, or tired eyes.
+        assertEquals(
+            "새로 왔구나? 오늘 손이 모자라. 한 시간만 도와줄래?",
+            greeting(Townsperson.HANA, month(), true, emptyList(), Weather.RAINY),
+        )
+        val tired = month()
+        repeat(4) { tired.take(Action.WORK) }
+        assertEquals("오늘은 그냥 쉬어. 쉬는 것도 일이야.", greeting(Townsperson.GRANDMA, tired, false, emptyList(), Weather.RAINY))
+    }
+
+    @Test
+    fun `on a dry day nobody says a rain line, all month long`() {
+        val month = month()
+        for (day in Month.FIRST_DAY..Month.LAST_DAY) {
+            for (weather in listOf(Weather.SUNNY, Weather.CLOUDY)) {
+                assertTrue(Situation.RAINY !in situations(month, false, emptyList(), weather), "day $day, $weather")
+                for (person in Townsperson.entries) {
+                    for (first in listOf(true, false)) {
+                        val line = greeting(person, month, first, emptyList(), weather)
+                        assertTrue(line !in rainLines.values, "$person on day $day, $weather: $line")
+                    }
+                }
+            }
+            if (!month.isOver) month.take(Action.REST)
+        }
+    }
 }

@@ -28,6 +28,8 @@ import vancouvermonth.text.date
 import vancouvermonth.text.greeting
 import vancouvermonth.text.money
 import vancouvermonth.text.replacesKept
+import vancouvermonth.text.weatherOn
+import vancouvermonth.text.weatherWord
 
 /**
  * A town whose evening does not end, as when the page is closed while the day changes. Everything else is
@@ -136,6 +138,8 @@ class ContinueMonthTest {
         }
         val month = played(Action.STUDY_ENGLISH, Action.WORK, Action.PRACTISE_CODING)
         assertEquals(5, month.day)
+        val sky = town.weather
+        assertEquals(weatherOn(1011, month.day), sky)
 
         val again = QuietTown()
         open(town = again)
@@ -158,6 +162,9 @@ class ContinueMonthTest {
         assertTrue(date(month.day) in hud && money(month.balance) in hud, hud)
         val skills = "영어 ${month.english}/10 · 코딩 ${month.coding}/10 · 체력 ${month.energy}/5"
         assertTrue(skills in hud, hud)
+        // The same sky as before the reload: the weather comes from the run and the day alone.
+        assertEquals(sky, again.weather)
+        assertEquals(" 날씨 ${weatherWord(sky)}", text(".hud .weather"))
         assertTrue("${date(month.day - 1)}에 있었던 일" in text(".over-town .log"))
         assertNull(root.querySelector(".guide-card"), "The guide opened again")
         assertSame(root.querySelector(".over-town .log"), document.activeElement, "The focus is not on the log")
@@ -193,8 +200,9 @@ class ContinueMonthTest {
         val month = played(Action.STUDY_ENGLISH)
         val yesterday = assertNotNull(kept?.replay()).lastEvents
         val leo = personAt(Place.LIBRARY)
-        val expected = greeting(leo, month, firstMeeting = false, yesterday = yesterday)
-        assertTrue(expected != greeting(leo, month, firstMeeting = true, yesterday = yesterday))
+        val sky = weatherOn(1011, month.day)
+        val expected = greeting(leo, month, firstMeeting = false, yesterday = yesterday, weather = sky)
+        assertTrue(expected != greeting(leo, month, firstMeeting = true, yesterday = yesterday, weather = sky))
         assertEquals(expected, text(".talk .talk-line .visually-hidden"))
     }
 

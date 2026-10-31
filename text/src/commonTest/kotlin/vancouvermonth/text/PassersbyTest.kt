@@ -37,4 +37,25 @@ class PassersbyTest {
             assertNotEquals(passerLine(passer, day = 10, count = 0), passerLine(passer, day = 11, count = 0))
         }
     }
+
+    @Test
+    fun `on a rainy day a passerby speaks of the rain first, then as on any day, and never so on a dry day`() {
+        for (passer in Passer.entries) {
+            val rain = passerLine(passer, day = 10, count = 0, weather = Weather.RAINY)
+            assertTrue("비" in rain || "우산" in rain, "$passer: $rain")
+            assertTrue(rain.length in 5..40 && Char(0x2014) !in rain, "$passer: $rain")
+            for (count in 1 until 4) {
+                assertEquals(
+                    passerLine(passer, day = 10, count = count - 1),
+                    passerLine(passer, day = 10, count = count, weather = Weather.RAINY),
+                    "$passer",
+                )
+            }
+            for (weather in listOf(Weather.SUNNY, Weather.CLOUDY)) {
+                for (day in 2..30) {
+                    for (count in 0 until 4) assertNotEquals(rain, passerLine(passer, day, count, weather))
+                }
+            }
+        }
+    }
 }

@@ -16,7 +16,9 @@ import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.asList
 import org.w3c.dom.events.Event
 import vancouvermonth.core.FirstMinute
+import vancouvermonth.core.Month
 import vancouvermonth.core.TodaysRun
+import vancouvermonth.text.Weather
 
 /** A town that only notes where the character was sent and whether it was closed, so a test needs no WebGL. */
 private class NotingTown : Town {
@@ -109,6 +111,18 @@ class PhoneGameTest {
         assertTrue("영어 실력이 올랐어요. 영어 2/10" in screen)
         assertTrue("생활비 -\$40, 잔고 \$1,615" in screen)
         assertTrue("오늘9월 3일" in screen)
+    }
+
+    @Test
+    fun `the button screen shows the day's weather in a word after the date`() {
+        val game = PhoneGame(root, 1011, playAgain = {})
+        game.weatherOf = { day -> if (day == Month.FIRST_DAY) Weather.CLOUDY else Weather.RAINY }
+        game.show()
+        startMonth(room = 1, amount = "1200")
+        assertTrue("오늘9월 2일 날씨 흐림" in screen, screen)
+        assertEquals("흐림", root.querySelector(".topbar .weather")?.lastChild?.textContent)
+        tap("쉬기")
+        assertTrue("오늘9월 3일 날씨 비" in screen, screen)
     }
 
     @Test

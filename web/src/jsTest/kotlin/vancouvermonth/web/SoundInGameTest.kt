@@ -4,6 +4,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlinx.browser.document
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
@@ -12,6 +13,7 @@ import org.w3c.dom.asList
 import org.w3c.dom.events.Event
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.text.Passer
+import vancouvermonth.text.Weather
 
 /** A town to walk in that draws nothing, whose nights pass at once. */
 internal class QuietTown : WalkableTown {
@@ -21,6 +23,9 @@ internal class QuietTown : WalkableTown {
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
     override var isCovered = false
+    override var weather = Weather.SUNNY
+    override var onSounds: (Double, Double, Double) -> Unit = { _, _, _ -> }
+    override var coveredTop: () -> Double = { 0.0 }
 
     override fun mark(place: Place?) {}
 
@@ -136,5 +141,48 @@ class SoundInGameTest {
         } finally {
             remembered.close()
         }
+    }
+
+    @Test
+    fun `on a rainy day the top card says so, the town and the sound are told, and people speak of the rain`() {
+        val town = QuietTown()
+        val game = PhoneGame(root, 1011, playAgain = {}, makeWalkableTown = { town })
+        game.sound = sound
+        game.talkSettleMillis = 0.0
+        // Rain from the second day on; the first day is dry.
+        game.weatherOf = { day -> if (day > 2) Weather.RAINY else Weather.SUNNY }
+        game.show()
+        switchIn().click()
+        startSeed1011(root)
+        assertEquals(Weather.SUNNY, town.weather)
+        assertEquals(false, speaker.rain)
+        assertTrue("오늘9월 2일 날씨 맑음" in root.textContent.orEmpty(), root.textContent)
+
+        // The town tells how loud the train and the fire are, and the sound hears it.
+        town.onSounds(0.4, 0.2, 0.0)
+        assertEquals(listOf(Triple(0.4, 0.2, 0.0)), speaker.nearby)
+
+        // A day of rest at home, after meeting the neighbour, and the next day is rainy.
+        town.onPlace(Place.HOME)
+        (root.querySelector(".talk .spend") as HTMLButtonElement).click()
+        assertEquals(Weather.RAINY, town.weather)
+        assertEquals(true, speaker.rain)
+        assertTrue("오늘9월 3일 날씨 비" in root.textContent.orEmpty(), root.textContent)
+        val word = assertNotNull(root.querySelector(".hud .weather"))
+        assertEquals(" 날씨 비", word.textContent)
+        val label = word.querySelector(".visually-hidden")?.textContent
+        assertEquals(" 날씨 ", label, "the word has no label for a screen reader")
+
+        town.onPlace(Place.HOME)
+        assertEquals("여기 비는 조용히 오지. 금방 익숙해져.", root.querySelector(".talk-line .visually-hidden")?.textContent)
+        town.onPasserby(Passer.MINA)
+        assertEquals("이것 봐요, 우산 들고 다닌 보람이 있죠?", root.querySelector(".talk-line .visually-hidden")?.textContent)
+
+        // Rested all month, still raining: the ending has no rain.
+        while ("다시 하기" !in root.textContent.orEmpty()) {
+            town.onPlace(Place.HOME)
+            (root.querySelector(".talk .spend") as HTMLButtonElement).click()
+        }
+        assertEquals(false, speaker.rain, "it still rains at the ending")
     }
 }

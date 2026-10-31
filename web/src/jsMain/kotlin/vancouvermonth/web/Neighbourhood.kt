@@ -530,7 +530,8 @@ object Neighbourhood {
     )
 
     // A soft, warm palette, as in a storybook village.
-    private const val WATER = 0x6FB3D9
+    /** The sea's and the pond's colour on a sunny day. */
+    const val WATER = 0x6FB3D9
     private const val GRASS = 0x9BCB6E
     private const val SEAWALL = 0xE6DCC6
     private const val SEAWALL_EDGE = 0xBFB39A

@@ -12,8 +12,15 @@ enum class Passer(val title: String, val role: String) {
     THEO("테오", "출근길 회사원"),
 }
 
-/** What [passer] says when the player stops them: [count] is how many times today, from 0, so the line changes. */
-fun passerLine(passer: Passer, day: Int, count: Int): String {
+/**
+ * What [passer] says when the player stops them: [count] is how many times today, from 0, so the line changes. On a
+ * rainy day their first word is about the rain, and the next ones go on as on any day.
+ */
+fun passerLine(passer: Passer, day: Int, count: Int, weather: Weather = Weather.SUNNY): String {
+    if (weather == Weather.RAINY) {
+        if (count == 0) return rainLines.getValue(passer)
+        return passerLine(passer, day, count - 1)
+    }
     val lines = passerLines.getValue(passer)
     return lines[(day + count) % lines.size]
 }
@@ -40,4 +47,12 @@ private val passerLines: Map<Passer, List<String>> = mapOf(
         "한 정거장이라 그냥 걸어요. 산 보면서요.",
         "여기 사람들은 비 와도 모자만 써요. 우산은 여행객이래요.",
     ),
+)
+
+/** What each one says first on a rainy day. */
+private val rainLines: Map<Passer, String> = mapOf(
+    Passer.OLIVER to "비 오는 날엔 바닷가 길이 텅 비어요. 저만 뛰어요.",
+    Passer.MINA to "이것 봐요, 우산 들고 다닌 보람이 있죠?",
+    Passer.PRIYA to "비가 오면 연못 오리들이 더 신나 해요.",
+    Passer.THEO to "이 정도는 비도 아니에요. 모자면 충분해요.",
 )

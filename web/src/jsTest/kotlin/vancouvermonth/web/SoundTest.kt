@@ -13,6 +13,7 @@ import org.w3c.dom.asList
 import org.w3c.dom.events.Event
 import org.w3c.dom.events.KeyboardEvent
 import org.w3c.dom.events.KeyboardEventInit
+import vancouvermonth.text.Weather
 
 /**
  * A speaker that only notes what it was asked to do, so a test needs no sound at all. While [plays] is false it acts
@@ -50,6 +51,18 @@ internal class NotingSpeaker : Speaker {
 
     override fun chime() {
         asked += "chime"
+    }
+
+    /** Whether the rain plays, as last asked, and each time the town's sounds were set: noted apart from [asked]. */
+    var rain: Boolean? = null
+    val nearby = mutableListOf<Triple<Double, Double, Double>>()
+
+    override fun weather(rain: Boolean) {
+        this.rain = rain
+    }
+
+    override fun nearby(train: Double, fire: Double, night: Double) {
+        nearby += Triple(train, fire, night)
     }
 }
 
@@ -302,5 +315,66 @@ class SoundTest {
         sound(webAudio = false).button(root)
         assertNull(root.querySelector(".sound-switch"))
         assertTrue(hasWebAudio())
+    }
+
+    @Test
+    fun `the rain and the town's sounds play only while on, and a sound made later starts with the rain`() {
+        val sound = sound()
+        sound.button(root)
+        // Told before the sound is made: nothing is made, and the rain is kept for later.
+        sound.weather(Weather.RAINY)
+        sound.nearby(0.5, 0.3, 0.0)
+        assertEquals(0, made)
+        switchIn().click()
+        assertEquals(true, speaker.rain, "The sound made on the tap starts without the rain")
+        assertTrue(speaker.nearby.isEmpty(), "The town's sounds from before were played")
+        sound.nearby(0.5, 0.3, 0.0)
+        assertEquals(listOf(Triple(0.5, 0.3, 0.0)), speaker.nearby)
+        sound.weather(Weather.CLOUDY)
+        assertEquals(false, speaker.rain, "Still raining on a cloudy day")
+        sound.weather(Weather.RAINY)
+        assertEquals(true, speaker.rain)
+        // Off: the town's sounds are no longer passed on; the rain is kept, and fades out with the rest.
+        switchIn().click()
+        sound.nearby(0.9, 0.9, 1.0)
+        assertEquals(1, speaker.nearby.size, "The town's sounds went on while off")
+        assertEquals(listOf("on", "off"), speaker.asked)
+    }
+
+    @Test
+    fun `a sound that fails on the rain or the town's sounds is noted, and nothing else stops`() {
+        var breaks = false
+        val failing = object : Speaker by speaker {
+            override fun weather(rain: Boolean) = if (breaks) throw IllegalStateException("No rain here") else Unit
+
+            override fun nearby(train: Double, fire: Double, night: Double) =
+                if (breaks) throw IllegalStateException("No train here") else Unit
+        }
+        val sound = Sound(Memory { FakeStore() }, { failing }, now = { clock }, hidden = { hidden })
+        sounds += sound
+        sound.button(root)
+        switchIn().click()
+        breaks = true
+        sound.weather(Weather.RAINY)
+        sound.nearby(0.5, 0.5, 1.0)
+        sound.nearby(0.0, 0.0, 0.0)
+        assertTrue(sound.isOn, "A failing rain or train switched the whole sound off")
+        assertEquals("소리 끄기", switchIn().textContent)
+    }
+
+    @Test
+    fun `a silence reaches the sound even while it is off, so nothing rumbles on once the town has gone`() {
+        val sound = sound()
+        sound.button(root)
+        switchIn().click()
+        sound.nearby(0.6, 0.5, 1.0)
+        // Switched off with the train passing and the fire near, then the town closes and says all is quiet.
+        switchIn().click()
+        sound.nearby(0.0, 0.0, 0.0)
+        assertEquals(Triple(0.0, 0.0, 0.0), speaker.nearby.last(), "The rumble and the crackle were left on")
+        // Switched on again later, nothing is still playing from the town.
+        switchIn().click()
+        assertEquals(Triple(0.0, 0.0, 0.0), speaker.nearby.last())
+        assertEquals(listOf("on", "off", "on"), speaker.asked)
     }
 }

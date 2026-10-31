@@ -453,6 +453,14 @@ a:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+/* The day's weather, a word after the date. */
+.weather {
+  margin-left: 0.3em;
+  font-size: 0.75em;
+  font-weight: 600;
+  color: var(--muted);
+}
+
 .log ul {
   display: flex;
   flex-direction: column;
@@ -684,6 +692,12 @@ html:has(.walk-town) {
   pointer-events: none;
 }
 
+/* A name that would sit under the top card or the day's log hides there, so it never peeks out from under them. */
+.place-name.under {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .over-town {
   position: fixed;
   inset: 0;
@@ -747,6 +761,11 @@ html:has(.walk-town) {
 
 .hud-line .hud-stats {
   margin-top: 0;
+}
+
+/* Each skill stays whole when the line wraps on a narrow phone. */
+.hud-stats span {
+  white-space: nowrap;
 }
 
 .hud-controls {

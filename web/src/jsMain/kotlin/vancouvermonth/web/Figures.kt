@@ -6,6 +6,7 @@ import org.khronos.webgl.Float32Array
 import org.khronos.webgl.set
 import vancouvermonth.text.Passer
 import vancouvermonth.text.Townsperson
+import vancouvermonth.text.Weather
 
 /** The part of a person a box belongs to. A leg swings from the hip and an arm from the shoulder. */
 enum class Limb(val pivot: Point) {
@@ -101,19 +102,27 @@ object Figures {
         Passer.THEO -> Look(skin = 0xF1CFB0, hair = 0x6B4A2E, top = 0x8C9AA8, bottom = 0x3A3F4A, shoes = 0x2A2A2A)
     }
 
-    /** A passerby, with what they carry or wear for the walk. */
-    fun passer(passer: Passer): List<Part> {
+    /**
+     * A passerby, with what they carry or wear for the walk. On a rainy day 미나 and 프리야 hold an umbrella open over
+     * their heads, in the left hand; 올리버 runs as he is and 테오 trusts his hat, as the locals do.
+     */
+    fun passer(passer: Passer, weather: Weather = Weather.SUNNY): List<Part> {
         val look = lookOf(passer)
+        val rainy = weather == Weather.RAINY
         val extra = when (passer) {
             // A headband for the run along the seawall.
             Passer.OLIVER -> listOf(Part(Limb.BODY, Block(-0.38, 1.1, -0.34, 0.76, 0.08, 0.68, 0xF06A5A)))
-            // A yellow raincoat, and a closed umbrella in one hand.
-            Passer.MINA -> listOf(Part(Limb.LEFT_ARM, Block(-0.03, -0.7, 0.03, 0.06, 0.4, 0.06, 0x3E6FB0)))
-            // Long hair down the back, and a cream scarf.
+            // A yellow raincoat, and an umbrella: closed in one hand, or open over her in the rain.
+            Passer.MINA -> if (rainy) {
+                umbrella(MINA_UMBRELLA)
+            } else {
+                listOf(Part(Limb.LEFT_ARM, Block(-0.03, -0.7, 0.03, 0.06, 0.4, 0.06, MINA_UMBRELLA)))
+            }
+            // Long hair down the back, and a cream scarf; an umbrella in the rain.
             Passer.PRIYA -> listOf(
                 Part(Limb.BODY, Block(-0.3, 0.6, -0.36, 0.6, 0.45, 0.08, look.hair)),
                 Part(Limb.BODY, Block(-0.24, 0.66, -0.17, 0.48, 0.12, 0.34, 0xF1E3C8)),
-            )
+            ) + if (rainy) umbrella(PRIYA_UMBRELLA) else emptyList()
             // A knitted hat, and a cup of coffee with a lid.
             Passer.THEO -> listOf(
                 Part(Limb.BODY, Block(-0.36, 1.36, -0.32, 0.72, 0.14, 0.64, 0x2F6B5A)),
@@ -123,6 +132,29 @@ object Figures {
         }
         return body(look) + extra
     }
+
+    /** True when [passer] holds an umbrella open in [weather]: their left arm is raised a little to hold it up. */
+    fun holdsUmbrella(passer: Passer, weather: Weather): Boolean =
+        weather == Weather.RAINY && (passer == Passer.MINA || passer == Passer.PRIYA)
+
+    /** How far the left arm is raised to the side to hold an umbrella's shaft, as a wave raises it. */
+    const val UMBRELLA_ARM = 0.35
+
+    /**
+     * An open umbrella held in the left hand: a shaft beside the head, from the raised hand up over it, and a canopy
+     * in three steps, wide enough to keep the big head dry, with a tip on top.
+     */
+    private fun umbrella(colour: Int): List<Part> = listOf(
+        Part(Limb.BODY, Block(-0.465, 0.3, -0.025, 0.05, 1.44, 0.05, UMBRELLA_SHAFT)),
+        Part(Limb.BODY, Block(-1.05, 1.72, -0.8, 1.6, 0.1, 1.6, colour)),
+        Part(Limb.BODY, Block(-0.8, 1.82, -0.55, 1.1, 0.12, 1.1, colour)),
+        Part(Limb.BODY, Block(-0.525, 1.94, -0.275, 0.55, 0.1, 0.55, colour)),
+        Part(Limb.BODY, Block(-0.28, 2.04, -0.03, 0.06, 0.1, 0.06, UMBRELLA_SHAFT)),
+    )
+
+    private const val MINA_UMBRELLA = 0x3E6FB0
+    private const val PRIYA_UMBRELLA = 0x2F8F83
+    private const val UMBRELLA_SHAFT = 0x4A3B30
 
     /**
      * Each box of [parts] in [pose], as the 3 by 4 matrix (row by row: three turns and stretches, then the move) that

@@ -39,6 +39,7 @@ enum class Situation {
     INTERVIEW_BOOKED,
     APPLIED,
     APPLICATIONS_CLOSED,
+    RAINY,
     GOOD_ENGLISH,
     LOW_CODING,
     LAST_WEEK,
@@ -48,10 +49,15 @@ enum class Situation {
 
 /**
  * Everything that is true about the player today, most telling first, always ending with [Situation.ORDINARY].
- * [firstMeeting] is true when the player has not talked to this person yet, and [yesterday] is what happened on
- * the day before, as the month told it.
+ * [firstMeeting] is true when the player has not talked to this person yet, [yesterday] is what happened on the day
+ * before, as the month told it, and [weather] is today's sky, which only changes what people say.
  */
-fun situations(month: Month, firstMeeting: Boolean, yesterday: List<Event>): List<Situation> {
+fun situations(
+    month: Month,
+    firstMeeting: Boolean,
+    yesterday: List<Event>,
+    weather: Weather = Weather.SUNNY,
+): List<Situation> {
     val stageToday = if (month.hasInterviewToday) month.interview?.stage else null
     val holds = mapOf(
         Situation.OFFER to (month.ending == Ending.OFFER),
@@ -64,6 +70,7 @@ fun situations(month: Month, firstMeeting: Boolean, yesterday: List<Event>): Lis
         Situation.INTERVIEW_BOOKED to (month.interview != null),
         Situation.APPLIED to yesterday.any { it is Event.Applied },
         Situation.APPLICATIONS_CLOSED to !month.canStillApplyThisMonth,
+        Situation.RAINY to (weather == Weather.RAINY),
         Situation.GOOD_ENGLISH to (month.english >= 5),
         Situation.LOW_CODING to (month.coding <= 4),
         Situation.LAST_WEEK to (month.day >= Month.LAST_DAY - 6),
@@ -74,9 +81,15 @@ fun situations(month: Month, firstMeeting: Boolean, yesterday: List<Event>): Lis
 }
 
 /** What [person] says on meeting the player: their line for the first situation in [situations] they have one for. */
-fun greeting(person: Townsperson, month: Month, firstMeeting: Boolean, yesterday: List<Event>): String {
+fun greeting(
+    person: Townsperson,
+    month: Month,
+    firstMeeting: Boolean,
+    yesterday: List<Event>,
+    weather: Weather = Weather.SUNNY,
+): String {
     val lines = greetings.getValue(person)
-    return situations(month, firstMeeting, yesterday).firstNotNullOf { lines[it] }
+    return situations(month, firstMeeting, yesterday, weather).firstNotNullOf { lines[it] }
 }
 
 /** A line of small talk, for the "이야기" button. [count] is how many times the player has asked today, from 0. */
@@ -92,6 +105,7 @@ private val greetings: Map<Townsperson, Map<Situation, String>> = mapOf(
         Situation.INTERVIEW_TODAY to "오늘 면접이라며? 일은 내일 해. 회사로 가 봐.",
         Situation.LOW_ENERGY to "얼굴이 피곤해 보여. 오늘은 쉬어도 돼.",
         Situation.MONEY_TIGHT to "월세 날 다가오지? 이번 주는 일 많이 줄게.",
+        Situation.RAINY to "오늘 같은 날엔 다들 따뜻한 걸 찾아. 손이 모자라.",
         Situation.LAST_WEEK to "벌써 그달 끝이네. 잘 버텼어.",
         Situation.FIRST_WEEK to "비 오는 날엔 손님이 두 배야. 우산 챙겨.",
         Situation.ORDINARY to "커피 내릴 줄 알지? 오늘도 한 시간 부탁해.",
@@ -101,6 +115,7 @@ private val greetings: Map<Townsperson, Map<Situation, String>> = mapOf(
         Situation.INTERVIEW_TODAY to "오늘은... 책 말고 면접이죠. 회사로 가요.",
         Situation.FAILED_INTERVIEW to "한 번 떨어진 건... 연습 한 번 한 거예요.",
         Situation.INTERVIEW_BOOKED to "면접에서는... 천천히 말해도 괜찮아요. 짧은 문장이 더 잘 들려요.",
+        Situation.RAINY to "비 오는 날엔... 자리가 금방 차요. 창가로 가요.",
         Situation.GOOD_ENGLISH to "요즘 말이... 많이 편해졌네요.",
         Situation.ORDINARY to "오늘도... 한 장씩 읽어 볼까요.",
     ),
@@ -118,6 +133,7 @@ private val greetings: Map<Townsperson, Map<Situation, String>> = mapOf(
         Situation.INTERVIEW_TODAY to "면접이시죠? 3층입니다. 행운을 빌어요.",
         Situation.INTERVIEW_BOOKED to "면접 날짜는 잡혀 있어요. 그날 다시 오세요.",
         Situation.APPLICATIONS_CLOSED to "이번 달 채용은 마감됐어요. 다음 달에 또 오세요.",
+        Situation.RAINY to "우산은 입구 통에 꽂아 주세요. 바닥이 미끄럽습니다.",
         Situation.ORDINARY to "어서 오세요. 지원서는 오늘도 받습니다.",
     ),
     Townsperson.GRANDMA to mapOf(
@@ -125,7 +141,8 @@ private val greetings: Map<Townsperson, Map<Situation, String>> = mapOf(
         Situation.FIRST_MEETING to "새로 이사 왔구먼. 이 동네는 아침 안개가 예뻐.",
         Situation.INTERVIEW_TODAY to "오늘 면접이라며? 따뜻하게 입고 회사로 가.",
         Situation.LOW_ENERGY to "오늘은 그냥 쉬어. 쉬는 것도 일이야.",
-        Situation.ORDINARY to "여기 비는 조용히 오지. 금방 익숙해져.",
+        Situation.RAINY to "여기 비는 조용히 오지. 금방 익숙해져.",
+        Situation.ORDINARY to "아침은 먹었어? 든든히 먹고 다녀.",
     ),
 )
 
