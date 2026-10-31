@@ -25,7 +25,8 @@ class MonthRecordTest {
 
     @Test
     fun `a record is one short line, and reads back as the same record`() {
-        val record = MonthRecord(1011, null, 2, 1165, listOf(english, coding, rest, apply, work, Choice.AttendInterview))
+        val days = listOf(english, coding, rest, apply, work, Choice.AttendInterview)
+        val record = MonthRecord(1011, null, 2, 1165, days)
         assertEquals("1|1011||2|1165|ECRAWI", record.encode())
         assertEquals(record, MonthRecord.decode(record.encode()))
 

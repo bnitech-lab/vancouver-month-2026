@@ -42,7 +42,7 @@ data class MonthRecord(
     /** The same month with one more day, spent on [choice]. */
     fun after(choice: Choice): MonthRecord = copy(days = days + choice)
 
-    /** "1|1011||2|1165|ECRA": the version, the seed, the date of today's run or nothing, the room, the guess, the days. */
+    /** "1|1011||2|1165|ECRA": the version, the seed, today's run's date or nothing, the room, the guess, the days. */
     fun encode(): String =
         listOf(VERSION, seed, today ?: "", room, guess, days.joinToString("") { letterOf(it).toString() })
             .joinToString(SEPARATOR)
