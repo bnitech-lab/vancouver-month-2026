@@ -706,6 +706,83 @@ class WalkableTownTest {
         )
     }
 
+    /** Where 미나 is on the town's screen, at the height of her head. */
+    private fun minaOn(town: NeighbourhoodScene): FramePoint {
+        val mina = town.passerbySpots.first { it.first == Passer.MINA }.second
+        return onScreen(town, Point(mina.x, 1.3, mina.z))
+    }
+
+    /** Who the open talk is with, or null when none is open. */
+    private fun talkWith(): String? = root.querySelector(".talk")?.getAttribute("aria-label")
+
+    @Test
+    fun `a double tap on a passerby hurries the character there, and the small talk stays open with nothing to spend`():
+        Promise<Unit> {
+        val town = startInTown()
+        return play(
+            Step("tap 미나 twice", { town.isStill }) {
+                val mina = minaOn(town)
+                tapScreen(town, mina)
+                tapScreen(town, mina)
+                assertTrue(town.isDashing, "the second tap did not dash")
+                assertEquals("미나", talkWith())
+                assertNull(root.querySelector(".talk .spend"), "a small talk can spend a day")
+                assertTrue("오늘9월 2일" in screen, screen)
+            },
+        )
+    }
+
+    @Test
+    fun `with a small talk open, a tap on the ground closes it`(): Promise<Unit> {
+        val town = startInTown()
+        return play(
+            Step("tap 미나, then the street", { town.isStill }) {
+                tapScreen(town, minaOn(town))
+                assertEquals("미나", talkWith())
+                // Well away from her, so it is not a double tap.
+                val street = Neighbourhood.venue(Place.HOME).door
+                tapScreen(town, onScreen(town, Point(street.x + 4.0, 0.0, Neighbourhood.STREET_MIDDLE)))
+                assertNull(talkWith(), "the small talk stayed open")
+                assertNotNull(town.markerSpot, "no walk")
+            },
+        )
+    }
+
+    @Test
+    fun `a tap on a passerby replaces a place's talk, and nothing left can spend a day`(): Promise<Unit> {
+        val town = startInTown()
+        return play(
+            Step("talk to 레오", { town.isStill }) {
+                talkTo(Place.LIBRARY)
+                assertEquals("레오", talkWith())
+            },
+            Step("tap 미나 once the character stands by 레오", { town.isStill }) {
+                assertEquals("레오", talkWith())
+                tapScreen(town, minaOn(town))
+                assertEquals("미나", talkWith())
+                assertNull(root.querySelector(".talk .spend"), "the place's answer is still there")
+                assertEquals(1, root.querySelectorAll(".talk").length)
+                assertTrue("오늘9월 2일" in screen, screen)
+            },
+        )
+    }
+
+    @Test
+    fun `while the day changes, a tap on a passerby opens nothing`(): Promise<Unit> {
+        val town = startInTown()
+        return play(
+            Step("spend the day, then tap 미나 as the evening begins", { town.isStill }) {
+                val mina = minaOn(town)
+                talkTo(Place.LIBRARY)
+                tap("영어 공부")
+                assertTrue(town.isChangingDay)
+                assertTrue(town.arePassersbyOut, "already gone")
+                tapScreen(town, mina)
+                assertNull(talkWith(), "a talk opened during the change of day")
+            },
+        )
+    }
+
     /** The ending's own line and figures. */
     private fun endingText(): String =
         listOf(".ending-line", ".figures").joinToString(" | ") { root.querySelector(it)?.textContent.orEmpty() }
