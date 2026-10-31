@@ -14,7 +14,15 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.asList
 import org.w3c.dom.events.KeyboardEvent
 import org.w3c.dom.events.KeyboardEventInit
+import vancouvermonth.text.Guide
 import vancouvermonth.text.PatchNotes
+
+/** A town to walk in whose nights last until the test says it is morning. */
+private class NightLongTown(val quiet: QuietTown = QuietTown()) : WalkableTown by quiet {
+    override fun endDay(place: Place) {}
+
+    fun morning() = quiet.onMorning()
+}
 
 /**
  * The patch notes (업데이트 소식): the version and the button by the title, the card with every update, the dot for
@@ -221,6 +229,88 @@ class PatchNotesCardTest {
         assertNull(card)
         assertSame(button, document.activeElement)
         assertFalse(hasNews(button))
+    }
+
+    /** Starts seed 1011's September in [town] with the guide and the update news, as the page wires them. */
+    private fun startInTown(town: WalkableTown, store: KeyValueStore = FakeStore()) {
+        root.innerHTML = ""
+        val game = PhoneGame(root, 1011, playAgain = {}, makeWalkableTown = { town })
+        val memory = Memory { store }
+        game.guide = FirstRunGuide(memory).also { guides += it }
+        game.notes = PatchNotesCard(memory).also { cards += it }
+        game.talkSettleMillis = 0.0
+        game.show()
+        startSeed1011(root)
+    }
+
+    private val guideLink: HTMLButtonElement?
+        get() = root.querySelector(".guide-card .guide-notes") as? HTMLButtonElement
+
+    private fun helpButton(): HTMLButtonElement =
+        assertNotNull(root.querySelector(".hud .guide-open") as? HTMLButtonElement, "No ? in the top card")
+
+    @Test
+    fun `the ? card's foot opens the same notes over it, and Escape goes back to the card`() {
+        val town = QuietTown()
+        startInTown(town)
+        val guide = assertNotNull(root.querySelector(".guide-card"), "No guide over the town")
+        val link = assertNotNull(guideLink, "No 업데이트 소식 at the guide's foot")
+        assertTrue(link.textContent.orEmpty().startsWith(PatchNotes.TITLE))
+        assertTrue(hasNews(link))
+        // Next to the map's credit, which stays the card's last line.
+        assertEquals("guide-credit", guide.lastElementChild?.className)
+        assertSame(guide.lastElementChild, link.parentElement?.nextElementSibling)
+
+        link.click()
+        val notes = assertNotNull(card, "The link opened nothing")
+        assertEquals(PatchNotes.ALL.size, notes.querySelectorAll(".notes-entry").length)
+        assertSame(root.lastElementChild, root.querySelector(".notes"), "The notes are not over the guide")
+        assertTrue(root.querySelector(".guide")!!.hasAttribute("inert"))
+        assertTrue(town.isCovered)
+
+        // Escape closes the notes only, and the guide takes the focus back on its link.
+        press("Escape")
+        assertNull(card)
+        assertNotNull(root.querySelector(".guide-card"), "Escape closed the guide too")
+        assertFalse(root.querySelector(".guide")!!.hasAttribute("inert"))
+        assertSame(link, document.activeElement)
+        assertFalse(hasNews(link))
+        press("Escape")
+        assertNull(root.querySelector(".guide-card"))
+        assertSame(helpButton(), document.activeElement)
+        assertFalse(town.isCovered)
+        assertNull(root.querySelector("[inert]"))
+    }
+
+    @Test
+    fun `the ? card has no link to the notes over a talk or while the day changes`() {
+        val town = NightLongTown()
+        startInTown(town)
+        assertNotNull(guideLink, "No link on the first card")
+        root.button(Guide.START).click()
+
+        town.onPlace(Place.LIBRARY)
+        assertNotNull(root.querySelector(".talk"))
+        helpButton().click()
+        assertNotNull(root.querySelector(".guide-card"))
+        assertNull(guideLink, "The notes could open over a talk")
+        press("Escape")
+        root.button("그만").click()
+        helpButton().click()
+        assertNotNull(guideLink, "No link once the talk ended")
+        press("Escape")
+
+        // The day is spent, and the night has not ended yet.
+        town.onPlace(Place.LIBRARY)
+        (root.querySelector(".talk .spend") as HTMLButtonElement).click()
+        helpButton().click()
+        assertNull(guideLink, "The notes could open during the change of day")
+        press("Escape")
+        town.morning()
+        helpButton().click()
+        assertNotNull(guideLink, "No link in the morning")
+        press("Escape")
+        assertNull(root.querySelector(".notes"))
     }
 
     /** Lays the page out with its own style sheet, as it is published (web/karma.config.d/style.js hands it over). */

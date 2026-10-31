@@ -316,6 +316,8 @@ class PhoneGame private constructor(
         walkable = makeWalkableTown()?.also { listenTo(it) }
         if (walkable == null) town = makeTown()
         guide?.onOpenChange = { walkable?.isCovered = isTownCovered() }
+        // In the town the update news open from the guide's foot, never over a talk or the change of day.
+        guide?.notes = { notes.takeIf { talkingAt == null && chattingWith == null && !dayChanging } }
         show()
         window.scrollTo(0.0, 0.0)
         if (walkable != null) guide?.openFirstTime(root)

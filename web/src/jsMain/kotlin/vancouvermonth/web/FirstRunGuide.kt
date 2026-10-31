@@ -28,6 +28,9 @@ internal class FirstRunGuide(private val memory: Memory) {
     /** Called with true when the card opens and false when it closes, so the town under it can slow down. */
     var onOpenChange: (Boolean) -> Unit = {}
 
+    /** The update news the card's foot links to, read as it opens; null leaves the link out. */
+    var notes: () -> PatchNotesCard? = { null }
+
     // A page or an extension may send a plain Event named "keydown"; only a real key press is read.
     private val onKey: (Event) -> Unit = { event -> (event as? KeyboardEvent)?.let { key(it) } }
 
@@ -54,6 +57,8 @@ internal class FirstRunGuide(private val memory: Memory) {
         val start = card.add("button", "primary", Guide.START) as HTMLButtonElement
         start.type = "button"
         start.onclick = { close() }
+        // At the foot, next to the map's credit: the update news, which open over this card and come back to it.
+        notes()?.let { news -> news.button(card.add("p", "guide-news"), root, "guide-notes") }
         // The town is traced from the City of Vancouver's open data, whose licence asks for this line where it shows,
         // with a link to the licence: its name links there, in a new tab, so the game stays where it is.
         val credit = card.add("p", "guide-credit")
@@ -105,7 +110,7 @@ internal class FirstRunGuide(private val memory: Memory) {
     }
 
     /**
-     * Escape closes the card; Tab and Shift+Tab go round its button and its link to the licence, and never leave it.
+     * Escape closes the card; Tab and Shift+Tab go round its buttons and its link to the licence, and never leave it.
      * A card taken off the page with the town lets go here.
      */
     private fun key(event: KeyboardEvent) {
@@ -114,6 +119,8 @@ internal class FirstRunGuide(private val memory: Memory) {
             close()
             return
         }
+        // The update news open over the card make it inert, and take the keys until they close.
+        if (cover.hasAttribute("inert")) return
         when (event.key) {
             "Escape" -> {
                 event.preventDefault()
