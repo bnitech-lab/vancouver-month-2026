@@ -97,7 +97,8 @@ class FollowCameraTest {
             val camera = camera(Point(venue.talkSpot.x, 1.0, venue.talkSpot.z), yaw)
             val head = assertNotNull(camera.screenPoint(Point(venue.person.x, 1.2, venue.person.z)), "${venue.place}")
             assertEquals(Picked.AtPlace(venue.place), camera.pick(head.left, head.top), "${venue.place}")
-            val wall = Point(venue.x + 0.6, venue.height - 0.5, if (venue.doorFacesSouth) venue.z + venue.depth + 0.0 else venue.z + 0.0)
+            val front = if (venue.doorFacesSouth) venue.z + venue.depth else venue.z
+            val wall = Point(venue.x + 0.6, venue.height - 0.5, front.toDouble())
             val onWall = camera.screenPoint(wall)
             if (onWall != null && onWall.left in 0.0..1.0 && onWall.top in 0.0..1.0) {
                 assertEquals(Picked.AtPlace(venue.place), camera.pick(onWall.left, onWall.top), "${venue.place}'s wall")

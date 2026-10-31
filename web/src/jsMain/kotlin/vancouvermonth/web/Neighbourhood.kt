@@ -46,7 +46,10 @@ data class Venue(
 
     /** The whole building as one box, roof included, for taps and for keeping the camera out. */
     val box: Block
-        get() = Block(x.toDouble(), 0.0, z.toDouble(), width.toDouble(), height + Neighbourhood.roofHeight(this), depth.toDouble(), wall)
+        get() {
+            val top = height + Neighbourhood.roofHeight(this)
+            return Block(x.toDouble(), 0.0, z.toDouble(), width.toDouble(), top, depth.toDouble(), wall)
+        }
 }
 
 /** The person at [place]: the one who offers the action a day there is spent on. */
@@ -80,7 +83,9 @@ object Neighbourhood {
     fun venue(place: Place): Venue = venues.first { it.place == place }
 
     /** A box around each place's person, so a tap on them talks to them. */
-    val people: List<Wall> = venues.map { Wall(Block(it.person.x - 0.4, 0.0, it.person.z - 0.4, 0.8, 1.8, 0.8, 0), it.place) }
+    val people: List<Wall> = venues.map { venue ->
+        Wall(Block(venue.person.x - 0.4, 0.0, venue.person.z - 0.4, 0.8, 1.8, 0.8, 0), venue.place)
+    }
 
     /** The bench in 내 방's garden, where the character sits by the campfire on a day of rest, facing the fire. */
     val benchSeat = Spot(2.3, 18.1)
@@ -261,7 +266,15 @@ object Neighbourhood {
          * Windows on all four sides, a row for each storey that fits. On the ground floor of the door's side they
          * leave the door clear.
          */
-        fun addWindows(x: Double, z: Double, width: Double, depth: Double, height: Double, doorX: Double, doorSouth: Boolean) {
+        fun addWindows(
+            x: Double,
+            z: Double,
+            width: Double,
+            depth: Double,
+            height: Double,
+            doorX: Double,
+            doorSouth: Boolean,
+        ) {
             var bottom = 0.75
             while (bottom + 0.7 < height - 0.2) {
                 for (south in listOf(false, true)) {
@@ -292,7 +305,11 @@ object Neighbourhood {
             addBench(benchSeat.x, benchSeat.z, facingSouth = true)
             // Stones in a ring, two crossed logs, and the fire, which glows after dark.
             val fire = campfire
-            for ((dx, dz) in listOf(-0.5 to 0.0, 0.5 to 0.0, 0.0 to -0.5, 0.0 to 0.5, -0.36 to -0.36, 0.36 to 0.36, -0.36 to 0.36, 0.36 to -0.36)) {
+            val stones = listOf(
+                -0.5 to 0.0, 0.5 to 0.0, 0.0 to -0.5, 0.0 to 0.5,
+                -0.36 to -0.36, 0.36 to 0.36, -0.36 to 0.36, 0.36 to -0.36,
+            )
+            for ((dx, dz) in stones) {
                 add(fire.x + dx - 0.12, 0.0, fire.z + dz - 0.12, 0.24, 0.16, 0.24, STONE)
             }
             footprints.add(Block(fire.x - 0.6, 0.0, fire.z - 0.6, 1.2, 0.2, 1.2, STONE))
@@ -350,10 +367,11 @@ object Neighbourhood {
             )
             for (house in houses) {
                 add(house.x, 0.0, house.z, house.width, house.height, house.depth, house.wall)
-                if (house.pitched) addPitchedRoof(house.x, house.z, house.width, house.depth, house.height, house.roof)
-                else add(house.x - 0.15, house.height, house.z - 0.15, house.width + 0.3, FLAT_ROOF, house.depth + 0.3, house.roof)
-                addWindows(house.x, house.z, house.width, house.depth, house.height, house.x + house.width / 2, house.z < 10)
-                otherWalls.add(Block(house.x, 0.0, house.z, house.width, house.height + PITCHED_ROOF, house.depth, house.wall))
+                val (x, z, width, depth, height) = listOf(house.x, house.z, house.width, house.depth, house.height)
+                if (house.pitched) addPitchedRoof(x, z, width, depth, height, house.roof)
+                else add(x - 0.15, height, z - 0.15, width + 0.3, FLAT_ROOF, depth + 0.3, house.roof)
+                addWindows(x, z, width, depth, height, x + width / 2, z < 10)
+                otherWalls.add(Block(x, 0.0, z, width, height + PITCHED_ROOF, depth, house.wall))
             }
         }
 

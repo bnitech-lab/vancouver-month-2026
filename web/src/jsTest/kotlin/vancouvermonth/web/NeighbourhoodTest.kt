@@ -59,7 +59,8 @@ class NeighbourhoodTest {
         for (venue in venues) {
             assertTrue(distanceBetween(venue.person, venue.door) <= 3.5, "${venue.place}")
             assertEquals(1.0, distanceBetween(venue.person, venue.talkSpot), 1e-9)
-            val streetSide = if (venue.doorFacesSouth) venue.talkSpot.z > venue.person.z else venue.talkSpot.z < venue.person.z
+            val south = venue.talkSpot.z > venue.person.z
+            val streetSide = if (venue.doorFacesSouth) south else !south
             assertTrue(streetSide, "${venue.place}")
         }
     }
@@ -89,7 +90,9 @@ class NeighbourhoodTest {
     fun `the town blocks every building and every person, and leaves each door and talk spot free`() {
         for (venue in Neighbourhood.venues) {
             for (x in venue.x until venue.x + venue.width) {
-                for (z in venue.z until venue.z + venue.depth) assertFalse(town.isFree(Cell(x, z)), "${venue.place} at $x, $z")
+                for (z in venue.z until venue.z + venue.depth) {
+                    assertFalse(town.isFree(Cell(x, z)), "${venue.place} at $x, $z")
+                }
             }
             assertFalse(town.isFree(town.cellAt(venue.person)), "${venue.place}'s person")
             assertTrue(town.isFree(town.cellAt(venue.door)), "${venue.place}'s door")
