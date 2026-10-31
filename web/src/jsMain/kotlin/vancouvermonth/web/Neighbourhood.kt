@@ -75,6 +75,10 @@ object Neighbourhood {
     /** How close to a door or a person the character must stop for the place to open. */
     const val REACH = 0.9
 
+    /** Far things fade into the sky's colour from this far from the camera, and are gone into it by [HAZE_FAR]. */
+    const val HAZE_NEAR = 70.0
+    const val HAZE_FAR = 230.0
+
     val venues: List<Venue> = listOf(
         Venue(Place.HOME, 5, 17, 5, 5, 4.2, 0xF6E7CB, 0xC0584A, false, Spot(4.6, 17.6), pitched = true),
         Venue(Place.CAFE, 13, 17, 5, 4, 3.2, 0xF2C28B, 0x8A5A3A, false, Spot(17.5, 16.5), pitched = true),
@@ -94,7 +98,21 @@ object Neighbourhood {
     val benchSeat = Spot(2.3, 18.1)
     const val BENCH_FACING = 0.0
     const val SEAT_HEIGHT = 0.42
-    private val campfire = Spot(2.3, 20.0)
+    val campfire = Spot(2.3, 20.0)
+
+    /** How high the logs lift the flames off the ground. */
+    const val FLAME_BASE = 0.12
+
+    /** The SkyTrain guideway's deck, from its west end to its east end, at this height. */
+    const val DECK_HEIGHT = 7.0
+    const val GUIDEWAY_WEST = -140.0
+    const val GUIDEWAY_EAST = 190.0
+
+    /** Where the train's west end stands at the station, how long the train is, and the width of the deck it runs on. */
+    const val TRAIN_STOP = 24.3
+    const val TRAIN_LENGTH = 7.4
+    const val DECK_NORTH = 3.0
+    const val DECK_SOUTH = 4.0
 
     /** The street between the two rows, its pavements included, from the north row's fronts to the south row's. */
     const val STREET_NORTH = 10.0
@@ -121,12 +139,26 @@ object Neighbourhood {
     }?.place
 
     /**
-     * Every box to draw except the people. [ground] holds what is too flat or too far to cast a shadow (the ground,
-     * the street, the water and the mountains), [glowing] the windows, lamps and fire, and [blocks] the rest.
+     * Every box to draw that stands still, the people aside. [ground] holds what is too flat or too far to cast a
+     * shadow (the ground, the street, the water and the mountains), [glowing] the windows and lamps, and [blocks] the
+     * rest.
      */
     val blocks: List<Block>
     val ground: List<Block>
     val glowing: List<Block>
+
+    /**
+     * The SkyTrain, which runs: its body and its windows, which light up after dark, measured from where its west
+     * end stands at the station ([TRAIN_STOP]) along x, and as they are on y and z.
+     */
+    val train: List<Block>
+    val trainWindows: List<Block>
+
+    /** The campfire's flames, which flicker: measured from the middle of the fire, [FLAME_BASE] above the ground. */
+    val flames: List<Block>
+
+    /** Where each blossom tree in the town stands; their petals drift down. */
+    val blossoms: List<Spot>
 
     /** What stands on the ground and blocks the way: a footprint for each building, trunk, fence, bench and lamp. */
     private val footprints: List<Block>
@@ -153,6 +185,10 @@ object Neighbourhood {
         blocks = town.blocks
         ground = town.ground
         glowing = town.glowing
+        train = town.train
+        trainWindows = town.trainWindows
+        flames = town.flames
+        blossoms = town.blossoms
         footprints = town.footprints
         walls = venues.map { Wall(it.box, it.place) } + town.otherWalls.map { Wall(it, null) }
         // Each person stands on one square, which the character walks around.
@@ -180,6 +216,10 @@ object Neighbourhood {
         val blocks = mutableListOf<Block>()
         val ground = mutableListOf<Block>()
         val glowing = mutableListOf<Block>()
+        val train = mutableListOf<Block>()
+        val trainWindows = mutableListOf<Block>()
+        val flames = mutableListOf<Block>()
+        val blossoms = mutableListOf<Spot>()
         val footprints = mutableListOf<Block>()
         val otherWalls = mutableListOf<Block>()
         private val random = Random(2026)
@@ -238,11 +278,12 @@ object Neighbourhood {
             }
         }
 
-        /** The guideway on pillars along the meadow, a station hall under it, and a train standing at the platform. */
+        /** The guideway on pillars along the meadow, a station hall under it, and a train that stops at the platform. */
         fun addSkyTrain() {
-            val deck = 7.0
-            add(-140.0, deck, 3.0, 330.0, 0.4, 1.0, CONCRETE)
-            otherWalls.add(Block(-140.0, deck, 3.0, 330.0, 0.4, 1.0, CONCRETE))
+            val deck = DECK_HEIGHT
+            val span = GUIDEWAY_EAST - GUIDEWAY_WEST
+            add(GUIDEWAY_WEST, deck, DECK_NORTH, span, 0.4, DECK_SOUTH - DECK_NORTH, CONCRETE)
+            otherWalls.add(Block(GUIDEWAY_WEST, deck, DECK_NORTH, span, 0.4, DECK_SOUTH - DECK_NORTH, CONCRETE))
             for (x in listOf(-14.0, -6.0, 2.0, 10.0, 18.0, 38.0, 46.0, 54.0, 62.0)) {
                 addSolid(x - 0.3, 0.0, 3.2, 0.6, deck, 0.6, PILLAR)
             }
@@ -253,10 +294,10 @@ object Neighbourhood {
             otherWalls.add(Block(24.6, deck + 2.4, 2.3, 6.8, 0.2, 2.4, SKYTRAIN_BLUE))
             for (x in listOf(24.8, 31.0)) add(x, deck + 0.4, 2.4, 0.2, 2.0, 0.2, PILLAR)
             for (car in 0..2) {
-                val x = 24.3 + car * 2.5
-                add(x, deck + 0.4, 3.05, 2.4, 1.0, 0.9, TRAIN)
-                add(x, deck + 0.55, 3.02, 2.4, 0.16, 0.96, SKYTRAIN_BLUE)
-                glow(x + 0.25, deck + 0.8, 3.01, 1.9, 0.35, 0.98, WINDOW)
+                val x = car * 2.5
+                train.add(Block(x, deck + 0.4, 3.05, 2.4, 1.0, 0.9, TRAIN))
+                train.add(Block(x, deck + 0.55, 3.02, 2.4, 0.16, 0.96, SKYTRAIN_BLUE))
+                trainWindows.add(Block(x + 0.25, deck + 0.8, 3.01, 1.9, 0.35, 0.98, WINDOW))
             }
         }
 
@@ -360,8 +401,8 @@ object Neighbourhood {
             footprints.add(Block(fire.x - 0.6, 0.0, fire.z - 0.6, 1.2, 0.2, 1.2, STONE))
             add(fire.x - 0.4, 0.05, fire.z - 0.07, 0.8, 0.14, 0.14, WOOD_DARK)
             add(fire.x - 0.07, 0.05, fire.z - 0.4, 0.14, 0.14, 0.8, WOOD_DARK)
-            glow(fire.x - 0.18, 0.12, fire.z - 0.18, 0.36, 0.34, 0.36, FLAME)
-            glow(fire.x - 0.1, 0.4, fire.z - 0.1, 0.2, 0.26, 0.2, FLAME_LIGHT)
+            flames.add(Block(-0.18, 0.0, -0.18, 0.36, 0.34, 0.36, FLAME))
+            flames.add(Block(-0.1, 0.28, -0.1, 0.2, 0.26, 0.2, FLAME_LIGHT))
             for (x in listOf(0.6, 1.4, 3.6)) addFlowerBed(x, 21.6)
         }
 
@@ -448,6 +489,7 @@ object Neighbourhood {
 
         /** A round tree: a trunk, then leaves in stacked blobs, wide in the middle and smaller on top. */
         fun addTree(x: Double, z: Double, blossom: Boolean) {
+            if (blossom) blossoms.add(Spot(x, z))
             val dark = if (blossom) BLOSSOM else LEAVES
             val light = if (blossom) BLOSSOM_LIGHT else LEAVES_LIGHT
             addSolid(x - 0.15, 0.0, z - 0.15, 0.3, 1.1, 0.3, TRUNK)

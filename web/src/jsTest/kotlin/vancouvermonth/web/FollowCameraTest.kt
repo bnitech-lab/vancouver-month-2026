@@ -257,4 +257,39 @@ class FollowCameraTest {
         assertNull(distanceToBox(Point(0.0, 5.0, 0.0), Point(1.0, 0.0, 0.0), box))
         assertEquals(0.0, distanceToBox(Point(3.0, 1.0, 0.0), Point(1.0, 0.0, 0.0), box))
     }
+
+    /** A camera south of the library's door, looking north at its front. */
+    private fun atTheLibrary(): FollowCamera = camera(Point(8.0, 1.0, 12.5), yaw = 0.0)
+
+    @Test
+    fun `a passerby in front of a building is picked`() {
+        val camera = atTheLibrary()
+        val passerby = Spot(8.0, 11.0)
+        val head = assertNotNull(camera.screenPoint(Point(passerby.x, 1.3, passerby.z)))
+        assertEquals(Picked.AtPlace(Place.LIBRARY), camera.pick(head.left, head.top))
+        val boxes = listOf(Passerby.boxAround(Spot(-100.0, -100.0)), Passerby.boxAround(passerby))
+        assertEquals(Picked.AtPasserby(1), camera.pick(head.left, head.top, boxes))
+    }
+
+    @Test
+    fun `a building in front of a passerby wins`() {
+        val camera = atTheLibrary()
+        val behind = Spot(8.0, 4.0)
+        val head = assertNotNull(camera.screenPoint(Point(behind.x, 1.3, behind.z)))
+        val picked = camera.pick(head.left, head.top, listOf(Passerby.boxAround(behind)))
+        assertEquals(Picked.AtPlace(Place.LIBRARY), picked)
+    }
+
+    @Test
+    fun `with no passersby, or none in the way, a tap lands where it always did`() {
+        val camera = camera()
+        val far = listOf(Passerby.boxAround(Spot(-100.0, -100.0)))
+        for (left in listOf(0.1, 0.3, 0.5, 0.7, 0.9)) {
+            for (top in listOf(0.2, 0.4, 0.6, 0.8)) {
+                val before = camera.pick(left, top)
+                assertEquals(before, camera.pick(left, top, emptyList()), "$left, $top")
+                assertEquals(before, camera.pick(left, top, far), "$left, $top")
+            }
+        }
+    }
 }

@@ -149,6 +149,17 @@ short, an interview booked or failed, the first or the last week, and so on. The
 effect (알바하기, 영어 공부, 코딩 연습, 지원서 넣기, 쉬기) or the reason it cannot be done today, 이야기 for small talk,
 and 그만. On an interview day only 회사 offers 면접 보기, and its name is marked.
 
+The town lives on its own. Four more people, invented too (올리버, 미나, 프리야 and 테오), stroll slow loops along the
+seawall, the south pavement and across the street, the park's paths and the plaza by the station. One stops when the
+character stands right in their way. A tap on one opens a short word of small talk with only 그만, which spends no day;
+they stop and face the character until it ends, and say something new each time that day. They are not obstacles, so
+the character's walks go through them. In the
+evening they fade out on their way home and they come back at dawn. The five at the places stay where they are, so they
+are always found there, but they look about, turn to face the character when it comes near, and wave as it comes up.
+The SkyTrain stands at the station, pulls out east and comes back in from the west every 32 seconds, slowing into the
+station, with its windows lit at night. The campfire flickers and lights the bench after dark, light glints on the
+water, petals drift down from the blossom trees, and clouds drift high over the water.
+
 An answer that spends the day ends it: a golden evening, a night with the windows, lamps and campfire lit, and the
 morning, in 1.5 seconds, with the character back at 내 방's door and the day's log over the top of the screen. On a day
 of rest the character spends the night sitting on the bench by the campfire, with the camera come round to the far side
@@ -156,8 +167,12 @@ of the fire; in the morning it stands at 내 방's door and the camera is the pl
 same choices end the same way in the town and with buttons; a test plays a whole month both ways. After an offer in the
 town, the neighbour has a word on the ending.
 
-The town draws no frames while nothing moves (a walk, the camera gliding, the change of day), at most two pixels per
-point however sharp the phone, and every box of a kind in one draw.
+The town draws every frame the screen offers while the character walks, the camera moves or the day changes, but its
+own life moves at most 30 times a second. While only that life moves, it draws at most 30 frames a second, and 15 once
+nobody has touched the town for 20 seconds or while a talk covers it; the sun's shadows are drawn again on every other
+of those frames. It draws nothing while the page is hidden. It draws at most two pixels per point however sharp the
+phone, and every box of a kind in one draw: all five townspeople in one, all four passersby in another. If the phone
+starts asking for less motion during the month, the town's own life stands still.
 
 Where the phone asks for less motion, the month is played with buttons, under the small fixed town of the first version,
 where the character simply appears at each day's building. Where the browser has no WebGL 2, which Three.js needs, there
@@ -166,10 +181,12 @@ console. Tests force each of these.
 
 The town's rules are plain Kotlin with tests: `Neighbourhood` (the layout, the people, which place a spot belongs to),
 `Grid` (the A* search for the way around things), `Trip` (a walk or a dash, and the double tap), `FollowCamera`
-(turning, zooming, keeping out of walls, and what a tap lands on) and `DayLight` (the light through the change of day).
-The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`). `WalkableTown` draws all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js included, is about 635 KB (about
-166 KB gzipped).
+(turning, zooming, keeping out of walls, and what a tap lands on), `DayLight` (the light through the change of day, and
+when the passersby are out), `Passersby` (their loops, and stopping for the character), `Greeter` (the five turning and
+waving), `TownLife` (the train's round, the fire's flicker, the glints, petals and clouds, all worked out from the time)
+and `FramePace` (which frames are drawn). The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`,
+and `Passersby.kt` for the passersby's). `WalkableTown` draws all of it, and `Three.kt` declares only the parts of
+Three.js in use. The page's script, Three.js included, is about 666 KB (about 176 KB gzipped).
 
 ## How it is built
 
@@ -210,8 +227,7 @@ or wage.
 
 ## What comes next
 
-Dawn plays the town to walk in and decides what changes. The plan's next stage adds people who walk the streets, a train
-that passes, and sound.
+Dawn plays the town to walk in and decides what changes. The plan's next stage adds sound.
 
 ## Licence
 
