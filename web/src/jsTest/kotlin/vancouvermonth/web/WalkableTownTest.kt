@@ -66,17 +66,20 @@ class WalkableTownTest {
      * Plays seed 1011 in a real town: the cheapest room, an exact guess, and September starts. [settle] is how long
      * a talk ignores taps after it opens (0 lets a test answer at once) and [night] how long a change of day takes.
      * With [phone], the town is 375 by 812 points, a phone's shape, whatever the test browser's window, so every
-     * point a test projects lands where it would on a phone.
+     * point a test projects lands where it would on a phone. The town's own life runs by [life], a clock the test
+     * holds: by default it stays at 0, so the passersby, the train and the rest stand still where a test can find them.
      */
     private fun startInTown(
         settle: Double = 0.0,
         night: Double = DayLight.MILLIS,
         phone: Boolean = true,
+        life: () -> Double = { 0.0 },
     ): NeighbourhoodScene {
         val game = PhoneGame(root, 1011, playAgain = {}, makeWalkableTown = {
             val opened = assertNotNull(openWalkableTown(lessMotion = false), "The test browser has no WebGL 2")
             (opened as NeighbourhoodScene).also {
                 it.nightMillis = night
+                it.lifeClock = life
                 town = it
             }
         })
@@ -581,6 +584,126 @@ class WalkableTownTest {
                 reject(error)
             }
         }
+    }
+
+    @Test
+    fun `a tap on a passerby opens small talk with only 그만, and the day stays the same`(): Promise<Unit> {
+        val town = startInTown()
+        return play(
+            Step("tap 미나 on the pavement", { town.isStill }) {
+                val mina = town.passerbySpots.first { it.first == Passer.MINA }.second
+                tapScreen(town, onScreen(town, Point(mina.x, 1.3, mina.z)))
+                val talk = root.querySelector(".talk") as? HTMLElement ?: error("no talk: $screen")
+                assertEquals("미나", talk.getAttribute("aria-label"))
+                assertTrue("우산 든 학생" in talk.textContent.orEmpty(), talk.textContent)
+                val answers = talk.querySelectorAll("button").asList().map { it.textContent }
+                assertEquals(listOf("그만"), answers)
+                assertNull(root.querySelector(".talk .spend"), "a talk with a passerby spends a day")
+                assertSame(talk, document.activeElement)
+                assertTrue("오늘9월 2일" in screen && "잔고\$1,835" in screen, screen)
+                assertFalse(town.isChangingDay)
+            },
+            Step("그만, then the street", { true }) {
+                tap("그만")
+                assertNull(root.querySelector(".talk"), "그만 left the talk open")
+                assertTrue("오늘9월 2일" in screen, screen)
+            },
+        )
+    }
+
+    @Test
+    fun `the town's own clock moves the train out of the station and back, and the passersby along their loops`():
+        Promise<Unit> {
+        var clock = 0.0
+        val town = startInTown(life = { clock })
+        var drawn = 0
+        var spots = emptyList<Pair<Passer, Spot>>()
+        fun drawnSince(): () -> Boolean = { town.framesDrawn >= drawn + 2 }
+        return play(
+            Step("at the station", { town.isStill }) {
+                assertEquals(0.0, town.trainShiftDrawn, "the train left before its time")
+                spots = town.passerbySpots
+                clock = SkyTrainRun.DWELL + SkyTrainRun.LEAVE / 2
+                drawn = town.framesDrawn
+            },
+            Step("halfway out", drawnSince()) {
+                assertTrue(town.trainShiftDrawn > 20.0, "the train is at ${town.trainShiftDrawn}")
+                for ((before, after) in spots.zip(town.passerbySpots)) {
+                    assertTrue(distanceBetween(before.second, after.second) > 0.05, "${before.first} stood still")
+                }
+                clock = SkyTrainRun.PERIOD - SkyTrainRun.ARRIVE / 2
+                drawn = town.framesDrawn
+            },
+            Step("coming in from the west", drawnSince()) {
+                assertTrue(town.trainShiftDrawn < -5.0, "the train is at ${town.trainShiftDrawn}")
+                clock = SkyTrainRun.PERIOD + 1_000
+                drawn = town.framesDrawn
+            },
+            Step("back at the station", drawnSince()) {
+                assertEquals(0.0, town.trainShiftDrawn)
+            },
+        )
+    }
+
+    @Test
+    fun `the passersby are gone in the night and out again in the morning`(): Promise<Unit> {
+        val town = startInTown(night = 3_000.0)
+        return play(
+            Step("spend the day", { town.isStill }) {
+                assertTrue(town.arePassersbyOut, "nobody out by day")
+                talkTo(Place.LIBRARY)
+                tap("영어 공부")
+                assertTrue(town.isChangingDay)
+            },
+            Step("in the middle of the night", after(1_500)) {
+                assertFalse(town.arePassersbyOut, "still out at night")
+            },
+            Step("in the morning", { !town.isChangingDay }) {
+                assertTrue(town.arePassersbyOut, "not back in the morning")
+            },
+        )
+    }
+
+    @Test
+    fun `nothing is drawn while the page is hidden, and the town draws again when it shows`(): Promise<Unit> {
+        val town = startInTown()
+        var hiddenAt = 0
+        return play(
+            Step("hide the page", { town.isStill }) {
+                town.pageHidden = { true }
+                document.dispatchEvent(Event("visibilitychange"))
+            },
+            Step("note the frames once any frame on its way is done", after(100)) {
+                hiddenAt = town.framesDrawn
+                // A drag still turns the camera, but draws nothing while hidden.
+                drag(town)
+            },
+            Step("half a second hidden", after(500)) {
+                assertEquals(hiddenAt, town.framesDrawn, "drew while hidden")
+                town.pageHidden = { false }
+                document.dispatchEvent(Event("visibilitychange"))
+            },
+            Step("shown again", after(400)) {
+                assertTrue(town.framesDrawn > hiddenAt, "did not draw again")
+            },
+        )
+    }
+
+    @Test
+    fun `with only the town's own life moving, it draws no more than thirty frames a second`(): Promise<Unit> {
+        var clock = 0.0
+        val town = startInTown(life = { clock })
+        var from = 0
+        return play(
+            Step("let the town's life run", { town.isStill }) {
+                clock = 1.0
+                from = town.framesDrawn
+            },
+            Step("one second later", after(1_000)) {
+                val drawn = town.framesDrawn - from
+                assertTrue(drawn in 1..FramePace.AMBIENT_FPS.toInt() + 1, "$drawn frames in a second")
+            },
+        )
     }
 
     /** The ending's own line and figures. */
