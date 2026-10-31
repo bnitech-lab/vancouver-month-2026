@@ -157,12 +157,16 @@ A test replays a few kept lines to months written down by hand, so a change to t
 On the phone screen, September is played in a small 3D town that fills the screen, drawn with
 [Three.js](https://threejs.org) from boxes only, with no image files. It aims for a cosy, storybook feel: soft colours,
 cartoon shading, a warm sun with soft shadows, round-headed people, round trees in leaf or blossom, flowers, fences,
-street lamps and a campfire. The five places stand on a stone street with brick pavements: 내 방 (the room picked on
-September 1st) with its garden, the 카페, the 도서관, 코워킹 and the 회사 tower, with a park and a pond, a seawall path by
-the water, a SkyTrain guideway with a station and a train, and mountains across the water. Each building's name floats
-over it. The day's figures sit thinly over the top of the screen, and a name that would sit under them or the day's log
-hides there. The month's first view looks down the street from its west end, high enough to show four of the buildings
-and their names.
+street lamps and a campfire. The town is real Vancouver, traced from the City's open data (see Map data below) and
+shrunk so the farthest walk between two places is about half a minute: the downtown peninsula with the big park at its
+tip as a forest of round trees, the West End's low blocks and downtown's towers along the real street grid, the seawall
+round the shore, False Creek with its south shore past it, and the inlet with the mountains far across it. The five
+places stand in the neighbourhoods that suit them: 내 방 (the room picked on September 1st) with its garden in the West
+End, the 카페 by the seawall on False Creek, the 도서관 in the middle of downtown, 코워킹 in the old brick streets at the
+east end, and the 회사 tower in the business district by the inlet. The SkyTrain runs on its guideway along False Creek,
+out of its tunnel by the station. Each building's name floats over it, and no other place has a name. The day's figures
+sit thinly over the top of the screen, and a name that would sit under them or the day's log hides there. The month's
+first view looks over 내 방 toward downtown, high enough to show four of the buildings and their names.
 
 | Do | What happens |
 |---|---|
@@ -172,8 +176,11 @@ and their names.
 | Pinch, or the mouse wheel | The camera comes nearer or goes farther |
 | Tap a person, a building or its name, or walk up to a door or a person | The character goes to that place's person, and a talk opens (a second quick tap only hurries it there) |
 
-A talk ignores taps for a moment after it opens, so the finger that opened it cannot also answer it. While a day
-changes into the next, the town takes no taps, drags, pinches or names, and no talk opens, until the morning.
+Downtown, where buildings stand close, the camera looks along the nearest street rather than come too close, and as
+the character reaches a place it comes round to the street side of the door, unless the player turned it on the way.
+A tap on the water walks to the near shore. A talk ignores taps for a moment after it opens, so the finger that opened
+it cannot also answer it. While a day changes into the next, the town takes no taps, drags, pinches or names, and no
+talk opens, until the morning.
 
 Each place has one person, all invented: 하나 at the 카페, 레오 at the 도서관, 수진 at 코워킹, 마커스 at the 회사 desk and
 the neighbour grandmother by the bench at 내 방. A talk shows their name, a small face drawn from their colours, and a
@@ -182,16 +189,16 @@ short, an interview booked or failed, the first or the last week, and so on. The
 effect (알바하기, 영어 공부, 코딩 연습, 지원서 넣기, 쉬기) or the reason it cannot be done today, 이야기 for small talk,
 and 그만. On an interview day only 회사 offers 면접 보기, and its name is marked.
 
-The town lives on its own. Four more people, invented too (올리버, 미나, 프리야 and 테오), stroll slow loops along the
-seawall, the south pavement and across the street, the park's paths and the plaza by the station. One stops when the
+The town lives on its own. Four more people, invented too (올리버, 미나, 프리야 and 테오), stroll slow loops along the English Bay
+seawall, a West End street near 내 방, the big park's edge and the square in front of the station. One stops when the
 character stands right in their way. A tap on one opens a short word of small talk with only 그만, which spends no day;
-they stop and face the character until it ends, and say something new each time that day. They are not obstacles, so
-the character's walks go through them. In the
-evening they fade out on their way home and they come back at dawn. The five at the places stay where they are, so they
-are always found there, but they look about, turn to face the character when it comes near, and wave as it comes up.
-The SkyTrain stands at the station, pulls out east and comes back in from the west every 32 seconds, slowing into the
-station, with its windows lit at night. The campfire flickers and lights the bench after dark, light glints on the
-water, petals drift down from the blossom trees, and clouds drift high over the water.
+they stop and face the character until it ends, and say something new each time that day. They are not obstacles, so the
+character's walks go through them. In the evening they fade out on their way home and they come back at dawn. The five
+at the places stay where they are, so they are always found there, but they look about, turn to face the character when
+it comes near, and wave as it comes up. The SkyTrain stands at the station, pulls out east along False Creek, its cars
+turning with the guideway, and comes back out of its tunnel from the west every 32 seconds, slowing into the station,
+with its windows lit at night. The campfire flickers and lights the bench after dark, light glints on the water, petals
+drift down from the blossom trees, and clouds drift high over the water.
 
 Each day has its weather, sunny, cloudy or rainy, worked out from the run's seed and the day, so a run always has the
 same skies and everyone who plays today's run gets the same weather. As in a Vancouver September, about three days in
@@ -211,28 +218,32 @@ of the fire; in the morning it stands at 내 방's door and the camera is the pl
 same choices end the same way in the town and with buttons; a test plays a whole month both ways. After an offer in the
 town, the neighbour has a word on the ending.
 
-The town draws every frame the screen offers while the character walks, the camera moves or the day changes, but its
-own life moves at most 30 times a second. While only that life moves, it draws at most 30 frames a second, and 15 once
+The town draws every frame the screen offers while the character walks, the camera moves or the day changes, but its own
+life moves at most 30 times a second. While only that life moves, it draws at most 30 frames a second, and 15 once
 nobody has touched the town for 20 seconds or while a talk covers it; the sun's shadows are drawn again on every other
 of those frames. It draws nothing while the page is hidden. It draws at most two pixels per point however sharp the
-phone, and every box of a kind in one draw: all five townspeople in one, all four passersby in another, and all the
-rain in one, moved on the same beat as the rest of the town's life. If the phone starts asking for less motion during
-the month, the town's own life stands still, the rain with it.
+phone, and boxes of a kind together: the buildings, trees and the rest that stand still and cast shadows in one draw for
+each 40-unit tile of the town, so a tile out of the camera's sight or the sun's shadow box is not drawn at all; the
+ground, the sea and the glowing windows in one draw each; all five townspeople in one, all four passersby in another,
+the train's cars in two, and all the rain in one, moved on the same beat as the rest of the town's life. If the phone
+starts asking for less motion during the month, the town's own life stands still, the rain with it.
 
 Where the phone asks for less motion, the month is played with buttons, under the small fixed town of the first version,
 where the character simply appears at each day's building. Where the browser has no WebGL 2, which Three.js needs, there
 is no town and the game plays with buttons, as before. If Three.js fails, the buttons take over and the error goes to the
 console. Tests force each of these.
 
-The town's rules are plain Kotlin with tests: `Neighbourhood` (the layout, the people, which place a spot belongs to),
-`Grid` (the A* search for the way around things), `Trip` (a walk or a dash, and the double tap), `FollowCamera`
-(turning, zooming, keeping out of walls, and what a tap lands on), `DayLight` (the light through the change of day, and
-when the passersby are out, and how each weather greys it), `Passersby` (their loops, and stopping for the character),
-`Greeter` (the five turning and waving), `TownLife` (the train's round and how loud it rumbles, the fire's flicker and
-crackle, the glints, petals, clouds and rain, all worked out from the time) and `FramePace` (which frames are drawn).
-The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`, and `Passersby.kt` for the passersby's),
-and so is each day's weather (`Weather.kt`). `WalkableTown` draws all of it, and `Three.kt` declares only the parts of
-Three.js in use. The page's script, Three.js included, is about 717 KB (about 193 KB gzipped).
+The town's rules are plain Kotlin with tests: `Neighbourhood` (the layout on the real map, the people, which place a
+spot belongs to), `VancouverMap` (the map's squares and lines, read from the generated `VancouverMapData`), `RailLine`
+(the guideway the train follows), `Grid` (the A* search for the way around things), `Trip` (a walk or a dash, and the
+double tap), `FollowCamera` (turning, zooming, keeping out of walls, and what a tap lands on), `DayLight` (the light
+through the change of day, and when the passersby are out, and how each weather greys it), `Passersby` (their loops, and
+stopping for the character), `Greeter` (the five turning and waving), `TownLife` (the train's round and how loud it
+rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, all worked out from the time) and
+`FramePace` (which frames are drawn). The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`, and
+`Passersby.kt` for the passersby's), and so is each day's weather (`Weather.kt`). `WalkableTown` draws all of it, and
+`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the map included, is about 791 KB
+(about 211 KB gzipped).
 
 ### Sound and the first-run guide
 
@@ -311,9 +322,27 @@ or wage.
 
 Dawn plays the month on a phone and decides what grows next.
 
+## Map data
+
+`tools/vancouver_map` traces real Vancouver (the peninsula, the big park at its tip, False Creek and its south shore)
+into a grid of squares in `VancouverMapData.kt`, with its city blocks and small parks, and the town is built on it.
+The page shows the licence's statement at the foot of the card on how to play. Its sources are
+the City of Vancouver's open datasets Shoreline 2002, Parks - polygon representation, Rapid transit lines, City
+boundary, Block outlines and Local area boundary, fetched on 2026-10-31 from
+[opendata.vancouver.ca](https://opendata.vancouver.ca).
+
+Contains information licensed under the
+[Open Government Licence – Vancouver](https://opendata.vancouver.ca/pages/licence/).
+
+The map data is licensed under that licence (version 1.0), not MIT, and keeps its attribution: on the page, the
+card on how to play shows the statement with a link to the licence, and `MAP-DATA-NOTICE.txt` ships beside the
+script. The code that makes and reads the data is MIT. How to fetch the data again and rebuild the map is in
+[tools/vancouver_map/README.md](tools/vancouver_map/README.md).
+
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+MIT, except the map data: see [LICENSE](LICENSE), and Map data above for the map. The page carries both notices
+beside its script, `three-LICENSE.txt` and `MAP-DATA-NOTICE.txt`.
 
 The phone screen bundles [Three.js](https://github.com/mrdoob/three.js) 0.169.0, which is also under the MIT
 licence (Copyright © 2010-2024 three.js authors). The build copies its full licence text next to the script, as

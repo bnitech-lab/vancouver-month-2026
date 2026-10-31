@@ -1,6 +1,8 @@
 package vancouvermonth.web
 
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -26,7 +28,7 @@ class TownLifeTest {
     }
 
     @Test
-    fun `the train always stays on the guideway, and never jumps while it can be seen`() {
+    fun `the train always stays on the guideway or in its tunnel, and never jumps while it can be seen`() {
         var last: Double? = null
         for (t in times(2 * SkyTrainRun.PERIOD)) {
             val shift = SkyTrainRun.shiftAt(t)
@@ -35,18 +37,48 @@ class TownLifeTest {
                 continue
             }
             val west = Neighbourhood.TRAIN_STOP + shift
-            assertTrue(west >= Neighbourhood.GUIDEWAY_WEST, "at $t the train is off the west end: $west")
-            assertTrue(west + Neighbourhood.TRAIN_LENGTH <= Neighbourhood.GUIDEWAY_EAST, "at $t off the east end")
+            // West of the guideway's first point the train is in its tunnel, at most as far as it ever goes.
+            assertTrue(west >= -SkyTrainRun.REACH, "at $t the train is past the tunnel's end: $west")
+            val east = west + Neighbourhood.TRAIN_LENGTH
+            assertTrue(east <= Neighbourhood.guideway.length, "at $t off the east end")
             last?.let { assertTrue(abs(shift - it) < 0.6, "at $t it jumped from $it to $shift") }
             last = shift
         }
-        // Its boxes sit on the deck, under the station's roof, within the deck's width.
-        for (block in Neighbourhood.train + Neighbourhood.trainWindows) {
+        // At the station the whole train stands under the station's roof, out of the tunnel.
+        assertTrue(Neighbourhood.TRAIN_STOP > 0.0)
+        // Its cars' boxes sit on the deck, under the station's roof, within the deck's width, a car long.
+        val half = Neighbourhood.CAR_LENGTH / 2
+        for (block in Neighbourhood.trainCar + Neighbourhood.trainCarWindows) {
             assertTrue(block.y >= Neighbourhood.DECK_HEIGHT + 0.4 - 1e-9, "$block")
             assertTrue(block.y + block.height <= Neighbourhood.DECK_HEIGHT + 2.4, "$block")
-            assertTrue(block.z >= Neighbourhood.DECK_NORTH && block.z + block.depth <= Neighbourhood.DECK_SOUTH, "$block")
-            assertTrue(block.x >= 0.0 && block.x + block.width <= Neighbourhood.TRAIN_LENGTH, "$block")
+            val wide = Neighbourhood.DECK_WIDTH / 2
+            assertTrue(block.z >= -wide && block.z + block.depth <= wide, "$block")
+            assertTrue(block.x >= -half - 1e-9 && block.x + block.width <= half + 1e-9, "$block")
         }
+        val last3 = (Neighbourhood.CARS - 1) * Neighbourhood.CAR_SPACING + Neighbourhood.CAR_LENGTH
+        assertEquals(Neighbourhood.TRAIN_LENGTH, last3, 1e-9)
+    }
+
+    @Test
+    fun `a car is drawn turned along the guideway where it bends, and not at all inside the tunnel`() {
+        val boxes = listOf(Block(0.5, 7.4, -0.25, 1.0, 1.0, 0.5, 0))
+        val numbers = Float32Array(2 * 16)
+        // A quarter turn: the car runs north, so a box half a car's length ahead lies north of the car's middle.
+        TrainCars.write(boxes, car = 1, spot = Spot(10.0, 20.0), turn = PI / 2, hidden = false, into = numbers)
+        val at = 16
+        assertEquals(10.0, numbers[at + 12].toDouble(), 1e-6)
+        assertEquals(7.9, numbers[at + 13].toDouble(), 1e-6)
+        assertEquals(19.0, numbers[at + 14].toDouble(), 1e-6)
+        // Its length now runs along z, its width along x.
+        assertEquals(-1.0, numbers[at + 2].toDouble(), 1e-6)
+        assertEquals(0.5, numbers[at + 8].toDouble(), 1e-6)
+        // The first car's slot is untouched; a hidden car is shrunk to nothing.
+        assertEquals(0f, numbers[0])
+        TrainCars.write(boxes, car = 1, spot = Spot(10.0, 20.0), turn = 0.0, hidden = true, into = numbers)
+        assertTrue((0 until 15).all { numbers[at + it] == 0f })
+        // Along the guideway, the line's turn is east on the station's straight leg.
+        assertEquals(0.0, Neighbourhood.guideway.turnAt(Neighbourhood.TRAIN_STOP), 1e-9)
+        assertEquals(Neighbourhood.guideway.points.first(), Neighbourhood.guideway.spotAt(0.0))
     }
 
     @Test
@@ -78,12 +110,10 @@ class TownLifeTest {
             val glints = Shimmer.at(t, night = 0.0)
             assertEquals(Shimmer.count, glints.size)
             for (glint in glints) {
-                val middle = Spot(glint.x + glint.width / 2, glint.z + glint.depth / 2)
-                val onSea = middle.z < -0.4 && glint.y < 0.0
-                val onPond = middle.x in 34.0..38.0 && middle.z in 24.6..27.4
-                assertTrue(onSea || onPond, "$glint at $t")
+                val middle = Cell(floor(glint.x + glint.width / 2).toInt(), floor(glint.z + glint.depth / 2).toInt())
+                val onSea = RealVancouver.map.terrainAt(middle) == Terrain.WATER && glint.y < 0.0
+                assertTrue(onSea, "$glint at $t")
                 assertTrue(glint.width <= Shimmer.MAX_WIDTH, "$glint")
-                if (onPond) assertTrue(glint.x >= 34.0 && glint.x + glint.width <= 38.0, "$glint spills off the pond")
             }
         }
         val one = Shimmer.at(1_000.0, 0.0).map { it.width }
@@ -133,8 +163,10 @@ class TownLifeTest {
             last = shows
             assertEquals(shows > 0.0, SkyTrainRun.isShownAt(t))
         }
-        // All there while any of it is over the town.
-        assertTrue(Neighbourhood.TRAIN_STOP + SkyTrainRun.FADE_FROM > Neighbourhood.COLUMNS + Neighbourhood.TRAIN_LENGTH)
+        // All there while any of it is over the town: it starts to fade only once it is past the grid's edge.
+        var edge = 0.0
+        while (Neighbourhood.guideway.spotAt(edge).x < Neighbourhood.COLUMNS) edge += 0.5
+        assertTrue(Neighbourhood.TRAIN_STOP + SkyTrainRun.FADE_FROM > edge, "it leaves the grid $edge along")
     }
 
     @Test
@@ -278,13 +310,20 @@ class TownLifeTest {
     fun `splashes flash on the ground or the sea for a moment, each time somewhere else`() {
         var shown = 0
         val spots = mutableSetOf<Pair<Int, Int>>()
+        // Round the café, where the seawall meets False Creek.
+        val (centreX, centreZ) = 190.0 to 112.0
         for (t in times(Rain.SPLASH_MILLIS * 6, 25.0)) {
             for (index in 0 until Rain.SPLASHES) {
-                val splash = Rain.splashAt(index, t, 24.3, 13.5)
+                val splash = Rain.splashAt(index, t, centreX, centreZ)
                 assertTrue(splash.width <= Rain.SPLASH_SIZE * 1.4 + 1e-9, "$splash")
-                val onSea = splash.z + splash.depth / 2 < 0.0
-                assertTrue(splash.y == Rain.SPLASH_HEIGHT || onSea, "a splash in the air: $splash")
-                assertTrue(splash.x >= 24.3 - Rain.SPAN / 2 - 1.0 && splash.x <= 24.3 + Rain.SPAN / 2, "$splash")
+                val middle = Cell(
+                    floor(splash.x + splash.width / 2).toInt(),
+                    floor(splash.z + splash.depth / 2).toInt(),
+                )
+                val onSea = RealVancouver.map.terrainAt(middle) == Terrain.WATER
+                assertEquals(onSea, splash.y < 0.0, "a splash in the air or under the ground: $splash")
+                if (!onSea) assertEquals(Rain.SPLASH_HEIGHT, splash.y, "$splash")
+                assertTrue(splash.x >= centreX - Rain.SPAN / 2 - 1.0 && splash.x <= centreX + Rain.SPAN / 2, "$splash")
                 if (splash.width > 0.01) {
                     shown += 1
                     spots += splash.x.toInt() to splash.z.toInt()
@@ -297,13 +336,19 @@ class TownLifeTest {
     }
 
     @Test
-    fun `puddles lie flat on the street, the pavements or the seawall, just over the stone`() {
+    fun `puddles lie flat on the street in front of the places, just over the stone`() {
+        assertEquals(2 * Neighbourhood.venues.size, Rain.puddles.size)
+        val grid = Neighbourhood.grid
         for (puddle in Rain.puddles) {
             assertTrue(puddle.height < 0.02 && puddle.y in 0.03..0.07, "$puddle")
-            val onStreet =
-                puddle.z >= Neighbourhood.STREET_NORTH && puddle.z + puddle.depth <= Neighbourhood.STREET_SOUTH
-            val onSeawall = puddle.z >= 0.0 && puddle.z + puddle.depth <= 2.0
-            assertTrue(onStreet || onSeawall, "$puddle")
+            // Every corner on open street, not under a building, a tree or the water.
+            for (x in listOf(puddle.x, puddle.x + puddle.width)) {
+                for (z in listOf(puddle.z, puddle.z + puddle.depth)) {
+                    val cell = grid.cellAt(Spot(x, z))
+                    assertTrue(grid.isFree(cell) && RealVancouver.map.terrainAt(cell) == Terrain.LAND, "$puddle")
+                }
+            }
+            assertTrue(Neighbourhood.venues.any { distanceBetween(it.door, Spot(puddle.x, puddle.z)) < 5.0 })
         }
     }
 
@@ -323,8 +368,9 @@ class TownLifeTest {
         assertEquals(0.5, SkyTrainRun.loudnessAt(SkyTrainRun.RUMBLE_NEAR), 1e-9)
         assertTrue(SkyTrainRun.loudnessAt(150.0) < 0.02)
 
-        // An ear above the station's plaza, where the camera often is.
-        val ear = Point(27.0, 12.0, 20.0)
+        // An ear above the square in front of the station, where the camera often is.
+        val station = Neighbourhood.guideway.points.first()
+        val ear = Point(station.x + 4.0, 12.0, station.z + 7.0)
         for (t in times(SkyTrainRun.PERIOD, 50.0)) {
             val level = SkyTrainRun.rumbleAt(t, ear)
             assertTrue(level in 0.0..1.0, "at $t: $level")

@@ -25,6 +25,16 @@ class GuideTest {
     }
 
     @Test
+    fun `the map's credit is the City's open data licence statement, word for word`() {
+        val statement = "Contains information licensed under the Open Government Licence \u2013 Vancouver."
+        assertEquals(statement, Guide.MAP_CREDIT)
+        // The licence's name, which links to the licence, is within the statement as it stands.
+        assertEquals("Open Government Licence \u2013 Vancouver", Guide.MAP_LICENCE)
+        assertTrue(Guide.MAP_LICENCE in Guide.MAP_CREDIT)
+        assertEquals("https://opendata.vancouver.ca/pages/licence/", Guide.MAP_LICENCE_URL)
+    }
+
+    @Test
     fun `the sound switch says what a tap does`() {
         assertEquals("소리 켜기", soundLabel(on = false))
         assertEquals("소리 끄기", soundLabel(on = true))

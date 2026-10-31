@@ -3,7 +3,9 @@ package vancouvermonth.web
 import kotlin.js.json
 import kotlin.math.PI
 import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.exp
+import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
@@ -167,7 +169,9 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     /** The passerby the player has stopped for a word, who stands and faces them for a while. */
     private var chatting: Passerby? = null
 
-    private val train = Group()
+    /** The train's three cars, their bodies in one draw and their windows in another, placed along the guideway. */
+    private lateinit var trainCars: InstancedMesh
+    private lateinit var trainWindows: InstancedMesh
 
     /** The train fades out far down the line, so it has materials of its own that can fade. */
     private val trainMaterial = MeshToonMaterial(json("gradientMap" to shades, "transparent" to true))
@@ -191,10 +195,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     /** The light as the time of day has it, before the weather greys it. */
     private var lighting = DayLight.MORNING
 
-    /** The ground's boxes, among them the sea and the pond, which darken in the rain; and which of them are water. */
-    private lateinit var groundBoxes: InstancedMesh
-    private val waterBoxes =
-        Neighbourhood.ground.indices.filter { Neighbourhood.ground[it].colour == Neighbourhood.WATER }
+    /** The sea, one plane under the whole town, which darkens in the rain. */
+    private lateinit var sea: InstancedMesh
 
     /** The rain's streaks and splashes in one draw, in a plain pale colour no light changes; the puddles in another. */
     private val rainMaterial = MeshBasicMaterial(
@@ -243,6 +245,9 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     /** True when the end of the walk should open the place there: a walk the player sent by tapping the ground. */
     private var opensOnArrival = false
+
+    /** True once the player has turned or zoomed the camera since the walk began; then it is left as they set it. */
+    private var cameraMovedOnWalk = false
 
     /** When the change of day began, or null outside one. While it lasts, the town takes no input. */
     private var nightFell: Double? = null
@@ -369,7 +374,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         shadowBox.top = SHADOW_REACH
         shadowBox.bottom = -SHADOW_REACH
         shadowBox.near = 1.0
-        shadowBox.far = 90.0
+        // The sun is 30 units from the character; past the ground below the tallest tower, nothing more to shadow.
+        shadowBox.far = SHADOW_DEPTH
         shadowBox.updateProjectionMatrix()
         sun.shadow.bias = -0.0005
         sun.shadow.normalBias = 0.03
@@ -378,15 +384,27 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         light(DayLight.MORNING)
     }
 
+    /**
+     * The town's boxes that stand still. The buildings, trees and the rest that cast shadows are drawn in one draw for
+     * each tile of the town, so the tiles out of the camera's sight, and out of the sun's shadow box, are not drawn at
+     * all. The ground, the water and the mountains take shadows but cast none, which saves the phone work; being flat
+     * or few, they and the glowing windows are one draw each.
+     */
     private fun addTown() {
-        // The ground, the street, the water and the mountains take shadows but cast none, which saves the phone work.
-        val ground = boxes(Neighbourhood.ground, material)
-        ground.castShadow = false
-        scene.add(ground)
-        groundBoxes = ground
-        scene.add(boxes(Neighbourhood.blocks, material))
+        val (water, ground) = Neighbourhood.ground.partition { it.colour == Neighbourhood.WATER }
+        sea = boxes(water, material)
+        sea.castShadow = false
+        scene.add(sea)
+        scene.add(boxes(ground, material).also { it.castShadow = false })
+        tiled(Neighbourhood.blocks, material)
         scene.add(boxes(Neighbourhood.glowing, glowMaterial))
     }
+
+    /** One draw for each tile of [blocks], [TILE] units square by where each box's middle is. */
+    private fun tiled(blocks: List<Block>, material: Material): List<InstancedMesh> =
+        blocks.groupBy { block ->
+            floor((block.x + block.width / 2) / TILE).toInt() to floor((block.z + block.depth / 2) / TILE).toInt()
+        }.values.map { tile -> boxes(tile, material).also { scene.add(it) } }
 
     /** The player: a body that turns as one, with legs and arms that swing from the hip and the shoulder. */
     private fun addCharacter() {
@@ -429,9 +447,9 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
      * blossom petals and clouds, which cast no shadow.
      */
     private fun addLife() {
-        train.add(boxes(Neighbourhood.train, trainMaterial))
-        train.add(boxes(Neighbourhood.trainWindows, trainGlowMaterial))
-        scene.add(train)
+        val cars = Neighbourhood.CARS
+        trainCars = movingBoxes(List(cars) { Neighbourhood.trainCar }.flatten(), trainMaterial)
+        trainWindows = movingBoxes(List(cars) { Neighbourhood.trainCarWindows }.flatten(), trainGlowMaterial)
         val fire = Neighbourhood.campfire
         flames.add(boxes(Neighbourhood.flames, flameMaterial).also { it.castShadow = false })
         flames.position.set(fire.x, Neighbourhood.FLAME_BASE, fire.z)
@@ -501,14 +519,24 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         }
     }
 
-    /** One draw for many boxes: the shared cube placed, stretched and coloured once for each block. */
+    /** One draw for boxes that move, placed again on every beat of the town's life, as the train's are. */
+    private fun movingBoxes(blocks: List<Block>, material: Material): InstancedMesh {
+        val mesh = boxes(blocks, material)
+        mesh.frustumCulled = false
+        mesh.instanceMatrix.setUsage(DynamicDrawUsage)
+        scene.add(mesh)
+        return mesh
+    }
+
+    /** One draw for many boxes: the shared cube placed, stretched, turned and coloured once for each block. */
     private fun boxes(blocks: List<Block>, material: Material): InstancedMesh {
         val mesh = InstancedMesh(cube, material, blocks.size)
         val placer = Object3D()
         val colour = Color(0)
         for ((index, block) in blocks.withIndex()) {
-            // A cube is placed by its middle.
+            // A cube is placed, and turned, by its middle.
             placer.position.set(block.x + block.width / 2, block.y + block.height / 2, block.z + block.depth / 2)
+            placer.rotation.y = block.turn
             placer.scale.set(block.width, block.height, block.depth)
             placer.updateMatrix()
             mesh.setMatrixAt(index, placer.matrix)
@@ -643,6 +671,12 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     internal val isSitting: Boolean
         get() = sitting
 
+    /** Turns the camera as a drag would, to [yaw], [pitch] and [distance], for tests that look somewhere on purpose. */
+    internal fun aimCamera(yaw: Double, pitch: Double, distance: Double) {
+        view.aim(yaw, pitch, distance)
+        askForFrame()
+    }
+
     internal val isDashing: Boolean
         get() = trip?.speed == Trip.DASH_SPEED
 
@@ -740,12 +774,14 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             val gap = gap()
             if (pinchGap > 0 && gap > 0) view.zoom(pinchGap / gap)
             pinchGap = gap
+            cameraMovedOnWalk = true
             askForFrame()
             return
         }
         if (!dragged && hypot(event.x - pressX, event.y - pressY) > TAP_SLOP) dragged = true
         if (dragged && !pinched) {
             view.orbit(event.x - last.first, event.y - last.second)
+            cameraMovedOnWalk = true
             askForFrame()
         }
     }
@@ -761,6 +797,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         touched()
         if (nightFell != null) return
         view.zoom(exp(event.deltaY * WHEEL_ZOOM))
+        cameraMovedOnWalk = true
         askForFrame()
     }
 
@@ -794,7 +831,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             }
             is Picked.OnGround -> {
                 onPlace(null)
-                walkTo(picked.spot, dash, opensOnArrival = true)
+                walkTo(Neighbourhood.landing(spot, picked.spot), dash, opensOnArrival = true)
             }
             null -> {}
         }
@@ -846,6 +883,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         trip = Trip(route, if (dash) Trip.DASH_SPEED else Trip.WALK_SPEED)
         tripStarted = window.performance.now()
         this.opensOnArrival = opensOnArrival
+        cameraMovedOnWalk = false
         val end = route.last()
         marker.position.set(end.x, 0.0, end.z)
         marker.visible = true
@@ -959,11 +997,12 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         crowd.castShadow = out >= 1.0
         placePassersby(millis, player)
         trainShift = SkyTrainRun.shiftAt(now)
-        train.position.set(Neighbourhood.TRAIN_STOP + trainShift, 0.0, 0.0)
+        placeTrain(trainShift)
         val trainShows = SkyTrainRun.opacityAt(now)
         trainMaterial.opacity = trainShows
         trainGlowMaterial.opacity = trainShows
-        train.visible = trainShows > 0.0
+        trainCars.visible = trainShows > 0.0
+        trainWindows.visible = trainShows > 0.0
         val flicker = Campfire.flicker(now)
         val spread = 1 + (flicker - 1) * 0.4
         flames.scale.set(spread, flicker, spread)
@@ -999,6 +1038,24 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         mesh.instanceMatrix.needsUpdate = true
     }
 
+    /**
+     * Puts each of the train's cars along the guideway, [shift] from its stop at the station, turned along the line
+     * where it bends. A car all the way into the tunnel is left out.
+     */
+    private fun placeTrain(shift: Double) {
+        for (car in 0 until Neighbourhood.CARS) {
+            val west = Neighbourhood.TRAIN_STOP + shift + car * Neighbourhood.CAR_SPACING
+            val middle = west + Neighbourhood.CAR_LENGTH / 2
+            val inTunnel = middle + Neighbourhood.CAR_LENGTH / 2 < 0
+            val spot = Neighbourhood.guideway.spotAt(middle)
+            val turn = Neighbourhood.guideway.turnAt(middle)
+            TrainCars.write(Neighbourhood.trainCar, car, spot, turn, inTunnel, trainCars.instanceMatrix.array)
+            TrainCars.write(Neighbourhood.trainCarWindows, car, spot, turn, inTunnel, trainWindows.instanceMatrix.array)
+        }
+        trainCars.instanceMatrix.needsUpdate = true
+        trainWindows.instanceMatrix.needsUpdate = true
+    }
+
     /** The rain at [millis], falling in a box of sky between where the camera looks and the camera itself. */
     private fun placeRain(millis: Double) {
         val eye = view.eye
@@ -1024,8 +1081,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         haze.near = near
         haze.far = far
         val colour = Color(0)
-        for (index in waterBoxes) groundBoxes.setColorAt(index, colour.setHex(DayLight.sea(weather)))
-        groundBoxes.instanceColor?.needsUpdate = true
+        sea.setColorAt(0, colour.setHex(DayLight.sea(weather)))
+        sea.instanceColor?.needsUpdate = true
         val clouds = Shimmer.count + Petals.count
         for (index in clouds until clouds + Clouds.count) {
             drifting.setColorAt(index, colour.setHex(Clouds.colour(weather)))
@@ -1072,13 +1129,19 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         return false
     }
 
-    /** At a place's person the character turns to them; at the end of a walk the player sent, the place opens. */
+    /**
+     * At a place's person the character turns to them; at the end of a walk the player sent, the place opens. Unless
+     * the player moved the camera on the way, it comes round to the street side of the place's door, looking at its
+     * front along the street rather than down between the towers.
+     */
     private fun arrive(end: Spot) {
         val place = Neighbourhood.placeAt(end) ?: return
         val venue = Neighbourhood.venue(place)
         if (distanceBetween(end, venue.talkSpot) <= Neighbourhood.REACH) {
             heading = atan2(venue.person.x - end.x, venue.person.z - end.z)
         }
+        val streetSide = if (venue.doorFacesSouth) 0.0 else PI
+        if (!cameraMovedOnWalk) view.aim(streetSide, FollowCamera.ARRIVAL_TILT, view.distance)
         if (opensOnArrival) onPlace(place)
     }
 
@@ -1155,7 +1218,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val arms = listOf(limbs.getValue(Limb.LEFT_ARM), limbs.getValue(Limb.RIGHT_ARM))
         if (sitting) {
             val seat = Neighbourhood.benchSeat
-            character.position.set(seat.x, SITTING_LIFT, seat.z + 0.1)
+            // A little forward on the seat, toward the way the bench faces.
+            character.position.set(seat.x, SITTING_LIFT, seat.z + 0.1 * cos(Neighbourhood.BENCH_FACING))
             character.rotation.y = Neighbourhood.BENCH_FACING
             // Legs straight out in front, hands in the lap.
             for (leg in legs) leg.rotation.x = -PI / 2
@@ -1249,10 +1313,14 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         /** Where the sun is from the character: high in the north-east, so shadows fall short to the south-west. */
         val SUN = Point(12.0, 26.0, -8.0)
         const val SHADOW_PIXELS = 1024.0
-        const val SHADOW_REACH = 18.0
+        const val SHADOW_REACH = 15.0
+        const val SHADOW_DEPTH = 55.0
 
-        /** The camera for a night by the campfire: south of it, near and low, looking north at the bench. */
-        const val FIRESIDE_TURN = 0.15
+        /** How wide a tile of the town's still boxes is: each tile is one draw, left out when out of sight. */
+        const val TILE = 40.0
+
+        /** The camera for a night by the campfire: north of it, near and low, looking south at the bench. */
+        const val FIRESIDE_TURN = PI + 0.15
         const val FIRESIDE_TILT = 0.5
         const val FIRESIDE_DISTANCE = 9.0
 

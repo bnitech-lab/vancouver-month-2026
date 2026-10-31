@@ -19,4 +19,16 @@ object Guide {
 
     /** The name of the small "?" button that opens the card again. */
     const val HELP = "하는 법 보기"
+
+    /**
+     * Where the town's map comes from, in the words the City of Vancouver's open data licence asks for, word for word,
+     * wherever its data is shown: the town is traced from that data.
+     */
+    const val MAP_CREDIT = "Contains information licensed under the Open Government Licence – Vancouver."
+
+    /** The licence's own name, as it reads in [MAP_CREDIT]: on the page it links to [MAP_LICENCE_URL]. */
+    const val MAP_LICENCE = "Open Government Licence – Vancouver"
+
+    /** Where the licence can be read, as the licence asks to be linked wherever its statement is shown. */
+    const val MAP_LICENCE_URL = "https://opendata.vancouver.ca/pages/licence/"
 }

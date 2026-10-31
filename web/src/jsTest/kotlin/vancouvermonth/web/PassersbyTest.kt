@@ -68,15 +68,30 @@ class PassersbyTest {
     }
 
     @Test
-    fun `the passersby walk the pavement, the park, the seawall and the plaza, and start far apart`() {
+    fun `the passersby walk the seawall, a West End street, the park's edge and the station's square`() {
         val all = Strolls.all()
         assertEquals(Passer.entries.toSet(), all.map { it.passer }.toSet())
+        val map = RealVancouver.map
+        /** True when a square of [terrain] lies within [reach] squares of [spot]. */
+        fun near(spot: Spot, terrain: Terrain, reach: Int): Boolean {
+            val cell = grid.cellAt(spot)
+            return (-reach..reach).any { dx ->
+                (-reach..reach).any { dz -> map.terrainAt(Cell(cell.x + dx, cell.z + dz)) == terrain }
+            }
+        }
         val seawall = all.first { it.passer == Passer.OLIVER }
-        assertTrue(along(seawall.stroll).all { it.z < 2.0 }, "on the seawall")
-        val pavement = all.first { it.passer == Passer.MINA }
-        assertTrue(along(pavement.stroll).any { it.z in 15.0..17.0 }, "on the south pavement")
+        val onSeawall = along(seawall.stroll).all { near(it, Terrain.SHORE, 1) && near(it, Terrain.WATER, 2) }
+        assertTrue(onSeawall, "on the seawall")
+        val street = all.first { it.passer == Passer.MINA }
+        val myRoom = Neighbourhood.venue(Place.HOME).door
+        assertTrue(along(street.stroll).all { map.terrainAt(grid.cellAt(it)) == Terrain.LAND }, "on the street")
+        assertTrue(along(street.stroll).all { distanceBetween(it, myRoom) < 25.0 }, "in the West End, by 내 방")
         val park = all.first { it.passer == Passer.PRIYA }
-        assertTrue(along(park.stroll).all { it.z > Neighbourhood.STREET_SOUTH + 1 }, "behind the park fence")
+        assertTrue(along(park.stroll).all { near(it, Terrain.PARK, 1) }, "along the park's edge")
+        val square = all.first { it.passer == Passer.THEO }
+        val station = Neighbourhood.guideway.points.first()
+        val bySquare = along(square.stroll).all { distanceBetween(it, station) < 12.0 && it.z > station.z + 1.5 }
+        assertTrue(bySquare, "in front of the station")
         val home = Neighbourhood.venue(Place.HOME).door
         for ((index, a) in all.withIndex()) {
             assertTrue(distanceBetween(a.spot, home) > 10.0, "${a.passer} starts near 내 방")

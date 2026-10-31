@@ -17,13 +17,18 @@ fun distanceBetween(a: Spot, b: Spot): Double = hypot(b.x - a.x, b.z - a.z)
 /**
  * The ground the character walks on, cut into squares one unit wide. A square is blocked when something stands on
  * it (a building, a person, a tree trunk, a fence) and every square outside the grid is blocked too.
- * [route] finds the way between two spots with A*, the usual shortest-path search in games.
+ * [route] finds the way between two spots with A*, the usual shortest-path search in games. Inside, each square is a
+ * number, z * [columns] + x, so a search on a big grid makes no new objects for the squares it looks at.
  */
 class Grid(val columns: Int, val rows: Int, blocked: Collection<Cell>) {
-    private val blockedCells: Set<Cell> = blocked.toSet()
+    private val closed = BooleanArray(columns * rows).also { closed ->
+        for (cell in blocked) if (cell.x in 0 until columns && cell.z in 0 until rows) closed[cell.z * columns + cell.x] = true
+    }
 
-    fun isFree(cell: Cell): Boolean =
-        cell.x in 0 until columns && cell.z in 0 until rows && cell !in blockedCells
+    fun isFree(cell: Cell): Boolean = isFree(cell.x, cell.z)
+
+    private fun isFree(x: Int, z: Int): Boolean =
+        x in 0 until columns && z in 0 until rows && !closed[z * columns + x]
 
     /** The square [spot] is on. */
     fun cellAt(spot: Spot): Cell = Cell(floor(spot.x).toInt(), floor(spot.z).toInt())
@@ -66,21 +71,36 @@ class Grid(val columns: Int, val rows: Int, blocked: Collection<Cell>) {
 
     /** Every free square the character can walk to from [start], [start] included. */
     fun reachableFrom(start: Cell): Set<Cell> {
-        val reached = mutableSetOf(start)
-        val waiting = ArrayDeque(listOf(start))
-        while (waiting.isNotEmpty()) {
-            for ((next, _) in neighbours(waiting.removeFirst())) {
-                if (reached.add(next)) waiting.addLast(next)
+        if (!isFree(start)) return setOf(start)
+        val reached = BooleanArray(columns * rows)
+        val waiting = IntArray(columns * rows)
+        var head = 0
+        var tail = 0
+        val first = start.z * columns + start.x
+        reached[first] = true
+        waiting[tail++] = first
+        while (head < tail) {
+            val square = waiting[head++]
+            val x = square % columns
+            val z = square / columns
+            for (dx in -1..1) {
+                for (dz in -1..1) {
+                    if (!canStep(x, z, dx, dz)) continue
+                    val next = (z + dz) * columns + x + dx
+                    if (reached[next]) continue
+                    reached[next] = true
+                    waiting[tail++] = next
+                }
             }
         }
-        return reached
+        return (0 until tail).mapTo(LinkedHashSet()) { Cell(waiting[it] % columns, waiting[it] / columns) }
     }
 
     /** Every free square of the grid. */
     fun freeCells(): List<Cell> {
         val cells = mutableListOf<Cell>()
         for (x in 0 until columns) {
-            for (z in 0 until rows) if (isFree(Cell(x, z))) cells.add(Cell(x, z))
+            for (z in 0 until rows) if (isFree(x, z)) cells.add(Cell(x, z))
         }
         return cells
     }
@@ -94,69 +114,72 @@ class Grid(val columns: Int, val rows: Int, blocked: Collection<Cell>) {
         for (step in 0..steps) {
             val x = a.x + (b.x - a.x) * step / steps
             val z = a.z + (b.z - a.z) * step / steps
-            for (dx in listOf(-CLEARANCE, CLEARANCE)) {
-                for (dz in listOf(-CLEARANCE, CLEARANCE)) {
-                    if (!isFree(cellAt(Spot(x + dx, z + dz)))) return false
-                }
-            }
+            if (!isFree(floor(x - CLEARANCE).toInt(), floor(z - CLEARANCE).toInt())) return false
+            if (!isFree(floor(x - CLEARANCE).toInt(), floor(z + CLEARANCE).toInt())) return false
+            if (!isFree(floor(x + CLEARANCE).toInt(), floor(z - CLEARANCE).toInt())) return false
+            if (!isFree(floor(x + CLEARANCE).toInt(), floor(z + CLEARANCE).toInt())) return false
         }
         return true
     }
 
+    /**
+     * True when a step of [dx], [dz] from square [x], [z] lands on a free square. A slanted step needs both squares
+     * beside it free, so the character never cuts the corner of a building.
+     */
+    private fun canStep(x: Int, z: Int, dx: Int, dz: Int): Boolean {
+        if (dx == 0 && dz == 0) return false
+        if (!isFree(x + dx, z + dz)) return false
+        return dx == 0 || dz == 0 || (isFree(x + dx, z) && isFree(x, z + dz))
+    }
+
     /** A*: the squares from [start] to [goal], both included, or null when no way joins them. */
     private fun search(start: Cell, goal: Cell): List<Cell>? {
+        val size = columns * rows
         // The cheapest known way to each square so far, and the square it came from on that way.
-        val cost = mutableMapOf(start to 0.0)
-        val cameFrom = mutableMapOf<Cell, Cell>()
+        val cost = DoubleArray(size) { Double.MAX_VALUE }
+        val cameFrom = IntArray(size) { -1 }
+        val done = BooleanArray(size)
+        val from = start.z * columns + start.x
+        val to = goal.z * columns + goal.x
+        cost[from] = 0.0
         // Each open square's score is the way so far plus a guess at the rest that is never too high.
         val open = OpenSquares()
-        open.push(start, guess(start, goal))
-        val done = mutableSetOf<Cell>()
+        open.push(from, guess(start.x, start.z, goal))
         while (open.isNotEmpty()) {
             val current = open.pop()
             // A square can wait in the heap twice, the second time with a better score; only its first turn counts.
-            if (!done.add(current)) continue
-            if (current == goal) return wayBack(goal, cameFrom)
-            for ((next, step) in neighbours(current)) {
-                if (next in done) continue
-                val newCost = cost.getValue(current) + step
-                if (newCost < (cost[next] ?: Double.MAX_VALUE)) {
-                    cost[next] = newCost
-                    cameFrom[next] = current
-                    open.push(next, newCost + guess(next, goal))
+            if (done[current]) continue
+            done[current] = true
+            if (current == to) return wayBack(to, cameFrom)
+            val x = current % columns
+            val z = current / columns
+            for (dx in -1..1) {
+                for (dz in -1..1) {
+                    if (!canStep(x, z, dx, dz)) continue
+                    val next = (z + dz) * columns + x + dx
+                    if (done[next]) continue
+                    val newCost = cost[current] + if (dx != 0 && dz != 0) SLANT else 1.0
+                    if (newCost < cost[next]) {
+                        cost[next] = newCost
+                        cameFrom[next] = current
+                        open.push(next, newCost + guess(x + dx, z + dz, goal))
+                    }
                 }
             }
         }
         return null
     }
 
-    private fun wayBack(goal: Cell, cameFrom: Map<Cell, Cell>): List<Cell> {
-        val cells = mutableListOf(goal)
-        while (true) cells.add(cameFrom[cells.last()] ?: break)
-        return cells.reversed()
-    }
-
-    /**
-     * The free squares next to [cell], with what a step there costs: 1 straight, about 1.41 on a slant. A slanted step
-     * needs both squares beside it free, so the character never cuts the corner of a building.
-     */
-    private fun neighbours(cell: Cell): List<Pair<Cell, Double>> = buildList {
-        for (dx in -1..1) {
-            for (dz in -1..1) {
-                if (dx == 0 && dz == 0) continue
-                val next = Cell(cell.x + dx, cell.z + dz)
-                if (!isFree(next)) continue
-                val slanted = dx != 0 && dz != 0
-                if (slanted && !(isFree(Cell(cell.x + dx, cell.z)) && isFree(Cell(cell.x, cell.z + dz)))) continue
-                add(next to if (slanted) SLANT else 1.0)
-            }
-        }
+    private fun wayBack(goal: Int, cameFrom: IntArray): List<Cell> {
+        val squares = mutableListOf(goal)
+        while (cameFrom[squares.last()] >= 0) squares.add(cameFrom[squares.last()])
+        return squares.asReversed().map { Cell(it % columns, it / columns) }
     }
 
     /** What the rest of the way would cost with nothing in it: slanted steps first, then straight ones. */
-    private fun guess(a: Cell, b: Cell): Double {
-        val across = abs(a.x - b.x)
-        val down = abs(a.z - b.z)
+    private fun guess(x: Int, z: Int, goal: Cell): Double {
+        val across = abs(x - goal.x)
+        val down = abs(z - goal.z)
         return max(across, down) + (SLANT - 1) * min(across, down)
     }
 
@@ -192,21 +215,28 @@ class Grid(val columns: Int, val rows: Int, blocked: Collection<Cell>) {
 }
 
 /**
- * The squares A* still has to look at, the lowest score always first. It is a binary heap: a list where each square
- * scores no more than the two below it (at 2i + 1 and 2i + 2), so adding one or taking the first moves squares along
- * one branch only, instead of searching the whole list.
+ * The squares A* still has to look at, each by its number, the lowest score always first. It is a binary heap: a list
+ * where each square scores no more than the two below it (at 2i + 1 and 2i + 2), so adding one or taking the first
+ * moves squares along one branch only, instead of searching the whole list. It grows as needed and makes nothing new
+ * otherwise.
  */
 internal class OpenSquares {
-    private val cells = mutableListOf<Cell>()
-    private val scores = mutableListOf<Double>()
+    private var squares = IntArray(256)
+    private var scores = DoubleArray(256)
+    private var size = 0
 
-    fun isNotEmpty(): Boolean = cells.isNotEmpty()
+    fun isNotEmpty(): Boolean = size > 0
 
-    fun push(cell: Cell, score: Double) {
-        cells.add(cell)
-        scores.add(score)
+    fun push(square: Int, score: Double) {
+        if (size == squares.size) {
+            squares = squares.copyOf(size * 2)
+            scores = scores.copyOf(size * 2)
+        }
+        squares[size] = square
+        scores[size] = score
+        size++
         // Move it up while the one above it scores more.
-        var child = cells.lastIndex
+        var child = size - 1
         while (child > 0) {
             val parent = (child - 1) / 2
             if (scores[parent] <= scores[child]) break
@@ -216,19 +246,18 @@ internal class OpenSquares {
     }
 
     /** Takes the square with the lowest score out. */
-    fun pop(): Cell {
-        val first = cells[0]
-        swap(0, cells.lastIndex)
-        cells.removeAt(cells.lastIndex)
-        scores.removeAt(scores.lastIndex)
+    fun pop(): Int {
+        val first = squares[0]
+        swap(0, size - 1)
+        size--
         // Move the one now at the top down while one below it scores less.
         var parent = 0
         while (true) {
             val left = 2 * parent + 1
             val right = left + 1
             var lowest = parent
-            if (left < cells.size && scores[left] < scores[lowest]) lowest = left
-            if (right < cells.size && scores[right] < scores[lowest]) lowest = right
+            if (left < size && scores[left] < scores[lowest]) lowest = left
+            if (right < size && scores[right] < scores[lowest]) lowest = right
             if (lowest == parent) return first
             swap(parent, lowest)
             parent = lowest
@@ -236,9 +265,9 @@ internal class OpenSquares {
     }
 
     private fun swap(a: Int, b: Int) {
-        val cell = cells[a]
-        cells[a] = cells[b]
-        cells[b] = cell
+        val square = squares[a]
+        squares[a] = squares[b]
+        squares[b] = square
         val score = scores[a]
         scores[a] = scores[b]
         scores[b] = score

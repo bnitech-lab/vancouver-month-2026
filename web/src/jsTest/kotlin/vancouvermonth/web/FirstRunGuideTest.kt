@@ -9,6 +9,7 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.browser.document
 import kotlinx.browser.window
+import org.w3c.dom.HTMLAnchorElement
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.asList
@@ -47,9 +48,10 @@ class FirstRunGuideTest {
     private val card: HTMLElement?
         get() = root.querySelector(".guide-card") as? HTMLElement
 
-    private fun press(key: String) {
+    private fun press(key: String, shift: Boolean = false) {
         val target = document.activeElement ?: document.body!!
-        target.dispatchEvent(KeyboardEvent("keydown", KeyboardEventInit(key = key, bubbles = true, cancelable = true)))
+        val init = KeyboardEventInit(key = key, shiftKey = shift, bubbles = true, cancelable = true)
+        target.dispatchEvent(KeyboardEvent("keydown", init))
     }
 
     private fun helpButton(): HTMLButtonElement =
@@ -70,6 +72,16 @@ class FirstRunGuideTest {
         val described = card.getAttribute("aria-describedby")!!.split(" ").map { document.getElementById(it)!!.textContent }
         assertEquals(listOf(Guide.LINES.joinToString(""), goalLine()), described)
         assertSame(root.button(Guide.START), document.activeElement)
+        // The map's credit, as its licence asks, at the card's foot, after its button, with the licence's name a link
+        // to the licence that opens in a new tab.
+        val credit = assertNotNull(card.lastElementChild)
+        assertEquals(Guide.MAP_CREDIT, credit.textContent)
+        assertEquals("guide-credit", credit.className)
+        val link = assertNotNull(credit.querySelector("a") as? HTMLAnchorElement, "No link to the licence")
+        assertEquals(Guide.MAP_LICENCE, link.textContent)
+        assertEquals(Guide.MAP_LICENCE_URL, link.href)
+        assertEquals("_blank", link.target)
+        assertEquals("noopener", link.rel)
         // Over the town, its top card and its first-day hint.
         assertTrue(root.querySelector(".over-town") != null && root.querySelector(".guide") != null)
     }
@@ -124,8 +136,15 @@ class FirstRunGuideTest {
         helpButton().click()
         assertNotNull(card)
         assertSame(root.button(Guide.START), document.activeElement)
-        // Tab stays in the card while it is open.
+        // Tab goes round the card's button and its link to the licence while it is open, either way.
+        val link = assertNotNull(card!!.querySelector(".guide-credit a") as? HTMLElement)
         press("Tab")
+        assertSame(link, document.activeElement)
+        press("Tab")
+        assertSame(root.button(Guide.START), document.activeElement)
+        press("Tab", shift = true)
+        assertSame(link, document.activeElement)
+        press("Tab", shift = true)
         assertSame(root.button(Guide.START), document.activeElement)
         press("Escape")
         assertNull(card)

@@ -134,32 +134,26 @@ private const val TURN_MILLIS = 120.0
 /**
  * Who walks where, all off the grid's blocked squares and well away from every door and every place to talk, so none
  * of them ever stands where the player opens a place:
- * - 올리버 jogs along the seawall and back.
- * - 미나 walks the south pavement east of the café, crosses the street, comes back along its north side and crosses
- *   again at the zebra.
- * - 프리야 walks the park's paths, past the pond.
- * - 테오 walks the plaza in front of the station, out of its door and back round.
+ * - 올리버 jogs along the English Bay seawall south of the West End, and back.
+ * - 미나 walks the West End street south-east of 내 방, along one side and back along the other.
+ * - 프리야 walks the edge of the big park, between it and the West End, and back.
+ * - 테오 walks the square in front of the station, round and round.
  * They start far apart and away from 내 방, where each day begins.
  */
 object Strolls {
     /** The four, each at the start of their loop: new walkers on every call, so each town has its own. */
     fun all(): List<Passerby> = listOf(
-        Passerby(Passer.OLIVER, Stroll(listOf(Spot(1.0, 0.5), Spot(47.0, 0.5))), speed = 1.7, start = 30.0),
+        Passerby(Passer.OLIVER, Stroll(listOf(Spot(101.6, 106.6), Spot(110.4, 116.4))), speed = 1.7, start = 12.0),
         Passerby(
             Passer.MINA,
-            Stroll(listOf(Spot(29.2, 16.3), Spot(45.5, 16.3), Spot(45.5, 12.6), Spot(29.2, 12.6))),
+            Stroll(listOf(Spot(122.5, 99.5), Spot(134.5, 99.5), Spot(134.5, 100.5), Spot(122.5, 100.5))),
             speed = 1.15,
             start = 4.0,
         ),
-        Passerby(
-            Passer.PRIYA,
-            Stroll(listOf(Spot(29.0, 18.5), Spot(29.0, 23.5), Spot(42.5, 23.5), Spot(42.5, 18.5))),
-            speed = 0.9,
-            start = 15.0,
-        ),
+        Passerby(Passer.PRIYA, Stroll(listOf(Spot(88.5, 85.5), Spot(88.5, 102.5))), speed = 0.9, start = 3.0),
         Passerby(
             Passer.THEO,
-            Stroll(listOf(Spot(22.6, 6.0), Spot(27.9, 5.5), Spot(32.6, 6.0), Spot(32.6, 9.6), Spot(22.6, 9.6))),
+            Stroll(listOf(Spot(193.5, 65.2), Spot(205.5, 65.2), Spot(205.5, 66.8), Spot(193.5, 66.8))),
             speed = 1.05,
             start = 2.0,
         ),
