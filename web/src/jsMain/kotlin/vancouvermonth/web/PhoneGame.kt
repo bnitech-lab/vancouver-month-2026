@@ -246,6 +246,7 @@ class PhoneGame private constructor(
                     month = game.startMonth(checkNotNull(picked))
                     walkable = makeWalkableTown()?.also { listenTo(it) }
                     if (walkable == null) town = makeTown()
+                    guide?.onOpenChange = { walkable?.isCovered = isTownCovered() }
                     show()
                     window.scrollTo(0.0, 0.0)
                     if (walkable != null) guide?.openFirstTime(root)
@@ -433,6 +434,9 @@ class PhoneGame private constructor(
         show()
     }
 
+    /** True while a card lies over most of the town: a talk, a small talk or the guide on how to play. */
+    private fun isTownCovered(): Boolean = talkingAt != null || chattingWith != null || guide?.isOpen == true
+
     /**
      * A day in the town: the town fills the screen, the day's figures sit over its top, and a talk with a place's
      * person opens over its bottom. The town stays on the page all month, so its picture never blinks; only what
@@ -445,7 +449,7 @@ class PhoneGame private constructor(
         }
         root.querySelector(".over-town")?.remove()
         town.mark(if (month.hasInterviewToday) INTERVIEW_PLACE else null)
-        town.isCovered = talkingAt != null || chattingWith != null
+        town.isCovered = isTownCovered()
         root.child("div", "over-town") {
             child("header", "hud") {
                 setAttribute("tabindex", "-1")

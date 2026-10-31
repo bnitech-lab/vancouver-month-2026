@@ -89,6 +89,18 @@ class FirstRunGuideTest {
     }
 
     @Test
+    fun `the town counts as covered while the card is open, so its own life slows down`() {
+        startMonth(FakeStore())
+        assertTrue(town.isCovered, "The town was not told the card covers it")
+        root.button(Guide.START).click()
+        assertTrue(!town.isCovered, "The town stayed covered after the card closed")
+        helpButton().click()
+        assertTrue(town.isCovered)
+        press("Escape")
+        assertTrue(!town.isCovered)
+    }
+
+    @Test
     fun `시작 closes it, the focus goes back to the ?, and the next visit has no guide`() {
         val store = FakeStore()
         startMonth(store)

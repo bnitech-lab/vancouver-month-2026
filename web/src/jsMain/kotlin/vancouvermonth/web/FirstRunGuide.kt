@@ -24,6 +24,9 @@ internal class FirstRunGuide(private val memory: Memory) {
     val isOpen: Boolean
         get() = shown?.isConnected == true
 
+    /** Called with true when the card opens and false when it closes, so the town under it can slow down. */
+    var onOpenChange: (Boolean) -> Unit = {}
+
     // A page or an extension may send a plain Event named "keydown"; only a real key press is read.
     private val onKey: (Event) -> Unit = { event -> (event as? KeyboardEvent)?.let { key(it) } }
 
@@ -58,6 +61,7 @@ internal class FirstRunGuide(private val memory: Memory) {
         }
         root.appendChild(cover)
         shown = cover
+        onOpenChange(true)
         document.addEventListener("keydown", onKey)
         start.focus()
         // On a short screen the card scrolls; focusing 시작 would scroll past the title, so it opens at its top.
@@ -68,6 +72,7 @@ internal class FirstRunGuide(private val memory: Memory) {
     fun close() {
         val cover = shown ?: return
         shown = null
+        onOpenChange(false)
         document.removeEventListener("keydown", onKey)
         // Before the focus can go back, what is under the card must take it again.
         stilled.forEach { it.removeAttribute("inert") }

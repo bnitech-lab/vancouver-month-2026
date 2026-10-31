@@ -11,15 +11,20 @@ import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.asList
 import org.w3c.dom.events.Event
 import vancouvermonth.core.FirstMinute
+import vancouvermonth.text.Passer
 
 /** A town to walk in that draws nothing, whose nights pass at once. */
 internal class QuietTown : WalkableTown {
     override val element = (document.createElement("div") as HTMLElement).also { it.className = "walk-town" }
     override var onPlace: (Place?) -> Unit = {}
+    override var onPasserby: (Passer) -> Unit = {}
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
+    override var isCovered = false
 
     override fun mark(place: Place?) {}
+
+    override fun endChat() {}
 
     override fun endDay(place: Place) = onMorning()
 
