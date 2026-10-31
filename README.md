@@ -171,6 +171,33 @@ The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`). 
 `Three.kt` declares only the parts of Three.js in use. The page's script, Three.js included, is about 635 KB (about
 166 KB gzipped).
 
+### Sound and the first-run guide
+
+The page has a calm background tune of its own, made entirely in code with the Web Audio API: no audio files, no
+samples, nothing downloaded. It is written by rules, not copied from any game or song: a music-box melody in F major
+pentatonic over soft chords and a low note, at 70 beats a minute, in a loop of 16 bars shaped like a short song
+(A A' B A''). The theme comes from a fixed seed, and each pass through the loop changes a few notes a little, so it
+never repeats exactly. The player's own clock colours it: the whole tune by day (from 6:00), a softer, sparser and
+darker one in the evening (from 18:00), and at night (from 22:00) only a quiet bed of soft noise that rises and falls
+like the sea, under a few slow notes. A talk opens with a soft blip, a line types out with very quiet ticks (at most
+one every 110 ms), and the change of day rings a gentle chime.
+
+Sound is off until the player turns it on with the switch (소리 켜기 / 소리 끄기, a toggle button with `aria-pressed`) in
+the town's top card, at the top of the button screen, and by the title on the room and ending screens. The browser's
+audio is made only on that tap, as browsers require. The choice is kept in `localStorage`; when it was left on, the
+sound comes back on the first tap anywhere. It pauses while the page is hidden, fades in and out, and plays quietly
+through a limiter. Where the browser has no Web Audio there is no switch, and where storage is refused nothing is
+remembered.
+
+The first time the town opens, one card says how to play: tap the ground to walk, tap twice to dash, drag to look
+around and pinch to zoom, and tap a person or a building to talk, where picking a job ends the day. It ends with the
+month's goal, in the words the month's start uses. 시작 or Escape closes it, and the "?" in the top card opens it again.
+The button screen has no card, since its buttons say what they do.
+
+`Music.kt` writes the tune as notes and is tested without sound; `Synth.kt` plays it, and the tests render it into an
+`OfflineAudioContext` to check it is heard, never clips, and is quietest at night; `Sound.kt` is the switch,
+`FirstRunGuide.kt` the card and `Memory.kt` the storage that may be refused. The words are in `text` (`Guide.kt`).
+
 ## How it is built
 
 | Part | What | Notes |
