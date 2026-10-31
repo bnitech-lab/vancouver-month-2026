@@ -4,6 +4,7 @@ import kotlin.js.Date
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
@@ -33,6 +34,7 @@ class ContinueMonthTest {
     private val root = (document.createElement("main") as HTMLElement).also { document.body!!.appendChild(it) }
     private val other = (document.createElement("main") as HTMLElement).also { document.body!!.appendChild(it) }
     private val store = FakeStore()
+    private var playedAgain = false
     private val guides = mutableListOf<FirstRunGuide>()
 
     @AfterTest
@@ -56,9 +58,9 @@ class ContinueMonthTest {
     ): PhoneGame {
         into.innerHTML = ""
         val game = if (today == null) {
-            PhoneGame(into, seed, playAgain = {}, makeWalkableTown = { town })
+            PhoneGame(into, seed, playAgain = { playedAgain = true }, makeWalkableTown = { town })
         } else {
-            PhoneGame(into, today, playAgain = {}, makeWalkableTown = { town })
+            PhoneGame(into, today, playAgain = { playedAgain = true }, makeWalkableTown = { town })
         }
         game.slot = SaveSlot(Memory { storage })
         game.guide = FirstRunGuide(Memory { storage }).also { guides += it }
@@ -243,11 +245,26 @@ class ContinueMonthTest {
         assertNotNull(root.querySelector(".rooms"), "No rooms after 새로 시작")
         assertTrue("판 번호 1011" in root.textContent.orEmpty())
         assertNull(kept)
+        assertFalse(playedAgain, "An address that names a run played a new one")
 
         open()
         assertNull(card, "The dropped month was offered again")
         startSeed1011(root)
         assertTrue(date(Month.FIRST_DAY) in text(".topbar"))
+    }
+
+    @Test
+    fun `from an address with no run, 새로 시작 plays a new run, as such an address did before`() {
+        open()
+        startSeed1011(root)
+        root.button("영어 공부").click()
+
+        val game = open()
+        game.startOverWithNewRun = true
+        game.show()
+        root.button(Continue.NEW).click()
+        assertTrue(playedAgain, "No new run")
+        assertNull(kept)
     }
 
     @Test
@@ -371,9 +388,10 @@ class ContinueMonthTest {
         val today = TodaysRun(2026, 10, 29)
         val bySeed = MonthRecord(1011, null, 0, 1000)
         val byDate = MonthRecord(today.seed, today, 0, 1000)
-        assertEquals(Opening(1011, null, "?seed=1011"), openingFor("", now, newSeed = 4242, kept = bySeed))
+        val bySeedOpening = openingFor("", now, newSeed = 4242, kept = bySeed)
+        assertEquals(Opening(1011, null, "?seed=1011", fromKept = true), bySeedOpening)
         val byDateOpening = openingFor("", now, newSeed = 4242, kept = byDate)
-        assertEquals(Opening(today.seed, today, "?today=2026-10-29"), byDateOpening)
+        assertEquals(Opening(today.seed, today, "?today=2026-10-29", fromKept = true), byDateOpening)
         // An address that names a run plays that run, kept month or not.
         assertEquals(Opening(5, null, null), openingFor("?seed=5", now, newSeed = 4242, kept = bySeed))
         val octoberThirtieth = TodaysRun(2026, 10, 30)

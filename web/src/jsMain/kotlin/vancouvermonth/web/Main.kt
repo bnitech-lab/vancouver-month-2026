@@ -34,13 +34,17 @@ fun main() {
     game.sound = pageSound(memory)
     game.guide = FirstRunGuide(memory)
     game.slot = slot
+    game.startOverWithNewRun = opening.fromKept
     game.show()
     // The game is drawn first, so the screen does not depend on the address changing.
     opening.address?.let { window.history.replaceState(null, "", it) }
 }
 
-/** The run a page plays, today's run when it is one, and the address to write, or null to keep the address. */
-data class Opening(val seed: Int, val today: TodaysRun?, val address: String?)
+/**
+ * The run a page plays, today's run when it is one, and the address to write, or null to keep the address.
+ * [fromKept] is true when the address named no run and the kept month's run was taken instead.
+ */
+data class Opening(val seed: Int, val today: TodaysRun?, val address: String?, val fromKept: Boolean = false)
 
 /**
  * What a page opened with [query] plays. `?seed=1011` wins and keeps its address, so a link replays that run.
@@ -55,8 +59,8 @@ fun openingFor(query: String, now: Date, newSeed: Int, kept: MonthRecord? = null
     val today = todayFrom(query, now)
     if (today != null) return Opening(today.seed, today, todayQuery(today))
     val keptToday = kept?.today
-    if (keptToday != null) return Opening(keptToday.seed, keptToday, todayQuery(keptToday))
-    if (kept != null) return Opening(kept.seed, null, "?seed=${kept.seed}")
+    if (keptToday != null) return Opening(keptToday.seed, keptToday, todayQuery(keptToday), fromKept = true)
+    if (kept != null) return Opening(kept.seed, null, "?seed=${kept.seed}", fromKept = true)
     return Opening(newSeed, null, "?seed=$newSeed")
 }
 

@@ -144,6 +144,12 @@ class PhoneGame private constructor(
     private var kept: KeptMonth? = null
     private var keptRead = false
 
+    /**
+     * True when the page took the kept month's run because its address named none: 새로 시작 then plays a new run, as
+     * such an address did before there was anything to continue. An address that names a run starts it again instead.
+     */
+    internal var startOverWithNewRun = false
+
     /** The day another run's kept month goes on from, read with [kept]: starting this run replaces that month. */
     private var replacing: Int? = null
 
@@ -324,10 +330,14 @@ class PhoneGame private constructor(
         }
     }
 
-    /** Drops the kept month and shows the run's rooms. */
+    /** Drops the kept month and shows the run's rooms, or plays a new run when the address named none. */
     private fun startOver() {
-        kept = null
         slot?.clear()
+        if (startOverWithNewRun) {
+            playAgain()
+            return
+        }
+        kept = null
         show()
     }
 
