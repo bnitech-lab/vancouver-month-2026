@@ -3,8 +3,8 @@
 `build_map.py` turns City of Vancouver open data into
 `web/src/jsMain/kotlin/vancouvermonth/web/VancouverMapData.kt`: the peninsula's outline as a grid of squares (water,
 land, park, shore), the simplified shoreline, the big park's outline, the rail on its guideway along False Creek, the
-line the mountains stand behind, and a proposed square for each of the five places. `VancouverMap.kt` reads it.
-Nothing draws it yet: the town is still the made-up street, and stage 20b rebuilds the town on this map.
+line the mountains stand behind, the city blocks and small parks, and a proposed square for each of the five places.
+`VancouverMap.kt` reads it, and `Neighbourhood.kt` builds the town on it.
 
 ## Rebuild
 
@@ -36,6 +36,11 @@ give a slightly different map; the SHA-1 of each file used is written at the top
 5. Each square takes what lies under its centre: water, land, or the park. Ponds under 4 squares become land, specks
    of land the character could never reach become water, and every land square beside the water becomes shore.
 6. Lines are simplified with Douglas-Peucker to within 0.35 of a square.
+7. Each real city block becomes a rectangle of plain land squares, drawn 0.4 of a square in from its outline on every
+   side so a street of at least one square always runs between blocks. A block turned off the grid (the older streets
+   to the east) becomes a square of the same area; one wider or deeper than 9 squares is cut into pieces with lanes
+   between; where two overlap, the larger keeps the ground. A block whose middle lies in one of the City's parks is a
+   small park, not buildings.
 
 The five spots are rough points in a neighbourhood, chosen by its character, never an address or a business: 내 방 in
 the West End's residential streets, 카페 by the seawall on False Creek's north shore, 도서관 in the civic blocks in the
@@ -54,10 +59,10 @@ copying, changing and publishing the data, also commercially, with this attribut
 | Dataset | Used for |
 |---|---|
 | [Shoreline 2002](https://opendata.vancouver.ca/explore/dataset/shoreline-2002/) | Land and water |
-| [Parks - polygon representation](https://opendata.vancouver.ca/explore/dataset/parks-polygon-representation/) | The big park's outline |
+| [Parks - polygon representation](https://opendata.vancouver.ca/explore/dataset/parks-polygon-representation/) | The big park's outline, and which blocks are small parks |
 | [Rapid transit lines](https://opendata.vancouver.ca/explore/dataset/rapid-transit-lines/) | The rail along False Creek |
 | [City boundary](https://opendata.vancouver.ca/explore/dataset/city-boundary/) | The line in Burrard Inlet the mountains stand behind |
-| [Block outlines](https://opendata.vancouver.ca/explore/dataset/block-outlines/) | The street grid's angle, and the comparison picture |
+| [Block outlines](https://opendata.vancouver.ca/explore/dataset/block-outlines/) | The street grid's angle, the city blocks, and the comparison picture |
 | [Local area boundary](https://opendata.vancouver.ca/explore/dataset/local-area-boundary/) | Which blocks are downtown, and the area's size |
 
 Fetched on 2026-10-31. The map data in the game is derived from these datasets and published under the same
