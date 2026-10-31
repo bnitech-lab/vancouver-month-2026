@@ -39,4 +39,10 @@ class GuideTest {
         assertEquals("소리 켜기", soundLabel(on = false))
         assertEquals("소리 끄기", soundLabel(on = true))
     }
+
+    @Test
+    fun `the small map tells a screen reader which place the character is near`() {
+        assertEquals("지도: 내 방 근처", minimapLabel("내 방"))
+        assertEquals("지도: 회사 근처", minimapLabel("회사"))
+    }
 }
