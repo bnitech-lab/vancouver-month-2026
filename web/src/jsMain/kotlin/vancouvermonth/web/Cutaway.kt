@@ -14,7 +14,9 @@ import kotlin.math.sqrt
  * behind it stand. Over the first [NEAR_LENGTH] in front of the camera it widens as the view does, up to
  * [NEAR_RADIUS], so what fills the near view folds but what stands beside or behind the camera, out of sight, does not.
  * A building already folded stays folded until it is [SLACK] farther out than that, so one at the edge does not
- * flicker. [buildings] are the boxes, each from the ground up, in the order the drawing knows them by.
+ * flicker. One the camera's eye is inside, or nearly, folds at once rather than over time, so the camera is never seen
+ * inside a tower still standing. [buildings] are the boxes, each from the ground up, in the order the drawing knows
+ * them by.
  *
  * Nothing new is made while the camera moves: the buildings are kept in buckets of [BUCKET] units on the ground, and
  * [aim] looks only at those near the ray.
@@ -44,6 +46,9 @@ class Cutaway(buildings: List<Block>) {
 
     /** How far each building is folded as drawn, from 0.0 standing to 1.0 down to its plinth. */
     private val folded = DoubleArray(count)
+
+    /** True for each building to fold all the way at the next [step]: the camera's eye is inside it. */
+    private val snaps = BooleanArray(count)
 
     /** The buildings folding or rising, by number, and a mark on each so it is listed once. */
     private val moving = IntArray(count)
@@ -133,13 +138,22 @@ class Cutaway(buildings: List<Block>) {
         headX: Double, headY: Double, headZ: Double,
     ) {
         val inWay = isInWay(index, eyeX, eyeY, eyeZ, headX, headY, headZ, if (wanted[index]) SLACK else 0.0)
-        if (inWay == wanted[index]) return
+        // With the eye inside it, or nearly, a building still standing even in part folds at once.
+        val snap = inWay && folded[index] < 1.0 && holdsEye(index, eyeX, eyeY, eyeZ)
+        if (inWay == wanted[index] && !snap) return
         wanted[index] = inWay
+        if (snap) snaps[index] = true
         if (!isListed[index]) {
             isListed[index] = true
             moving[movingCount++] = index
         }
     }
+
+    /** True when the eye at [eyeX], [eyeY], [eyeZ] is inside building [index], grown by [SNAP_MARGIN] all round. */
+    private fun holdsEye(index: Int, eyeX: Double, eyeY: Double, eyeZ: Double): Boolean =
+        eyeX >= lowX[index] - SNAP_MARGIN && eyeX <= highX[index] + SNAP_MARGIN &&
+            eyeZ >= lowZ[index] - SNAP_MARGIN && eyeZ <= highZ[index] + SNAP_MARGIN &&
+            eyeY <= tops[index] + SNAP_MARGIN
 
     /**
      * True when building [index] comes within the ray's thickness, plus [slack], of the way from the eye to the head:
@@ -189,7 +203,12 @@ class Cutaway(buildings: List<Block>) {
             val index = moving[at]
             val target = if (wanted[index]) 1.0 else 0.0
             val now = folded[index]
-            val next = if (target > now) min(target, now + by) else max(target, now - by)
+            val next = when {
+                snaps[index] -> target
+                target > now -> min(target, now + by)
+                else -> max(target, now - by)
+            }
+            snaps[index] = false
             if (next != now) {
                 folded[index] = next
                 changed[changedCount++] = index
@@ -221,6 +240,9 @@ class Cutaway(buildings: List<Block>) {
         const val NEAR_LENGTH = 6.0
         const val NEAR_RADIUS = 3.0
         const val NEAR_SPREAD = 0.9
+
+        /** How near the eye must be to a building, outside it, for the building to fold at once. */
+        const val SNAP_MARGIN = 0.5
 
         /** How much farther out a folded building must be before it rises again. */
         const val SLACK = 0.6

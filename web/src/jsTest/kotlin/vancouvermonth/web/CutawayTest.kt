@@ -86,6 +86,32 @@ class CutawayTest {
     }
 
     @Test
+    fun `a building the camera's eye is in folds at once, never seen standing round the camera`() {
+        val tower = tower(eye.x + 0.3, eye.z, height = 20.0)
+        val cutaway = Cutaway(listOf(tower))
+        cutaway.aimAt(eye, head)
+        assertTrue(cutaway.isFolding(0))
+        cutaway.step(16.0)
+        assertEquals(Cutaway.PLINTH, cutaway.heightOf(0), 1e-9)
+        // One that had begun to fold as the camera came near folds the rest of the way as soon as the eye is in it.
+        val ahead = Cutaway(listOf(tower(eye.x + 4.0, eye.z, height = 20.0)))
+        ahead.aimAt(eye, head)
+        assertTrue(ahead.isFolding(0), "the tower just ahead of the camera stands")
+        ahead.step(40.0)
+        assertTrue(ahead.foldOf(0) in 0.01..0.5, "it folded ${ahead.foldOf(0)} in 40 ms")
+        ahead.aimAt(Point(eye.x + 3.6, eye.y, eye.z), head)
+        ahead.step(16.0)
+        assertEquals(Cutaway.PLINTH, ahead.heightOf(0), 1e-9)
+        assertEquals(1, ahead.changedCount)
+        // Clear of the eye, a building folds over time as before.
+        val middle = onLine(0.5)
+        val far = Cutaway(listOf(tower(middle.x, middle.z, height = 12.0)))
+        far.aimAt(eye, head)
+        far.step(16.0)
+        assertTrue(far.heightOf(0) > 11.0, "${far.heightOf(0)}")
+    }
+
+    @Test
     fun `brought in close, the camera has no wider near view to fold what stands round the character`() {
         val close = Point(head.x - 4.0, head.y + 2.5, head.z)
         // Beside the camera, 2.0 off the line: inside a near view, outside the ray.
