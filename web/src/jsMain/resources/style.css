@@ -719,6 +719,21 @@ html:has(.walk-town) {
   pointer-events: none;
 }
 
+/* The small map of the whole town, in the top right corner just under the top card and the day's log. Where it sits
+   and its size are set in code; it is a picture that looks the same in both themes, as the town does. A tap shows it
+   larger, about four fifths of the screen wide. */
+.minimap {
+  background: #6fb3d9;
+  border: 1px solid rgba(122, 82, 51, 0.35);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(59, 47, 37, 0.3);
+  cursor: pointer;
+}
+
+.minimap.large {
+  border-radius: 14px;
+}
+
 .over-town {
   position: fixed;
   inset: 0;

@@ -22,6 +22,8 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.asList
 import org.w3c.dom.events.Event
+import org.w3c.dom.events.KeyboardEvent
+import org.w3c.dom.events.KeyboardEventInit
 import org.w3c.dom.events.WheelEvent
 import org.w3c.dom.events.WheelEventInit
 import org.w3c.dom.pointerevents.PointerEvent
@@ -1104,6 +1106,77 @@ class WalkableTownTest {
         )
     }
 
+    @Test
+    fun `a small map sits in the corner under the top card, and its arrow moves as the character walks`(): Promise<Unit> {
+        val town = startInTown()
+        val start = town.characterSpot
+        // Beside 내 방, east and a little south, in front of the first view.
+        val target = Spot(start.x + 3.0, start.z + 1.0)
+        val map = town.minimapElement
+        var before = 0.0 to 0.0
+        return play(
+            Step("the town drew its map", { town.isStill }) {
+                assertSame(town.element, map.parentElement)
+                assertEquals("img", map.getAttribute("role"))
+                assertEquals("지도: 내 방 근처", map.getAttribute("aria-label"))
+                // In the town's top right corner, under the top card, never over it, and small.
+                val frame = map.getBoundingClientRect()
+                val hud = assertNotNull(root.querySelector(".hud")).getBoundingClientRect()
+                assertTrue(frame.top >= hud.bottom, "the map's top ${frame.top} is over the card, which ends at ${hud.bottom}")
+                assertEquals(375.0 - 8.0, frame.right, 1.0)
+                assertTrue(frame.width in 96.0..122.0, "${frame.width} wide")
+                // The arrow is where the character stands.
+                val width = map.clientWidth.toDouble()
+                before = town.minimapDot
+                assertEquals(start.x * width / Neighbourhood.COLUMNS, before.first, 1e-6)
+                assertEquals(start.z * map.clientHeight / Neighbourhood.ROWS, before.second, 1e-6)
+                tapScreen(town, onScreen(town, Point(target.x, 0.0, target.z)))
+            },
+            Step("walked there", { town.isStill }) {
+                val after = town.minimapDot
+                val width = map.clientWidth.toDouble()
+                assertEquals(target.x * width / Neighbourhood.COLUMNS, after.first, 1e-6)
+                assertEquals(target.z * map.clientHeight / Neighbourhood.ROWS, after.second, 1e-6)
+                assertTrue(after.first > before.first && after.second > before.second, "$before to $after")
+            },
+        )
+    }
+
+    @Test
+    fun `a tap on the small map shows it larger, and a tap, Escape or a talk brings it back`(): Promise<Unit> {
+        val town = startInTown()
+        val map = town.minimapElement
+        var small = 0.0
+        fun escape() = document.dispatchEvent(KeyboardEvent("keydown", KeyboardEventInit(key = "Escape")))
+        return play(
+            Step("tap the map", { town.isStill }) {
+                small = map.getBoundingClientRect().width
+                map.click()
+                assertTrue(map.classList.contains("large"))
+                // About four fifths of the 375-point town.
+                assertEquals(300.0, map.getBoundingClientRect().width, 2.0)
+                assertNull(town.markerSpot, "a tap on the map walked the character")
+            },
+            Step("drawn larger", { town.isStill }) {
+                val canvas = map.querySelector("canvas") as HTMLCanvasElement
+                assertTrue(canvas.width >= map.clientWidth, "the larger map is drawn at ${canvas.width} pixels")
+                map.click()
+                assertFalse(map.classList.contains("large"))
+                assertEquals(small, map.getBoundingClientRect().width, 0.5)
+                map.click()
+                escape()
+                assertFalse(map.classList.contains("large"), "Escape left it large")
+                map.click()
+                talkTo(Place.HOME)
+                assertNotNull(root.querySelector(".talk"))
+                assertFalse(map.classList.contains("large"), "a talk opened over the larger map")
+                // While the talk covers the town, it does not grow under it.
+                map.click()
+                assertFalse(map.classList.contains("large"))
+            },
+        )
+    }
+
     /** The five places' own walls, by where they are among the town's still boxes. */
     private fun placeBodies(): List<Pair<Venue, Int>> = Neighbourhood.venues.map { venue ->
         venue to Neighbourhood.blocks.indexOfFirst {
@@ -1223,6 +1296,7 @@ class WalkableTownTest {
                 assertEquals(FollowCamera.START_DISTANCE, town.cameraReach, 1e-6)
                 assertEquals(FollowCamera.START_YAW, town.cameraEyeTurn, 1e-6)
                 assertTrue(Neighbourhood.foldables.indices.any { town.isFolded(it) }, "nothing folded downtown")
+                assertEquals("지도: 도서관 근처", town.minimapElement.getAttribute("aria-label"))
             },
         )
     }

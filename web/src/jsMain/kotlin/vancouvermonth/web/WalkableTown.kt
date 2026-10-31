@@ -2,6 +2,7 @@ package vancouvermonth.web
 
 import kotlin.js.json
 import kotlin.math.PI
+import kotlin.math.atan
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.exp
@@ -10,6 +11,7 @@ import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
+import kotlin.math.tan
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.khronos.webgl.Uint8Array
@@ -20,6 +22,7 @@ import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.RenderingContext
 import org.w3c.dom.events.Event
+import org.w3c.dom.events.KeyboardEvent
 import org.w3c.dom.events.WheelEvent
 import org.w3c.dom.pointerevents.PointerEvent
 import vancouvermonth.text.Passer
@@ -119,7 +122,8 @@ fun openWalkableTown(
  * The town lives on its own too: the townspeople look about and turn to the player, passersby stroll, the SkyTrain
  * comes and goes, the campfire flickers and the water glints. That life is drawn at most [FramePace.AMBIENT_FPS]
  * frames a second; a walk, the camera moving or the change of day are drawn at the screen's full rate; and nothing
- * is drawn while the page is hidden. The city's buildings in the camera's way fold down out of it ([Cutaway]).
+ * is drawn while the page is hidden. The city's buildings in the camera's way fold down out of it ([Cutaway]), and a
+ * small map in the corner shows where the character is ([Minimap]).
  */
 internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context: RenderingContext) : WalkableTown {
     override val element = document.createElement("div") as HTMLElement
@@ -162,6 +166,24 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private var aimedEyeZ = Double.NaN
     private var aimedHeadX = Double.NaN
     private var aimedHeadZ = Double.NaN
+
+    /**
+     * The small map in the corner, and what it last showed: the character, the way it faced and the camera. It is drawn
+     * again only when one of them moved, it was resized, or the day's place to go changed.
+     */
+    private val minimap = Minimap()
+    private var mapX = Double.NaN
+    private var mapZ = Double.NaN
+    private var mapHeading = Double.NaN
+    private var mapEyeX = Double.NaN
+    private var mapEyeZ = Double.NaN
+    private var mapStale = true
+    private var mapResized = true
+    private var mapTop = Double.NaN
+    private var marked: Place? = null
+
+    /** How much the camera sees from side to side, in radians. */
+    private var across = 1.0
 
     // The town's own life. Everything in it moves by the town's own time, [lifeClock], which a test may set.
     internal var lifeClock: () -> Double = { window.performance.now() }
@@ -256,6 +278,12 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private val taps = TapTimer()
     private val resizeObserver = ResizeObserver { fit() }
 
+    /** The small map is measured again only when it changed size, not each time the town is fitted. */
+    private val minimapObserver = ResizeObserver {
+        mapResized = true
+        askForFrame()
+    }
+
     /** Where the character stands, or has got to on a walk, and the way it faces. */
     private var spot = home.door
     private var heading = home.facing
@@ -321,6 +349,12 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     /** A phone that stops asking for less motion gets the town's life back at once, not at the next touch. */
     private val onMotionPreference: (Event) -> Unit = { askForFrame() }
 
+    /** A tap on the small map shows it larger or smaller; Escape brings the larger one back. */
+    private val onMinimap: (Event) -> Unit = { showLargeMinimap(!minimap.isLarge) }
+    private val onMinimapKey: (Event) -> Unit = { event ->
+        if ((event as? KeyboardEvent)?.key == "Escape") showLargeMinimap(false)
+    }
+
     /** True while the phone has taken WebGL back from the page: the town waits, drawing nothing, until it returns. */
     private var contextLost = false
 
@@ -349,6 +383,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         canvas.style.height = "100%"
         canvas.setAttribute("aria-hidden", "true")
         element.appendChild(canvas)
+        // Before the names, so a name that floats over the small map is drawn over it and can still be tapped.
+        element.appendChild(minimap.element)
         // A phone screen may have three pixels per point or more; two look as sharp and cost far less.
         renderer.setPixelRatio(min(window.devicePixelRatio, 2.0))
 
@@ -362,6 +398,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         addLabels()
 
         resizeObserver.observe(canvas)
+        minimapObserver.observe(minimap.element)
+        minimap.element.addEventListener("click", onMinimap)
         // Each finger is captured on press, so its moves and its lift come to the canvas even off it.
         canvas.addEventListener("pointerdown", onPress)
         canvas.addEventListener("pointermove", onMove)
@@ -594,6 +632,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         set(value) {
             if (value == pace.isCovered) return
             pace.isCovered = value
+            // A talk or the guide takes the player's eyes, and the larger map would lie under it.
+            if (value) showLargeMinimap(false)
             touched()
         }
 
@@ -616,6 +656,11 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     override fun mark(place: Place?) {
         for ((labelPlace, label) in labels) label.classList.toggle("here", labelPlace == place)
+        if (place != marked) {
+            marked = place
+            mapStale = true
+            askForFrame()
+        }
     }
 
     override fun endDay(place: Place) {
@@ -647,6 +692,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         if (closed) return
         closed = true
         resizeObserver.disconnect()
+        minimapObserver.disconnect()
         canvas.removeEventListener("pointerdown", onPress)
         canvas.removeEventListener("pointermove", onMove)
         canvas.removeEventListener("pointerup", onRelease)
@@ -657,6 +703,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         canvas.removeEventListener("webglcontextrestored", onRestored)
         document.removeEventListener("visibilitychange", onVisibility)
         lessMotion.removeEventListener("change", onMotionPreference)
+        minimap.element.removeEventListener("click", onMinimap)
+        document.removeEventListener("keydown", onMinimapKey)
         for (mesh in meshes) mesh.dispose()
         renderer.dispose()
         cube.dispose()
@@ -757,6 +805,13 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             val z = eye.z - focus.z
             return sqrt(x * x + y * y + z * z)
         }
+
+    /** The small map, and where it last drew the character's arrow, in CSS pixels from its top left. For tests. */
+    internal val minimapElement: HTMLElement
+        get() = minimap.element
+
+    internal val minimapDot: Pair<Double, Double>
+        get() = minimap.dotLeft to minimap.dotTop
 
     /** How far east of its stop at the station the train was last drawn, for tests. */
     internal val trainShiftDrawn: Double
@@ -966,6 +1021,21 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         camera.aspect = view.aspect
         camera.fov = view.fov
         camera.updateProjectionMatrix()
+        across = 2 * atan(tan(view.fov * PI / 360) * view.aspect)
+        askForFrame()
+    }
+
+    /** Shows the small map larger, or back as it was. Not while a card covers the town, as it would lie under it. */
+    private fun showLargeMinimap(large: Boolean) {
+        if (large == minimap.isLarge || (large && pace.isCovered)) return
+        minimap.isLarge = large
+        if (large) {
+            document.addEventListener("keydown", onMinimapKey)
+        } else {
+            document.removeEventListener("keydown", onMinimapKey)
+        }
+        mapResized = true
+        touched()
         askForFrame()
     }
 
@@ -1037,6 +1107,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             labelsFocus = focus
             labelsStale = false
         }
+        drawMinimap()
         framesDrawn += 1
         if (walking || night || gliding || folding || !still) nextFrame()
     }
@@ -1103,6 +1174,31 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         numbers[at + 5] = height.toFloat()
         numbers[at + 13] = (bottom + height / 2).toFloat()
         mesh.instanceMatrix.needsUpdate = true
+    }
+
+    /**
+     * Draws the small map again when the character or the camera moved since it was last drawn, or it changed size or
+     * what it marks.
+     */
+    private fun drawMinimap() {
+        val subject = if (sitting) Neighbourhood.benchSeat else spot
+        val facing = if (sitting) Neighbourhood.BENCH_FACING else heading
+        val eye = view.eye
+        val moved = subject.x != mapX || subject.z != mapZ || facing != mapHeading || eye.x != mapEyeX ||
+            eye.z != mapEyeZ
+        if (!moved && !mapStale && !mapResized) return
+        if (mapResized) {
+            mapResized = false
+            minimap.measure()
+        }
+        mapStale = false
+        mapX = subject.x
+        mapZ = subject.z
+        mapHeading = facing
+        mapEyeX = eye.x
+        mapEyeZ = eye.z
+        val focus = view.focus
+        minimap.draw(subject.x, subject.z, facing, eye.x, eye.z, focus.x, focus.z, across, marked)
     }
 
     /**
@@ -1386,6 +1482,12 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val width = canvas.clientWidth.toDouble()
         val height = canvas.clientHeight.toDouble()
         val covered = coveredTop()
+        // The small map sits in the top right corner, just under the top card and the day's log.
+        val top = covered + MAP_GAP
+        if (top != mapTop) {
+            mapTop = top
+            minimap.element.style.top = "${top}px"
+        }
         // The names are all one line, so the first one tells how tall a name is.
         val tall = labels.values.first().offsetHeight.toDouble()
         for ((place, label) in labels) {
@@ -1434,6 +1536,9 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
         /** How high the character's head is: the end of the way the city's buildings fold out of. */
         const val HEAD_HEIGHT = 1.6
+
+        /** How far under the top card and the day's log the small map sits, in CSS pixels. */
+        const val MAP_GAP = 8.0
 
         /** How far a finger may move and still count as a tap, in pixels. */
         const val TAP_SLOP = 10.0
