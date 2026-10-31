@@ -1,3 +1,3 @@
 rootProject.name = "vancouver-month-2026"
 
-include("core", "text", "terminal", "web")
+include("core", "text", "save", "terminal", "web")

@@ -16,10 +16,15 @@ import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.Month
 import vancouvermonth.core.Reveal
 import vancouvermonth.core.TodaysRun
+import vancouvermonth.save.Choice
+import vancouvermonth.save.MonthRecord
+import vancouvermonth.save.play
+import vancouvermonth.text.Continue
 import vancouvermonth.text.actionEffect
 import vancouvermonth.text.actionName
 import vancouvermonth.text.breakdown
 import vancouvermonth.text.cheapestLine
+import vancouvermonth.text.continueFrom
 import vancouvermonth.text.date
 import vancouvermonth.text.endingLine
 import vancouvermonth.text.eventLine
@@ -28,6 +33,7 @@ import vancouvermonth.text.guessLine
 import vancouvermonth.text.keyword
 import vancouvermonth.text.money
 import vancouvermonth.text.monthStartLines
+import vancouvermonth.text.replacesKept
 import vancouvermonth.text.parseAmount
 import vancouvermonth.text.Passer
 import vancouvermonth.text.passerLine
@@ -48,7 +54,8 @@ import vancouvermonth.text.whyNot
  * Every tap redraws the whole screen from that state. A run comes from a seed or from today's date, never both.
  * The month is played in a town the player walks in, which [makeWalkableTown] makes on the first day: each day is
  * spent by talking to a place's person. Where it gives none, the month is played with buttons, under a town that
- * is a picture when [makeTown] gives one. Either town is closed at the ending.
+ * is a picture when [makeTown] gives one. Either town is closed at the ending. Given a [slot], the month in
+ * progress is kept after every day, and the page opened again for the same run offers to go on with it.
  */
 class PhoneGame private constructor(
     private val root: HTMLElement,
@@ -122,6 +129,30 @@ class PhoneGame private constructor(
     /** The card on how to play, shown the first time the town opens; null for none. */
     internal var guide: FirstRunGuide? = null
 
+    /**
+     * Where the month in progress is kept between visits; null for a game that keeps nothing. The kept month is read
+     * on the first [show] after this is set, so setting it again reads it again.
+     */
+    internal var slot: SaveSlot? = null
+        set(value) {
+            field = value
+            keptRead = false
+        }
+
+    /** The month being played as the slot keeps it, and the month kept from an earlier visit, read once on opening. */
+    private var record: MonthRecord? = null
+    private var kept: KeptMonth? = null
+    private var keptRead = false
+
+    /**
+     * True when the page took the kept month's run because its address named none: 새로 시작 then plays a new run, as
+     * such an address did before there was anything to continue. An address that names a run starts it again instead.
+     */
+    internal var startOverWithNewRun = false
+
+    /** The day another run's kept month goes on from, read with [kept]: starting this run replaces that month. */
+    private var replacing: Int? = null
+
     fun show() {
         stopTyping()
         val current = month
@@ -131,7 +162,9 @@ class PhoneGame private constructor(
             return
         }
         root.clear()
+        val offered = if (current == null) keptMonth() else null
         when {
+            offered != null -> showKept(offered)
             current == null -> showRooms()
             current.isOver -> showEnding(current)
             else -> showDay(current)
@@ -241,18 +274,93 @@ class PhoneGame private constructor(
             child("ul", "notes") {
                 for (text in monthStartLines(room)) child("li", text = text)
             }
+            replacing?.let { child("p", "replaces", replacesKept(it)).id = "replaces" }
             button("primary", text = "${date(Month.FIRST_DAY)} 시작하기") {
+                if (replacing != null) setAttribute("aria-describedby", "replaces")
                 onclick = {
-                    month = game.startMonth(checkNotNull(picked))
-                    walkable = makeWalkableTown()?.also { listenTo(it) }
-                    if (walkable == null) town = makeTown()
-                    guide?.onOpenChange = { walkable?.isCovered = isTownCovered() }
-                    show()
-                    window.scrollTo(0.0, 0.0)
-                    if (walkable != null) guide?.openFirstTime(root)
+                    val room = checkNotNull(picked)
+                    beginMonth(game.startMonth(room), MonthRecord(game.seed, today, room, reveal.guess))
                 }
             }
         }
+    }
+
+    /** Opens [started] for play, in a town to walk in where there is one, and keeps it in the slot as [keeping]. */
+    private fun beginMonth(started: Month, keeping: MonthRecord) {
+        month = started
+        record = keeping
+        slot?.keep(keeping)
+        walkable = makeWalkableTown()?.also { listenTo(it) }
+        if (walkable == null) town = makeTown()
+        guide?.onOpenChange = { walkable?.isCovered = isTownCovered() }
+        show()
+        window.scrollTo(0.0, 0.0)
+        if (walkable != null) guide?.openFirstTime(root)
+    }
+
+    /** The month kept from an earlier visit for this run, read once, when the page first shows. */
+    private fun keptMonth(): KeptMonth? {
+        if (!keptRead) {
+            keptRead = true
+            kept = slot?.keptFor(game.seed, today)
+            replacing = slot?.otherRunDay(game.seed, today)
+        }
+        return kept
+    }
+
+    /** Before the rooms, a card that offers the kept month: 이어하기 goes on with it, 새로 시작 drops it. */
+    private fun showKept(offer: KeptMonth) {
+        showTitle()
+        val month = offer.replayed.month
+        root.child("section", "card kept") {
+            setAttribute("aria-labelledby", "kept-title")
+            child("h2", text = Continue.TITLE).id = "kept-title"
+            child("p", "kept-from", continueFrom(month.day, month.balance)).id = "kept-from"
+            child("p", "kept-note", Continue.NOTE).id = "kept-note"
+            child("div", "kept-buttons") {
+                button("primary", text = Continue.CONTINUE) {
+                    setAttribute("aria-describedby", "kept-from")
+                    onclick = { goOn(offer) }
+                }
+                button("secondary", text = Continue.NEW) {
+                    setAttribute("aria-describedby", "kept-note")
+                    onclick = { startOver() }
+                }
+            }
+        }
+    }
+
+    /** Drops the kept month and shows the run's rooms, or plays a new run when the address named none. */
+    private fun startOver() {
+        slot?.clear()
+        if (startOverWithNewRun) {
+            playAgain()
+            return
+        }
+        kept = null
+        show()
+    }
+
+    /** Goes on with [offer] on the day it reached, with that day's log, as if the page had never closed. */
+    private fun goOn(offer: KeptMonth) {
+        kept = null
+        val record = offer.record
+        val month = offer.replayed.month
+        picked = record.room
+        guess = "${record.guess}"
+        reveal = offer.replayed.reveal
+        if (record.days.isNotEmpty()) {
+            lastDay = month.day - 1
+            lastEvents = offer.replayed.lastEvents
+            lastLines = lastEvents.map { eventLine(it, month) }
+        }
+        // Who was met is not kept, but the people of the places where days were spent know the player by now.
+        for (choice in record.days) {
+            met += personAt(if (choice is Choice.Take) placeFor(choice.action) else INTERVIEW_PLACE)
+        }
+        // In the town, the focus lands where a day ends: on the day before's log, or on the top card on the first day.
+        focusNext = if (record.days.isEmpty()) ".hud" else ".over-town .log"
+        beginMonth(month, record)
     }
 
     private fun showDay(month: Month) {
@@ -304,7 +412,7 @@ class PhoneGame private constructor(
             if (month.hasInterviewToday) {
                 child("h2", text = "오늘은 면접 날이에요.")
                 button("primary", text = "면접 보기") {
-                    onclick = { spend(month, INTERVIEW_PLACE) { attendInterview() } }
+                    onclick = { spend(month, INTERVIEW_PLACE, Choice.AttendInterview) }
                 }
             } else {
                 child("h2", text = "오늘 할 일 하나")
@@ -315,7 +423,7 @@ class PhoneGame private constructor(
                         child("span", "action-name", actionName(action))
                         child("span", "action-effect", actionEffect(action, month))
                         if (blocked != null) child("span", "action-why", whyNot(blocked))
-                        onclick = { spend(month, placeFor(action)) { take(action) } }
+                        onclick = { spend(month, placeFor(action), Choice.Take(action)) }
                     }
                 }
             }
@@ -369,17 +477,21 @@ class PhoneGame private constructor(
     }
 
     /**
-     * Spends today at [place], keeps what happened for the next screen, and goes back to the top of the page.
-     * The character sets off for [place] as the day's log appears.
+     * Spends today at [place] on [choice], keeps what happened for the next screen, and goes back to the top of the
+     * page. The character sets off for [place] as the day's log appears. The slot keeps the month, or lets it go at
+     * the ending.
      */
-    private fun spend(month: Month, place: Place, today: Month.() -> List<Event>) {
+    private fun spend(month: Month, place: Place, choice: Choice) {
         lastDay = month.day
-        lastEvents = month.today()
+        lastEvents = month.play(choice)
         lastLines = lastEvents.map { eventLine(it, month) }
         talkingAt = null
+        record = record?.after(choice)
         if (month.isOver) {
+            slot?.clear()
             closeTown()
         } else {
+            record?.let { slot?.keep(it) }
             sound?.chime()
             town?.walkTo(place)
             val walking = walkable
@@ -572,7 +684,7 @@ class PhoneGame private constructor(
                 child("span", "action-name", "면접 보기")
                 val chance = percent(month.passChance(interview.stage))
                 child("span", "action-effect", "${stageName(interview.stage)} · 통과 확률 $chance")
-                onclick = { spend(month, INTERVIEW_PLACE) { attendInterview() } }
+                onclick = { spend(month, INTERVIEW_PLACE, Choice.AttendInterview) }
             }
             return
         }
@@ -583,7 +695,7 @@ class PhoneGame private constructor(
             child("span", "action-name", keyword(action))
             child("span", "action-effect", actionEffect(action, month))
             if (blocked != null) child("span", "action-why", whyNot(blocked))
-            onclick = { spend(month, place) { take(action) } }
+            onclick = { spend(month, place, Choice.Take(action)) }
         }
     }
 

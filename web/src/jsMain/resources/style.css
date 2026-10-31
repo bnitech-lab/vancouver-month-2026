@@ -352,6 +352,32 @@ a:focus-visible {
   font-size: 15px;
 }
 
+/* The card that offers the month kept from an earlier visit */
+.kept-from {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.kept-note {
+  margin: 4px 0 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.kept-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* On another run's start card: starting it drops the kept month. */
+.start .replaces {
+  margin: -4px 0 12px;
+  font-size: 14px;
+  color: var(--warn);
+}
+
 /* The month */
 
 /* The 3D town. Its shape (aspect-ratio) comes from TownCamera, so the picture and the names over it line up. */
