@@ -525,6 +525,7 @@ input:focus-visible {
 
 .copy {
   width: 100%;
+  min-height: 52px;
   font-weight: 700;
   color: var(--accent);
   background: var(--surface);
