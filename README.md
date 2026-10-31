@@ -169,12 +169,15 @@ sit thinly over the top of the screen, and a name that would sit under them or t
 first view looks over 내 방 toward downtown, high enough to show four of the buildings and their names.
 
 A small map of the whole town sits in the top right corner, just under the day's figures and the day's log, so the
-player always knows roughly where the character is. It lies as the game map lies, never turned: the land, the water,
-the big park and the seawall, the city's blocks faintly, the five places (내 방 a red square, the others dots, 회사 green
-on an interview day as its name is), the camera's view as a pale wedge, and the character as a gold arrow pointing the
-way it faces. It is drawn again only when the character or the camera moves. A tap shows it larger, about four fifths
-of the screen wide with the places' names; a tap or Escape brings it back, and a talk or the guide closes it. It is a
-picture: a screen reader hears only which place the character is nearest, as in "지도: 내 방 근처".
+player always knows roughly where the character is. It lies with real north up, as a paper map of the city does, and
+never turns; a small N with an arrow at its top says so. (The town itself is the real city turned 44.7 degrees, so
+downtown's streets run along it; the map turns that back.) It shows all the ground the character can walk on: the land,
+the water, the big park and the seawall, the city's blocks faintly, the north shore's forest across the inlet, the five
+places (내 방 a red square, the others dots, 회사 green on an interview day as its name is), the camera's view as a pale
+wedge, and the character as a gold arrow pointing the way it faces. It is drawn again only when the character or the
+camera moves. A tap shows it larger, about four fifths of the screen wide with the places' names; a tap or Escape brings
+it back, and a talk or the guide closes it. It is a picture: a screen reader hears only which place the character is
+nearest, as in "지도: 내 방 근처".
 
 | Do | What happens |
 |---|---|
@@ -253,14 +256,14 @@ spot belongs to), `VancouverMap` (the map's squares and lines, read from the gen
 (the guideway the train follows), `Grid` (the A* search for the way around things), `Trip` (a walk or a dash, and the
 double tap), `FollowCamera` (turning, zooming, keeping out of the places' walls, and what a tap lands on), `Cutaway`
 (which of the city's buildings fold down out of the camera's way, and how far), `Minimap` (where the grid lies on the
-small map, and which place is nearest), `DayLight` (the light
+small map turned north up, and which place is nearest), `DayLight` (the light
 through the change of day, and when the passersby are out, and how each weather greys it), `Passersby` (their loops, and
 stopping for the character), `Greeter` (the five turning and waving), `TownLife` (the train's round and how loud it
 rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, all worked out from the time) and
 `FramePace` (which frames are drawn). The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`, and
 `Passersby.kt` for the passersby's), and so is each day's weather (`Weather.kt`). `WalkableTown` draws all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the map included, is about 806 KB
-(about 216 KB gzipped).
+`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the map included, is about 809 KB
+(about 218 KB gzipped).
 
 ### Sound and the first-run guide
 

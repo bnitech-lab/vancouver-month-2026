@@ -1133,19 +1133,22 @@ class WalkableTownTest {
                 val hud = assertNotNull(root.querySelector(".hud")).getBoundingClientRect()
                 assertTrue(frame.top >= hud.bottom, "the map's top ${frame.top} is over the card, which ends at ${hud.bottom}")
                 assertEquals(375.0 - 8.0, frame.right, 1.0)
-                assertTrue(frame.width in 96.0..122.0, "${frame.width} wide")
-                // The arrow is where the character stands.
-                val width = map.clientWidth.toDouble()
+                assertTrue(frame.width in 80.0..102.0, "${frame.width} wide")
+                // A little taller than wide, as the area round the coast is with real north up.
+                assertTrue(frame.height > frame.width, "${frame.width} by ${frame.height}")
+                // The arrow is where the character stands, on the map turned north up.
+                val projection = MinimapProjection(map.clientWidth.toDouble(), map.clientHeight.toDouble())
                 before = town.minimapDot
-                assertEquals(start.x * width / Neighbourhood.COLUMNS, before.first, 1e-6)
-                assertEquals(start.z * map.clientHeight / Neighbourhood.ROWS, before.second, 1e-6)
+                assertEquals(projection.left(start.x, start.z), before.first, 1e-6)
+                assertEquals(projection.top(start.x, start.z), before.second, 1e-6)
                 tapScreen(town, onScreen(town, Point(target.x, 0.0, target.z)))
             },
             Step("walked there", { town.isStill }) {
                 val after = town.minimapDot
-                val width = map.clientWidth.toDouble()
-                assertEquals(target.x * width / Neighbourhood.COLUMNS, after.first, 1e-6)
-                assertEquals(target.z * map.clientHeight / Neighbourhood.ROWS, after.second, 1e-6)
+                val projection = MinimapProjection(map.clientWidth.toDouble(), map.clientHeight.toDouble())
+                assertEquals(projection.left(target.x, target.z), after.first, 1e-6)
+                assertEquals(projection.top(target.x, target.z), after.second, 1e-6)
+                // East and a little south on the game map is east and south in the real city too: right and down.
                 assertTrue(after.first > before.first && after.second > before.second, "$before to $after")
             },
         )
