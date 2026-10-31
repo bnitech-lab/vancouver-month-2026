@@ -167,7 +167,7 @@ class MinimapTest {
     }
 
     @Test
-    fun `the map is painted from the grid north up, with the character's arrow and the places marked`() {
+    fun `the map is painted from the grid north up, with the character's arrow, the places and north marked`() {
         val minimap = Minimap()
         val element = minimap.element
         // One CSS pixel a square, so each square can be looked at.
@@ -204,6 +204,8 @@ class MinimapTest {
         assertEquals(standLeft, minimap.dotLeft, 1e-9)
         assertEquals(standTop, minimap.dotTop, 1e-9)
         assertEquals(0xFFD23F, colourAt(standLeft, standTop - 2.0))
+        // The north arrow in ink at the top right.
+        assertEquals(0x3B2F25, colourAt(AREA_WIDTH - Minimap.NORTH_INSET + 0.5, Minimap.NORTH_TOP + 3.5))
         // 내 방 in its roof's red, the others dark; on an interview day 회사 takes the colour its name does.
         fun middleOf(place: Place): Pair<Double, Double> {
             val venue = Neighbourhood.venue(place)

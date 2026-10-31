@@ -19,6 +19,7 @@ import org.w3c.dom.CanvasTextAlign
 import org.w3c.dom.CanvasTextBaseline
 import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLElement
+import org.w3c.dom.TOP
 import vancouvermonth.text.minimapLabel
 import vancouvermonth.web.MinimapProjection.Companion.AREA_HEIGHT
 import vancouvermonth.web.MinimapProjection.Companion.AREA_LEFT
@@ -112,10 +113,10 @@ class MinimapProjection(val width: Double, val height: Double) {
 
 /**
  * A small map of the whole town in a corner, so the player always knows roughly where the character is. It lies with
- * real north up, as a paper map of the city does, and never turns ([MinimapProjection]). The land, water, park,
- * seawall and the city's blocks are painted once from the grid, already turned; over them it draws the five places
- * (내 방 a square in its roof's red, the others dots, the place of an interview day in the colour its name takes), the
- * camera's view as a pale wedge, and the character as an arrow the way it faces.
+ * real north up, as a paper map of the city does, and never turns ([MinimapProjection]); a small N and arrow at its
+ * top say so. The land, water, park, seawall and the city's blocks are painted once from the grid, already turned;
+ * over them it draws the five places (내 방 a square in its roof's red, the others dots, the place of an interview day
+ * in the colour its name takes), the camera's view as a pale wedge, and the character as an arrow the way it faces.
  * It is drawn again only when asked, as the character or the camera moves, and makes nothing new each time. A tap on
  * it shows it larger, about four fifths of the screen wide, with the places' names; a tap or Escape brings it back. It
  * is a picture: a screen reader hears only which place the character is nearest.
@@ -270,6 +271,7 @@ internal class Minimap {
         c.lineWidth = 1.2
         c.strokeStyle = INK
         c.stroke()
+        north(map.width - NORTH_INSET * scale, NORTH_TOP * scale, scale, large)
         // The names on the larger map, last, over the wedge and the arrow.
         if (large) {
             for (at in 0 until venues.size) {
@@ -296,6 +298,33 @@ internal class Minimap {
         c.lineWidth = 1.0
         c.strokeStyle = RING
         c.stroke()
+    }
+
+    /**
+     * The map's north: an arrow pointing up with its tip at [x], [y], and an N under it, [scale] times their small
+     * size, with a pale edge so they read over any ground.
+     */
+    private fun north(x: Double, y: Double, scale: Double, large: Boolean) {
+        val c = context
+        val wide = NORTH_WIDE * scale
+        val tall = NORTH_TALL * scale
+        c.beginPath()
+        c.moveTo(x, y)
+        c.lineTo(x + wide, y + tall)
+        c.lineTo(x, y + tall * 0.7)
+        c.lineTo(x - wide, y + tall)
+        c.closePath()
+        c.lineWidth = 2.0
+        c.strokeStyle = RING
+        c.stroke()
+        c.fillStyle = INK
+        c.fill()
+        c.font = if (large) NORTH_FONT_LARGE else NORTH_FONT
+        c.textAlign = CanvasTextAlign.CENTER
+        c.textBaseline = CanvasTextBaseline.TOP
+        c.lineWidth = 2.5
+        c.strokeText("N", x, y + tall + scale)
+        c.fillText("N", x, y + tall + scale)
     }
 
     /** A place's name over its dot, on the larger map only, with a pale edge so it reads over any ground. */
@@ -413,6 +442,8 @@ internal class Minimap {
         private const val WEDGE = "rgba(255, 214, 90, 0.42)"
         private const val WEDGE_EDGE = "rgba(122, 82, 51, 0.5)"
         private const val NAME_FONT = "700 12px system-ui, sans-serif"
+        private const val NORTH_FONT = "700 9px system-ui, sans-serif"
+        private const val NORTH_FONT_LARGE = "700 14px system-ui, sans-serif"
 
         /** How many pixels a square of the grid takes in the picture painted once. */
         private const val GROUND_DETAIL = 2
@@ -422,6 +453,12 @@ internal class Minimap {
         private const val BIG_DOT = 3.6
         private const val ARROW = 5.5
         private const val LARGE_SCALE = 1.6
+
+        /** Where the north arrow's tip is, from the map's right edge and its top, and its half width and height. */
+        const val NORTH_INSET = 10.0
+        const val NORTH_TOP = 4.0
+        private const val NORTH_WIDE = 3.5
+        private const val NORTH_TALL = 6.0
 
         /** How far past the character the wedge of the camera's view reaches, in squares. */
         private const val WEDGE_PAST = 14.0
