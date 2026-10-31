@@ -1114,6 +1114,56 @@ html:has(.walk-town) {
   color: var(--talk-muted);
 }
 
+/*
+ * Where to go on the SkyTrain, a bus, the water bus or a taxi: a button for each place, its fare beside it or why
+ * not. A long list scrolls inside the card, so 그만 always stays on a small screen.
+ */
+.chooser .talk-line {
+  min-height: 0;
+  margin: 4px 0 10px;
+  font-size: 14px;
+  cursor: default;
+}
+
+.chooser-list {
+  max-height: 34vh;
+  margin-bottom: 8px;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+
+.keyword.go {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "name effect"
+    "why why";
+  align-items: center;
+  column-gap: 8px;
+  text-align: left;
+  border-radius: 14px;
+}
+
+.keyword.go .action-effect {
+  color: inherit;
+}
+
+.keyword.go .action-why {
+  font-size: 12px;
+}
+
+.keyword.go:disabled {
+  color: var(--talk-muted);
+  background: transparent;
+  border-style: dashed;
+}
+
+/* 택시 부르기, quieter than getting on what the player owns. */
+.hud-ride-button.hud-taxi {
+  color: var(--accent);
+  background: var(--surface);
+}
+
 .ending-word {
   font-weight: 600;
   color: var(--accent);
