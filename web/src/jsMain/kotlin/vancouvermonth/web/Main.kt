@@ -26,9 +26,10 @@ fun main() {
     } else {
         PhoneGame(root, opening.seed, playAgain, makeTown, makeWalkableTown)
     }
-    // A gentle sound the player can switch on.
+    // A gentle sound the player can switch on, and a card on how to play the first time the town opens.
     val memory = pageMemory()
     game.sound = pageSound(memory)
+    game.guide = FirstRunGuide(memory)
     game.show()
     // The game is drawn first, so the screen does not depend on the address changing.
     opening.address?.let { window.history.replaceState(null, "", it) }

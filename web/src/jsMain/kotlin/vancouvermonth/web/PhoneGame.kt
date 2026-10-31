@@ -110,6 +110,9 @@ class PhoneGame private constructor(
     /** The sound switch, and the sounds of a talk and of the change of day; null for a game with no sound. */
     internal var sound: Sound? = null
 
+    /** The card on how to play, shown the first time the town opens; null for none. */
+    internal var guide: FirstRunGuide? = null
+
     fun show() {
         stopTyping()
         val current = month
@@ -236,6 +239,7 @@ class PhoneGame private constructor(
                     if (walkable == null) town = makeTown()
                     show()
                     window.scrollTo(0.0, 0.0)
+                    if (walkable != null) guide?.openFirstTime(root)
                 }
             }
         }
@@ -473,11 +477,14 @@ class PhoneGame private constructor(
         focusNext = null
     }
 
-    /** The sound switch, at the end of the town's top card. */
+    /** The sound switch and the "?" that shows how to play again, at the end of the town's top card. */
     private fun HTMLElement.townControls() {
-        val sound = sound ?: return
+        val sound = sound
+        val guide = guide
+        if (sound == null && guide == null) return
         child("div", "hud-controls") {
-            sound.button(this)
+            sound?.button(this)
+            guide?.helpButton(this, root)
         }
     }
 
