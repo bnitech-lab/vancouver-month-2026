@@ -133,6 +133,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     private var frameAsked = false
     private var lastFrame = 0.0
+    private var framesDrawn = 0
     private var closed = false
 
     // The fingers (or the mouse button) on the town and where each one is now, to tell a tap from a drag or a pinch.
@@ -367,6 +368,10 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     internal val isChangingDay: Boolean
         get() = nightFell != null
 
+    /** True once the town has drawn and nothing moves: no walk, no change of day, the camera settled. For tests. */
+    internal val isStill: Boolean
+        get() = framesDrawn > 0 && !frameAsked && trip == null && nightFell == null
+
     /** The camera's turn, tilt and distance as asked, for tests. */
     internal val cameraTurn: Double
         get() = view.yaw
@@ -520,6 +525,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             return
         }
         placeLabels()
+        framesDrawn += 1
         if (walking || night || gliding) askForFrame()
     }
 

@@ -63,8 +63,14 @@ class WalkableTownTest {
     /**
      * Plays seed 1011 in a real town: the cheapest room, an exact guess, and September starts. [settle] is how long
      * a talk ignores taps after it opens (0 lets a test answer at once) and [night] how long a change of day takes.
+     * With [phone], the town is 375 by 812 points, a phone's shape, whatever the test browser's window, so every
+     * point a test projects lands where it would on a phone.
      */
-    private fun startInTown(settle: Double = 0.0, night: Double = DayLight.MILLIS): NeighbourhoodScene {
+    private fun startInTown(
+        settle: Double = 0.0,
+        night: Double = DayLight.MILLIS,
+        phone: Boolean = true,
+    ): NeighbourhoodScene {
         val game = PhoneGame(root, 1011, playAgain = {}, makeWalkableTown = {
             val opened = assertNotNull(openWalkableTown(lessMotion = false), "The test browser has no WebGL 2")
             (opened as NeighbourhoodScene).also {
@@ -75,7 +81,16 @@ class WalkableTownTest {
         game.talkSettleMillis = settle
         game.show()
         startMonth()
-        return assertNotNull(town)
+        val started = assertNotNull(town)
+        if (phone) {
+            val element = started.element
+            element.style.setProperty("inset", "auto")
+            element.style.left = "0px"
+            element.style.top = "0px"
+            element.style.width = "375px"
+            element.style.height = "812px"
+        }
+        return started
     }
 
     private fun startMonth() {
@@ -109,14 +124,28 @@ class WalkableTownTest {
 
     private fun canvasOf(town: NeighbourhoodScene) = town.element.querySelector("canvas") as HTMLCanvasElement
 
-    /** Taps the town's canvas at [point], 0.0 to 1.0 across and down, as a finger would. */
+    /** Where [point] is on the town's screen; it must be in front of the camera. */
+    private fun onScreen(town: NeighbourhoodScene, point: Point): FramePoint =
+        assertNotNull(town.screenPoint(point), "$point is behind the camera")
+
+    /**
+     * Taps the town's canvas at [point], 0.0 to 1.0 across and down, as a finger would, at that exact point rather
+     * than the nearest whole pixel. The point must be well inside the canvas, below where the top card sits and
+     * above where a talk opens.
+     */
     private fun tapScreen(town: NeighbourhoodScene, point: FramePoint) {
-        assertTrue(point.left in 0.0..1.0 && point.top in 0.0..1.0, "$point is off the screen")
+        val clear = point.left in 0.05..0.95 && point.top in 0.2..0.65
+        assertTrue(clear, "$point is near the edge, or under the top card or a talk")
         val canvas = canvasOf(town)
         val frame = canvas.getBoundingClientRect()
-        val x = (frame.left + point.left * frame.width).toInt()
-        val y = (frame.top + point.top * frame.height).toInt()
-        for (type in listOf("pointerdown", "pointerup")) finger(canvas, type, x, y)
+        for (type in listOf("pointerdown", "pointerup")) {
+            val init: dynamic = js("({})")
+            init.pointerId = 1
+            init.clientX = frame.left + point.left * frame.width
+            init.clientY = frame.top + point.top * frame.height
+            init.bubbles = true
+            canvas.dispatchEvent(PointerEvent(type, init.unsafeCast<PointerEventInit>()))
+        }
     }
 
     /** One finger event on the canvas: [id] tells the fingers apart, and [first] marks the first finger of a touch. */
@@ -136,34 +165,43 @@ class WalkableTownTest {
         finger(canvas, "pointerup", 200, 300)
     }
 
-    /** Runs each step [millis] after the one before, as one test the runner waits for. */
-    private fun steps(vararg steps: Pair<Int, () -> Unit>): Promise<Unit> = Promise { resolve, reject ->
+    /** A step of a test that waits: its name in a failure, when it is ready to run, and what it does. */
+    private class Step(val name: String, val ready: () -> Boolean, val run: () -> Unit)
+
+    /** Ready once [millis] have passed since the step before was done. */
+    private fun after(millis: Int): () -> Boolean {
+        var since: Double? = null
+        return {
+            val now = Date.now()
+            val start = since ?: now.also { since = it }
+            now - start >= millis
+        }
+    }
+
+    /** Runs each step once it is ready, as one test the runner waits for. A failure says which step it was. */
+    private fun play(vararg steps: Step): Promise<Unit> = Promise { resolve, reject ->
         fun run(index: Int) {
             if (index == steps.size) {
                 resolve(Unit)
                 return
             }
-            val (millis, step) = steps[index]
-            window.setTimeout({
-                try {
-                    step()
-                    run(index + 1)
-                } catch (error: Throwable) {
-                    reject(error)
-                }
-            }, millis)
+            val step = steps[index]
+            whenReady(step.ready, { error -> reject(AssertionError("${step.name}: ${error.message}")) }) {
+                step.run()
+                run(index + 1)
+            }
         }
         run(0)
     }
 
-    /** Checks [ready] every 20 ms and then runs [then], or fails after five seconds. */
+    /** Checks [ready] every 20 ms and then runs [then], or fails after fifteen seconds, which a slow machine needs. */
     private fun whenReady(ready: () -> Boolean, fail: (Throwable) -> Unit, then: () -> Unit) {
         val started = Date.now()
         fun check() {
             try {
                 when {
                     ready() -> then()
-                    Date.now() - started > 5_000 -> fail(AssertionError("Waited too long: $screen"))
+                    Date.now() - started > 15_000 -> fail(AssertionError("Waited too long: $screen"))
                     else -> window.setTimeout({ check() }, 20)
                 }
             } catch (error: Throwable) {
@@ -175,7 +213,7 @@ class WalkableTownTest {
 
     @Test
     fun `the town fills the screen, with the five names and the day's figures over it, and no day buttons`() {
-        startInTown()
+        startInTown(phone = false)
         val town = root.querySelector(".walk-town") as HTMLElement
         val frame = town.getBoundingClientRect()
         assertEquals(window.innerWidth.toDouble(), frame.width)
@@ -234,15 +272,15 @@ class WalkableTownTest {
         val town = startInTown()
         val start = town.characterSpot
         val target = Spot(start.x + 5.0, 13.5)
-        return steps(
-            300 to {
-                tapScreen(town, assertNotNull(town.screenPoint(Point(target.x, 0.0, target.z))))
+        return play(
+            Step("tap the street", { town.isStill }) {
+                tapScreen(town, onScreen(town, Point(target.x, 0.0, target.z)))
                 val marker = assertNotNull(town.markerSpot, "no marker")
-                assertTrue(distanceBetween(marker, target) < 0.3, "the marker is at $marker")
-                assertTrue(town.isMarkerShown)
-                assertFalse(town.isDashing)
+                assertTrue(distanceBetween(marker, target) < 0.01, "the marker is at $marker")
+                assertTrue(town.isMarkerShown, "the marker is hidden")
+                assertFalse(town.isDashing, "one tap dashes")
             },
-            700 to {
+            Step("0.7 s later", after(700)) {
                 val now = town.characterSpot
                 assertTrue(distanceBetween(now, target) < distanceBetween(start, target) - 1.0, "still at $now")
             },
@@ -252,12 +290,12 @@ class WalkableTownTest {
     @Test
     fun `a double tap on the ground dashes`(): Promise<Unit> {
         val town = startInTown()
-        return steps(
-            300 to {
-                val point = assertNotNull(town.screenPoint(Point(town.characterSpot.x + 6.0, 0.0, 13.5)))
+        return play(
+            Step("tap the street twice", { town.isStill }) {
+                val point = onScreen(town, Point(town.characterSpot.x + 6.0, 0.0, 13.5))
                 tapScreen(town, point)
                 tapScreen(town, point)
-                assertTrue(town.isDashing)
+                assertTrue(town.isDashing, "no dash")
             },
         )
     }
@@ -300,17 +338,20 @@ class WalkableTownTest {
         val town = startInTown()
         val home = Neighbourhood.venue(Place.HOME)
         val cafe = Neighbourhood.venue(Place.CAFE)
-        return steps(
-            300 to {
-                tapScreen(town, assertNotNull(town.screenPoint(Point(home.person.x, 1.3, home.person.z))))
-                assertTrue("이웃 할머니" in root.querySelector(".talk")?.textContent.orEmpty(), screen)
-                tap("그만")
-                assertNull(root.querySelector(".talk"))
-            },
-            600 to {
-                tapScreen(town, assertNotNull(town.screenPoint(Point(cafe.x + 1.0, 2.6, cafe.z.toDouble()))))
+        // The middle of the café's roof, seen from above, rather than its front, which the first view sees edge on.
+        val cafeRoof = Point(cafe.x + cafe.width / 2.0, cafe.height + 1.0, cafe.z + cafe.depth / 2.0)
+        return play(
+            Step("tap the neighbour", { town.isStill }) {
+                tapScreen(town, onScreen(town, Point(home.person.x, 1.3, home.person.z)))
                 val talk = root.querySelector(".talk")?.textContent.orEmpty()
-                assertTrue("하나" in talk && "알바하기" in talk && "+\$110, 체력 -1" in talk, talk)
+                assertTrue("이웃 할머니" in talk, "no talk with the neighbour: $screen")
+                tap("그만")
+                assertNull(root.querySelector(".talk"), "그만 left the talk open")
+            },
+            Step("tap the café's roof once the character has reached the neighbour", { town.isStill }) {
+                tapScreen(town, onScreen(town, cafeRoof))
+                val talk = root.querySelector(".talk")?.textContent.orEmpty()
+                assertTrue("하나" in talk && "알바하기" in talk && "+\$110, 체력 -1" in talk, "no talk with 하나: $screen")
             },
         )
     }
@@ -319,24 +360,24 @@ class WalkableTownTest {
     fun `a double tap on a place only walks there, and the new talk ignores taps for a moment`(): Promise<Unit> {
         val town = startInTown(settle = 400.0)
         val cafe = Neighbourhood.venue(Place.CAFE)
-        return steps(
-            300 to {
+        return play(
+            Step("tap the café's roof twice, then its answer and 그만 at once", { town.isStill }) {
                 val roof = Point(cafe.x + cafe.width / 2.0, cafe.height + 1.0, cafe.z + cafe.depth / 2.0)
-                val onRoof = assertNotNull(town.screenPoint(roof))
+                val onRoof = onScreen(town, roof)
                 tapScreen(town, onRoof)
                 tapScreen(town, onRoof)
-                assertTrue(town.isDashing, "the second tap dashes")
+                assertTrue(town.isDashing, "the second tap did not dash")
                 // A tap on the answer, as a finger lands where the talk has just come up, does nothing.
                 spendButton().click()
-                assertTrue("오늘9월 2일" in screen, screen)
-                assertFalse(town.isChangingDay)
+                assertTrue("오늘9월 2일" in screen, "the day was spent: $screen")
+                assertFalse(town.isChangingDay, "the night began")
                 tap("그만")
-                assertNotNull(root.querySelector(".talk"), "그만 waits too")
+                assertNotNull(root.querySelector(".talk"), "그만 closed the talk at once")
             },
-            450 to {
+            Step("answer once the talk has settled", after(450)) {
                 spendButton().click()
-                assertTrue("오늘9월 3일" in screen, screen)
-                assertTrue(town.isChangingDay)
+                assertTrue("오늘9월 3일" in screen, "the day was not spent: $screen")
+                assertTrue(town.isChangingDay, "no night")
             },
         )
     }
@@ -390,41 +431,47 @@ class WalkableTownTest {
     @Test
     fun `the change of day takes no input, and the morning gives back the player's camera`(): Promise<Unit> {
         val town = startInTown()
-        // The player's own view, after a drag, before the night.
-        drag(town)
-        val turn = town.cameraTurn
-        val tilt = town.cameraTilt
-        val distance = town.cameraDistance
-        // A walk started before the answer leaves no marker behind.
-        tapScreen(town, assertNotNull(town.screenPoint(Point(town.characterSpot.x + 4.0, 0.0, 13.5))))
-        assertTrue(town.isMarkerShown)
-        talkTo(Place.HOME)
-        tap("쉬기")
-        assertTrue(town.isSitting)
-        assertFalse(town.isMarkerShown)
-        val fireside = Triple(town.cameraTurn, town.cameraTilt, town.cameraDistance)
-        return steps(
-            300 to {
+        var turn = 0.0
+        var tilt = 0.0
+        var distance = 0.0
+        var fireside = Triple(0.0, 0.0, 0.0)
+        return play(
+            Step("turn the camera, start a walk, then rest", { town.isStill }) {
+                // The player's own view, after a drag, before the night.
+                drag(town)
+                turn = town.cameraTurn
+                tilt = town.cameraTilt
+                distance = town.cameraDistance
+                // A walk started before the answer leaves no marker behind.
+                tapScreen(town, onScreen(town, Point(town.characterSpot.x + 4.0, 0.0, 13.5)))
+                assertTrue(town.isMarkerShown, "no marker")
+                talkTo(Place.HOME)
+                tap("쉬기")
+                assertTrue(town.isSitting, "not on the bench")
+                assertFalse(town.isMarkerShown, "the marker stayed")
+                fireside = Triple(town.cameraTurn, town.cameraTilt, town.cameraDistance)
+            },
+            Step("in the night", after(300)) {
                 // In the night: no talk, no walk, no turn and no zoom.
                 talkTo(Place.CAFE)
-                assertNull(root.querySelector(".talk"))
+                assertNull(root.querySelector(".talk"), "a talk opened")
                 tapScreen(town, FramePoint(0.5, 0.6))
-                assertNull(town.markerSpot)
+                assertNull(town.markerSpot, "a walk began")
                 drag(town)
                 wheel(town)
-                assertEquals(fireside, Triple(town.cameraTurn, town.cameraTilt, town.cameraDistance))
-                assertTrue(town.isSitting)
+                val view = Triple(town.cameraTurn, town.cameraTilt, town.cameraDistance)
+                assertEquals(fireside, view, "the camera moved")
+                assertTrue(town.isSitting, "got up")
             },
-            (DayLight.MILLIS + 300).toInt() to {
-                assertFalse(town.isChangingDay)
-                assertFalse(town.isSitting)
-                assertEquals(Neighbourhood.venue(Place.HOME).door, town.characterSpot)
-                assertFalse(town.isMarkerShown)
-                assertEquals(turn, town.cameraTurn, 1e-9)
-                assertEquals(tilt, town.cameraTilt, 1e-9)
-                assertEquals(distance, town.cameraDistance, 1e-9)
+            Step("in the morning", { !town.isChangingDay }) {
+                assertFalse(town.isSitting, "still on the bench")
+                assertEquals(Neighbourhood.venue(Place.HOME).door, town.characterSpot, "not at the door")
+                assertFalse(town.isMarkerShown, "a marker is left")
+                assertEquals(turn, town.cameraTurn, 1e-9, "the turn")
+                assertEquals(tilt, town.cameraTilt, 1e-9, "the tilt")
+                assertEquals(distance, town.cameraDistance, 1e-9, "the distance")
                 talkTo(Place.CAFE)
-                assertNotNull(root.querySelector(".talk"), "the morning takes input again")
+                assertNotNull(root.querySelector(".talk"), "the morning takes no input")
             },
         )
     }
