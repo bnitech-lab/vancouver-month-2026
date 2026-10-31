@@ -28,6 +28,8 @@ fun openTown(canvas: HTMLCanvasElement = document.createElement("canvas") as HTM
         val context = canvas.getContext("webgl2", json("antialias" to true, "alpha" to true))
         if (context == null) null else TownScene(canvas, context)
     } catch (error: Throwable) {
+        // Anything else is a fault worth seeing, so it goes to the console before the game goes on without a town.
+        console.warn("The town could not be drawn:", error)
         null
     }
 
@@ -162,6 +164,7 @@ private class TownScene(private val canvas: HTMLCanvasElement, context: Renderin
             renderer.render(scene, camera)
         } catch (error: Throwable) {
             // If Three.js fails, the town goes and the game goes on without it.
+            console.warn("The town stopped drawing:", error)
             element.hidden = true
             walk = null
             return
