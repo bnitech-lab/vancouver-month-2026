@@ -128,7 +128,8 @@ cartoon shading, a warm sun with soft shadows, round-headed people, round trees 
 street lamps and a campfire. The five places stand on a stone street with brick pavements: 내 방 (the room picked on
 September 1st) with its garden, the 카페, the 도서관, 코워킹 and the 회사 tower, with a park and a pond, a seawall path by
 the water, a SkyTrain guideway with a station and a train, and mountains across the water. Each building's name floats
-over it. The day's figures sit thinly over the top of the screen.
+over it. The day's figures sit thinly over the top of the screen. The month's first view looks down the street from
+its west end, high enough to show four of the buildings and their names.
 
 | Do | What happens |
 |---|---|
@@ -136,7 +137,10 @@ over it. The day's figures sit thinly over the top of the screen.
 | Tap twice quickly | It dashes there instead |
 | Drag | The camera turns around the character, and tilts within limits that keep the ground in view |
 | Pinch, or the mouse wheel | The camera comes nearer or goes farther |
-| Tap a person, a building or its name, or walk up to a door or a person | The character goes to that place's person, and a talk opens |
+| Tap a person, a building or its name, or walk up to a door or a person | The character goes to that place's person, and a talk opens (a second quick tap only hurries it there) |
+
+A talk ignores taps for a moment after it opens, so the finger that opened it cannot also answer it. While a day
+changes into the next, the town takes no taps, drags, pinches or names, and no talk opens, until the morning.
 
 Each place has one person, all invented: 하나 at the 카페, 레오 at the 도서관, 수진 at 코워킹, 마커스 at the 회사 desk and
 the neighbour grandmother by the bench at 내 방. A talk shows their name, a small face drawn from their colours, and a
@@ -146,8 +150,9 @@ effect (알바하기, 영어 공부, 코딩 연습, 지원서 넣기, 쉬기) or
 and 그만. On an interview day only 회사 offers 면접 보기, and its name is marked.
 
 An answer that spends the day ends it: a golden evening, a night with the windows, lamps and campfire lit, and the
-morning, in 1.5 seconds, with the character back at 내 방's door and the day's log over the top of the screen. A day of
-rest is spent on the bench by the campfire. Every answer goes to the same rules as the buttons, so the same seed and the
+morning, in 1.5 seconds, with the character back at 내 방's door and the day's log over the top of the screen. On a day
+of rest the character spends the night sitting on the bench by the campfire, with the camera come round to the far side
+of the fire; in the morning it stands at 내 방's door and the camera is the player's own again. Every answer goes to the same rules as the buttons, so the same seed and the
 same choices end the same way in the town and with buttons; a test plays a whole month both ways. After an offer in the
 town, the neighbour has a word on the ending.
 
