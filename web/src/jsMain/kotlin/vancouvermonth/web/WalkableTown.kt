@@ -422,13 +422,22 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         return hypot(a.first - b.first, a.second - b.second)
     }
 
-    /** A tap at [x], [y] on the page: talk to a place, or walk (on a double tap, dash) to a spot on the ground. */
+    /**
+     * A tap at [x], [y] on the page: talk to a place, or walk to a spot on the ground. The second tap of a double tap
+     * dashes; on a place it only dashes there, since the first tap already opened the talk.
+     */
     private fun tap(x: Double, y: Double) {
         val frame = canvas.getBoundingClientRect()
         if (frame.width == 0.0 || frame.height == 0.0 || nightFell != null) return
         val dash = taps.isDouble(window.performance.now(), x, y)
         when (val picked = view.pick((x - frame.left) / frame.width, (y - frame.top) / frame.height)) {
-            is Picked.AtPlace -> goTalk(picked.place, dash)
+            is Picked.AtPlace -> {
+                if (dash) {
+                    walkTo(Neighbourhood.venue(picked.place).talkSpot, dash = true, opensOnArrival = false)
+                } else {
+                    goTalk(picked.place, dash = false)
+                }
+            }
             is Picked.OnGround -> {
                 onPlace(null)
                 walkTo(picked.spot, dash, opensOnArrival = true)

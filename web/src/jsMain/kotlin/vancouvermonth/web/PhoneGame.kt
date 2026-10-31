@@ -97,6 +97,10 @@ class PhoneGame private constructor(
     /** The timer typing the person's line, while it types. */
     private var typing: Int? = null
 
+    /** When the open talk opened: for [talkSettleMillis] after that, taps on it do nothing. A test may change it. */
+    private var talkOpened = 0.0
+    internal var talkSettleMillis = TALK_SETTLE_MILLIS
+
     /** True from an answer until the town's morning: meanwhile no talk opens. */
     private var dayChanging = false
 
@@ -396,6 +400,7 @@ class PhoneGame private constructor(
             val person = personAt(place)
             talkLine = greeting(person, current, firstMeeting = person !in met, yesterday = lastEvents)
             met.add(person)
+            talkOpened = window.performance.now()
         }
         show()
     }
@@ -453,6 +458,14 @@ class PhoneGame private constructor(
         val person = personAt(place)
         child("section", "talk") {
             setAttribute("aria-label", person.title)
+            // The tap that opened the talk can land on it a moment later, as the second tap of a double tap or a
+            // finger lifted late. For a short while after the talk opens, taps on it do nothing.
+            addEventListener("click", { event ->
+                if (window.performance.now() - talkOpened < talkSettleMillis) {
+                    event.stopPropagation()
+                    event.preventDefault()
+                }
+            }, true)
             child("div", "talk-head") {
                 face(Figures.lookOf(person))
                 child("p", "talk-name") {
@@ -533,6 +546,9 @@ class PhoneGame private constructor(
     private companion object {
         /** How long each letter of a person's line takes to appear. */
         const val TYPE_MILLIS = 35
+
+        /** How long a talk ignores taps after it opens. */
+        const val TALK_SETTLE_MILLIS = 400.0
     }
 }
 
