@@ -409,5 +409,5 @@ object Rain {
     /** North of this the box of sky is over the sea, past the seawall's edge. */
     private const val SEA_EDGE = -0.4
     private const val MIN_SIZE = 0.001
-    private const val PUDDLE = 0x9DB2C4
+    private const val PUDDLE = 0xA3AEB6
 }

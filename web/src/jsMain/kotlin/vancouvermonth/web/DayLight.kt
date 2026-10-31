@@ -112,8 +112,8 @@ object DayLight {
     /** How near the haze starts and how far it hides everything under [weather]'s sky: nearer in the rain. */
     fun haze(weather: Weather): Pair<Double, Double> = when (weather) {
         Weather.SUNNY -> Neighbourhood.HAZE_NEAR to Neighbourhood.HAZE_FAR
-        Weather.CLOUDY -> 55.0 to 200.0
-        Weather.RAINY -> 30.0 to 150.0
+        Weather.CLOUDY -> 62.0 to 215.0
+        Weather.RAINY -> 48.0 to 190.0
     }
 
     /** The sea's colour under [weather]'s sky: darker and greyer in the rain. */
