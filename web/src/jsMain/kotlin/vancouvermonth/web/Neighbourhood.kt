@@ -109,7 +109,10 @@ object Neighbourhood {
     /** What stands on the ground and blocks the way: a footprint for each building, trunk, fence, bench and lamp. */
     private val footprints: List<Block>
 
-    /** The buildings the camera stays out of, the five places among them. */
+    /**
+     * What the camera stays out of and never looks through: the buildings (the five places among them), the
+     * SkyTrain deck, the station's roof, the café's awning and the office's canopy.
+     */
     val walls: List<Wall>
 
     val grid: Grid
@@ -217,6 +220,7 @@ object Neighbourhood {
         fun addSkyTrain() {
             val deck = 7.0
             add(-140.0, deck, 3.0, 330.0, 0.4, 1.0, CONCRETE)
+            otherWalls.add(Block(-140.0, deck, 3.0, 330.0, 0.4, 1.0, CONCRETE))
             for (x in listOf(-14.0, -6.0, 2.0, 10.0, 18.0, 38.0, 46.0, 54.0, 62.0)) {
                 addSolid(x - 0.3, 0.0, 3.2, 0.6, deck, 0.6, PILLAR)
             }
@@ -224,6 +228,7 @@ object Neighbourhood {
             otherWalls.add(Block(25.0, 0.0, 2.0, 6.0, deck + 3.0, 3.0, STATION))
             add(27.2, 0.0, 4.98, 1.6, 2.0, 0.05, DOOR_GLASS)
             add(24.6, deck + 2.4, 2.3, 6.8, 0.2, 2.4, SKYTRAIN_BLUE)
+            otherWalls.add(Block(24.6, deck + 2.4, 2.3, 6.8, 0.2, 2.4, SKYTRAIN_BLUE))
             for (x in listOf(24.8, 31.0)) add(x, deck + 0.4, 2.4, 0.2, 2.0, 0.2, PILLAR)
             for (car in 0..2) {
                 val x = 24.3 + car * 2.5
@@ -251,15 +256,21 @@ object Neighbourhood {
             addWindows(x, z, width, depth, venue.height, doorX, venue.doorFacesSouth)
             when (venue.place) {
                 Place.CAFE -> {
-                    // A striped awning over the front, and a small table outside.
-                    for (stripe in 0 until (width * 2).toInt()) {
-                        add(x + stripe * 0.5, 2.0, z - 0.7, 0.5, 0.14, 0.7, if (stripe % 2 == 0) AWNING else AWNING_LIGHT)
+                    // An awning over the front in green and cream bands, and a small table outside. The awning stops
+                    // short of the door's spot, so the character never stands under it.
+                    for (band in 0 until (width * 2).toInt()) {
+                        add(x + band * 0.5, 2.0, z - 0.35, 0.5, 0.14, 0.35, if (band % 2 == 0) AWNING else AWNING_LIGHT)
                     }
+                    otherWalls.add(Block(x, 2.0, z - 0.35, width, 0.14, 0.35, AWNING))
                     addSolid(x + 0.6, 0.0, z - 1.3, 0.6, 0.7, 0.6, WOOD)
                 }
                 Place.LIBRARY -> add(x + 2.5, 0.0, z + depth, width - 5.0, 0.15, 0.4, STONE_LIGHT)
                 Place.COWORKING -> add(x + 0.4, 0.3, z + depth, width - 0.8, 0.18, 0.08, SIGN_GREEN)
-                Place.OFFICE -> add(doorX - 1.2, 2.2, z + depth, 2.4, 0.15, 1.2, CONCRETE)
+                Place.OFFICE -> {
+                    // A canopy over the door, short of the door's spot, as the café's awning is.
+                    add(doorX - 1.2, 2.2, z + depth, 2.4, 0.15, 0.35, CONCRETE)
+                    otherWalls.add(Block(doorX - 1.2, 2.2, z + depth, 2.4, 0.15, 0.35, CONCRETE))
+                }
                 Place.HOME -> add(x + 3.6, venue.height, z + 1.2, 0.6, 1.8, 0.6, BRICK_DARK)
             }
         }
