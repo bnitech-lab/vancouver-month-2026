@@ -9,6 +9,7 @@ import vancouvermonth.core.Room
 import vancouvermonth.core.TodaysRun
 import vancouvermonth.text.actionEffect
 import vancouvermonth.text.actionName
+import vancouvermonth.text.arrivalLines
 import vancouvermonth.text.breakdown
 import vancouvermonth.text.cheapestLine
 import vancouvermonth.text.date
@@ -16,6 +17,7 @@ import vancouvermonth.text.endingLine
 import vancouvermonth.text.eventLine
 import vancouvermonth.text.guessLine
 import vancouvermonth.text.money
+import vancouvermonth.text.monthCostLine
 import vancouvermonth.text.monthStartLines
 import vancouvermonth.text.parseAmount
 import vancouvermonth.text.passPrices
@@ -26,6 +28,7 @@ import vancouvermonth.text.todaysRunResult
 import vancouvermonth.text.utilitiesLabel
 import vancouvermonth.text.utilitiesPrices
 import vancouvermonth.text.whyNot
+import vancouvermonth.text.whyTotalLines
 
 /**
  * Plays one run as text: the room on September 1st, then one action a day until the month ends.
@@ -74,11 +77,14 @@ class TerminalGame(
         line()
         line("밴쿠버 한 달 (가제)                판 번호 ${game.seed}")
         if (today != null) line(todaysRunName(today))
-        line("잔고 ${money(game.startingBalance)} · 9월 1일")
+        line()
+        // The story says the money and the date, so no balance line repeats them.
+        for (text in arrivalLines(game.startingBalance)) line(text)
         line()
         // Hangul takes two columns in a terminal, so the indents below count "할 일: " as 7 and "공과금" as 6.
         line("할 일: 한 달 총비용이 가장 싼 방을 고르세요.")
         line("       한 달 총비용 = 월세 + 공과금 + 교통 정기권")
+        for (text in whyTotalLines()) line("       $text")
         line()
         line("요금표")
         line("  교통 정기권   " + passPrices())
@@ -100,6 +106,7 @@ class TerminalGame(
         line("  방 고르기 점수 ${reveal.score} / ${FirstMinute.MAX_SCORE}")
         line()
         line("  첫 달을 내고 남은 잔고 ${money(reveal.balanceAfterFirstMonth)}")
+        line("  ${monthCostLine(game, reveal)}")
         line()
         return reveal
     }
