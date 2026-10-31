@@ -126,7 +126,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     }
     private val greeterParts = Neighbourhood.venues.map { Figures.townsperson(personAt(it.place)) }
     private val greeterFigures = greeterParts.map { FigureBoxes(it) }
-    private val passersby = Strolls.all
+    private val passersby = Strolls.all()
     private val passerbyParts = passersby.map { Figures.passer(it.passer) }
     private val passerbyFigures = passerbyParts.map { FigureBoxes(it) }
 

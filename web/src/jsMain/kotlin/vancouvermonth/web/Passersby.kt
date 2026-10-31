@@ -142,7 +142,8 @@ private const val TURN_MILLIS = 120.0
  * They start far apart and away from 내 방, where each day begins.
  */
 object Strolls {
-    val all: List<Passerby> get() = listOf(
+    /** The four, each at the start of their loop: new walkers on every call, so each town has its own. */
+    fun all(): List<Passerby> = listOf(
         Passerby(Passer.OLIVER, Stroll(listOf(Spot(1.0, 0.5), Spot(47.0, 0.5))), speed = 1.7, start = 30.0),
         Passerby(
             Passer.MINA,

@@ -39,7 +39,7 @@ class PassersbyTest {
 
     @Test
     fun `every passerby walks on free squares, inside the town, never through a building`() {
-        for (passerby in Strolls.all) {
+        for (passerby in Strolls.all()) {
             for ((a, b) in passerby.stroll.legs) {
                 assertTrue(grid.isClear(a, b), "${passerby.passer}: $a to $b")
             }
@@ -56,7 +56,7 @@ class PassersbyTest {
 
     @Test
     fun `no passerby ever comes near a door or a place to talk, so none stands where a place opens`() {
-        for (passerby in Strolls.all) {
+        for (passerby in Strolls.all()) {
             for (spot in along(passerby.stroll)) {
                 for (door in doors) {
                     val away = distanceBetween(spot, door)
@@ -69,7 +69,7 @@ class PassersbyTest {
 
     @Test
     fun `the passersby walk the pavement, the park, the seawall and the plaza, and start far apart`() {
-        val all = Strolls.all
+        val all = Strolls.all()
         assertEquals(Passer.entries.toSet(), all.map { it.passer }.toSet())
         val seawall = all.first { it.passer == Passer.OLIVER }
         assertTrue(along(seawall.stroll).all { it.z < 2.0 }, "on the seawall")
@@ -87,7 +87,7 @@ class PassersbyTest {
     @Test
     fun `the player's walks go straight through where the passersby are, since they are not in the grid`() {
         val home = Neighbourhood.venue(Place.HOME).door
-        for (passerby in Strolls.all) {
+        for (passerby in Strolls.all()) {
             val there = passerby.spot
             assertTrue(grid.isFree(grid.cellAt(there)), "${passerby.passer}")
             assertEquals(there, grid.route(home, there).last(), "${passerby.passer}")
@@ -96,7 +96,7 @@ class PassersbyTest {
 
     @Test
     fun `a passerby strolls at their speed, bobbing and swinging their legs`() {
-        val passerby = Strolls.all.first()
+        val passerby = Strolls.all().first()
         val far = Spot(-50.0, -50.0)
         val start = passerby.walked
         var pose = passerby.step(0.0, far)
@@ -111,7 +111,7 @@ class PassersbyTest {
 
     @Test
     fun `a passerby stops for the player right in front, faces them, and walks on once they step aside`() {
-        val passerby = Strolls.all.first { it.passer == Passer.MINA }
+        val passerby = Strolls.all().first { it.passer == Passer.MINA }
         val here = passerby.spot
         val ahead = passerby.stroll.headingAt(passerby.walked)
         val inFront = Spot(here.x + sin(ahead) * 1.0, here.z + cos(ahead) * 1.0)
@@ -132,7 +132,7 @@ class PassersbyTest {
 
     @Test
     fun `a passerby stopped for a word stands and faces the player until let go, then walks on`() {
-        val passerby = Strolls.all.first { it.passer == Passer.THEO }
+        val passerby = Strolls.all().first { it.passer == Passer.THEO }
         val player = Spot(passerby.spot.x + 3.0, passerby.spot.z)
         passerby.hold()
         val walked = passerby.walked
