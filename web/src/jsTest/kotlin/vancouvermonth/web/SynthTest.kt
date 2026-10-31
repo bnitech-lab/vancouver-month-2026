@@ -131,4 +131,79 @@ class SynthTest {
             assertTrue(levels(once).first > 0.02)
         }
     }
+
+    /** [seconds] of only what [more] asks of a mixer faded in from the start, with no tune: the town's own sounds. */
+    private fun townSounds(seconds: Double, more: (Mixer) -> Unit): Promise<AudioBuffer> {
+        val context = OfflineAudioContext(2, (rate * seconds).toInt(), rate)
+        val mixer = Mixer(context)
+        mixer.fadeIn(0.0)
+        more(mixer)
+        return context.startRendering()
+    }
+
+    @Test
+    fun `the rain is heard under the tune, never reaching its peak, and with everything at once nothing clips`():
+        Promise<Unit> {
+        val renders = arrayOf(
+            render(8.0, Mood.DAY),
+            townSounds(8.0) { it.setRain(true, 0.0) },
+            render(8.0, Mood.DAY) { mixer ->
+                mixer.setRain(true, 0.0)
+                mixer.setNearby(1.0, 1.0, 0.0)
+                mixer.chime(4.0)
+                mixer.blip(5.0)
+            },
+        )
+        return Promise.all(renders).then { (tune, rain, everything) ->
+            // Once the rain has come in fully.
+            val (tunePeak, tuneRms) = levels(tune, from = 4.0)
+            val (rainPeak, rainRms) = levels(rain, from = 4.0)
+            assertTrue(rainRms > 0.003, "The rain is too quiet to hear: $rainRms")
+            assertTrue(rainPeak < tunePeak / 2, "The rain reaches $rainPeak, the tune's peak is $tunePeak")
+            assertTrue(rainRms < tuneRms, "The rain ($rainRms) is louder than the tune ($tuneRms)")
+            // It comes in gently, not at once.
+            assertTrue(levels(rain, until = 0.3).second < rainRms / 3, "The rain starts at once")
+            val (peak, _) = levels(everything)
+            assertTrue(peak < 1.0, "Clipped: the loudest sample is $peak")
+        }
+    }
+
+    @Test
+    fun `the train and the fire are heard as loud as they are near, and not at all when far`(): Promise<Unit> {
+        val renders = arrayOf(
+            townSounds(4.0) { it.setNearby(1.0, 0.0, 0.0) },
+            townSounds(4.0) { it.setNearby(0.3, 0.0, 0.0) },
+            townSounds(4.0) { it.setNearby(0.0, 1.0, 0.0) },
+            townSounds(4.0) { it.setNearby(0.0, 0.0, 0.0) },
+            townSounds(4.0) { mixer ->
+                mixer.setNearby(1.0, 1.0, 0.0)
+                mixer.setNearby(0.0, 0.0, 2.0)
+            },
+        )
+        return Promise.all(renders).then { (near, farther, fire, none, gone) ->
+            val nearRms = levels(near, from = 1.0).second
+            val fartherRms = levels(farther, from = 1.0).second
+            assertTrue(nearRms > 0.005, "The train close by is not heard: $nearRms")
+            assertTrue(fartherRms in nearRms * 0.15..nearRms * 0.5, "Farther off: $fartherRms, close by: $nearRms")
+            assertTrue(levels(near).first < 0.5, "The train is too loud: ${levels(near).first}")
+            val (firePeak, fireRms) = levels(fire, from = 1.0)
+            assertTrue(fireRms > 0.002 && firePeak > 0.02, "The fire is not heard: $fireRms, $firePeak")
+            assertTrue(firePeak < 0.5, "The fire is too loud: $firePeak")
+            assertTrue(levels(none).first < 1e-6, "Something plays when nothing is near")
+            assertTrue(levels(gone, from = 3.0).first < 2e-3, "Still heard after going away: ${levels(gone, from = 3.0)}")
+        }
+    }
+
+    @Test
+    fun `switching off silences the rain, the train and the fire with the tune`(): Promise<Unit> =
+        render(5.0, Mood.DAY) { mixer ->
+            mixer.setRain(true, 0.0)
+            mixer.setNearby(1.0, 1.0, 0.0)
+            mixer.fadeOut(3.0)
+        }.then { buffer ->
+            val (before, _) = levels(buffer, from = 2.0, until = 3.0)
+            val (after, _) = levels(buffer, from = 3.0 + Mixer.FADE_OUT + 0.05)
+            assertTrue(before > 0.02, "Nothing played before the fade: $before")
+            assertTrue(after < 1e-4, "Still heard after switching off: $after")
+        }
 }

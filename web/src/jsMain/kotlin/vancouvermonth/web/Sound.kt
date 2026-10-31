@@ -8,6 +8,7 @@ import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.events.Event
 import org.w3c.dom.events.KeyboardEvent
+import vancouvermonth.text.Weather
 import vancouvermonth.text.soundLabel
 
 /** Lets a tick through at most once every [gapMillis], so a line typed out clicks softly instead of buzzing. */
@@ -42,6 +43,9 @@ internal class Sound(
 
     private var speaker: Speaker? = null
     private val ticks = TickLimiter()
+
+    /** True on a rainy day, kept so a sound made later starts with the rain. */
+    private var rainy = false
 
     /** The switches on the page now, to show the sound off everywhere if it cannot be made. */
     private val switches = mutableListOf<HTMLButtonElement>()
@@ -103,6 +107,19 @@ internal class Sound(
         if (isOn) speaker?.chime()
     }
 
+    /** Today's weather: a soft bed of rain on a rainy day, heard while the sound is on. */
+    fun weather(weather: Weather) {
+        val rain = weather == Weather.RAINY
+        if (rain == rainy) return
+        rainy = rain
+        speaker?.weather(rain)
+    }
+
+    /** How loud the town's train and fire are where the player is, and how dark its night is, while the sound is on. */
+    fun nearby(train: Double, fire: Double, night: Double) {
+        if (isOn) speaker?.nearby(train, fire, night)
+    }
+
     /** Stops waiting for a tap and watching whether the page is hidden, as a test does when it is over. */
     fun close() {
         stopWaiting()
@@ -116,7 +133,10 @@ internal class Sound(
             return
         }
         try {
-            val made = speaker ?: checkNotNull(makeSpeaker).invoke().also { speaker = it }
+            val made = speaker ?: checkNotNull(makeSpeaker).invoke().also {
+                speaker = it
+                it.weather(rainy)
+            }
             waitForTap()
             made.on { if (isOn) stopWaiting() }
         } catch (error: Throwable) {

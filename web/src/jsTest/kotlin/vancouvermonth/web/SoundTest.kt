@@ -13,6 +13,7 @@ import org.w3c.dom.asList
 import org.w3c.dom.events.Event
 import org.w3c.dom.events.KeyboardEvent
 import org.w3c.dom.events.KeyboardEventInit
+import vancouvermonth.text.Weather
 
 /**
  * A speaker that only notes what it was asked to do, so a test needs no sound at all. While [plays] is false it acts
@@ -50,6 +51,18 @@ internal class NotingSpeaker : Speaker {
 
     override fun chime() {
         asked += "chime"
+    }
+
+    /** Whether the rain plays, as last asked, and each time the town's sounds were set: noted apart from [asked]. */
+    var rain: Boolean? = null
+    val nearby = mutableListOf<Triple<Double, Double, Double>>()
+
+    override fun weather(rain: Boolean) {
+        this.rain = rain
+    }
+
+    override fun nearby(train: Double, fire: Double, night: Double) {
+        nearby += Triple(train, fire, night)
     }
 }
 
@@ -302,5 +315,29 @@ class SoundTest {
         sound(webAudio = false).button(root)
         assertNull(root.querySelector(".sound-switch"))
         assertTrue(hasWebAudio())
+    }
+
+    @Test
+    fun `the rain and the town's sounds reach the sound only while it is on, and a sound made later starts with the rain`() {
+        val sound = sound()
+        sound.button(root)
+        // Told before the sound is made: nothing is made, and the rain is kept for later.
+        sound.weather(Weather.RAINY)
+        sound.nearby(0.5, 0.3, 0.0)
+        assertEquals(0, made)
+        switchIn().click()
+        assertEquals(true, speaker.rain, "The sound made on the tap starts without the rain")
+        assertTrue(speaker.nearby.isEmpty(), "The town's sounds from before were played")
+        sound.nearby(0.5, 0.3, 0.0)
+        assertEquals(listOf(Triple(0.5, 0.3, 0.0)), speaker.nearby)
+        sound.weather(Weather.CLOUDY)
+        assertEquals(false, speaker.rain, "Still raining on a cloudy day")
+        sound.weather(Weather.RAINY)
+        assertEquals(true, speaker.rain)
+        // Off: the town's sounds are no longer passed on; the rain is kept, and fades out with the rest.
+        switchIn().click()
+        sound.nearby(0.9, 0.9, 1.0)
+        assertEquals(1, speaker.nearby.size, "The town's sounds went on while off")
+        assertEquals(listOf("on", "off"), speaker.asked)
     }
 }
