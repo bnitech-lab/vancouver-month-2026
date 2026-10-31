@@ -25,6 +25,9 @@ the money runs out.
 In a browser, on a phone or a computer: **https://bnitech-lab.github.io/vancouver-month-2026/** (the phone
 screen with the 3D town; add `?seed=1011` to replay a run, or `?today` for today's run).
 
+What changed in each version is in [PATCH_NOTES.md](PATCH_NOTES.md), in Korean, the same notes the game shows under
+업데이트 소식.
+
 In a terminal, which needs Java 21:
 
 ```sh
@@ -262,8 +265,8 @@ stopping for the character), `Greeter` (the five turning and waving), `TownLife`
 rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, all worked out from the time) and
 `FramePace` (which frames are drawn). The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`, and
 `Passersby.kt` for the passersby's), and so is each day's weather (`Weather.kt`). `WalkableTown` draws all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the map included, is about 809 KB
-(about 218 KB gzipped).
+`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the map included, is about 822 KB
+(about 223 KB gzipped).
 
 ### Sound and the first-run guide
 
@@ -299,6 +302,28 @@ The button screen has no card, since its buttons say what they do.
 `OfflineAudioContext` to check it is heard, never clips, is quietest at night, and keeps the rain under it; `Sound.kt`
 is the switch, `FirstRunGuide.kt` the card and `Memory.kt` the storage that may be refused. The words are in `text`
 (`Guide.kt`).
+
+### Patch notes (업데이트 소식)
+
+Players read what changed the way a game's patch notes read: each version with its date (in Vancouver), a one-line
+headline, and short lines under 새로운 기능, 개선, 수정 and 알려진 문제, newest first. The first screen shows the version
+small after the title and an 업데이트 소식 button next to the sound switch; the button screen has the same button at its
+foot, and in the town it is a link at the foot of the "?" card, next to the map's credit, left out while a talk is open
+or the day changes. The notes open as a card: the newest version open, the older ones folded, the list scrolling inside
+it, closed with 닫기 or Escape. A small dot sits on the button while the newest version has not been opened yet, kept in
+`localStorage`, so a first visit has it too; where storage is refused, it goes once the notes are opened on that page.
+
+The notes are data in `text` (`PatchNotes.kt`), and [PATCH_NOTES.md](PATCH_NOTES.md) is written from the same data;
+a test (`PatchNotesFileTest`) fails when the two differ. **Every change players can see adds one entry:**
+
+1. Add a `PatchNote` at the top of `PatchNotes.ALL` with the next version, the day it merges in Vancouver as
+   `2026-11-01`, a headline, and at least one line under `added`, `improved`, `fixed` or `known`. Write to players in
+   short, friendly Korean: no pull request numbers, file names or tools, and no em dash.
+2. Bump `CURRENT` to that version. Players who opened the notes on an older version see the dot again.
+3. Write the file again: `UPDATE_PATCH_NOTES=1 ./gradlew :text:jvmTest --tests '*PatchNotesFileTest*' --rerun`.
+
+`PatchNotesTest` checks the order (newest first, each version newer than the one below it), the dates, that `CURRENT`
+is the newest, and the lines' widths and words.
 
 ## How it is built
 
