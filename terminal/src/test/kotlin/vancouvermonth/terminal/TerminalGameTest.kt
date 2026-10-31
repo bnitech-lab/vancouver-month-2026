@@ -10,9 +10,12 @@ import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.Room
 import vancouvermonth.core.TodaysRun
 import vancouvermonth.core.Zone
+import vancouvermonth.text.arrivalLines
 import vancouvermonth.text.date
+import vancouvermonth.text.goalLine
 import vancouvermonth.text.money
 import vancouvermonth.text.percent
+import vancouvermonth.text.whyTotalLines
 
 class TerminalGameTest {
     private fun playWith(seed: Int, vararg answers: String): Pair<Boolean, String> {
@@ -125,6 +128,31 @@ class TerminalGameTest {
         assertTrue("할 일: 한 달 총비용이 가장 싼 방을 고르세요." in screen)
         assertTrue("1구역 \$105 · 2구역 \$145 · 3구역 \$195" in screen)
         assertTrue("별도면 한 달 \$120~\$190" in screen)
+    }
+
+    @Test
+    fun `the first screen tells the story, the goal and why the room matters before the rooms`() {
+        val (_, screen) = playWith(4821)
+        val lines = screen.lines()
+        val story = arrivalLines(FirstMinute.STARTING_BALANCE)
+        val why = whyTotalLines().map { "       $it" }
+        val at = (story + why).map { lines.indexOf(it) }
+        assertTrue(at.all { it >= 0 }, "missing a line in: $screen")
+        assertEquals(at.sorted(), at)
+        assertTrue(goalLine() in story)
+        assertTrue(lines.indexOf("할 일: 한 달 총비용이 가장 싼 방을 고르세요.") in at.first()..at.last())
+        assertTrue(at.last() < lines.indexOfFirst { it.startsWith("  1) ") })
+        // No room's total is handed over before the guess.
+        for (room in FirstMinute(4821).rooms) assertFalse(money(room.totalMonthlyCost) in screen)
+    }
+
+    @Test
+    fun `the reveal ties the pick to the month, against the cheapest room`() {
+        val game = FirstMinute(1011)
+        val (_, dear) = playWith(1011, "2", "1300", "n")
+        assertTrue("  가장 싼 방보다 한 달에 \$180 더 내요. 10월 1일에도 그만큼 더 나가요." in dear.lines())
+        val (_, cheap) = playWith(1011, "${game.cheapestRoomIndex + 1}", "${game.lowestTotal}", "n")
+        assertTrue("  가장 싼 방이라 9월을 버틸 돈이 가장 많이 남아요." in cheap.lines())
     }
 
     @Test
