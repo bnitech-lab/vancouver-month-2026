@@ -96,9 +96,12 @@ class PhoneGame private constructor(
     private var smallTalks = 0
     private val met = mutableSetOf<Townsperson>()
 
-    /** The passerby the player has stopped for a word, or null, and how many words today. No day is spent on them. */
+    /** The passerby the player has stopped for a word, or null. No day is spent on them. */
     private var chattingWith: Passer? = null
-    private var chats = 0
+
+    /** How many words each passerby has had on [chatsDay], so the same person says something new each time. */
+    private val chats = mutableMapOf<Passer, Int>()
+    private var chatsDay = 0
 
     /** The timer typing the person's line, while it types. */
     private var typing: Int? = null
@@ -559,9 +562,14 @@ class PhoneGame private constructor(
     private fun chatWith(passer: Passer) {
         val current = month ?: return
         talkingAt = null
-        chats = if (passer == chattingWith) chats + 1 else 0
+        if (current.day != chatsDay) {
+            chats.clear()
+            chatsDay = current.day
+        }
+        val count = chats[passer] ?: 0
+        chats[passer] = count + 1
         chattingWith = passer
-        talkLine = passerLine(passer, current.day, chats)
+        talkLine = passerLine(passer, current.day, count)
         talkOpened = window.performance.now()
         focusNext = ".talk"
         show()
