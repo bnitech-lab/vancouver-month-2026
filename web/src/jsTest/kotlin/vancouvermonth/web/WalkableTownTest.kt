@@ -1425,21 +1425,40 @@ class WalkableTownTest {
         )
     }
 
+    // One test for each place's door: all five turns round every door in one test took about 29 s on a fast laptop,
+    // and on a slower machine passed the 30 s Karma waits for a test to report before it gives up on the browser.
     @Test
-    fun `the five places never fold, even with the camera turned all the way round each`(): Promise<Unit> {
+    fun `the five places never fold, with the camera turned all the way round 내 방's door`() = placesStandRound(Place.HOME)
+
+    @Test
+    fun `the five places never fold, with the camera turned all the way round 카페's door`() = placesStandRound(Place.CAFE)
+
+    @Test
+    fun `the five places never fold, with the camera turned all the way round 도서관's door`() =
+        placesStandRound(Place.LIBRARY)
+
+    @Test
+    fun `the five places never fold, with the camera turned all the way round 코워킹's door`() =
+        placesStandRound(Place.COWORKING)
+
+    @Test
+    fun `the five places never fold, with the camera turned all the way round 회사's door`() =
+        placesStandRound(Place.OFFICE)
+
+    /** Stands at [at]'s door and turns the camera all the way round it, checking that none of the five places folds. */
+    private fun placesStandRound(at: Place): Promise<Unit> {
         val town = startInTown()
         val places = placeBodies()
         assertTrue(places.all { it.second >= 0 }, "a place's walls are missing: $places")
+        val venue = Neighbourhood.venue(at)
         val steps = mutableListOf<Step>()
-        for (venue in Neighbourhood.venues) {
-            steps += Step("stand at ${venue.place}'s door", { town.isStill }) { town.standAt(venue.door) }
-            for (turn in 0 until 4) {
-                steps += Step("${venue.place}, turn $turn", { town.isStill }) {
-                    for ((place, body) in places) {
-                        assertEquals(place.height, town.drawnHeight(body), 1e-4, "${place.place} at ${venue.place}")
-                    }
-                    town.aimCamera(turn * PI / 2, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+        steps += Step("stand at ${venue.place}'s door", { town.isStill }) { town.standAt(venue.door) }
+        for (turn in 0 until 4) {
+            steps += Step("${venue.place}, turn $turn", { town.isStill }) {
+                for ((place, body) in places) {
+                    assertEquals(place.height, town.drawnHeight(body), 1e-4, "${place.place} at ${venue.place}")
                 }
+                town.aimCamera(turn * PI / 2, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
             }
         }
         steps += Step("last turn", { town.isStill }) {

@@ -43,6 +43,7 @@ import vancouvermonth.text.monthStartLines
 import vancouvermonth.text.replacesKept
 import vancouvermonth.text.parseAmount
 import vancouvermonth.text.Passer
+import vancouvermonth.text.PatchNotes
 import vancouvermonth.text.passerLine
 import vancouvermonth.text.passPrices
 import vancouvermonth.text.percent
@@ -154,6 +155,9 @@ class PhoneGame private constructor(
 
     /** The card on how to play, shown the first time the town opens; null for none. */
     internal var guide: FirstRunGuide? = null
+
+    /** The update news, from a button by the title and at the button screen's foot; null for none. */
+    internal var notes: PatchNotesCard? = null
 
     /** Each day's weather, from the run's seed: only for how the town looks and sounds. A test may set its own. */
     internal var weatherOf: (Int) -> Weather = { day -> weatherOn(game.seed, day) }
@@ -330,6 +334,8 @@ class PhoneGame private constructor(
         walkable = makeWalkableTown()?.also { listenTo(it) }
         if (walkable == null) town = makeTown()
         guide?.onOpenChange = { walkable?.isCovered = isTownCovered() }
+        // In the town the update news open from the guide's foot, never over a talk or the change of day.
+        guide?.notes = { notes.takeIf { talkingAt == null && chattingWith == null && !dayChanging } }
         show()
         window.scrollTo(0.0, 0.0)
         if (walkable != null) guide?.openFirstTime(root)
@@ -425,6 +431,8 @@ class PhoneGame private constructor(
             showStats(month)
             showInterview(month)
         }
+        // The same update news as by the title, at the foot, out of the way of the day's figures.
+        notes?.let { news -> root.child("footer", "patch-foot") { news.button(this, root) } }
     }
 
     private fun showStats(month: Month) {
@@ -499,10 +507,21 @@ class PhoneGame private constructor(
 
     private fun showTitle() {
         root.child("header", "title") {
-            child("p", "brand", "BNI Tech")
-            child("h1", text = "밴쿠버 한 달 (가제)")
+            // The update news and the sound switch share the brand's line, so the title has the width to itself.
+            child("div", "title-bar") {
+                child("p", "brand", "BNI Tech")
+                if (notes != null || sound != null) {
+                    child("div", "title-controls") {
+                        notes?.button(this, root)
+                        sound?.button(this)
+                    }
+                }
+            }
+            child("div", "title-name") {
+                child("h1", text = "밴쿠버 한 달 (가제)")
+                child("p", "patch-current", PatchNotes.versionLabel(PatchNotes.CURRENT))
+            }
             child("p", "run", if (today == null) "판 번호 ${game.seed}" else "${todaysRunName(today)} · 판 번호 ${game.seed}")
-            sound?.button(this)
         }
     }
 

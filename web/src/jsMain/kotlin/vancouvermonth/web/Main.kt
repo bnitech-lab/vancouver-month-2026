@@ -33,6 +33,8 @@ fun main() {
     // A gentle sound the player can switch on, a card on how to play the first time the town opens, and the month kept.
     game.sound = pageSound(memory)
     game.guide = FirstRunGuide(memory)
+    // The update news, by the title and from the guide's foot, with a dot until the newest version is opened.
+    game.notes = PatchNotesCard(memory)
     game.slot = slot
     game.startOverWithNewRun = opening.fromKept
     game.show()
