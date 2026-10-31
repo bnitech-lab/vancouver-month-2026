@@ -681,9 +681,18 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     internal val isRainOnePassLast: Boolean
         get() = rainMaterial.forceSinglePass && rain.renderOrder > 0
 
-    /** How high the first streak of rain was last drawn, for tests: it falls as the town's time goes on. */
-    internal val firstStreakHeight: Double
-        get() = rain.instanceMatrix.array[13].toDouble()
+    /**
+     * The first streak of rain drawn (one right by the camera is left out) and how high it was last drawn, for tests:
+     * it falls as the town's time goes on.
+     */
+    internal val drawnStreak: Pair<Int, Double>?
+        get() {
+            val numbers = rain.instanceMatrix.array
+            for (index in 0 until Rain.DROPS) {
+                if (numbers[index * 16 + 5] != 0f) return index to numbers[index * 16 + 13].toDouble()
+            }
+            return null
+        }
 
     /** The passersby as drawn today: in their rain clothes on a rainy day. */
     private val crowd: InstancedMesh

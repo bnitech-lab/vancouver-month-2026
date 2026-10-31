@@ -806,7 +806,13 @@ class WalkableTownTest {
     }
 
     /** How high the first streak of rain is drawn when the town's time is [millis]: its top less half a streak. */
-    private fun streakAt(millis: Double): Double = Rain.dropAt(0, millis, 0.0, 0.0).y - Rain.STREAK / 2
+    private fun streakAt(index: Int, millis: Double): Double = Rain.dropAt(index, millis, 0.0, 0.0).y - Rain.STREAK / 2
+
+    /** True when the first streak the town drew is where the rain's rule puts it at [millis]. */
+    private fun rainDrawnAt(town: NeighbourhoodScene, millis: Double): Boolean {
+        val (index, height) = town.drawnStreak ?: return false
+        return abs(height - streakAt(index, millis)) < 1e-4
+    }
 
     @Test
     fun `on seed 1011's sunny days no rain falls, and on its first rainy day rain falls and the top card says 비`():
@@ -835,11 +841,11 @@ class WalkableTownTest {
                 assertEquals(" 날씨 비", word)
                 assertTrue("오늘9월 ${day}일" in screen, screen)
                 // The rain falls with the town's own time, every streak where the rain's rule puts it.
-                assertNotEquals(streakAt(1_000.0), streakAt(1_040.0))
+                assertNotEquals(streakAt(0, 1_000.0), streakAt(0, 1_040.0))
                 clock = 1_000.0
-                whenReady({ abs(town.firstStreakHeight - streakAt(1_000.0)) < 1e-4 }, reject) {
+                whenReady({ rainDrawnAt(town, 1_000.0) }, reject) {
                     clock = 1_040.0
-                    whenReady({ abs(town.firstStreakHeight - streakAt(1_040.0)) < 1e-4 }, reject) {
+                    whenReady({ rainDrawnAt(town, 1_040.0) }, reject) {
                         assertTrue(town.arePassersbyOut, "the passersby stayed in")
                         resolve(Unit)
                     }
@@ -1030,13 +1036,12 @@ class WalkableTownTest {
     @Test
     fun `with rain falling and only the town's own life moving, it still draws no more than thirty frames a second`():
         Promise<Unit> {
-        var clock = 0.0
-        val town = startInTown(life = { clock }, weather = { Weather.RAINY })
+        // The town's own clock runs, so the rain really falls through the counted second.
+        val town = startInTown(life = { window.performance.now() }, weather = { Weather.RAINY })
         var from = 0
         return play(
             Step("let the rain fall", { town.isStill }) {
                 assertTrue(town.isRaining)
-                clock = 1.0
                 from = town.framesDrawn
             },
             Step("one second later", after(1_000)) {
