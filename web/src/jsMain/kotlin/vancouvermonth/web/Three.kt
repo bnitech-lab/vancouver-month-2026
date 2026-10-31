@@ -131,10 +131,19 @@ external class DataTexture(data: Uint8Array, width: Int, height: Int, format: In
     fun dispose()
 }
 
-/** The shape of a box. The town draws every box from one 1x1x1 box, stretched with `scale`. */
-external class BoxGeometry(width: Double, height: Double, depth: Double) {
+/** A shape made of triangles, shared by every copy drawn from it. */
+external open class BufferGeometry {
     fun dispose()
 }
+
+/** The shape of a box. The town draws every box from one 1x1x1 box, stretched with `scale`. */
+external class BoxGeometry(width: Double, height: Double, depth: Double) : BufferGeometry
+
+/** A flat square standing up, facing +z: two triangles where a box has twelve. Each streak of rain is drawn from one. */
+external class PlaneGeometry(width: Double, height: Double) : BufferGeometry
+
+/** For a material's `side`: drawn from both faces, as a flat square seen from behind must be. */
+external val DoubleSide: Int
 
 /** How a surface looks. Each kind below takes options such as `color`. */
 external open class Material {
@@ -159,10 +168,10 @@ external class MeshBasicMaterial(parameters: Json) : Material {
     val color: Color
 }
 
-external class Mesh(geometry: BoxGeometry, material: Material) : Object3D
+external class Mesh(geometry: BufferGeometry, material: Material) : Object3D
 
 /** Many copies of one shape drawn at once, each with its own place, size and colour: one draw for many boxes. */
-external class InstancedMesh(geometry: BoxGeometry, material: Material, count: Int) : Object3D {
+external class InstancedMesh(geometry: BufferGeometry, material: Material, count: Int) : Object3D {
     fun setMatrixAt(index: Int, matrix: Matrix4)
     fun setColorAt(index: Int, color: Color)
     fun dispose()

@@ -189,8 +189,18 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private val waterBoxes = Neighbourhood.ground.indices.filter { Neighbourhood.ground[it].colour == Neighbourhood.WATER }
 
     /** The rain's streaks and splashes in one draw, in a plain pale colour no light changes; the puddles in another. */
-    private val rainMaterial =
-        MeshBasicMaterial(json("color" to 0xFFFFFF, "transparent" to true, "opacity" to RAIN_OPACITY, "depthWrite" to false))
+    private val rainMaterial = MeshBasicMaterial(
+        json(
+            "color" to 0xFFFFFF,
+            "transparent" to true,
+            "opacity" to RAIN_OPACITY,
+            "depthWrite" to false,
+            "side" to DoubleSide,
+        ),
+    )
+
+    /** The flat square each streak of rain and each splash is drawn from. */
+    private val drop = PlaneGeometry(1.0, 1.0)
     private lateinit var rain: InstancedMesh
     private lateinit var puddles: InstancedMesh
 
@@ -420,7 +430,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     /** The rain, falling only on a rainy day, and the puddles it leaves; neither casts a shadow. */
     private fun addWeather() {
-        rain = InstancedMesh(cube, rainMaterial, Rain.DROPS + Rain.SPLASHES)
+        rain = InstancedMesh(drop, rainMaterial, Rain.DROPS + Rain.SPLASHES)
         rain.castShadow = false
         rain.receiveShadow = false
         rain.frustumCulled = false
@@ -563,6 +573,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         for (mesh in meshes) mesh.dispose()
         renderer.dispose()
         cube.dispose()
+        drop.dispose()
         material.dispose()
         glowMaterial.dispose()
         trainMaterial.dispose()
@@ -930,7 +941,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val focus = view.focus
         val x = focus.x + (eye.x - focus.x) * RAIN_TOWARD_EYE
         val z = focus.z + (eye.z - focus.z) * RAIN_TOWARD_EYE
-        Rain.write(millis, x, z, rain.instanceMatrix.array, eye)
+        Rain.write(millis, x, z, rain.instanceMatrix.array, eye, view.yaw)
         rain.instanceMatrix.needsUpdate = true
     }
 

@@ -222,6 +222,31 @@ class TownLifeTest {
             val at = (Rain.DROPS + index) * 16
             assertEquals(splash.x + splash.width / 2, numbers[at + 12].toDouble(), 1e-4)
             assertEquals(splash.width, numbers[at].toDouble(), 1e-6)
+            // Laid flat: the square's up runs along the ground, its face up.
+            assertEquals(0f, numbers[at + 5])
+            assertEquals(splash.depth, -numbers[at + 6].toDouble(), 1e-6)
+            assertEquals(1f, numbers[at + 9])
+        }
+    }
+
+    @Test
+    fun `each streak stands up turned to the camera, thin across its view`() {
+        val numbers = Float32Array((Rain.DROPS + Rain.SPLASHES) * 16)
+        for (turn in listOf(0.0, 0.7, -2.1, kotlin.math.PI)) {
+            Rain.write(500.0, 10.0, 10.0, numbers, turn = turn)
+            for (index in listOf(0, 99, Rain.DROPS - 1)) {
+                val at = index * 16
+                // Its face points the way the camera looks from, across the ground.
+                assertEquals(kotlin.math.sin(turn), numbers[at + 8].toDouble(), 1e-6)
+                assertEquals(kotlin.math.cos(turn), numbers[at + 10].toDouble(), 1e-6)
+                assertEquals(0f, numbers[at + 9])
+                // Thin across, at right angles to its face, and long upright.
+                val acrossX = numbers[at].toDouble()
+                val acrossZ = numbers[at + 2].toDouble()
+                assertEquals(Rain.THIN, kotlin.math.hypot(acrossX, acrossZ), 1e-6)
+                assertEquals(0.0, acrossX * numbers[at + 8] + acrossZ * numbers[at + 10], 1e-6)
+                assertEquals(Rain.STREAK, numbers[at + 5].toDouble(), 1e-6)
+            }
         }
     }
 

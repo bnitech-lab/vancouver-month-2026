@@ -259,7 +259,8 @@ object Clouds {
  * Rain on a rainy day: thin streaks falling in a box of sky around [centre][write], a light wind from the west
  * slanting them, and small splashes flashing on the ground. Each streak keeps its own place in the town, so the rain
  * stays put as the camera moves; one that leaves the box on one side comes back on the other, so the box is always
- * full and [DROPS] streaks are enough. Worked out from the town's time alone, like the rest of its life.
+ * full and [DROPS] streaks are enough. Worked out from the town's time alone, like the rest of its life. Each streak
+ * and splash is drawn from a flat 1 by 1 square: a streak stands up turned to the camera, a splash lies on the ground.
  */
 object Rain {
     const val DROPS = 420
@@ -341,13 +342,23 @@ object Rain {
 
     /**
      * Writes every streak and then every splash at [millis] into [into], sixteen numbers each, column by column as
-     * Three.js keeps a matrix, with the box of sky centred on [centreX], [centreZ]. A streak within [CLEAR] of the
-     * camera at [eye] is left out (shrunk to nothing): so close, it would be a pale bar across the screen, and costly
-     * to draw. It makes nothing new, since it runs on every beat of the town's life.
+     * Three.js keeps a matrix, with the box of sky centred on [centreX], [centreZ]. Each streak's square is turned by
+     * [turn] about the vertical, the camera's own turn, so it faces the camera. A streak within [CLEAR] of the camera at
+     * [eye] is left out (shrunk to nothing): so close, it would be a pale bar across the screen, and costly to draw. It
+     * makes nothing new, since it runs on every beat of the town's life.
      */
-    fun write(millis: Double, centreX: Double, centreZ: Double, into: Float32Array, eye: Point? = null) {
+    fun write(
+        millis: Double,
+        centreX: Double,
+        centreZ: Double,
+        into: Float32Array,
+        eye: Point? = null,
+        turn: Double = 0.0,
+    ) {
         val west = centreX - SPAN / 2
         val north = centreZ - SPAN / 2
+        val across = cos(turn)
+        val toward = sin(turn)
         for (index in 0 until DROPS) {
             val fall = fallen(index, millis)
             val at = index * 16
@@ -359,18 +370,19 @@ object Rain {
                 into[at + 15] = 1f
                 continue
             }
-            // Stretched to a thin streak whose top leans west, as the wind blows it east on the way down.
-            into[at] = THIN.toFloat()
+            // Thin across the camera's view, and long, with its top leaning west, as the wind blows it east on the way
+            // down; its face turned to the camera.
+            into[at] = (THIN * across).toFloat()
             into[at + 1] = 0f
-            into[at + 2] = 0f
+            into[at + 2] = (-THIN * toward).toFloat()
             into[at + 3] = 0f
             into[at + 4] = (-SLANT * STREAK).toFloat()
             into[at + 5] = STREAK.toFloat()
             into[at + 6] = 0f
             into[at + 7] = 0f
-            into[at + 8] = 0f
+            into[at + 8] = toward.toFloat()
             into[at + 9] = 0f
-            into[at + 10] = THIN.toFloat()
+            into[at + 10] = across.toFloat()
             into[at + 11] = 0f
             into[at + 12] = x.toFloat()
             into[at + 13] = y.toFloat()
@@ -380,10 +392,11 @@ object Rain {
         for (index in 0 until SPLASHES) {
             val splash = splashAt(index, millis, centreX, centreZ)
             val at = (DROPS + index) * 16
+            // The square laid flat on the ground: its up runs north, its face up.
             for (offset in 0 until 16) into[at + offset] = 0f
             into[at] = splash.width.toFloat()
-            into[at + 5] = splash.height.toFloat()
-            into[at + 10] = splash.depth.toFloat()
+            into[at + 6] = (-splash.depth).toFloat()
+            into[at + 9] = 1f
             into[at + 12] = (splash.x + splash.width / 2).toFloat()
             into[at + 13] = (splash.y + splash.height / 2).toFloat()
             into[at + 14] = (splash.z + splash.depth / 2).toFloat()
