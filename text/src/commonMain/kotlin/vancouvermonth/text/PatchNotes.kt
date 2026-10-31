@@ -32,10 +32,29 @@ class PatchNote(
  */
 object PatchNotes {
     /** The newest version, shown by the title; it is [ALL]'s first entry. */
-    const val CURRENT = "0.11"
+    const val CURRENT = "0.12"
 
     /** Every update, newest first. */
     val ALL: List<PatchNote> = listOf(
+        PatchNote(
+            version = "0.12",
+            date = "2026-10-31",
+            headline = "자전거 가게와 자전거·퀵보드",
+            added = listOf(
+                "다운타운 가는 길에 자전거 가게가 생겼어요. 주인 벤에게 말을 걸어 보세요.",
+                "자전거는 $350, 퀵보드는 $550에 살 수 있어요. 사도 하루가 지나지 않아요.",
+                "산 뒤에는 위 카드에서 바로 타고, '내리기'로 내려요.",
+                "자전거는 걷기보다 두 배 넘게, 퀵보드는 세 배쯤 빨라요.",
+                "내 방, 도서관, 카페, 역 근처에 공유 자전거가 있어요. 한 번에 $3이에요.",
+                "길모퉁이에 선 공유 퀵보드는 한 번에 $4예요. 누르면 걸어가서 타요.",
+                "말을 걸거나 하루가 끝나면 내려요. 공유한 건 제자리로 돌아가요.",
+                "그날 쓴 돈은 다음 날 기록 맨 위에 나와요.",
+                "사고 나면 9월 생활비가 모자라게 되는 물건은 살 수 없어요.",
+            ),
+            known = listOf(
+                "이번 업데이트 전에 하던 한 달은 이어할 수 없어요. 새로 시작해 주세요.",
+            ),
+        ),
         PatchNote(
             version = "0.11",
             date = "2026-10-31",

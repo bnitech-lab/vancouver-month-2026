@@ -436,7 +436,17 @@ class ContinueMonthTest {
 
     @Test
     fun `a kept line that does not read or does not replay is dropped without a word`() {
-        for (line in listOf("1|1011||2|1165|Z", "9|1011||2|1165|", "1|1011||2|1165|I", "1|1011||7|1165|")) {
+        // A bad letter, another version (the first one among them, from before money could be spent), an interview on
+        // a day without one, a room that is not there, and a bike bought twice.
+        val lines = listOf(
+            "2|1011||2|1165|Z",
+            "9|1011||2|1165|",
+            "1|1011||2|1165|EWC",
+            "2|1011||2|1165|I",
+            "2|1011||7|1165|",
+            "2|1011||2|1165|b350Eb350",
+        )
+        for (line in lines) {
             store.items[SaveSlot.KEY] = line
             open()
             assertNull(card, "Offered: $line")
@@ -463,13 +473,13 @@ class ContinueMonthTest {
     @Test
     fun `only a kept month that replays decides the run of an address with no run`() {
         val slot = SaveSlot(Memory { store })
-        store.items[SaveSlot.KEY] = "1|1011||2|1165|EWC"
+        store.items[SaveSlot.KEY] = "2|1011||2|1165|EWC"
         assertEquals(1011, slot.continuable()?.seed)
-        for (line in listOf("1|1011||2|1165|I", "1|1011||2|1165|Z", "")) {
+        for (line in listOf("2|1011||2|1165|I", "2|1011||2|1165|Z", "1|1011||2|1165|EWC", "")) {
             store.items[SaveSlot.KEY] = line
             assertNull(slot.continuable(), "Continuable: $line")
         }
-        store.items[SaveSlot.KEY] = "1|1011||2|1165|EWC"
+        store.items[SaveSlot.KEY] = "2|1011||2|1165|EWC"
         assertNull(SaveSlot(Memory { store }) { error("A rule this line was not kept under") }.continuable())
     }
 

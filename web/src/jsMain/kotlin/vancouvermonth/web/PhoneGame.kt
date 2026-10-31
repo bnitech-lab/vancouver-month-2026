@@ -14,11 +14,14 @@ import vancouvermonth.core.Action
 import vancouvermonth.core.Ending
 import vancouvermonth.core.Event
 import vancouvermonth.core.FirstMinute
+import vancouvermonth.core.Item
 import vancouvermonth.core.Month
 import vancouvermonth.core.Reveal
+import vancouvermonth.core.Spending
 import vancouvermonth.core.TodaysRun
 import vancouvermonth.save.Choice
 import vancouvermonth.save.MonthRecord
+import vancouvermonth.save.Spend
 import vancouvermonth.save.play
 import vancouvermonth.text.Continue
 import vancouvermonth.text.actionEffect
@@ -28,8 +31,8 @@ import vancouvermonth.text.breakdown
 import vancouvermonth.text.cheapestLine
 import vancouvermonth.text.continueFrom
 import vancouvermonth.text.date
+import vancouvermonth.text.dayLog
 import vancouvermonth.text.endingLine
-import vancouvermonth.text.eventLine
 import vancouvermonth.text.goalLine
 import vancouvermonth.text.greeting
 import vancouvermonth.text.guessLine
@@ -44,6 +47,8 @@ import vancouvermonth.text.PatchNotes
 import vancouvermonth.text.passerLine
 import vancouvermonth.text.passPrices
 import vancouvermonth.text.percent
+import vancouvermonth.text.Riding
+import vancouvermonth.text.Shop
 import vancouvermonth.text.smallTalk
 import vancouvermonth.text.stageName
 import vancouvermonth.text.todaysRunName
@@ -55,6 +60,7 @@ import vancouvermonth.text.Weather
 import vancouvermonth.text.weatherOn
 import vancouvermonth.text.weatherWord
 import vancouvermonth.text.whyNot
+import vancouvermonth.text.whyNotSpend
 import vancouvermonth.text.whyTotalLines
 
 /**
@@ -114,6 +120,18 @@ class PhoneGame private constructor(
 
     /** The passerby the player has stopped for a word, or null. No day is spent on them. */
     private var chattingWith: Passer? = null
+
+    /** True while the player talks to the bike shop's keeper; whether they have met him; how much small talk so far. */
+    private var atShop = false
+    private var metKeeper = false
+    private var shopTalks = 0
+
+    /**
+     * The money spent today so far, which goes at the top of today's log when the day is spent; and, on the top card
+     * until the next ride or the day's end, why a shared one could not be rented.
+     */
+    private var spentToday: List<Event> = emptyList()
+    private var rideNote: String? = null
 
     /** How many words each passerby has had on [chatsDay], so the same person says something new each time. */
     private val chats = mutableMapOf<Passer, Int>()
@@ -377,8 +395,10 @@ class PhoneGame private constructor(
         if (record.days.isNotEmpty()) {
             lastDay = month.day - 1
             lastEvents = offer.replayed.lastEvents
-            lastLines = lastEvents.map { eventLine(it, month) }
+            lastLines = dayLog(lastEvents, month)
         }
+        // What was bought is the month's own; what was spent today goes into today's log, as if never closed.
+        spentToday = offer.replayed.spentToday
         // Who was met is not kept, but the people of the places where days were spent know the player by now.
         for (choice in record.days) {
             met += personAt(if (choice is Choice.Take) placeFor(choice.action) else INTERVIEW_PLACE)
@@ -521,9 +541,12 @@ class PhoneGame private constructor(
      */
     private fun spend(month: Month, place: Place, choice: Choice) {
         lastDay = month.day
-        lastEvents = month.play(choice)
-        lastLines = lastEvents.map { eventLine(it, month) }
+        lastEvents = spentToday + month.play(choice)
+        lastLines = dayLog(lastEvents, month)
+        spentToday = emptyList()
+        rideNote = null
         talkingAt = null
+        atShop = false
         record = record?.after(choice)
         if (month.isOver) {
             slot?.clear()
@@ -555,13 +578,18 @@ class PhoneGame private constructor(
     /** The town tells the game where the player turns, and when it can no longer draw: then buttons take over. */
     private fun listenTo(town: WalkableTown) {
         playedInTown = true
-        town.onPlace = { place -> if (!dayChanging && (place != talkingAt || chattingWith != null)) talkTo(place) }
+        town.onPlace = { place ->
+            if (!dayChanging && (place != talkingAt || chattingWith != null || atShop)) talkTo(place)
+        }
         town.onPasserby = { passer -> if (!dayChanging) chatWith(passer) }
+        town.onShop = { if (!dayChanging) openShop() }
+        town.onRent = { ride -> if (!dayChanging) rent(ride) }
         town.onMorning = { dayChanging = false }
         town.onSounds = { train, fire, night -> sound?.nearby(train, fire, night) }
         town.onFail = {
             walkable = null
             talkingAt = null
+            atShop = false
             dayChanging = false
             show()
         }
@@ -571,10 +599,13 @@ class PhoneGame private constructor(
     private fun talkTo(place: Place?) {
         val current = month ?: return
         talkingAt = place
+        atShop = false
         if (chattingWith != null) walkable?.endChat()
         chattingWith = null
         smallTalks = 0
         if (place != null) {
+            // A talk opens on foot: the character gets off whatever it rides.
+            walkable?.getOff()
             val person = personAt(place)
             talkLine = greeting(person, current, person !in met, lastEvents, weatherOf(current.day))
             met.add(person)
@@ -586,7 +617,8 @@ class PhoneGame private constructor(
     }
 
     /** True while a card lies over most of the town: a talk, a small talk or the guide on how to play. */
-    private fun isTownCovered(): Boolean = talkingAt != null || chattingWith != null || guide?.isOpen == true
+    private fun isTownCovered(): Boolean =
+        talkingAt != null || chattingWith != null || atShop || guide?.isOpen == true
 
     /**
      * A day in the town: the town fills the screen, the day's figures sit over its top, and a talk with a place's
@@ -635,12 +667,15 @@ class PhoneGame private constructor(
                             "통과 확률 ${percent(month.passChance(interview.stage))}",
                     )
                 }
+                rides(month, town)
             }
             showLog(this)
             querySelector(".log")?.setAttribute("tabindex", "-1")
             val talking = talkingAt
             val chatting = chattingWith
-            if (talking != null) {
+            if (atShop) {
+                shopTalk(month)
+            } else if (talking != null) {
                 talk(month, talking)
             } else if (chatting != null) {
                 chat(chatting)
@@ -757,6 +792,8 @@ class PhoneGame private constructor(
     private fun chatWith(passer: Passer) {
         val current = month ?: return
         talkingAt = null
+        atShop = false
+        walkable?.getOff()
         if (current.day != chatsDay) {
             chats.clear()
             chatsDay = current.day
@@ -810,6 +847,178 @@ class PhoneGame private constructor(
                 }
             }
         }
+    }
+
+    /**
+     * One row on the town's top card, for what the player owns: a button to get on each, or, while riding, what is
+     * ridden (with the fare for a shared one) and 내리기; and why a shared one could not be rented. Nothing until
+     * something is owned, ridden or refused. Taps while the day changes do nothing, as the town's do.
+     */
+    private fun HTMLElement.rides(month: Month, town: WalkableTown) {
+        val riding = town.riding
+        val note = rideNote
+        if (riding == null && month.owned.isEmpty() && note == null) return
+        child("div", "hud-ride") {
+            note?.let { child("span", "hud-ride-note", it).setAttribute("aria-live", "polite") }
+            if (riding != null) {
+                val fare = riding.fare
+                val now = if (fare == null) {
+                    Riding.now(riding.vehicle.item, shared = false)
+                } else {
+                    Riding.rented(riding.vehicle.item, fare.price)
+                }
+                child("span", "hud-riding", now)
+                button("hud-ride-button", text = Riding.GET_OFF) {
+                    onclick = {
+                        if (!dayChanging) {
+                            town.getOff()
+                            focusNext = ".hud-ride-button"
+                            show()
+                        }
+                    }
+                }
+                return@child
+            }
+            for (item in Item.entries) {
+                if (!month.owns(item)) continue
+                button("hud-ride-button", text = Riding.getOn(item)) {
+                    onclick = {
+                        if (!dayChanging) {
+                            // Getting on ends a talk, as a talk ends a ride.
+                            closeTalks()
+                            rideNote = null
+                            town.ride(Ride.own(item))
+                            focusNext = ".hud-ride-button"
+                            show()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Closes whatever talk is open: a place's, a passerby's or the shop keeper's. */
+    private fun closeTalks() {
+        talkingAt = null
+        atShop = false
+        if (chattingWith != null) walkable?.endChat()
+        chattingWith = null
+    }
+
+    /** Opens the talk with the bike shop's keeper, on foot. No day is spent on it. */
+    private fun openShop() {
+        val current = month ?: return
+        closeTalks()
+        walkable?.getOff()
+        atShop = true
+        shopTalks = 0
+        talkLine = Shop.greeting(!metKeeper, current.owned)
+        metKeeper = true
+        talkOpened = window.performance.now()
+        focusNext = ".talk"
+        sound?.blip()
+        show()
+    }
+
+    /** The talk with the keeper: a button to buy each, with its price or why not, small talk, and 그만. */
+    private fun HTMLElement.shopTalk(month: Month) {
+        child("section", "talk shop-talk") {
+            setAttribute("role", "dialog")
+            setAttribute("aria-label", Shop.KEEPER)
+            setAttribute("tabindex", "-1")
+            // As in the other talks, the tap that opened it does nothing on it for a moment.
+            addEventListener("click", { event ->
+                if (window.performance.now() - talkOpened < talkSettleMillis) {
+                    event.stopPropagation()
+                    event.preventDefault()
+                }
+            }, true)
+            child("div", "talk-head") {
+                face(Figures.keeperLook)
+                child("p", "talk-name") {
+                    child("strong", text = Shop.KEEPER)
+                    child("span", "talk-role", "${Shop.ROLE} · ${Shop.NAME}")
+                }
+            }
+            val line = child("p", "talk-line")
+            val typed = line.child("span") { setAttribute("aria-hidden", "true") }
+            line.child("span", "visually-hidden", talkLine)
+            typeOut(typed, talkLine)
+            line.onclick = {
+                stopTyping()
+                typed.textContent = talkLine
+            }
+            child("div", "keywords") {
+                for (item in Item.entries) {
+                    val kind = Spending.entries.first { it.buys == item }
+                    val blocked = month.spendBlockedBy(kind)
+                    button("keyword buy") {
+                        disabled = blocked != null
+                        child("span", "action-name", Shop.buy(item))
+                        child("span", "action-effect", money(kind.price))
+                        if (blocked != null) child("span", "action-why", whyNotSpend(blocked))
+                        onclick = { buy(month, kind) }
+                    }
+                }
+                button("keyword", text = "이야기") {
+                    onclick = {
+                        talkLine = Shop.smallTalk(shopTalks)
+                        shopTalks += 1
+                        focusNext = ".talk"
+                        show()
+                    }
+                }
+                button("keyword", text = "그만") {
+                    onclick = {
+                        atShop = false
+                        focusNext = ".hud"
+                        show()
+                    }
+                }
+            }
+        }
+    }
+
+    /** Buys [kind] from the keeper, who says how to get on it. */
+    private fun buy(month: Month, kind: Spending) {
+        val item = kind.buys ?: return
+        if (!pay(month, kind)) return
+        talkLine = Shop.bought(item)
+        focusNext = ".talk"
+        show()
+    }
+
+    /**
+     * Rents a shared bike or e-scooter for [ride]'s fare, and the character gets on; or says why it cannot. The fare is
+     * paid only when the town will get on it, so a fare is never paid for a ride not taken.
+     */
+    private fun rent(ride: Ride) {
+        val current = month ?: return
+        val town = walkable ?: return
+        val fare = ride.fare ?: return
+        if (!town.canRide(ride)) return
+        val blocked = current.spendBlockedBy(fare)
+        if (blocked != null) {
+            rideNote = Riding.cannotRent(fare, blocked)
+        } else if (pay(current, fare)) {
+            rideNote = null
+            town.ride(ride)
+        }
+        show()
+    }
+
+    /**
+     * Spends [kind]'s price through the month's rules, without spending the day: kept for today's log and in the slot.
+     * False when the month does not allow it.
+     */
+    private fun pay(month: Month, kind: Spending): Boolean {
+        if (!month.canSpend(kind)) return false
+        val spent = month.spend(kind)
+        spentToday = spentToday + spent
+        record = record?.after(Spend(kind, spent.amount))
+        record?.let { slot?.keep(it) }
+        sound?.blip()
+        return true
     }
 
     /** Types [line] into [element] one letter at a time. */

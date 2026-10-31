@@ -139,9 +139,10 @@ different runs.
 ### Continuing a month
 
 The phone screen keeps the month in progress in the browser's `localStorage`: a short record of the run (its seed, or
-today's run and its date), the room picked, the guess, and what each day was spent on. Nothing more is needed, since the
-same seed and the same choices always play out the same way. The record is written when the month starts and after every
-day, and emptied at any ending.
+today's run and its date), the room picked, the guess, what each day was spent on, and in its place between the days each
+spend in the town (what, and how much). Nothing more is needed, since the same seed and the same choices always play out
+the same way. The record is written when the month starts, after every day and after every spend, and emptied at any
+ending. Continued, a month keeps what was bought, and what was spent today still heads today's log.
 
 Opened again for the same run, the page first offers that month: a card shows the day and the balance it goes on from,
 with 이어하기 and 새로 시작. 이어하기 rebuilds the month by playing the recorded days again through the same rules and goes
@@ -167,7 +168,8 @@ round the shore, False Creek with its south shore past it, and the inlet with th
 places stand in the neighbourhoods that suit them: 내 방 (the room picked on September 1st) with its garden in the West
 End, the 카페 by the seawall on False Creek, the 도서관 in the middle of downtown, 코워킹 in the old brick streets at the
 east end, and the 회사 tower in the business district by the inlet. The SkyTrain runs on its guideway along False Creek,
-out of its tunnel by the station. Each building's name floats over it, and no other place has a name. The day's figures
+out of its tunnel by the station. Each place's name floats over it, and so does the bike shop's (see below); no other
+building has a name. The day's figures
 sit thinly over the top of the screen, and a name that would sit under them or the day's log hides there. The month's
 first view looks over 내 방 toward downtown, high enough to show four of the buildings and their names.
 
@@ -189,6 +191,9 @@ nearest, as in "지도: 내 방 근처".
 | Drag | The camera turns around the character, and tilts within limits that keep the ground in view |
 | Pinch, or the mouse wheel | The camera comes nearer or goes farther |
 | Tap a person, a building or its name, or walk up to a door or a person | The character goes to that place's person, and a talk opens (a second quick tap only hurries it there) |
+| Tap the bike shop, its name or its keeper | The character goes to 벤, and his talk opens |
+| Tap a shared bike or e-scooter | The character walks up to it, pays its fare and rides off on it |
+| Tap 자전거 타기 or 퀵보드 타기 on the top card, once bought | The character gets on; 내리기 gets off |
 | Tap the small map | It shows larger; a tap or Escape brings it back |
 
 The city's buildings never get in the way. One that stands between the camera and the character, or fills the view
@@ -209,6 +214,25 @@ line typed one letter at a time (a tap shows all of it) that fits the day: a fir
 short, an interview booked or failed, the first or the last week, and so on. The answers are the place's action with its
 effect (알바하기, 영어 공부, 코딩 연습, 지원서 넣기, 쉬기) or the reason it cannot be done today, 이야기 for small talk,
 and 그만. On an interview day only 회사 offers 면접 보기, and its name is marked.
+
+Money can be spent in the town without spending a day. On the West End's wide street toward downtown, on the way from
+내 방 to the business district, stands a bike shop (자전거 가게), kept by 벤, invented like everyone else, with a bike on
+show beside it. It is not one of the five places, as no day is spent there, but it matters as they do: its name floats
+over it, it never folds and the camera keeps out of it. His talk offers 자전거 사기 ($350), 퀵보드 사기 ($550), 이야기 and
+그만. Buying takes the price off the balance and nothing else: the date stays, the keeper says how to get on it, and the
+button then shows it owned, or why it cannot be bought: 잔고가 모자라요., or 이걸 사면 9월 생활비가 모자라요. when what would
+be left could not pay the living cost of every day left in September, so the balance never goes below zero in September
+(October's total is another matter). What is bought is the player's for the month. Then one row on the top card
+offers 자전거 타기 or 퀵보드 타기, and while riding says what is ridden (a shared one with its fare), with 내리기. A
+bike goes about 9 units a second and an e-scooter 11, against 3.6 on foot (a double tap is a little faster still), along
+the same streets, never over the water, the rider pedalling on the saddle or standing on the deck, and the camera keeps
+up. Shared bikes stand two to a dock near 내 방, 도서관, 카페 and the station, and shared e-scooters on four street
+corners, all in an invented purple. A tap on one walks up to it, pays its fare ($3 a bike ride, $4 an e-scooter ride)
+once, there, and rides off on it; it goes back to its dock or corner when the player taps 내리기 or a talk opens. Any
+talk gets the character off first, and the day's end too, so each morning starts on foot; a fare is only ever paid for
+a ride that starts. The money spent during a day heads that day's log, in two lines at most ("그 밖에 5건 -$15" for the
+rest), and on a small phone the log gives up its last lines before a talk would leave the screen. Every price is invented, and no shop, brand or bike-share or scooter company is real. On the
+button screen there is no shop and no riding.
 
 The town lives on its own. Four more people, invented too (올리버, 미나, 프리야 and 테오), stroll slow loops along the English Bay
 seawall, a West End street near 내 방, the big park's edge and the square in front of the station. One stops when the
@@ -257,16 +281,18 @@ console. Tests force each of these.
 The town's rules are plain Kotlin with tests: `Neighbourhood` (the layout on the real map, the people, which place a
 spot belongs to), `VancouverMap` (the map's squares and lines, read from the generated `VancouverMapData`), `RailLine`
 (the guideway the train follows), `Grid` (the A* search for the way around things), `Trip` (a walk or a dash, and the
-double tap), `FollowCamera` (turning, zooming, keeping out of the places' walls, and what a tap lands on), `Cutaway`
+double tap), `Rides` (the bikes and e-scooters, their speeds, and where the shared ones stand), `FollowCamera`
+(turning, zooming, keeping out of the places' walls, and what a tap lands on), `Cutaway`
 (which of the city's buildings fold down out of the camera's way, and how far), `Minimap` (where the grid lies on the
 small map turned north up, and which place is nearest), `DayLight` (the light
 through the change of day, and when the passersby are out, and how each weather greys it), `Passersby` (their loops, and
 stopping for the character), `Greeter` (the five turning and waving), `TownLife` (the train's round and how loud it
 rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, all worked out from the time) and
 `FramePace` (which frames are drawn). The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`, and
-`Passersby.kt` for the passersby's), and so is each day's weather (`Weather.kt`). `WalkableTown` draws all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the map included, is about 822 KB
-(about 223 KB gzipped).
+`Passersby.kt` for the passersby's), and so are each day's weather (`Weather.kt`) and the bike shop's and riding's
+words (`Shop.kt`). `WalkableTown` draws all of it, and
+`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the map included, is about 846 KB
+(about 229 KB gzipped).
 
 ### Sound and the first-run guide
 
@@ -329,8 +355,8 @@ is the newest, and the lines' widths and words.
 
 | Part | What | Notes |
 |---|---|---|
-| `core` | The rules: rooms, the score, the month, interviews, endings, and the run number for a date | Kotlin Multiplatform, standard library only, so the same rules run on the JVM and in a browser. All luck goes through one `Dice` interface, so tests can control it |
-| `save` | A month in progress as a short record, and the month rebuilt from it by playing each day's choice again | Kotlin Multiplatform, core only, so the JVM tests it by replaying hundreds of random months beside the live ones |
+| `core` | The rules: rooms, the score, the month, interviews, endings, money spent in the town, and the run number for a date | Kotlin Multiplatform, standard library only, so the same rules run on the JVM and in a browser. All luck goes through one `Dice` interface, so tests can control it |
+| `save` | A month in progress as a short record, and the month rebuilt from it by playing each day's choice and each spend again | Kotlin Multiplatform, core only, so the JVM tests it by replaying hundreds of random months beside the live ones |
 | `text` | The Korean lines both screens share (amounts, dates, actions, events, endings, today's result line, the townspeople's lines) and how a typed amount is read | Kotlin Multiplatform, no layout |
 | `terminal` | The text screen | Kotlin on the JVM |
 | `web` | The phone screen in a browser, with the 3D town to walk in | Kotlin/JS drawing the page with the DOM, plain CSS, no framework. The town is drawn with Three.js |

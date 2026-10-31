@@ -20,6 +20,9 @@ internal class QuietTown : WalkableTown {
     override val element = (document.createElement("div") as HTMLElement).also { it.className = "walk-town" }
     override var onPlace: (Place?) -> Unit = {}
     override var onPasserby: (Passer) -> Unit = {}
+    override var onShop: () -> Unit = {}
+    override var onRent: (Ride) -> Unit = {}
+    override var riding: Ride? = null
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
     override var isCovered = false
@@ -31,7 +34,21 @@ internal class QuietTown : WalkableTown {
 
     override fun endChat() {}
 
-    override fun endDay(place: Place) = onMorning()
+    /** As the real town: on nothing while already riding. A shared one stands for one the character has reached. */
+    override fun canRide(ride: Ride): Boolean = riding == null
+
+    override fun ride(ride: Ride) {
+        if (canRide(ride)) riding = ride
+    }
+
+    override fun getOff() {
+        riding = null
+    }
+
+    override fun endDay(place: Place) {
+        riding = null
+        onMorning()
+    }
 
     override fun close() {}
 }

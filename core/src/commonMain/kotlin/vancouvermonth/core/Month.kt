@@ -41,6 +41,43 @@ enum class Blocked {
     APPLICATIONS_CLOSED,
 }
 
+/** Something the player can buy once and keep for the rest of the month. */
+enum class Item { BIKE, E_SCOOTER }
+
+/**
+ * What money can go on in the town without spending a day: something to keep ([buys]), or one ride's fare. Each has
+ * a fixed [price]; all of them are invented. A ride that is free with the month's pass (the SkyTrain, the bus) needs
+ * no spending at all.
+ */
+enum class Spending(val price: Int, val buys: Item? = null) {
+    BIKE(350, Item.BIKE),
+    E_SCOOTER(550, Item.E_SCOOTER),
+    SHARED_BIKE_RIDE(3),
+    SHARED_E_SCOOTER_RIDE(4),
+    ;
+
+    /**
+     * True when [amount] is what this costs. A fare that depends on the trip (a taxi's, say) would check its own rule
+     * here; [Month.spend] already takes the amount.
+     */
+    fun costs(amount: Int): Boolean = amount == price
+}
+
+/** Why money cannot be spent now. */
+enum class SpendBlocked {
+    /** The month has ended. */
+    MONTH_OVER,
+
+    /** The player already has what it buys. */
+    ALREADY_OWNED,
+
+    /** The balance is less than it costs. */
+    NOT_ENOUGH_MONEY,
+
+    /** What would be left could not pay the living cost of every day left in September, today included. */
+    LIVING_COST,
+}
+
 /** What happened on a day, in order, for the screen to show. */
 sealed interface Event {
     data class Earned(val amount: Int) : Event
@@ -49,13 +86,17 @@ sealed interface Event {
     data class Rested(val energy: Int) : Event
     data class InterviewHeld(val stage: InterviewStage, val passed: Boolean, val next: Interview?) : Event
     data class LivingCost(val amount: Int) : Event
+
+    /** Money spent in the town on [kind], during the day: no day goes by for it. */
+    data class Spent(val kind: Spending, val amount: Int) : Event
 }
 
 /**
  * September in Vancouver, one action a day, after the room was picked on September 1st.
  * The goal is a job offer by September 30th. On October 1st the room's total monthly cost is due again.
- * Every day, the offer day included, costs living money; what is left after the first room always covers it,
- * so the money pressure is October's total. All numbers are invented.
+ * Every day, the offer day included, costs living money; what is left after the first room always covers it, and
+ * money spent in the town never leaves less than the living cost of the days left, so the balance never goes below
+ * zero in September and the money pressure is October's total. All numbers are invented.
  */
 class Month(
     val room: Room,
@@ -75,6 +116,10 @@ class Month(
     var interview: Interview? = null
         private set
     var ending: Ending? = null
+        private set
+
+    /** What the player has bought this month and keeps until its end. */
+    var owned: Set<Item> = emptySet()
         private set
 
     val isOver: Boolean
@@ -156,6 +201,39 @@ class Month(
             }
         }
         return listOf(event) + endDay()
+    }
+
+    fun owns(item: Item): Boolean = item in owned
+
+    /**
+     * Why [amount] cannot be spent on [kind] now, or null when it can: the month is over, it is already owned, the
+     * balance is short of it, or what is left would not pay the living cost of every day left, today included. An
+     * interview day does not stop it.
+     */
+    fun spendBlockedBy(kind: Spending, amount: Int = kind.price): SpendBlocked? = when {
+        isOver -> SpendBlocked.MONTH_OVER
+        kind.buys != null && owns(kind.buys) -> SpendBlocked.ALREADY_OWNED
+        balance < amount -> SpendBlocked.NOT_ENOUGH_MONEY
+        balance - amount < daysLeft * DAILY_LIVING_COST -> SpendBlocked.LIVING_COST
+        else -> null
+    }
+
+    /** True when [amount] is what [kind] costs and nothing stops spending it now. */
+    fun canSpend(kind: Spending, amount: Int = kind.price): Boolean =
+        kind.costs(amount) && spendBlockedBy(kind, amount) == null
+
+    /**
+     * Spends [amount] on [kind]: it comes off the balance, and what it buys is kept for the rest of the month. No day
+     * goes by, nothing else changes and no luck is used, so the days before and after play out as they would have,
+     * with less money: October's total may then be out of reach, but September's living cost never is.
+     */
+    fun spend(kind: Spending, amount: Int = kind.price): Event.Spent {
+        require(kind.costs(amount)) { "$kind does not cost $amount" }
+        val blocked = spendBlockedBy(kind, amount)
+        require(blocked == null) { "Cannot spend $amount on $kind on day $day: $blocked" }
+        balance -= amount
+        kind.buys?.let { owned = owned + it }
+        return Event.Spent(kind, amount)
     }
 
     /** Spends today on the interview that falls on it. */

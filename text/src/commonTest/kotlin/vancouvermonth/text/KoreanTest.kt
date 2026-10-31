@@ -16,6 +16,8 @@ import vancouvermonth.core.Month
 import vancouvermonth.core.Room
 import vancouvermonth.core.RoomDealer
 import vancouvermonth.core.Skill
+import vancouvermonth.core.SpendBlocked
+import vancouvermonth.core.Spending
 import vancouvermonth.core.TodaysRun
 import vancouvermonth.core.Zone
 
@@ -91,8 +93,8 @@ class KoreanTest {
         assertEquals("$999", money(999))
         assertEquals("$1,000", money(1_000))
         assertEquals("$1,234,567", money(1_234_567))
-        assertEquals("$-40", money(-40))
-        assertEquals("$-1,234", money(-1_234))
+        assertEquals("-$40", money(-40))
+        assertEquals("-$1,234", money(-1_234))
     }
 
     @Test
@@ -241,5 +243,49 @@ class KoreanTest {
             eventLine(Event.InterviewHeld(InterviewStage.PHONE_SCREEN, true, Interview(InterviewStage.TECHNICAL, 9)), month),
         )
         assertEquals("생활비 -\$40, 잔고 \$1,800", eventLine(Event.LivingCost(40), month))
+    }
+
+    @Test
+    fun `money spent in the town reads as what it bought or rented, and its price`() {
+        val month = month()
+        val lines = Spending.entries.map { eventLine(Event.Spent(it, it.price), month) }
+        assertEquals(
+            listOf(
+                "자전거를 샀어요. -\$350",
+                "퀵보드를 샀어요. -\$550",
+                "공유 자전거를 빌렸어요. -\$3",
+                "공유 퀵보드를 빌렸어요. -\$4",
+            ),
+            lines,
+        )
+        for (line in lines) assertFalse('\u2014' in line, line)
+    }
+
+    @Test
+    fun `a day's spends take at most two lines at the top of its log`() {
+        val month = month()
+        val bike = Event.Spent(Spending.BIKE, 350)
+        val ride = Event.Spent(Spending.SHARED_BIKE_RIDE, 3)
+        val scooter = Event.Spent(Spending.SHARED_E_SCOOTER_RIDE, 4)
+        assertEquals(emptyList(), spentLines(emptyList()))
+        assertEquals(listOf("자전거를 샀어요. -\$350", "공유 자전거를 빌렸어요. -\$3"), spentLines(listOf(bike, ride)))
+        assertEquals(
+            listOf("자전거를 샀어요. -\$350", "그 밖에 5건 -\$17"),
+            spentLines(listOf(bike, ride, ride, ride, scooter, scooter)),
+        )
+        val day = listOf(bike, ride, scooter, Event.Rested(5), Event.LivingCost(40))
+        assertEquals(
+            listOf("자전거를 샀어요. -\$350", "그 밖에 2건 -\$7", "푹 쉬었어요. 체력 5/5", "생활비 -\$40, 잔고 \$1,800"),
+            dayLog(day, month),
+        )
+        assertEquals(listOf("푹 쉬었어요. 체력 5/5"), dayLog(listOf(Event.Rested(5)), month))
+    }
+
+    @Test
+    fun `every reason money cannot be spent reads as Korean`() {
+        assertEquals(
+            listOf("9월이 끝났어요.", "이미 있어요.", "잔고가 모자라요.", "이걸 사면 9월 생활비가 모자라요."),
+            SpendBlocked.entries.map { whyNotSpend(it) },
+        )
     }
 }

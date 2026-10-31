@@ -731,6 +731,11 @@ html:has(.walk-town) {
   inset: -8px;
 }
 
+/* The bike shop's name, in the warm colour of its walls, so it reads apart from the five places. */
+.place-name.shop-name {
+  background: rgba(249, 230, 176, 0.95);
+}
+
 .place-name.here {
   color: #ffffff;
   background: #1d6b57;
@@ -841,6 +846,46 @@ html:has(.walk-town) {
   pointer-events: auto;
 }
 
+/* What the player owns, to get on, or what they ride and 내리기. Under the skills, in the top card. */
+.hud-ride {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  pointer-events: auto;
+}
+
+.hud-riding {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.hud-ride-button {
+  position: relative;
+  min-height: 30px;
+  padding: 2px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+}
+
+.hud-ride-button::after {
+  content: "";
+  position: absolute;
+  inset: -7px -2px;
+}
+
+/* Why a shared one could not be rented. */
+.hud-ride-note {
+  font-size: 13px;
+  color: var(--warn);
+}
+
 .hud .sound-switch,
 .guide-open {
   position: relative;
@@ -866,7 +911,10 @@ html:has(.walk-town) {
   border-radius: 50%;
 }
 
+/* The log gives up its lower lines before a talk is pushed off a small screen: the talk always stays whole. */
 .over-town .log {
+  min-height: 0;
+  overflow: hidden;
   padding: 8px 12px;
   background: color-mix(in srgb, var(--surface) 90%, transparent);
 }
@@ -1029,6 +1077,30 @@ html:has(.walk-town) {
 .keyword.spend .action-effect {
   color: inherit;
   opacity: 0.85;
+}
+
+/* At the bike shop, a button for each thing to buy, with its price, or why not. */
+.keyword.buy {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "name effect"
+    "why why";
+  align-items: center;
+  column-gap: 12px;
+  text-align: left;
+  border-radius: 14px;
+}
+
+.keyword.buy .action-effect {
+  color: inherit;
+}
+
+.keyword.buy:disabled {
+  color: var(--talk-muted);
+  background: transparent;
+  border-style: dashed;
 }
 
 .keyword.spend:disabled {

@@ -95,6 +95,19 @@ object Figures {
         return body(look) + extra
     }
 
+    /** 벤, who keeps the bike shop: a red cap, a sage shirt, a leather apron and a spanner in his hand. */
+    val keeperLook = Look(skin = 0xE9C2A0, hair = 0x5A3A22, top = 0x7A9E7E, bottom = 0x3C4A5A, shoes = 0x2E2A26)
+
+    val keeper: List<Part> = body(keeperLook) + listOf(
+        // A cap with its peak to the front.
+        Part(Limb.BODY, Block(-0.36, 1.36, -0.32, 0.72, 0.14, 0.64, 0xC8463D)),
+        Part(Limb.BODY, Block(-0.26, 1.36, 0.3, 0.52, 0.05, 0.18, 0xC8463D)),
+        // A leather apron over the shirt.
+        Part(Limb.BODY, Block(-0.2, 0.3, 0.15, 0.4, 0.42, 0.03, 0x8A6A4A)),
+        // A spanner in the right hand.
+        Part(Limb.RIGHT_ARM, Block(-0.03, -0.62, 0.0, 0.06, 0.24, 0.05, 0x9AA3AA)),
+    )
+
     fun lookOf(passer: Passer): Look = when (passer) {
         Passer.OLIVER -> Look(skin = 0xE8C3A0, hair = 0x8B5A2B, top = 0x4FA3A5, bottom = 0x2F3440, shoes = 0xF2F2F2)
         Passer.MINA -> Look(skin = 0xF6D6BD, hair = 0x2B1E1A, top = 0xF2D16B, bottom = 0x4A5568, shoes = 0x7A4E3A)
