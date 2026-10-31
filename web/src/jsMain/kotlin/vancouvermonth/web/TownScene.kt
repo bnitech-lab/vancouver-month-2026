@@ -124,8 +124,14 @@ private class TownScene(private val canvas: HTMLCanvasElement, context: Renderin
     override fun walkTo(place: Place) {
         // A walk still going when the next day starts ends at once.
         walk?.let { stand(it.to) }
-        walk = Walk(this.place, place)
-        walkStarted = window.performance.now()
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            // The phone asks for less motion, so the character is simply there.
+            walk = null
+            stand(place)
+        } else {
+            walk = Walk(this.place, place)
+            walkStarted = window.performance.now()
+        }
         this.place = place
         highlight(place)
         askForFrame()
