@@ -55,6 +55,8 @@ external class Color(hex: Int) {
 /** Haze that fades far things into [color], from [near] to [far] away. */
 external class Fog(color: Int, near: Double, far: Double) {
     val color: Color
+    var near: Double
+    var far: Double
 }
 
 external class Scene : Object3D {
@@ -152,6 +154,9 @@ external class MeshToonMaterial(parameters: Json) : Material {
     var opacity: Double
 }
 
+/** A plain colour that no light changes, as rain is. With the option `transparent`, `opacity` lets the town show through. */
+external class MeshBasicMaterial(parameters: Json) : Material
+
 external class Mesh(geometry: BoxGeometry, material: Material) : Object3D
 
 /** Many copies of one shape drawn at once, each with its own place, size and colour: one draw for many boxes. */
@@ -162,6 +167,14 @@ external class InstancedMesh(geometry: BoxGeometry, material: Material, count: I
 
     /** Every copy's place, size and turn, sixteen numbers each, column by column, to change while it moves. */
     val instanceMatrix: InstanceMatrices
+
+    /** Every copy's colour, once [setColorAt] has given one; after a change, its `needsUpdate` sends them again. */
+    val instanceColor: InstanceColours?
+}
+
+/** The numbers behind [InstancedMesh.instanceColor]: [needsUpdate] sends changed colours to the graphics card. */
+external interface InstanceColours {
+    var needsUpdate: Boolean
 }
 
 /**
