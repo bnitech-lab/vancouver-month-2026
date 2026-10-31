@@ -90,6 +90,9 @@ internal class Mixer(private val context: BaseAudioContext) {
 
     fun fadeOut(time: Double) = fade(fadeLevelAt(time), 0.0, time, FADE_OUT)
 
+    /** Back after a pause: up from silence quickly, so the sound does not start again mid-note at full level. */
+    fun fadeBack(time: Double) = fade(0.0, 1.0, time, FADE_BACK)
+
     /** The fade's level at [time], from its plan. */
     private fun fadeLevelAt(time: Double): Double = when {
         time <= fadeFromTime -> fadeFrom
@@ -231,6 +234,7 @@ internal class Mixer(private val context: BaseAudioContext) {
         const val MASTER = 0.5
         const val FADE_IN = 1.5
         const val FADE_OUT = 0.6
+        const val FADE_BACK = 0.3
         const val MOOD_GLIDE = 1.5
 
         const val PLUCK = 0.22
@@ -371,7 +375,9 @@ internal class WebAudioSpeaker(private val context: AudioContext, seed: Int, hou
     override fun pause() = sleep()
 
     override fun resume(whenPlaying: () -> Unit) {
-        if (playing) wake(whenPlaying)
+        if (!playing) return
+        mixer.fadeBack(context.currentTime)
+        wake(whenPlaying)
     }
 
     override fun blip() {

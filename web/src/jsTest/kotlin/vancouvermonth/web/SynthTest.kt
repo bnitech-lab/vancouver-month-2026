@@ -82,4 +82,16 @@ class SynthTest {
             assertTrue(justAfter > 0.4 * justBefore, "A cut, not a fade: $justBefore then $justAfter")
             assertTrue(later < justAfter, "The fade does not go down: $justAfter then $later")
         }
+
+    @Test
+    fun `back after a pause the sound comes up from silence over a moment, not at once`(): Promise<Unit> =
+        Promise.all(arrayOf(render(4.0, Mood.DAY), render(4.0, Mood.DAY) { mixer -> mixer.fadeBack(2.0) })).then {
+            val (steady, back) = it
+            val ratio = { from: Double, until: Double -> levels(back, from, until).second / levels(steady, from, until).second }
+            // The same music both times: just after coming back it is much quieter, and a moment later it is the same.
+            val start = ratio(2.0, 2.0 + Mixer.FADE_BACK / 3)
+            val later = ratio(2.0 + Mixer.FADE_BACK + 0.05, 3.0)
+            assertTrue(start < 0.4, "Back at once, not faded: $start of the level")
+            assertTrue(later in 0.95..1.05, "Not back to the full level: $later")
+        }
 }
