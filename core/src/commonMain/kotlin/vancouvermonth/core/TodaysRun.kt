@@ -14,10 +14,13 @@ data class TodaysRun(val year: Int, val month: Int, val day: Int) {
     val seed: Int
         get() {
             // The date as 20261030, then mixed, so neighbouring days land far apart instead of one number apart.
+            // A product too big for an Int wraps around at 32 bits. Kotlin/JS compiles Int multiplication to
+            // Math.imul, so a browser wraps exactly as the JVM does; plain JavaScript numbers would not wrap.
             var x = year * 10_000 + month * 100 + day
             x = ((x ushr 16) xor x) * MIX
             x = ((x ushr 16) xor x) * MIX
             x = (x ushr 16) xor x
+            // mod, not %: x can be negative here, and % keeps the sign (-7 % 3 is -1, while (-7).mod(3) is 2).
             return SEEDS.first + x.mod(SEEDS.last - SEEDS.first + 1)
         }
 
@@ -32,7 +35,7 @@ data class TodaysRun(val year: Int, val month: Int, val day: Int) {
         /** The years today's run covers, so a year always has four digits. */
         val YEARS = 2000..2099
 
-        /** A well-known integer hash constant. Int multiplication wraps the same way on the JVM and in a browser. */
+        /** A well-known integer hash constant. */
         private const val MIX = 0x45d9f3b
 
         private val DATE = Regex("""(\d{4})-(\d{1,2})-(\d{1,2})""")
