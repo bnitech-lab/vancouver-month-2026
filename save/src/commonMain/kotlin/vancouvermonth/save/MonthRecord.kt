@@ -87,8 +87,9 @@ data class MonthRecord(
 
         /**
          * The record [text] holds, or null when it is not one this version wrote: another version, a missing or
-         * extra part, a part that is not a number, a date that is not real, or a day it has no letter for. Only the
-         * exact line [encode] writes is read, so nothing half-written or edited by hand passes.
+         * extra part, a part that is not a number, a date that is not real or whose run has another seed, or a day it
+         * has no letter for. Only the exact line [encode] writes is read, so nothing half-written or edited by hand
+         * passes.
          */
         fun decode(text: String?): MonthRecord? {
             if (text.isNullOrEmpty()) return null
@@ -96,6 +97,7 @@ data class MonthRecord(
             if (parts.size != 6 || parts[0] != VERSION.toString()) return null
             val seed = parts[1].toIntOrNull() ?: return null
             val today = if (parts[2].isEmpty()) null else TodaysRun.parse(parts[2]) ?: return null
+            if (today != null && today.seed != seed) return null
             val room = parts[3].toIntOrNull() ?: return null
             val guess = parts[4].toIntOrNull() ?: return null
             val days = parts[5].map { LETTERS[it] ?: return null }

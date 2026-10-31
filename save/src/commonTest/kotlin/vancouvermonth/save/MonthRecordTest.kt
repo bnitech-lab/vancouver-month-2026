@@ -39,6 +39,8 @@ class MonthRecordTest {
     fun `a line this version did not write is not a record`() {
         val good = "1|1011||2|1165|ECRA"
         assertNotNull(MonthRecord.decode(good))
+        val run = TodaysRun(2026, 1, 5)
+        assertNotNull(MonthRecord.decode("1|${run.seed}|2026-01-05|2|1165|ECRA"))
         val bad = listOf(
             null,
             "",
@@ -52,13 +54,14 @@ class MonthRecordTest {
             "1|1011||2||ECRA",
             "1|1011||2|1165|ECRZ",
             "1|1011||2|1165|ecra",
-            "1|1011|2026-02-30|2|1165|ECRA",
-            "1|1011|someday|2|1165|ECRA",
+            "1|${run.seed}|2026-02-30|2|1165|ECRA",
+            "1|${run.seed}|someday|2|1165|ECRA",
+            "1|${run.seed + 1}|2026-01-05|2|1165|ECRA",
             // Only the exact line encode writes: no padding, no sign, no unpadded date, no space.
             " 1|1011||2|1165|ECRA",
             "1|1011||02|1165|ECRA",
             "1|1011||2|+1165|ECRA",
-            "1|1011|2026-1-5|2|1165|ECRA",
+            "1|${run.seed}|2026-1-5|2|1165|ECRA",
             "1|1011||2|1165|ECRA ",
         )
         for (text in bad) assertNull(MonthRecord.decode(text), "Read as a record: $text")
