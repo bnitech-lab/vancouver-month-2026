@@ -91,12 +91,39 @@ open web/build/dist/js/productionExecutable/index.html   # add ?seed=1011 to rep
 
 The first build downloads Node.js and the npm packages the Kotlin/JS build uses.
 
+### Today's run
+
+Everyone who plays today's run (오늘의 판) on the same date gets the same rooms and the same luck. The date picks
+the run number, so no server is needed. At the end, the result comes as one line to paste anywhere, with no run
+number, no link and nothing about the player:
+
+```
+밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 155/200 · 9월 19일 취업 제안
+```
+
+The other two endings read `9월을 버팀` and `10월 월세 모자람`.
+
+```sh
+./play --today        # today's run, from this computer's date
+```
+
+The terminal prints the line under `결과 한 줄 (복사해서 붙여 넣으세요)`. `--today` and `--seed` together are
+refused.
+
+On the phone screen, open the page with `?today`. The page reads the browser's date and writes it into the
+address (`?today=2026-10-30`), so a reload or a shared link replays that date's run, even on another day. The
+ending shows the line with a `결과 복사` button; where the browser does not allow copying, the line is selected
+for copying by hand. `?seed` wins over `?today`.
+
+The date is each player's own, so near midnight two time zones can be on different runs. The date in the line
+says which run it was.
+
 ## How it is built
 
 | Part | What | Notes |
 |---|---|---|
-| `core` | The rules: rooms, the score, the month, interviews, endings | Kotlin Multiplatform, standard library only, so the same rules run on the JVM and in a browser. All luck goes through one `Dice` interface, so tests can control it |
-| `text` | The Korean lines both screens share (amounts, dates, actions, events, endings) and how a typed amount is read | Kotlin Multiplatform, no layout |
+| `core` | The rules: rooms, the score, the month, interviews, endings, and the run number for a date | Kotlin Multiplatform, standard library only, so the same rules run on the JVM and in a browser. All luck goes through one `Dice` interface, so tests can control it |
+| `text` | The Korean lines both screens share (amounts, dates, actions, events, endings, today's result line) and how a typed amount is read | Kotlin Multiplatform, no layout |
 | `terminal` | The text screen | Kotlin on the JVM |
 | `web` | The phone screen in a browser | Kotlin/JS drawing the page with the DOM, plain CSS, no framework |
 
