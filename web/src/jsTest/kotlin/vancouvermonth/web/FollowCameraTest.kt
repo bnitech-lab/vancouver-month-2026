@@ -153,6 +153,23 @@ class FollowCameraTest {
     }
 
     @Test
+    fun `the camera stays under the SkyTrain deck, the awning and the canopy rather than look through them`() {
+        // Standing under each, with the camera turned to look along it and tilted as high as it goes: without them
+        // among the camera's walls, the camera would rise high above and look down through them.
+        val under = listOf(
+            Point(12.5, 1.0, 3.5) to 7.0,
+            Point(15.0, 1.0, 16.8) to 2.0,
+            Point(37.5, 1.0, 10.2) to 2.2,
+        )
+        for ((spot, roof) in under) {
+            val camera = camera(spot, -PI / 2)
+            camera.orbit(0.0, 10_000.0)
+            camera.jumpTo(spot)
+            assertTrue(camera.eye.y < roof, "under a roof at $roof over $spot, the eye is at ${camera.eye}")
+        }
+    }
+
+    @Test
     fun `however near the camera comes, the character stays in the picture`() {
         // On the street the camera looks toward its middle; close in, less and less, so the character stays.
         val door = Neighbourhood.venue(Place.HOME).door
