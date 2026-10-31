@@ -199,23 +199,43 @@ class PhoneGame private constructor(
             figure("잔고", money(month.balance))
             figure("10월 1일에 낼 총비용", money(month.room.totalMonthlyCost))
         }
-        // The same town every day, so the character stays where the last day left it.
-        town?.let { root.appendChild(it.element) }
-        showLog()
+        val shownTown = town
+        if (shownTown == null) {
+            showLog()
+            showStats(month)
+            showInterview(month)
+            showActions(month)
+        } else {
+            // The same town every day, so the character stays where the last day left it. The town takes room,
+            // so the day's buttons come right under it, where a small phone still shows them without scrolling.
+            root.appendChild(shownTown.element)
+            showActions(month)
+            showLog()
+            showStats(month)
+            showInterview(month)
+        }
+    }
+
+    private fun showStats(month: Month) {
         root.child("section", "card stats") {
             meter("영어", "english", month.english, Month.MAX_SKILL)
             meter("코딩", "coding", month.coding, Month.MAX_SKILL)
             meter("체력", "energy", month.energy, Month.MAX_ENERGY)
         }
-        month.interview?.let { interview ->
-            root.child("section", "card interview") {
-                child("h2", text = "면접")
-                child("p") {
-                    child("span", text = "${stageName(interview.stage)} ${date(interview.day)} · ")
-                    child("strong", "chance", "통과 확률 ${percent(month.passChance(interview.stage))}")
-                }
+    }
+
+    private fun showInterview(month: Month) {
+        val interview = month.interview ?: return
+        root.child("section", "card interview") {
+            child("h2", text = "면접")
+            child("p") {
+                child("span", text = "${stageName(interview.stage)} ${date(interview.day)} · ")
+                child("strong", "chance", "통과 확률 ${percent(month.passChance(interview.stage))}")
             }
         }
+    }
+
+    private fun showActions(month: Month) {
         root.child("section", "actions") {
             if (month.hasInterviewToday) {
                 child("h2", text = "오늘은 면접 날이에요.")

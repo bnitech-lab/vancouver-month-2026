@@ -287,7 +287,10 @@ class PhoneGameTest {
         assertNull(root.querySelector(".town"), "the room screen has no town")
         startMonth(room = 3, amount = "1165")
         assertSame(town.element, root.querySelector(".topbar")?.nextElementSibling)
+        // The day's buttons come right under the town, and what happened comes after them.
+        assertSame(root.querySelector(".actions"), town.element.nextElementSibling)
         for (action in listOf("카페 알바", "영어 공부", "코딩 연습", "지원서 넣기", "쉬기")) tap(action)
+        assertSame(root.querySelector(".log"), root.querySelector(".actions")?.nextElementSibling)
         assertEquals(listOf(Place.CAFE, Place.LIBRARY, Place.COWORKING, Place.OFFICE, Place.HOME), town.visits)
         // Every day redraws the screen around the same town, so the character stays where it was.
         assertSame(town.element, root.querySelector(".topbar")?.nextElementSibling)
@@ -304,6 +307,7 @@ class PhoneGameTest {
             if (apply.disabled) tap("쉬기") else apply.click()
         }
         assertSame(town.element, root.querySelector(".topbar")?.nextElementSibling)
+        assertSame(root.querySelector(".actions"), town.element.nextElementSibling)
         town.visits.clear()
         tap("면접 보기")
         assertEquals(listOf(Place.OFFICE), town.visits)

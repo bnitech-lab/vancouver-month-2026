@@ -184,21 +184,22 @@ object TownMap {
      * why the eastern ones are farther away. The water stops behind each peak, so the sky shows above them.
      */
     private fun MutableList<Block>.addWaterAndMountains() {
-        // Each peak as a point: x, then its height, then z.
+        // Each peak as a point whose y is its height.
         val peaks = listOf(
-            Point(-3.0, 2.2, -2.4),
-            Point(1.5, 2.6, -3.6),
-            Point(6.0, 2.1, -4.8),
-            Point(10.5, 2.5, -6.0),
-            Point(15.0, 2.3, -7.2),
-            Point(19.5, 2.6, -8.4),
+            Point(x = -4.0, y = 2.0, z = -2.4),
+            Point(x = 0.0, y = 2.2, z = -3.2),
+            Point(x = 4.0, y = 2.05, z = -4.1),
+            Point(x = 8.0, y = 2.2, z = -4.9),
+            Point(x = 12.0, y = 2.0, z = -5.8),
+            Point(x = 16.0, y = 2.15, z = -6.6),
+            Point(x = 20.0, y = 2.05, z = -7.5),
         )
-        val widths = listOf(6.4, 5.0, 3.6, 2.2, 1.0)
+        val widths = listOf(5.6, 4.4, 3.2, 2.0, 1.0)
         val colours = listOf(FOREST, FOREST_DARK, ROCK, ROCK_LIGHT, SNOW)
         for ((index, peak) in peaks.withIndex()) {
             // Each peak's water reaches halfway to the next peak; the first and the last reach past the picture.
-            val west = if (index == 0) -30.0 else peak.x - 2.25
-            val east = if (index == peaks.lastIndex) 50.0 else peak.x + 2.25
+            val west = if (index == 0) -30.0 else peak.x - 2.0
+            val east = if (index == peaks.lastIndex) 50.0 else peak.x + 2.0
             add(Block(west, -0.4, peak.z, east - west, 0.3, -peak.z, WATER))
             val stepHeight = peak.y / widths.size
             for (step in widths.indices) {

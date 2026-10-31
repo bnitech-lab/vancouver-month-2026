@@ -14,20 +14,20 @@ data class FramePoint(val left: Double, val top: Double)
  */
 object TownCamera {
     /** The frame's shape, width to height. The town on the page takes this shape from here, and only from here. */
-    const val FRAME_WIDTH = 16
-    const val FRAME_HEIGHT = 9
+    const val FRAME_WIDTH = 5
+    const val FRAME_HEIGHT = 2
     val ASPECT: Double = FRAME_WIDTH.toDouble() / FRAME_HEIGHT
 
     /** How far the camera is turned east of due south, and how far it looks down, in degrees. */
-    const val TURN_DEGREES = 15.0
-    const val TILT_DEGREES = 28.0
+    const val TURN_DEGREES = 12.0
+    const val TILT_DEGREES = 24.0
 
     /** Half the frame's width and height, in grid squares. */
-    const val HALF_WIDTH = 9.0
+    const val HALF_WIDTH = 9.5
     val HALF_HEIGHT: Double = HALF_WIDTH / ASPECT
 
     /** The point at the middle of the frame. */
-    val target = Point(8.5, 1.8, 3.2)
+    val target = Point(8.4, 1.9, 4.0)
 
     /** Far enough that the whole town is in front of the camera. */
     const val DISTANCE = 60.0

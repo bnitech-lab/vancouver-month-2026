@@ -373,6 +373,14 @@ a:focus-visible {
   pointer-events: none;
 }
 
+/* On the narrowest phones the names get smaller, so neighbours do not cover each other. */
+@media (max-width: 359px) {
+  .town-label {
+    padding: 0 4px;
+    font-size: 11px;
+  }
+}
+
 .town-label.here {
   color: #ffffff;
   background: #1d6b57;
