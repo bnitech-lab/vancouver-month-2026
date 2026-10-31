@@ -123,7 +123,7 @@ object DayLight {
         Weather.RAINY -> grey(Neighbourhood.WATER, 0.5, 0.68)
     }
 
-    /** How dull the glints on the water are under [weather]'s sky, as the night dulls them: none of it on a sunny day. */
+    /** How dull the glints on the water are under [weather]'s sky, as the night dulls them: not at all when sunny. */
     fun dullness(weather: Weather): Double = when (weather) {
         Weather.SUNNY -> 0.0
         Weather.CLOUDY -> 0.5

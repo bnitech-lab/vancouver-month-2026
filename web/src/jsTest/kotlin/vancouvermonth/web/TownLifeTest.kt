@@ -282,7 +282,8 @@ class TownLifeTest {
             for (index in 0 until Rain.SPLASHES) {
                 val splash = Rain.splashAt(index, t, 24.3, 13.5)
                 assertTrue(splash.width <= Rain.SPLASH_SIZE * 1.4 + 1e-9, "$splash")
-                assertTrue(splash.y == Rain.SPLASH_HEIGHT || splash.z + splash.depth / 2 < 0.0, "a splash in the air: $splash")
+                val onSea = splash.z + splash.depth / 2 < 0.0
+                assertTrue(splash.y == Rain.SPLASH_HEIGHT || onSea, "a splash in the air: $splash")
                 assertTrue(splash.x >= 24.3 - Rain.SPAN / 2 - 1.0 && splash.x <= 24.3 + Rain.SPAN / 2, "$splash")
                 if (splash.width > 0.01) {
                     shown += 1
@@ -299,7 +300,8 @@ class TownLifeTest {
     fun `puddles lie flat on the street, the pavements or the seawall, just over the stone`() {
         for (puddle in Rain.puddles) {
             assertTrue(puddle.height < 0.02 && puddle.y in 0.03..0.07, "$puddle")
-            val onStreet = puddle.z >= Neighbourhood.STREET_NORTH && puddle.z + puddle.depth <= Neighbourhood.STREET_SOUTH
+            val onStreet =
+                puddle.z >= Neighbourhood.STREET_NORTH && puddle.z + puddle.depth <= Neighbourhood.STREET_SOUTH
             val onSeawall = puddle.z >= 0.0 && puddle.z + puddle.depth <= 2.0
             assertTrue(onStreet || onSeawall, "$puddle")
         }

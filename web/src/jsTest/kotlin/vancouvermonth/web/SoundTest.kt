@@ -318,7 +318,7 @@ class SoundTest {
     }
 
     @Test
-    fun `the rain and the town's sounds reach the sound only while it is on, and a sound made later starts with the rain`() {
+    fun `the rain and the town's sounds play only while on, and a sound made later starts with the rain`() {
         val sound = sound()
         sound.button(root)
         // Told before the sound is made: nothing is made, and the rain is kept for later.
@@ -350,7 +350,8 @@ class SoundTest {
             override fun nearby(train: Double, fire: Double, night: Double) =
                 if (breaks) throw IllegalStateException("No train here") else Unit
         }
-        val sound = Sound(Memory { FakeStore() }, { failing }, now = { clock }, hidden = { hidden }).also { sounds += it }
+        val sound = Sound(Memory { FakeStore() }, { failing }, now = { clock }, hidden = { hidden })
+        sounds += sound
         sound.button(root)
         switchIn().click()
         breaks = true

@@ -193,7 +193,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     /** The ground's boxes, among them the sea and the pond, which darken in the rain; and which of them are water. */
     private lateinit var groundBoxes: InstancedMesh
-    private val waterBoxes = Neighbourhood.ground.indices.filter { Neighbourhood.ground[it].colour == Neighbourhood.WATER }
+    private val waterBoxes =
+        Neighbourhood.ground.indices.filter { Neighbourhood.ground[it].colour == Neighbourhood.WATER }
 
     /** The rain's streaks and splashes in one draw, in a plain pale colour no light changes; the puddles in another. */
     private val rainMaterial = MeshBasicMaterial(
@@ -990,7 +991,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         for (index in passersby.indices) {
             val passerby = passersby[index]
             val pose = passerby.step(millis, player)
-            val held = if (Figures.holdsUmbrella(passerby.passer, shownWeather)) pose.copy(wave = Figures.UMBRELLA_ARM) else pose
+            val umbrella = Figures.holdsUmbrella(passerby.passer, shownWeather)
+            val held = if (umbrella) pose.copy(wave = Figures.UMBRELLA_ARM) else pose
             dressed[index].write(held, mesh.instanceMatrix.array, first)
             first += dressed[index].count
         }
@@ -1025,7 +1027,9 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         for (index in waterBoxes) groundBoxes.setColorAt(index, colour.setHex(DayLight.sea(weather)))
         groundBoxes.instanceColor?.needsUpdate = true
         val clouds = Shimmer.count + Petals.count
-        for (index in clouds until clouds + Clouds.count) drifting.setColorAt(index, colour.setHex(Clouds.colour(weather)))
+        for (index in clouds until clouds + Clouds.count) {
+            drifting.setColorAt(index, colour.setHex(Clouds.colour(weather)))
+        }
         drifting.instanceColor?.needsUpdate = true
         crowd.visible = out
         placePassersby(0.0, if (sitting) Neighbourhood.benchSeat else spot)
@@ -1084,7 +1088,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val progress = ((now - start) / nightMillis).coerceIn(0.0, 1.0)
         nightProgress = progress
         light(DayLight.at(progress))
-        // In the dark the next day's weather comes, and the character goes home, unless it spends the night by the fire.
+        // In the dark the next day's weather comes, and the character goes home, unless it spends the night by the
+        // fire.
         val coming = comingWeather
         if (progress >= DayLight.HOME_AT && coming != null) {
             comingWeather = null

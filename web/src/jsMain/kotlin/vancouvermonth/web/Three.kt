@@ -142,7 +142,7 @@ external open class BufferGeometry {
 /** The shape of a box. The town draws every box from one 1x1x1 box, stretched with `scale`. */
 external class BoxGeometry(width: Double, height: Double, depth: Double) : BufferGeometry
 
-/** A flat square standing up, facing +z: two triangles where a box has twelve. Each streak of rain is drawn from one. */
+/** A flat square standing up, facing +z: two triangles where a box has twelve. Each streak of rain is one. */
 external class PlaneGeometry(width: Double, height: Double) : BufferGeometry
 
 /** For a material's `side`: drawn from both faces, as a flat square seen from behind must be. */
@@ -171,7 +171,10 @@ external class MeshToonMaterial(parameters: Json) : Material {
     var opacity: Double
 }
 
-/** A plain colour that no light changes, as rain is. With the option `transparent`, `opacity` lets the town show through. */
+/**
+ * A plain colour that no light changes, as rain is. With the option `transparent`, `opacity` lets the town show
+ * through.
+ */
 external class MeshBasicMaterial(parameters: Json) : Material {
     val color: Color
 }

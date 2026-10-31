@@ -143,7 +143,8 @@ class FiguresTest {
                 }
             }
         }
-        assertTrue(Figures.holdsUmbrella(Passer.MINA, Weather.RAINY) && Figures.holdsUmbrella(Passer.PRIYA, Weather.RAINY))
+        assertTrue(Figures.holdsUmbrella(Passer.MINA, Weather.RAINY))
+        assertTrue(Figures.holdsUmbrella(Passer.PRIYA, Weather.RAINY))
         // 미나 carries her umbrella closed when it does not rain, and has no closed one when it is open.
         assertTrue(Figures.passer(Passer.MINA).any { it.limb == Limb.LEFT_ARM && it.block.y < -0.5 })
         assertTrue(Figures.passer(Passer.MINA, Weather.RAINY).none { it.limb == Limb.LEFT_ARM && it.block.y < -0.5 })

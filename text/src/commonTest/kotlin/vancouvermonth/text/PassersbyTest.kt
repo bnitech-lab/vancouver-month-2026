@@ -52,7 +52,9 @@ class PassersbyTest {
                 )
             }
             for (weather in listOf(Weather.SUNNY, Weather.CLOUDY)) {
-                for (day in 2..30) for (count in 0 until 4) assertNotEquals(rain, passerLine(passer, day, count, weather))
+                for (day in 2..30) {
+                    for (count in 0 until 4) assertNotEquals(rain, passerLine(passer, day, count, weather))
+                }
             }
         }
     }

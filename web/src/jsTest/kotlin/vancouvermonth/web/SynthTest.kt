@@ -190,7 +190,8 @@ class SynthTest {
             assertTrue(fireRms > 0.002 && firePeak > 0.02, "The fire is not heard: $fireRms, $firePeak")
             assertTrue(firePeak < 0.5, "The fire is too loud: $firePeak")
             assertTrue(levels(none).first < 1e-6, "Something plays when nothing is near")
-            assertTrue(levels(gone, from = 3.0).first < 2e-3, "Still heard after going away: ${levels(gone, from = 3.0)}")
+            val after = levels(gone, from = 3.0)
+            assertTrue(after.first < 2e-3, "Still heard after going away: $after")
         }
     }
 

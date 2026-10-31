@@ -170,7 +170,8 @@ class SoundInGameTest {
         assertTrue("오늘9월 3일 날씨 비" in root.textContent.orEmpty(), root.textContent)
         val word = assertNotNull(root.querySelector(".hud .weather"))
         assertEquals(" 날씨 비", word.textContent)
-        assertEquals(" 날씨 ", word.querySelector(".visually-hidden")?.textContent, "the word has no label for a screen reader")
+        val label = word.querySelector(".visually-hidden")?.textContent
+        assertEquals(" 날씨 ", label, "the word has no label for a screen reader")
 
         town.onPlace(Place.HOME)
         assertEquals("여기 비는 조용히 오지. 금방 익숙해져.", root.querySelector(".talk-line .visually-hidden")?.textContent)

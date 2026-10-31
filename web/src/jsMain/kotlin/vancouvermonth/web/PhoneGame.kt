@@ -850,7 +850,7 @@ private fun HTMLElement.dayFigure(day: Int, weather: Weather) {
         child("span", "figure-label", "오늘")
         child("span", "figure-value") {
             appendChild(document.createTextNode(date(day)))
-            child("span", "weather weather-${weather.name.lowercase()}") {
+            child("span", "weather") {
                 child("span", "visually-hidden", " 날씨 ")
                 appendChild(document.createTextNode(weatherWord(weather)))
             }

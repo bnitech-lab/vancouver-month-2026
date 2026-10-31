@@ -942,7 +942,8 @@ class WalkableTownTest {
             .map { it to it.classList.contains("under") }
 
     @Test
-    fun `a building's name hides where the top card or the day's log would cover it, and nowhere else`(): Promise<Unit> {
+    fun `a building's name hides where the top card or the day's log would cover it, and nowhere else`():
+        Promise<Unit> {
         val town = startInTown()
         return play(
             Step("the names under the game's own cards", { town.isStill }) {

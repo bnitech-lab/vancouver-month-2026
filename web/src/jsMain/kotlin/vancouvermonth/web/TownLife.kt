@@ -78,7 +78,7 @@ object SkyTrainRun {
         return sqrt(across * across + up * up + side * side)
     }
 
-    /** How loud a rumble [distance] away sounds, from 1.0 right by it: half as loud [RUMBLE_NEAR] away, little far off. */
+    /** How loud a rumble [distance] away sounds: 1.0 right by it, half as loud [RUMBLE_NEAR] away, little far off. */
     fun loudnessAt(distance: Double): Double = 1 / (1 + square(distance / RUMBLE_NEAR))
 
     /**
@@ -106,13 +106,16 @@ object Campfire {
     fun flicker(millis: Double): Double =
         1 + 0.12 * sin(millis / 97) + 0.07 * sin(millis / 41 + 1.3) + 0.04 * sin(millis / 23 + 0.4)
 
-    /** How much of the fire's crackle reaches someone [distance] from it: all of it beside it, none [HEARD_WITHIN] off. */
+    /** How much of the fire's crackle reaches someone [distance] from it: all beside it, none [HEARD_WITHIN] off. */
     fun nearness(distance: Double): Double {
         val near = (1 - distance / HEARD_WITHIN).coerceIn(0.0, 1.0)
         return near * near
     }
 
-    /** How loud the fire crackles, from 0.0 to 1.0, for someone [near] it as [nearness] says, when [night] is how dark it is. */
+    /**
+     * How loud the fire crackles, from 0.0 to 1.0, for someone [near] it as [nearness] says, when [night] is how dark
+     * it is.
+     */
     fun crackle(near: Double, night: Double): Double = near.coerceIn(0.0, 1.0) * night.coerceIn(0.0, 1.0)
 
     const val HEARD_WITHIN = 10.0
@@ -305,7 +308,7 @@ object Rain {
         }
     }
 
-    /** How far through its fall streak [index] is at [millis], from 0.0 at the top of the box to nearly 1.0 at the ground. */
+    /** How far through its fall streak [index] is at [millis]: 0.0 at the top of the box, nearly 1.0 at the ground. */
     private fun fallen(index: Int, millis: Double): Double {
         val fall = millis * dropSpeed[index] / TOP + dropPhase[index]
         return fall - floor(fall)
@@ -327,7 +330,7 @@ object Rain {
         )
     }
 
-    /** Where splash [index] is at [millis] around [centreX], [centreZ], and how wide: next to nothing between splashes. */
+    /** Where splash [index] is at [millis] around [centreX], [centreZ], and how wide: next to nothing in between. */
     fun splashAt(index: Int, millis: Double, centreX: Double, centreZ: Double): Block {
         val beat = millis / SPLASH_MILLIS + index * 0.37
         val round = floor(beat)
@@ -343,9 +346,9 @@ object Rain {
     /**
      * Writes every streak and then every splash at [millis] into [into], sixteen numbers each, column by column as
      * Three.js keeps a matrix, with the box of sky centred on [centreX], [centreZ]. Each streak's square is turned by
-     * [turn] about the vertical, the camera's own turn, so it faces the camera. A streak within [CLEAR] of the camera at
-     * [eye] is left out (shrunk to nothing): so close, it would be a pale bar across the screen, and costly to draw. It
-     * makes nothing new, since it runs on every beat of the town's life.
+     * [turn] about the vertical, the camera's own turn, so it faces the camera. A streak within [CLEAR] of the camera
+     * at [eye] is left out (shrunk to nothing): so close, it would be a pale bar across the screen, and costly to draw.
+     * It makes nothing new, since it runs on every beat of the town's life.
      */
     fun write(
         millis: Double,

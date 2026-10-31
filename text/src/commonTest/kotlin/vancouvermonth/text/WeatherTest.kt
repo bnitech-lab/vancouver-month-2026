@@ -37,7 +37,8 @@ class WeatherTest {
     fun `today's run has the skies of its run number, so everyone playing it on that date gets the same weather`() {
         val today = TodaysRun(2026, 10, 31)
         assertEquals(7546, today.seed)
-        assertEquals("CSRRSSRRRRSRRSCSCCSSSSSSSSSSS", september(today.seed), "the weather changed: today's run 2026-10-31")
+        val sky = "CSRRSSRRRRSRRSCSCCSSSSSSSSSSS"
+        assertEquals(sky, september(today.seed), "the weather changed: today's run 2026-10-31")
     }
 
     @Test
