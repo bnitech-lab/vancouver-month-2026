@@ -302,6 +302,20 @@ or wage.
 
 Dawn plays the month on a phone and decides what grows next.
 
+## Map data
+
+`tools/vancouver_map` traces real Vancouver (the peninsula, the big park at its tip, False Creek and its south shore)
+into a grid of squares in `VancouverMapData.kt`, for the town to be rebuilt on. Nothing draws it yet. Its sources are
+the City of Vancouver's open datasets Shoreline 2002, Parks - polygon representation, Rapid transit lines, City
+boundary, Block outlines and Local area boundary, fetched on 2026-10-31 from
+[opendata.vancouver.ca](https://opendata.vancouver.ca).
+
+Contains information licensed under the
+[Open Government Licence – Vancouver](https://opendata.vancouver.ca/pages/licence/).
+
+The map data follows that licence and keeps its attribution; the code that makes and reads it is MIT. How to fetch
+the data again and rebuild the map is in [tools/vancouver_map/README.md](tools/vancouver_map/README.md).
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
