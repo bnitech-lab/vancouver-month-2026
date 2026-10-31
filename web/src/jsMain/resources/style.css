@@ -741,6 +741,17 @@ html:has(.walk-town) {
   }
 }
 
+/* How to get about, at the bottom on the first day, where the talks open later. */
+.town-hint {
+  margin-top: auto;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
 .talk-head {
   display: flex;
   align-items: center;

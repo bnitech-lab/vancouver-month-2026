@@ -22,10 +22,12 @@ sealed interface Picked {
 /**
  * The camera behind and above the character, which the player turns by dragging and brings nearer or farther by
  * pinching. [yaw], [pitch] and [distance] are what the player asked for, already kept in their limits; the camera
- * moves toward them a little each frame, so it glides instead of jumping. It looks at [focus], which follows the
- * character, and it stays out of the buildings: a wall in the way pulls it in front of the wall.
+ * moves toward them a little each frame, so it glides instead of jumping. It follows the character ([subject]) and
+ * looks at [focus], which on the street is nudged toward the street's middle so both rows are in view. It never
+ * looks at the character through anything: a wall, the SkyTrain deck or a canopy in the way pulls it in front, or
+ * lifts it over when that would bring it too close.
  */
-class FollowCamera(focus: Point) {
+class FollowCamera(subject: Point) {
     /** The turn around the character, in radians. 0 puts the camera south of it; -PI / 2 puts it west, looking east. */
     var yaw = START_YAW
         private set
@@ -42,8 +44,16 @@ class FollowCamera(focus: Point) {
     private var shownPitch = pitch
     private var shownDistance = distance
 
-    var focus: Point = focus
+    /** Where the camera has followed the character to: the point it keeps in sight. */
+    var subject: Point = subject
         private set
+
+    /** The point in the middle of the screen. */
+    val focus: Point
+        get() {
+            val nudged = Neighbourhood.cameraFocus(Spot(subject.x, subject.z))
+            return Point(nudged.x, subject.y, nudged.z)
+        }
 
     var eye: Point = eyeFor()
         private set
@@ -62,12 +72,14 @@ class FollowCamera(focus: Point) {
     }
 
     /**
-     * Turns the camera to [yaw] on its own, as for the night by the campfire; it glides there the short way round,
-     * like a drag.
+     * Points the camera on its own, as for the night by the campfire and back again in the morning. It glides there
+     * like a drag, the short way round, and keeps to the same limits.
      */
-    fun turnTo(yaw: Double) {
+    fun aim(yaw: Double, pitch: Double, distance: Double) {
         val turns = round((this.yaw - yaw) / (2 * PI))
         this.yaw = yaw + turns * 2 * PI
+        this.pitch = pitch.coerceIn(MIN_PITCH, MAX_PITCH)
+        this.distance = distance.coerceIn(NEAR, FAR)
     }
 
     /** Moves the camera [factor] times as far away: under 1 comes nearer, over 1 goes farther. */
@@ -77,7 +89,7 @@ class FollowCamera(focus: Point) {
 
     /** Moves straight to [subject] with no glide, as when the character wakes up at home. */
     fun jumpTo(subject: Point) {
-        focus = subject
+        this.subject = subject
         shownYaw = yaw
         shownPitch = pitch
         shownDistance = distance
@@ -85,7 +97,7 @@ class FollowCamera(focus: Point) {
     }
 
     /**
-     * Moves the camera [millis] milliseconds' worth toward what the player asked for, and its focus toward
+     * Moves the camera [millis] milliseconds' worth toward what the player asked for, and toward the character at
      * [subject]. True while it is still moving, so the town keeps drawing frames; false once it has settled.
      */
     fun follow(subject: Point, millis: Double): Boolean {
@@ -94,9 +106,9 @@ class FollowCamera(focus: Point) {
         shownPitch += (pitch - shownPitch) * turn
         shownDistance += (distance - shownDistance) * turn
         val along = 1 - exp(-millis / FOLLOW_MILLIS)
-        focus = focus + (subject - focus) * along
+        this.subject = this.subject + (subject - this.subject) * along
         val settled = abs(yaw - shownYaw) < SETTLED && abs(pitch - shownPitch) < SETTLED &&
-            abs(distance - shownDistance) < SETTLED && length(subject - focus) < SETTLED
+            abs(distance - shownDistance) < SETTLED && length(subject - this.subject) < SETTLED
         if (settled) jumpTo(subject) else eye = eyeFor()
         return !settled
     }
@@ -156,7 +168,7 @@ class FollowCamera(focus: Point) {
     }
 
     /**
-     * Behind and above the focus at the shown turn, tilt and distance, but never inside a building: a wall in the
+     * Behind and above the character at the shown turn, tilt and distance, with nothing between them: a wall in the
      * way pulls the camera in front of it, and when that would bring it too close, it rises over the wall instead.
      */
     private fun eyeFor(): Point {
@@ -165,22 +177,23 @@ class FollowCamera(focus: Point) {
             val out = Point(cos(tilt) * sin(shownYaw), sin(tilt), cos(tilt) * cos(shownYaw))
             var reach = shownDistance
             for (wall in Neighbourhood.walls) {
-                val hit = distanceToBox(focus, out, wall.box) ?: continue
+                val hit = distanceToBox(subject, out, wall.box) ?: continue
                 reach = min(reach, max(0.0, hit - WALL_GAP))
             }
-            if (reach >= CLOSEST || tilt >= HIGHEST_TILT) return focus + out * reach
+            if (reach >= CLOSEST || tilt >= HIGHEST_TILT) return subject + out * reach
             tilt = min(HIGHEST_TILT, tilt + 0.1)
         }
     }
 
     companion object {
-        val START_YAW = -0.55 * PI
-        val START_PITCH = 0.5
-        const val START_DISTANCE = 9.0
+        /** The first view: from the street's west end, high and far enough to see four buildings and their names. */
+        val START_YAW = -0.5 * PI
+        const val START_PITCH = 0.7
+        const val START_DISTANCE = 21.0
         const val MIN_PITCH = 0.2
         const val MAX_PITCH = 1.3
         const val NEAR = 4.5
-        const val FAR = 24.0
+        const val FAR = 30.0
 
         const val TURN_PER_PIXEL = 0.008
         const val TURN_MILLIS = 60.0
@@ -199,7 +212,7 @@ class FollowCamera(focus: Point) {
         const val MAX_TAP_DISTANCE = 120.0
 
         const val MIN_FOV = 50.0
-        const val MAX_FOV = 72.0
+        const val MAX_FOV = 84.0
 
         /** The least the camera should see from side to side, in degrees. */
         const val MIN_ACROSS = 44.0

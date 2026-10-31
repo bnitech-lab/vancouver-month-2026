@@ -294,7 +294,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             // The camera comes round to the far side of the fire, to see the character's face in its light.
             spot = Neighbourhood.benchSeat
             turnBeforeRest = view.yaw
-            view.turnTo(FIRESIDE_TURN)
+            view.aim(FIRESIDE_TURN, view.pitch, view.distance)
         }
         if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
             // The phone asks for less motion, so the night passes at once.
@@ -517,7 +517,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     /** The character stands at 내 방's door, facing the street, ready for the day. */
     private fun wakeAtHome(jump: Boolean) {
-        if (sitting) view.turnTo(turnBeforeRest)
+        if (sitting) view.aim(turnBeforeRest, view.pitch, view.distance)
         sitting = false
         trip = null
         spot = home.door

@@ -425,11 +425,16 @@ class PhoneGame private constructor(
                         "${stageName(interview.stage)} ${date(interview.day)} · " +
                             "통과 확률 ${percent(month.passChance(interview.stage))}",
                     )
-                    lastLines.isEmpty() -> child("p", "hud-note", "땅을 누르면 걷고, 두 번 누르면 달려요. 사람이나 건물을 누르면 말을 걸어요.")
                 }
             }
             showLog(this)
-            talkingAt?.let { talk(month, it) }
+            val talking = talkingAt
+            if (talking != null) {
+                talk(month, talking)
+            } else if (lastLines.isEmpty()) {
+                // On the first day, at the bottom where the talks open, how to get about.
+                child("p", "town-hint", "땅을 누르면 걷고, 두 번 누르면 달려요. 사람이나 건물을 누르면 말을 걸어요.")
+            }
         }
     }
 

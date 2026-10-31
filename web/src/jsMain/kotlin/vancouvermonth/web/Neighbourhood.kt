@@ -40,9 +40,12 @@ data class Venue(
     val facing: Double
         get() = if (doorFacesSouth) 0.0 else PI
 
-    /** Where the name floats: above the middle of the roof. */
+    /** Where the name floats: above the roof, over the side that faces the street. */
     val labelAnchor: Point
-        get() = Point(x + width / 2.0, height + Neighbourhood.roofHeight(this) + 0.8, z + depth / 2.0)
+        get() {
+            val front = if (doorFacesSouth) z + depth - 0.5 else z + 0.5
+            return Point(x + width / 2.0, height + Neighbourhood.roofHeight(this) + 0.5, front)
+        }
 
     /** The whole building as one box, roof included, for taps and for keeping the camera out. */
     val box: Block
@@ -92,6 +95,25 @@ object Neighbourhood {
     const val BENCH_FACING = 0.0
     const val SEAT_HEIGHT = 0.42
     private val campfire = Spot(2.3, 20.0)
+
+    /** The street between the two rows, its pavements included, from the north row's fronts to the south row's. */
+    const val STREET_NORTH = 10.0
+    const val STREET_SOUTH = 17.0
+    const val STREET_MIDDLE = 13.5
+
+    /**
+     * The point the camera looks at for a character at [spot]. On the street and its pavements it is the street's
+     * middle, level with the character, so both rows are in view; past them the nudge fades out within a square.
+     */
+    fun cameraFocus(spot: Spot): Spot {
+        val past = when {
+            spot.z < STREET_NORTH -> STREET_NORTH - spot.z
+            spot.z > STREET_SOUTH -> spot.z - STREET_SOUTH
+            else -> 0.0
+        }
+        val share = (1 - past).coerceIn(0.0, 1.0)
+        return Spot(spot.x, spot.z + (STREET_MIDDLE - spot.z) * share)
+    }
 
     /** The place whose door or person [spot] is within [REACH] of, or null when it is near none. */
     fun placeAt(spot: Spot): Place? = venues.firstOrNull { venue ->

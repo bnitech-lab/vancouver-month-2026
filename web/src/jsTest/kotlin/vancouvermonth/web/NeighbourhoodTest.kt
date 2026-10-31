@@ -144,4 +144,28 @@ class NeighbourhoodTest {
         // A square in the garden, by the fire.
         assertTrue(Cell(3, 20) in reached)
     }
+
+    @Test
+    fun `on the street the camera looks at its middle, and past the pavements at the character`() {
+        assertEquals(Spot(7.5, Neighbourhood.STREET_MIDDLE), Neighbourhood.cameraFocus(Spot(7.5, 16.5)))
+        assertEquals(Spot(9.5, Neighbourhood.STREET_MIDDLE), Neighbourhood.cameraFocus(Spot(9.5, 11.5)))
+        assertEquals(Spot(20.0, 1.0), Neighbourhood.cameraFocus(Spot(20.0, 1.0)))
+        assertEquals(Neighbourhood.benchSeat, Neighbourhood.cameraFocus(Neighbourhood.benchSeat))
+        // Halfway out of the street, the nudge is half gone, so the camera never jumps.
+        val halfway = 17.5 + (Neighbourhood.STREET_MIDDLE - 17.5) * 0.5
+        assertEquals(halfway, Neighbourhood.cameraFocus(Spot(3.0, 17.5)).z, 1e-9)
+    }
+
+    @Test
+    fun `each name floats above its building, over the side facing the street`() {
+        for (venue in venues) {
+            val anchor = venue.labelAnchor
+            assertTrue(anchor.x > venue.x && anchor.x < venue.x + venue.width, "${venue.place}")
+            assertTrue(anchor.z > venue.z && anchor.z < venue.z + venue.depth, "${venue.place}")
+            assertTrue(anchor.y > venue.box.height, "${venue.place}")
+            val middle = venue.z + venue.depth / 2.0
+            val streetSide = if (venue.doorFacesSouth) anchor.z > middle else anchor.z < middle
+            assertTrue(streetSide, "${venue.place}")
+        }
+    }
 }
