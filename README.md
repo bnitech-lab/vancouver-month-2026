@@ -130,10 +130,14 @@ day, and emptied at any ending.
 Opened again for the same run, the page first offers that month: a card shows the day and the balance it goes on from,
 with 이어하기 and 새로 시작. 이어하기 rebuilds the month by playing the recorded days again through the same rules and goes
 straight to that day, in the town or on the button screen; 새로 시작 drops the record and shows the rooms. An address with
-no run (neither `?seed` nor `?today`) opens the kept month's run. There is one slot: a page opened for another run leaves
-the kept month alone, and starting that run's month takes its place. A record that cannot be read or replayed (another
-version, or a day the rules refuse) is dropped without a word, and where the browser refuses storage there is no card
-and nothing is kept.
+no run (neither `?seed` nor `?today`) opens the kept month's run, and there 새로 시작 plays a new run instead. There is one
+slot: a page opened for another run leaves the kept month alone, its start card says that starting will drop the month
+kept on that day, and starting takes its place. Two tabs share the slot too, so the day last played in either is the one
+kept. A record that cannot be read or replayed (another version, or a day the rules refuse) is dropped without a word,
+and where the browser refuses storage there is no card and nothing is kept.
+
+A test replays a few kept lines to months written down by hand, so a change to the rules fails it until
+`MonthRecord.VERSION` goes up, which drops the older lines rather than continuing them into a different month.
 
 ### The 3D town
 
