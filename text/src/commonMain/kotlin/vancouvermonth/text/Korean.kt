@@ -124,18 +124,38 @@ fun eventLine(event: Event, month: Month): String = when (event) {
 fun spentLine(event: Event.Spent): String {
     val what = when (event.kind) {
         Spending.BIKE -> "자전거를 샀어요."
-        Spending.E_SCOOTER -> "전동 퀵보드를 샀어요."
+        Spending.E_SCOOTER -> "퀵보드를 샀어요."
         Spending.SHARED_BIKE_RIDE -> "공유 자전거를 빌렸어요."
         Spending.SHARED_E_SCOOTER_RIDE -> "공유 퀵보드를 빌렸어요."
     }
     return "$what -${money(event.amount)}"
 }
 
+/**
+ * The money spent during a day, for that day's log, in at most two lines: one line each when there are one or two,
+ * else the first and "그 밖에 3건 -$11" for the rest, so a busy day never pushes the log down the screen.
+ */
+fun spentLines(spends: List<Event.Spent>): List<String> = when {
+    spends.size <= 2 -> spends.map { spentLine(it) }
+    else -> {
+        val rest = spends.drop(1)
+        listOf(spentLine(spends.first()), "그 밖에 ${rest.size}건 -${money(rest.sumOf { it.amount })}")
+    }
+}
+
+/**
+ * A day's log as the screen shows it: the money spent during the day first, in at most two lines ([spentLines]), then
+ * one line for each thing the day itself brought. [month] is read after the day.
+ */
+fun dayLog(events: List<Event>, month: Month): List<String> =
+    spentLines(events.filterIsInstance<Event.Spent>()) + events.filter { it !is Event.Spent }.map { eventLine(it, month) }
+
 /** Why money cannot be spent now, from the reason the month gives. */
 fun whyNotSpend(blocked: SpendBlocked): String = when (blocked) {
     SpendBlocked.MONTH_OVER -> "9월이 끝났어요."
     SpendBlocked.ALREADY_OWNED -> "이미 있어요."
     SpendBlocked.NOT_ENOUGH_MONEY -> "잔고가 모자라요."
+    SpendBlocked.LIVING_COST -> "이걸 사면 9월 생활비가 모자라요."
 }
 
 private fun applied(interview: Interview?): String =
@@ -196,9 +216,9 @@ fun date(day: Int): String = if (day <= Month.LAST_DAY) "9월 ${day}일" else "1
 
 fun percent(chance: Double): String = "${(chance * 100).roundToInt()}%"
 
-/** "$1,245". A negative amount keeps its minus sign after the dollar sign, as in "$-40". */
+/** "$1,245". A negative amount has its minus sign first, as in "-$40". */
 fun money(amount: Int): String {
     val digits = amount.toString().removePrefix("-")
     val grouped = digits.reversed().chunked(3).joinToString(",").reversed()
-    return "$" + (if (amount < 0) "-" else "") + grouped
+    return (if (amount < 0) "-" else "") + "$" + grouped
 }

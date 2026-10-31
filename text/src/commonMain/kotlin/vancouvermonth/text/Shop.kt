@@ -15,9 +15,9 @@ object Shop {
 
     /** The keeper's first word: on meeting the player, before they own anything, and once they do. */
     fun greeting(firstMeeting: Boolean, owned: Set<Item>): String = when {
-        firstMeeting -> "어서 와요, 벤이에요. 바퀴 하나면 이 마을이 훨씬 작아져요."
-        owned.isEmpty() -> "또 왔네요. 오늘은 한 대 데려갈래요?"
-        else -> "잘 타고 다녀요? 바퀴 바람은 언제든 봐 줄게요."
+        firstMeeting -> "어서 와요, 벤이에요. 자전거 한 대면 동네가 훨씬 가까워져요."
+        owned.isEmpty() -> "또 왔네요. 오늘은 한 대 장만할래요?"
+        else -> "잘 타고 다녀요? 타이어 바람 빠지면 언제든 들러요."
     }
 
     /** The button that buys [item]. Its price goes beside it. */
@@ -56,10 +56,15 @@ object Riding {
     /** What the character is riding now: its own bike or e-scooter, or a [shared] one rented for the ride. */
     fun now(vehicle: Item, shared: Boolean): String = "${name(vehicle, shared)} 타는 중"
 
+    /** A shared one being ridden, with the [fare] it cost: "공유 퀵보드 타는 중 · -$4". */
+    fun rented(vehicle: Item, fare: Int): String = "${now(vehicle, shared = true)} · -${money(fare)}"
+
     /** Why a shared bike or e-scooter could not be rented for [kind]'s fare. */
     fun cannotRent(kind: Spending, blocked: SpendBlocked): String {
         val vehicle = if (kind == Spending.SHARED_BIKE_RIDE) Item.BIKE else Item.E_SCOOTER
-        return "${name(vehicle, shared = true)}를 빌리지 못했어요. ${whyNotSpend(blocked)}"
+        val shared = name(vehicle, shared = true)
+        if (blocked == SpendBlocked.LIVING_COST) return "${shared}를 빌리면 9월 생활비가 모자라요."
+        return "${shared}를 빌리지 못했어요. ${whyNotSpend(blocked)}"
     }
 
     private fun name(vehicle: Item, shared: Boolean): String {

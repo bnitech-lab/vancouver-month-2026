@@ -23,6 +23,7 @@ class ShopTest {
             add(Shop.bought(item))
             add(Riding.getOn(item))
             for (shared in listOf(false, true)) add(Riding.now(item, shared))
+            add(Riding.rented(item, 3))
         }
         repeat(4) { add(Shop.smallTalk(it)) }
         add(Riding.GET_OFF)
@@ -77,6 +78,11 @@ class ShopTest {
             Riding.cannotRent(Spending.SHARED_BIKE_RIDE, SpendBlocked.NOT_ENOUGH_MONEY),
             Riding.cannotRent(Spending.SHARED_E_SCOOTER_RIDE, SpendBlocked.NOT_ENOUGH_MONEY),
         )
+        assertEquals(
+            "공유 자전거를 빌리면 9월 생활비가 모자라요.",
+            Riding.cannotRent(Spending.SHARED_BIKE_RIDE, SpendBlocked.LIVING_COST),
+        )
+        assertEquals("공유 퀵보드 타는 중 · -\$4", Riding.rented(Item.E_SCOOTER, 4))
     }
 
     @Test

@@ -73,6 +73,9 @@ enum class SpendBlocked {
 
     /** The balance is less than it costs. */
     NOT_ENOUGH_MONEY,
+
+    /** What would be left could not pay the living cost of every day left in September, today included. */
+    LIVING_COST,
 }
 
 /** What happened on a day, in order, for the screen to show. */
@@ -91,8 +94,9 @@ sealed interface Event {
 /**
  * September in Vancouver, one action a day, after the room was picked on September 1st.
  * The goal is a job offer by September 30th. On October 1st the room's total monthly cost is due again.
- * Every day, the offer day included, costs living money; what is left after the first room always covers it,
- * so the money pressure is October's total. All numbers are invented.
+ * Every day, the offer day included, costs living money; what is left after the first room always covers it, and
+ * money spent in the town never leaves less than the living cost of the days left, so the balance never goes below
+ * zero in September and the money pressure is October's total. All numbers are invented.
  */
 class Month(
     val room: Room,
@@ -201,11 +205,16 @@ class Month(
 
     fun owns(item: Item): Boolean = item in owned
 
-    /** Why [amount] cannot be spent on [kind] now, or null when it can. An interview day does not stop it. */
+    /**
+     * Why [amount] cannot be spent on [kind] now, or null when it can: the month is over, it is already owned, the
+     * balance is short of it, or what is left would not pay the living cost of every day left, today included. An
+     * interview day does not stop it.
+     */
     fun spendBlockedBy(kind: Spending, amount: Int = kind.price): SpendBlocked? = when {
         isOver -> SpendBlocked.MONTH_OVER
         kind.buys != null && owns(kind.buys) -> SpendBlocked.ALREADY_OWNED
         balance < amount -> SpendBlocked.NOT_ENOUGH_MONEY
+        balance - amount < daysLeft * DAILY_LIVING_COST -> SpendBlocked.LIVING_COST
         else -> null
     }
 
@@ -215,7 +224,8 @@ class Month(
 
     /**
      * Spends [amount] on [kind]: it comes off the balance, and what it buys is kept for the rest of the month. No day
-     * goes by, nothing else changes and no luck is used, so the days before and after play out as they would have.
+     * goes by, nothing else changes and no luck is used, so the days before and after play out as they would have,
+     * with less money: October's total may then be out of reach, but September's living cost never is.
      */
     fun spend(kind: Spending, amount: Int = kind.price): Event.Spent {
         require(kind.costs(amount)) { "$kind does not cost $amount" }

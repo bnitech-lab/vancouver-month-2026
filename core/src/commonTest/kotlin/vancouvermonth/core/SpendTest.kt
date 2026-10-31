@@ -57,12 +57,12 @@ class SpendTest {
 
     @Test
     fun `a bike already bought is not bought again`() {
-        val month = month()
+        val month = month(balance = 3_000)
         month.spend(Spending.BIKE)
         assertEquals(SpendBlocked.ALREADY_OWNED, month.spendBlockedBy(Spending.BIKE))
         assertFalse(month.canSpend(Spending.BIKE, 350))
         assertFailsWith<IllegalArgumentException> { month.spend(Spending.BIKE) }
-        assertEquals(1_800 - 350, month.balance)
+        assertEquals(3_000 - 350, month.balance)
         // The other one can still be bought.
         assertNull(month.spendBlockedBy(Spending.E_SCOOTER))
         month.spend(Spending.E_SCOOTER)
@@ -70,16 +70,49 @@ class SpendTest {
     }
 
     @Test
-    fun `a short balance refuses, and the very last dollar can be spent`() {
+    fun `a short balance refuses, and so does a spend that would leave too little for September's living cost`() {
         val month = month(balance = 549)
         assertEquals(SpendBlocked.NOT_ENOUGH_MONEY, month.spendBlockedBy(Spending.E_SCOOTER))
         assertFailsWith<IllegalArgumentException> { month.spend(Spending.E_SCOOTER) }
         assertEquals(549, month.balance)
         assertEquals(emptySet(), month.owned)
-        val exact = month(balance = 550)
+        // On the first day, 29 days of living cost must be left after it, today's included.
+        val living = month.daysLeft * Month.DAILY_LIVING_COST
+        assertEquals(29 * 40, living)
+        val tight = month(balance = 550 + living - 1)
+        assertEquals(SpendBlocked.LIVING_COST, tight.spendBlockedBy(Spending.E_SCOOTER))
+        assertFalse(tight.canSpend(Spending.E_SCOOTER))
+        assertFailsWith<IllegalArgumentException> { tight.spend(Spending.E_SCOOTER) }
+        val exact = month(balance = 550 + living)
         exact.spend(Spending.E_SCOOTER)
+        assertEquals(living, exact.balance)
+        assertEquals(SpendBlocked.LIVING_COST, exact.spendBlockedBy(Spending.SHARED_BIKE_RIDE))
+        // Resting to the end of the month, the living cost is paid to the last day, and nothing goes below zero.
+        while (!exact.isOver) {
+            exact.take(Action.REST)
+            assertTrue(exact.balance >= 0, "${exact.balance} on day ${exact.day}")
+        }
         assertEquals(0, exact.balance)
-        assertEquals(SpendBlocked.NOT_ENOUGH_MONEY, exact.spendBlockedBy(Spending.SHARED_BIKE_RIDE))
+    }
+
+    /**
+     * A spend the month allows can still cost October: a month that would have ended with October's total in hand ends
+     * without it after a bike, though September's living cost is paid to the end.
+     */
+    @Test
+    fun `a spend that is allowed can turn a month that would be survived into one that cannot pay October`() {
+        val plain = month(balance = 2_500)
+        val spender = month(balance = 2_500)
+        assertNull(spender.spendBlockedBy(Spending.BIKE))
+        spender.spend(Spending.BIKE)
+        while (!plain.isOver) {
+            plain.take(Action.REST)
+            spender.take(Action.REST)
+        }
+        assertEquals(Ending.SURVIVED, plain.ending)
+        assertEquals(Ending.CANNOT_PAY_RENT, spender.ending)
+        assertEquals(2_500 - 350 - 29 * Month.DAILY_LIVING_COST, spender.balance)
+        assertTrue(spender.balance in 0 until room.totalMonthlyCost)
     }
 
     @Test
