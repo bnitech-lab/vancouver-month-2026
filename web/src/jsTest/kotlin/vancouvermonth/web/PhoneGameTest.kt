@@ -19,6 +19,11 @@ import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.Month
 import vancouvermonth.core.TodaysRun
 import vancouvermonth.text.Weather
+import vancouvermonth.text.arrivalLines
+import vancouvermonth.text.goalLine
+import vancouvermonth.text.money
+import vancouvermonth.text.monthCostLine
+import vancouvermonth.text.whyTotalLines
 
 /** A town that only notes where the character was sent and whether it was closed, so a test needs no WebGL. */
 private class NotingTown : Town {
@@ -84,7 +89,8 @@ class PhoneGameTest {
     fun `seed 1011 plays the first day the README shows`() {
         open(1011)
         assertTrue("판 번호 1011" in screen)
-        assertTrue("잔고 \$3,000 · 9월 1일" in screen)
+        assertTrue("9월 1일, 딱 \$3,000 들고 밴쿠버에 막 도착했어요." in screen)
+        assertFalse("잔고 \$3,000" in screen)
         assertTrue("1구역 \$105 · 2구역 \$145 · 3구역 \$195" in screen)
         assertTrue("별도면 한 달 \$120~\$190" in screen)
 
@@ -111,6 +117,45 @@ class PhoneGameTest {
         assertTrue("영어 실력이 올랐어요. 영어 2/10" in screen)
         assertTrue("생활비 -\$40, 잔고 \$1,615" in screen)
         assertTrue("오늘9월 3일" in screen)
+    }
+
+    @Test
+    fun `the first screen tells the story, the goal and why the room matters before the rooms`() {
+        open(1011)
+        val game = FirstMinute(1011)
+        val story = root.querySelector(".story")?.textContent.orEmpty()
+        assertEquals(arrivalLines(game.startingBalance).joinToString(""), story)
+        assertEquals(goalLine(), root.querySelector(".story .goal")?.textContent)
+        assertEquals(1, root.querySelectorAll(".story .goal").length)
+        val firstRoom = screen.indexOf("1번 방")
+        val order = arrivalLines(game.startingBalance) + "할 일" + whyTotalLines()
+        val at = order.map { screen.indexOf(it) }
+        assertTrue(at.all { it >= 0 }, "missing one of $order in: $screen")
+        assertEquals(at.sorted(), at, "out of order: $screen")
+        assertTrue(at.last() < firstRoom, "the why comes after the rooms: $screen")
+        // The guess and the score stay: no room's total, and no word that names the cheapest room, before the reveal.
+        for (room in game.rooms) assertFalse(money(room.totalMonthlyCost) in screen, screen)
+        for (word in listOf("가장 싼 방은", "번이었어요", "가장 싼 방보다", "가장 싼 방이라")) assertFalse(word in screen, word)
+    }
+
+    @Test
+    fun `the reveal says what the pick costs the month against the cheapest room`() {
+        val game = FirstMinute(1011)
+        open(1011)
+        tap("2번 방")
+        type("1300")
+        tap("총비용 확인하기")
+        val dear = root.querySelector(".reveal .month-cost")?.textContent
+        assertEquals("가장 싼 방보다 한 달에 \$180 더 내요. 10월 1일에도 그만큼 더 나가요.", dear)
+        assertEquals(monthCostLine(game, game.reveal(1, 1300)), dear)
+        assertTrue(money(game.rooms[1].totalMonthlyCost - game.lowestTotal) in dear.orEmpty())
+
+        open(1011)
+        tap("${game.cheapestRoomIndex + 1}번 방")
+        type("${game.lowestTotal}")
+        tap("총비용 확인하기")
+        val cheap = root.querySelector(".reveal .month-cost")?.textContent
+        assertEquals("가장 싼 방이라 9월을 버틸 돈이 가장 많이 남아요.", cheap)
     }
 
     @Test

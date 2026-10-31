@@ -127,9 +127,17 @@ h2 {
   font-size: 14px;
 }
 
-.balance {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+/* The arrival story, kept small so the rooms stay on a phone's first screen */
+
+.story {
+  padding: 10px 14px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.story .goal {
+  font-weight: 700;
+  color: var(--accent);
 }
 
 /* Room pick */
@@ -141,6 +149,14 @@ h2 {
 .formula {
   color: var(--muted);
   font-size: 14px;
+}
+
+.why {
+  font-size: 14px;
+}
+
+.formula + .why {
+  margin-top: 4px;
 }
 
 .board {
@@ -342,6 +358,11 @@ a:focus-visible {
 
 .left {
   font-weight: 600;
+}
+
+.month-cost {
+  margin-top: 2px;
+  font-size: 14px;
 }
 
 .start .notes {
