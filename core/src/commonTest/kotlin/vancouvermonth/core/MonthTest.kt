@@ -215,6 +215,20 @@ class MonthTest {
     }
 
     @Test
+    fun `the forecast takes the living cost of every day left, and is tight below October's total`() {
+        // October's total is 1,020 + 145 = 1,165, and the 29 days from the 2nd cost 1,160 to live.
+        val month = month(balance = 2_400)
+        assertEquals(2_400 - 1_160, month.balanceForecast)
+        assertFalse(month.moneyTight)
+        month.take(Action.REST)
+        assertEquals(2_400 - 1_160, month.balanceForecast, "a day of rest was already in the forecast")
+        assertTrue(month(balance = 2_324).moneyTight)
+        assertFalse(month(balance = 2_325).moneyTight)
+        month.take(Action.WORK)
+        assertEquals(2_400 - 1_160 + Month.WORK_PAY, month.balanceForecast)
+    }
+
+    @Test
     fun `what is left after any first room covers the month's living cost`() {
         val livingCost = Month.DAILY_LIVING_COST * (Month.LAST_DAY - Month.FIRST_DAY + 1)
         for (seed in 1..2_000) {

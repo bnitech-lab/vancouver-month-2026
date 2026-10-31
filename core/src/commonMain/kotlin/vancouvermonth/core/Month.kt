@@ -86,6 +86,17 @@ class Month(
     val daysLeft: Int
         get() = LAST_DAY - day + 1
 
+    /**
+     * What the balance would be on October 1st, before October's total is paid, if every day left, today included,
+     * cost only living money: no more pay and no offer.
+     */
+    val balanceForecast: Int
+        get() = balance - daysLeft * DAILY_LIVING_COST
+
+    /** True when that forecast falls short of October's total, so the money is tight. */
+    val moneyTight: Boolean
+        get() = balanceForecast < room.totalMonthlyCost
+
     /** Chance that an application turns into a phone screen. A better coding level makes a better résumé. */
     val applyChance: Double
         get() = min(MAX_CHANCE, APPLY_BASE + APPLY_PER_CODING * coding)
