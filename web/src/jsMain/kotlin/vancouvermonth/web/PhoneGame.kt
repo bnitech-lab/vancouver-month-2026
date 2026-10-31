@@ -573,8 +573,8 @@ class PhoneGame private constructor(
         typing = window.setInterval({
             shown += 1
             element.textContent = line.take(shown)
-            if (line.getOrNull(shown - 1)?.isWhitespace() == false) sound?.tick()
             if (shown >= line.length) stopTyping()
+            if (line.getOrNull(shown - 1)?.isWhitespace() == false) sound?.tick()
         }, TYPE_MILLIS)
     }
 
