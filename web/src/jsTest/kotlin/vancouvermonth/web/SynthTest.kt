@@ -17,12 +17,14 @@ class SynthTest {
 
     /**
      * [seconds] of the tune in [mood], faded in from the start, with whatever [more] adds, rendered to a buffer.
-     * Notes due before [late] are left out, as after a stall.
+     * Notes due before [late] are left out, as after a stall. With [inSteps], the bars are planned a quarter of a
+     * second at a time, as the page's timer does, instead of all at once.
      */
     private fun render(
         seconds: Double,
         mood: Mood,
         late: Double = Double.NEGATIVE_INFINITY,
+        inSteps: Boolean = false,
         more: (Mixer) -> Unit = {},
     ): Promise<AudioBuffer> {
         val context = OfflineAudioContext(2, (rate * seconds).toInt(), rate)
@@ -30,6 +32,9 @@ class SynthTest {
         mixer.fadeIn(0.0)
         val band = Band(mixer, VillageTune.THEME_SEED) { mood }
         band.start(0.05)
+        if (inSteps) {
+            for (quarter in 1..(seconds * 4).toInt()) band.scheduleUntil(quarter * 0.25, late)
+        }
         band.scheduleUntil(seconds, late)
         more(mixer)
         return context.startRendering()
@@ -111,4 +116,19 @@ class SynthTest {
             assertTrue(overdue < 1e-4, "Overdue notes were played: $overdue")
             assertTrue(played > 0.02, "Nothing was played after the stall: $played")
         }
+
+    @Test
+    fun `planning a quarter of a second at a time plays each bar once, as planning it all at once does`(): Promise<Unit> {
+        val plans = arrayOf(render(8.0, Mood.DAY), render(8.0, Mood.DAY, inSteps = true))
+        return Promise.all(plans).then { (once, inSteps) ->
+            var largest = 0.0
+            for (channel in 0 until once.numberOfChannels) {
+                val a = once.getChannelData(channel)
+                val b = inSteps.getChannelData(channel)
+                for (i in 0 until once.length) largest = max(largest, abs(a[i] - b[i]).toDouble())
+            }
+            assertTrue(largest < 1e-6, "The two plans sound different, by up to $largest")
+            assertTrue(levels(once).first > 0.02)
+        }
+    }
 }

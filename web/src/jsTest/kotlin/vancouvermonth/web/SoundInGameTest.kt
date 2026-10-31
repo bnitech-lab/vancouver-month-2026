@@ -97,4 +97,23 @@ class SoundInGameTest {
         startSeed1011(root)
         assertEquals(null, root.querySelector(".sound-switch"))
     }
+
+    @Test
+    fun `after a reload with the sound left on, the first tap still does what it was for`() {
+        val store = FakeStore()
+        store.setItem("vancouver-month.sound", "on")
+        val remembered = Sound(Memory { store }, { speaker })
+        try {
+            val game = PhoneGame(root, 1011, playAgain = {})
+            game.sound = remembered
+            game.show()
+            assertEquals(emptyList(), speaker.asked)
+            root.button("1번 방").click()
+            // The tap woke the sound and still picked the room.
+            assertEquals(listOf("on"), speaker.asked)
+            assertEquals("true", root.button("1번 방").getAttribute("aria-pressed"))
+        } finally {
+            remembered.close()
+        }
+    }
 }
