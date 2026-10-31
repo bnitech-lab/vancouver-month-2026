@@ -7,6 +7,7 @@ import kotlinx.browser.window
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.url.URLSearchParams
 import vancouvermonth.core.TodaysRun
+import vancouvermonth.save.MonthRecord
 
 /**
  * Plays the run the address asks for (see [openingFor]), then makes the address name that run.
@@ -14,10 +15,10 @@ import vancouvermonth.core.TodaysRun
  */
 fun main() {
     val root = document.getElementById("app") as? HTMLElement ?: return
-    // What the page remembers, the month in progress among it.
+    // What the page remembers, the month in progress among it: an address with no run goes on with that month's run.
     val memory = pageMemory()
     val saves = SaveSlot(memory)
-    val opening = openingFor(window.location.search, Date(), newSeed())
+    val opening = openingFor(window.location.search, Date(), newSeed(), saves.record())
     val playAgain = { window.location.search = "?seed=${newSeed()}" }
     val today = opening.today
     // The towns are made when the month starts, not now, so the room screen does not wait for WebGL.
@@ -44,14 +45,18 @@ data class Opening(val seed: Int, val today: TodaysRun?, val address: String?)
 /**
  * What a page opened with [query] plays. `?seed=1011` wins and keeps its address, so a link replays that run.
  * `?today` or `?today=2026-10-30` plays that date's run (the browser's date, [now], when none reads) and writes
- * the date into the address, so a reload or a shared link replays it even on another day. Anything else plays
- * [newSeed] and writes it into the address.
+ * the date into the address, so a reload or a shared link replays it even on another day. An address with neither
+ * plays the run of the month [kept] from an earlier visit, so the page can offer to go on with it, and otherwise
+ * [newSeed]; either is written into the address.
  */
-fun openingFor(query: String, now: Date, newSeed: Int): Opening {
+fun openingFor(query: String, now: Date, newSeed: Int, kept: MonthRecord? = null): Opening {
     val seed = seedFrom(query)
     if (seed != null) return Opening(seed, null, null)
     val today = todayFrom(query, now)
     if (today != null) return Opening(today.seed, today, todayQuery(today))
+    val keptToday = kept?.today
+    if (keptToday != null) return Opening(keptToday.seed, keptToday, todayQuery(keptToday))
+    if (kept != null) return Opening(kept.seed, null, "?seed=${kept.seed}")
     return Opening(newSeed, null, "?seed=$newSeed")
 }
 

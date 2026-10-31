@@ -1,5 +1,6 @@
 package vancouvermonth.web
 
+import kotlin.js.Date
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -306,5 +307,24 @@ class ContinueMonthTest {
             assertNotNull(root.querySelector(".rooms"))
             assertEquals("", store.items[SaveSlot.KEY], "Not dropped: $line")
         }
+    }
+
+    @Test
+    fun `an address with no run plays the kept month's run, so the card can offer it`() {
+        val now = Date(2026, 9, 30) // October 30th
+        val today = TodaysRun(2026, 10, 29)
+        val bySeed = MonthRecord(1011, null, 0, 1000)
+        val byDate = MonthRecord(today.seed, today, 0, 1000)
+        assertEquals(Opening(1011, null, "?seed=1011"), openingFor("", now, newSeed = 4242, kept = bySeed))
+        val byDateOpening = openingFor("", now, newSeed = 4242, kept = byDate)
+        assertEquals(Opening(today.seed, today, "?today=2026-10-29"), byDateOpening)
+        // An address that names a run plays that run, kept month or not.
+        assertEquals(Opening(5, null, null), openingFor("?seed=5", now, newSeed = 4242, kept = bySeed))
+        val octoberThirtieth = TodaysRun(2026, 10, 30)
+        assertEquals(
+            Opening(octoberThirtieth.seed, octoberThirtieth, "?today=2026-10-30"),
+            openingFor("?today", now, newSeed = 4242, kept = byDate),
+        )
+        assertEquals(Opening(4242, null, "?seed=4242"), openingFor("", now, newSeed = 4242, kept = null))
     }
 }
