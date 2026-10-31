@@ -180,6 +180,9 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private var mapStale = true
     private var mapResized = true
     private var mapTop = Double.NaN
+
+    /** True once drawing the map has failed: it is hidden, and the town goes on without it. */
+    private var mapBroken = false
     private var marked: Place? = null
 
     /** How much the camera sees from side to side, in radians. */
@@ -1107,7 +1110,16 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             labelsFocus = focus
             labelsStale = false
         }
-        drawMinimap()
+        // On its own: a fault in the map hides the map, and never stops the town.
+        if (!mapBroken) {
+            try {
+                drawMinimap()
+            } catch (error: Throwable) {
+                console.warn("The small map stopped:", error)
+                mapBroken = true
+                minimap.element.hidden = true
+            }
+        }
         framesDrawn += 1
         if (walking || night || gliding || folding || !still) nextFrame()
     }

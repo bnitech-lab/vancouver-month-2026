@@ -1177,6 +1177,25 @@ class WalkableTownTest {
         )
     }
 
+    @Test
+    fun `a fault in the small map hides it, and the town goes on walking`(): Promise<Unit> {
+        val town = startInTown()
+        val map = town.minimapElement
+        val start = town.characterSpot
+        val target = Spot(start.x + 3.0, start.z + 1.0)
+        return play(
+            Step("break the map's drawing, then walk", { town.isStill }) {
+                val canvas = map.querySelector("canvas") as HTMLCanvasElement
+                canvas.getContext("2d").asDynamic().drawImage = { throw IllegalStateException("broken on purpose") }
+                tapScreen(town, onScreen(town, Point(target.x, 0.0, target.z)))
+            },
+            Step("walked there all the same", { town.isStill }) {
+                assertTrue(map.hidden, "the broken map still shows")
+                assertTrue(distanceBetween(town.characterSpot, target) < 0.01, "the walk stopped at ${town.characterSpot}")
+            },
+        )
+    }
+
     /** The five places' own walls, by where they are among the town's still boxes. */
     private fun placeBodies(): List<Pair<Venue, Int>> = Neighbourhood.venues.map { venue ->
         venue to Neighbourhood.blocks.indexOfFirst {
