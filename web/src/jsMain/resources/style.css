@@ -965,20 +965,29 @@ html:has(.walk-town) {
   right: 0;
 }
 
-/* The card on how to play, over the town the first time it opens. The town waits under a soft shade. */
+/* The card on how to play, over the town the first time it opens. The town waits under a soft shade. On a short
+   screen (a phone on its side, or large text) the card is never taller than the screen: it scrolls instead, and the
+   shade can scroll too, with "safe" centring so nothing is pushed off the top. */
 .guide {
   position: fixed;
   inset: 0;
   z-index: 2;
   display: grid;
   place-items: center;
-  padding: 16px;
+  place-items: safe center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   background: rgba(28, 29, 31, 0.35);
 }
 
 .guide-card {
   width: 100%;
   max-width: 400px;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 18px 18px 16px;
   color: var(--talk-text);
   background: var(--talk-bg);

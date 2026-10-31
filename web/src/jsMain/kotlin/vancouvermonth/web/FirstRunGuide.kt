@@ -60,6 +60,8 @@ internal class FirstRunGuide(private val memory: Memory) {
         shown = cover
         document.addEventListener("keydown", onKey)
         start.focus()
+        // On a short screen the card scrolls; focusing 시작 would scroll past the title, so it opens at its top.
+        card.scrollTop = 0.0
     }
 
     /** Closes the card, remembers that it was seen, and gives the focus back to the "?". */
