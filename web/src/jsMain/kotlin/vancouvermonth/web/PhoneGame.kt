@@ -469,7 +469,7 @@ class PhoneGame private constructor(
                 talk(month, talking)
             } else if (lastLines.isEmpty()) {
                 // On the first day, at the bottom where the talks open, how to get about.
-                child("p", "town-hint", "땅을 누르면 걷고, 두 번 누르면 달려요. 사람이나 건물을 누르면 말을 걸어요.")
+                child("p", "town-hint", "땅을 누르면 걷고, 두 번 누르면 빨리 가요. 사람이나 건물을 누르면 말을 걸어요.")
             }
         }
         // A keyboard or a screen reader follows what happens: into a talk that opens, to the log after an answer.
