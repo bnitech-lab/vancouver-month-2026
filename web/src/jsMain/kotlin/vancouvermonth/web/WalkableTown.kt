@@ -30,7 +30,10 @@ interface WalkableTown {
      */
     var onPlace: (Place?) -> Unit
 
-    /** Called with the passerby the player stops for a word: they tapped them. No day is spent on it. */
+    /**
+     * Called with the passerby the player stops for a word: they tapped them. No day is spent on it. The passerby
+     * stands and faces the player until [endChat].
+     */
     var onPasserby: (Passer) -> Unit
 
     /** Called once if the town stops drawing, so the game can go on with buttons. */
@@ -50,6 +53,9 @@ interface WalkableTown {
 
     /** Marks the name of [place], as on an interview day, or no name when null. */
     fun mark(place: Place?)
+
+    /** Lets the passerby the player stopped walk on: the game closed the small talk. */
+    fun endChat()
 
     /**
      * Ends a day spent at [place]: a golden evening, a night with the lights on, then morning, with the character
@@ -428,6 +434,11 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             touched()
         }
 
+    override fun endChat() {
+        touched()
+        stopChatting()
+    }
+
     override fun mark(place: Place?) {
         for ((labelPlace, label) in labels) label.classList.toggle("here", labelPlace == place)
     }
@@ -605,7 +616,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         // The passersby can be tapped while they are out.
         val boxes = if (passerbyBoxes.visible) passersby.map { Passerby.boxAround(it.spot) } else emptyList()
         val picked = view.pick((x - frame.left) / frame.width, (y - frame.top) / frame.height, boxes)
-        if (picked !is Picked.AtPasserby) stopChatting()
+        // A tap that lands on something else turns the player away from the passerby; a tap on the sky does not.
+        if (picked != null && picked !is Picked.AtPasserby) stopChatting()
         when (picked) {
             is Picked.AtPasserby -> stopFor(passersby[picked.index], dash)
             is Picked.AtPlace -> {
@@ -631,7 +643,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         if (sitting) return
         chatting?.takeIf { it !== passerby }?.release()
         chatting = passerby
-        passerby.hold(lifeNow)
+        passerby.hold()
         val there = passerby.spot
         val away = distanceBetween(spot, there)
         if (away > CHAT_DISTANCE) {
@@ -775,7 +787,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         passerbyBoxes.castShadow = out >= 1.0
         first = 0
         for (index in passersby.indices) {
-            val pose = passersby[index].step(now, millis, player)
+            val pose = passersby[index].step(millis, player)
             passerbyFigures[index].write(pose, passerbyBoxes.instanceMatrix.array, first)
             first += passerbyFigures[index].count
         }

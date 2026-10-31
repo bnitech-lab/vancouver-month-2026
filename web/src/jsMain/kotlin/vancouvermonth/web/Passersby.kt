@@ -49,8 +49,8 @@ class Stroll(val points: List<Spot>) {
 
 /**
  * Someone who walks round their [stroll] at a slow [speed], in units a second, starting [start] units along it.
- * They stop and turn to the player when the player stands right in front of them, or for a while after the player
- * stops them for a word, then walk on. They are not in the grid: the player's walks go through them.
+ * They stop and turn to the player when the player stands right in front of them, or while the player has stopped
+ * them for a word, then walk on. They are not in the grid: the player's walks go through them.
  */
 class Passerby(val passer: Passer, val stroll: Stroll, val speed: Double, start: Double) {
     /** How far round the loop they have walked. */
@@ -61,8 +61,8 @@ class Passerby(val passer: Passer, val stroll: Stroll, val speed: Double, start:
     var heading = stroll.headingAt(start)
         private set
 
-    /** Until when they stay to talk, in the town's own milliseconds. */
-    private var heldUntil = Double.NEGATIVE_INFINITY
+    /** True while the player has stopped them for a word. */
+    private var held = false
 
     val spot: Spot
         get() = stroll.spotAt(walked)
@@ -71,14 +71,14 @@ class Passerby(val passer: Passer, val stroll: Stroll, val speed: Double, start:
     var isStanding = false
         private set
 
-    /** Stops them for a word at [now]: they stand and face the player for [HOLD_MILLIS]. */
-    fun hold(now: Double) {
-        heldUntil = now + HOLD_MILLIS
+    /** Stops them for a word: they stand and face the player until [release]. */
+    fun hold() {
+        held = true
     }
 
-    /** Lets them walk on at once, as when the player walks off. */
+    /** Lets them walk on, as when the talk ends. */
     fun release() {
-        heldUntil = Double.NEGATIVE_INFINITY
+        held = false
     }
 
     /** True when [player] stands right in front of them, close and ahead of the way they walk. */
@@ -90,11 +90,11 @@ class Passerby(val passer: Passer, val stroll: Stroll, val speed: Double, start:
     }
 
     /**
-     * Moves them on by [millis] at the town's time [now], with the player at [player], and says how they stand: walking
-     * with a bob and a swing, or standing and turned to the player.
+     * Moves them on by [millis] of the town's time, with the player at [player], and says how they stand: walking with
+     * a bob and a swing, or standing and turned to the player.
      */
-    fun step(now: Double, millis: Double, player: Spot): Pose {
-        isStanding = now < heldUntil || isInTheWay(player)
+    fun step(millis: Double, player: Spot): Pose {
+        isStanding = held || isInTheWay(player)
         if (!isStanding) walked += millis.coerceAtLeast(0.0) / 1_000 * speed
         val here = spot
         val target = if (isStanding) atan2(player.x - here.x, player.z - here.z) else stroll.headingAt(walked)
@@ -105,9 +105,6 @@ class Passerby(val passer: Passer, val stroll: Stroll, val speed: Double, start:
     }
 
     companion object {
-        /** How long someone stays to talk after the player stops them. */
-        const val HOLD_MILLIS = 10_000.0
-
         /** The player is in their way within this distance, and within this turn of the way they walk. */
         const val BLOCK_DISTANCE = 1.4
         const val BLOCK_ANGLE = 0.9

@@ -406,6 +406,7 @@ class PhoneGame private constructor(
     private fun talkTo(place: Place?) {
         val current = month ?: return
         talkingAt = place
+        if (chattingWith != null) walkable?.endChat()
         chattingWith = null
         smallTalks = 0
         if (place != null) {
@@ -598,6 +599,7 @@ class PhoneGame private constructor(
                 button("keyword", text = "그만") {
                     onclick = {
                         chattingWith = null
+                        walkable?.endChat()
                         focusNext = ".hud"
                         show()
                     }

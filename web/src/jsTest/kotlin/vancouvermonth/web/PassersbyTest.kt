@@ -99,12 +99,12 @@ class PassersbyTest {
         val passerby = Strolls.all.first()
         val far = Spot(-50.0, -50.0)
         val start = passerby.walked
-        var pose = passerby.step(0.0, 0.0, far)
-        for (frame in 1..300) pose = passerby.step(frame * 33.0, 33.0, far)
+        var pose = passerby.step(0.0, far)
+        for (frame in 1..300) pose = passerby.step(33.0, far)
         assertEquals(start + 300 * 0.033 * passerby.speed, passerby.walked, 1e-6)
         assertFalse(passerby.isStanding)
         assertEquals(passerby.spot, pose.spot)
-        val swings = (1..20).map { passerby.step(10_000.0 + it * 33.0, 33.0, far).swing }
+        val swings = (1..20).map { passerby.step(33.0, far).swing }
         assertTrue(swings.any { it > 0.1 } && swings.any { it < -0.1 }, "$swings")
         assertTrue(swings.all { abs(it) <= Passerby.STROLL_SWING })
     }
@@ -116,8 +116,8 @@ class PassersbyTest {
         val ahead = passerby.stroll.headingAt(passerby.walked)
         val inFront = Spot(here.x + sin(ahead) * 1.0, here.z + cos(ahead) * 1.0)
         val walked = passerby.walked
-        var pose = passerby.step(0.0, 0.0, inFront)
-        for (frame in 1..60) pose = passerby.step(frame * 33.0, 33.0, inFront)
+        var pose = passerby.step(0.0, inFront)
+        for (frame in 1..60) pose = passerby.step(33.0, inFront)
         assertTrue(passerby.isStanding)
         assertEquals(walked, passerby.walked, "walked on into the player")
         assertEquals(0.0, pose.swing)
@@ -125,28 +125,30 @@ class PassersbyTest {
         // Behind them, or off to the side, the player is not in the way.
         val behind = Spot(here.x - sin(ahead) * 1.0, here.z - cos(ahead) * 1.0)
         assertFalse(passerby.isInTheWay(behind))
-        passerby.step(3_000.0, 33.0, behind)
+        passerby.step(33.0, behind)
         assertFalse(passerby.isStanding)
         assertTrue(passerby.walked > walked)
     }
 
     @Test
-    fun `a passerby stopped for a word stands and faces the player for a while, and walks on after`() {
+    fun `a passerby stopped for a word stands and faces the player until let go, then walks on`() {
         val passerby = Strolls.all.first { it.passer == Passer.THEO }
         val player = Spot(passerby.spot.x + 3.0, passerby.spot.z)
-        passerby.hold(1_000.0)
+        passerby.hold()
         val walked = passerby.walked
-        var pose = passerby.step(1_000.0, 0.0, player)
-        for (frame in 1..30) pose = passerby.step(1_000.0 + frame * 33.0, 33.0, player)
+        var pose = passerby.step(0.0, player)
+        for (frame in 1..30) pose = passerby.step(33.0, player)
         assertTrue(passerby.isStanding)
         assertEquals(walked, passerby.walked)
         assertEquals(PI / 2, pose.heading, 0.02, "turned east, to the player")
-        passerby.step(1_000.0 + Passerby.HOLD_MILLIS + 1, 33.0, player)
-        assertFalse(passerby.isStanding, "still held after the time is up")
-        passerby.hold(20_000.0)
+        // However long the talk lasts.
+        passerby.step(33.0, player)
+        assertTrue(passerby.isStanding, "walked off while the talk was open")
+        assertEquals(walked, passerby.walked)
         passerby.release()
-        passerby.step(20_100.0, 33.0, player)
+        passerby.step(33.0, player)
         assertFalse(passerby.isStanding, "release() did not let them go")
+        assertTrue(passerby.walked > walked)
     }
 
     @Test

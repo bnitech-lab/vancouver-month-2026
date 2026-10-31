@@ -40,6 +40,8 @@ private class SilentTown : WalkableTown {
 
     override fun mark(place: Place?) {}
 
+    override fun endChat() {}
+
     override fun endDay(place: Place) = onMorning()
 
     override fun close() {}
