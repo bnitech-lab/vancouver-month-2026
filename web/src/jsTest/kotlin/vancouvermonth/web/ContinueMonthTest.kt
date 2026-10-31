@@ -59,7 +59,7 @@ class ContinueMonthTest {
         } else {
             PhoneGame(into, today, playAgain = {}, makeWalkableTown = { town })
         }
-        game.saves = SaveSlot(Memory { storage })
+        game.slot = SaveSlot(Memory { storage })
         game.guide = FirstRunGuide(Memory { storage }).also { guides += it }
         game.talkSettleMillis = 0.0
         game.show()
@@ -211,6 +211,21 @@ class ContinueMonthTest {
     }
 
     @Test
+    fun `a slot given after the page first showed is still read`() {
+        open()
+        startSeed1011(root)
+        root.button("영어 공부").click()
+
+        root.innerHTML = ""
+        val game = PhoneGame(root, 1011, playAgain = {})
+        game.show()
+        assertNull(card)
+        game.slot = SaveSlot(Memory { store })
+        game.show()
+        assertNotNull(card, "The slot set late was never read")
+    }
+
+    @Test
     fun `새로 시작 starts the run over from its rooms and drops the kept month`() {
         open()
         startSeed1011(root)
@@ -247,7 +262,7 @@ class ContinueMonthTest {
         for (storage in listOf<KeyValueStore?>(RefusingStore(), null)) {
             root.innerHTML = ""
             val game = PhoneGame(root, 1011, playAgain = {})
-            game.saves = SaveSlot(Memory { storage })
+            game.slot = SaveSlot(Memory { storage })
             game.show()
             startSeed1011(root)
             root.button("영어 공부").click()
@@ -255,7 +270,7 @@ class ContinueMonthTest {
 
             root.innerHTML = ""
             val again = PhoneGame(root, 1011, playAgain = {})
-            again.saves = SaveSlot(Memory { storage })
+            again.slot = SaveSlot(Memory { storage })
             again.show()
             assertNull(card)
             assertNotNull(root.querySelector(".rooms"))

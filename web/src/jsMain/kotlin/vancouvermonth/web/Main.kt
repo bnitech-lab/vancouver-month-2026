@@ -17,8 +17,8 @@ fun main() {
     val root = document.getElementById("app") as? HTMLElement ?: return
     // What the page remembers, the month in progress among it: an address with no run goes on with that month's run.
     val memory = pageMemory()
-    val saves = SaveSlot(memory)
-    val opening = openingFor(window.location.search, Date(), newSeed(), saves.record())
+    val slot = SaveSlot(memory)
+    val opening = openingFor(window.location.search, Date(), newSeed(), slot.record())
     val playAgain = { window.location.search = "?seed=${newSeed()}" }
     val today = opening.today
     // The towns are made when the month starts, not now, so the room screen does not wait for WebGL.
@@ -33,7 +33,7 @@ fun main() {
     // A gentle sound the player can switch on, a card on how to play the first time the town opens, and the month kept.
     game.sound = pageSound(memory)
     game.guide = FirstRunGuide(memory)
-    game.saves = saves
+    game.slot = slot
     game.show()
     // The game is drawn first, so the screen does not depend on the address changing.
     opening.address?.let { window.history.replaceState(null, "", it) }

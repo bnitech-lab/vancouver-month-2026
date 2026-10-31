@@ -53,7 +53,7 @@ import vancouvermonth.text.whyNot
  * Every tap redraws the whole screen from that state. A run comes from a seed or from today's date, never both.
  * The month is played in a town the player walks in, which [makeWalkableTown] makes on the first day: each day is
  * spent by talking to a place's person. Where it gives none, the month is played with buttons, under a town that
- * is a picture when [makeTown] gives one. Either town is closed at the ending. Given a slot in [saves], the month in
+ * is a picture when [makeTown] gives one. Either town is closed at the ending. Given a [slot], the month in
  * progress is kept after every day, and the page opened again for the same run offers to go on with it.
  */
 class PhoneGame private constructor(
@@ -128,8 +128,15 @@ class PhoneGame private constructor(
     /** The card on how to play, shown the first time the town opens; null for none. */
     internal var guide: FirstRunGuide? = null
 
-    /** Where the month in progress is kept between visits; null for a game that keeps nothing. */
-    internal var saves: SaveSlot? = null
+    /**
+     * Where the month in progress is kept between visits; null for a game that keeps nothing. The kept month is read
+     * on the first [show] after this is set, so setting it again reads it again.
+     */
+    internal var slot: SaveSlot? = null
+        set(value) {
+            field = value
+            keptRead = false
+        }
 
     /** The month being played as the slot keeps it, and the month kept from an earlier visit, read once on opening. */
     private var record: MonthRecord? = null
@@ -266,11 +273,11 @@ class PhoneGame private constructor(
         }
     }
 
-    /** Opens [started] for play, in a town to walk in where there is one, and keeps it in the slot as [kept]. */
-    private fun beginMonth(started: Month, kept: MonthRecord) {
+    /** Opens [started] for play, in a town to walk in where there is one, and keeps it in the slot as [keeping]. */
+    private fun beginMonth(started: Month, keeping: MonthRecord) {
         month = started
-        record = kept
-        saves?.keep(kept)
+        record = keeping
+        slot?.keep(keeping)
         walkable = makeWalkableTown()?.also { listenTo(it) }
         if (walkable == null) town = makeTown()
         guide?.onOpenChange = { walkable?.isCovered = isTownCovered() }
@@ -283,15 +290,15 @@ class PhoneGame private constructor(
     private fun keptMonth(): KeptMonth? {
         if (!keptRead) {
             keptRead = true
-            kept = saves?.keptFor(game.seed, today)
+            kept = slot?.keptFor(game.seed, today)
         }
         return kept
     }
 
     /** Before the rooms, a card that offers the kept month: 이어하기 goes on with it, 새로 시작 drops it. */
-    private fun showKept(kept: KeptMonth) {
+    private fun showKept(offer: KeptMonth) {
         showTitle()
-        val month = kept.replayed.month
+        val month = offer.replayed.month
         root.child("section", "card kept") {
             setAttribute("aria-labelledby", "kept-title")
             child("h2", text = Continue.TITLE).id = "kept-title"
@@ -300,31 +307,34 @@ class PhoneGame private constructor(
             child("div", "kept-buttons") {
                 button("primary", text = Continue.CONTINUE) {
                     setAttribute("aria-describedby", "kept-from")
-                    onclick = { goOn(kept) }
+                    onclick = { goOn(offer) }
                 }
                 button("secondary", text = Continue.NEW) {
                     setAttribute("aria-describedby", "kept-note")
-                    onclick = {
-                        this@PhoneGame.kept = null
-                        saves?.clear()
-                        show()
-                    }
+                    onclick = { startOver() }
                 }
             }
         }
     }
 
-    /** Goes on with [kept] on the day it reached, with that day's log, as if the page had never closed. */
-    private fun goOn(kept: KeptMonth) {
-        this.kept = null
-        val record = kept.record
-        val month = kept.replayed.month
+    /** Drops the kept month and shows the run's rooms. */
+    private fun startOver() {
+        kept = null
+        slot?.clear()
+        show()
+    }
+
+    /** Goes on with [offer] on the day it reached, with that day's log, as if the page had never closed. */
+    private fun goOn(offer: KeptMonth) {
+        kept = null
+        val record = offer.record
+        val month = offer.replayed.month
         picked = record.room
         guess = "${record.guess}"
-        reveal = kept.replayed.reveal
+        reveal = offer.replayed.reveal
         if (record.days.isNotEmpty()) {
             lastDay = month.day - 1
-            lastEvents = kept.replayed.lastEvents
+            lastEvents = offer.replayed.lastEvents
             lastLines = lastEvents.map { eventLine(it, month) }
         }
         // Who was met is not kept, but the people of the places where days were spent know the player by now.
@@ -459,10 +469,10 @@ class PhoneGame private constructor(
         talkingAt = null
         record = record?.after(choice)
         if (month.isOver) {
-            saves?.clear()
+            slot?.clear()
             closeTown()
         } else {
-            record?.let { saves?.keep(it) }
+            record?.let { slot?.keep(it) }
             sound?.chime()
             town?.walkTo(place)
             val walking = walkable

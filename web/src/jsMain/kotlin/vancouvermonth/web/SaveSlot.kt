@@ -28,9 +28,15 @@ internal class SaveSlot(private val memory: Memory) {
     fun keptFor(seed: Int, today: TodaysRun?): KeptMonth? {
         val text = memory.read(KEY)
         if (text.isNullOrEmpty()) return null
-        val record = MonthRecord.decode(text) ?: return null.also { clear() }
+        val record = MonthRecord.decode(text) ?: run {
+            clear()
+            return null
+        }
         if (record.seed != seed || record.today != today) return null
-        val replayed = record.replay() ?: return null.also { clear() }
+        val replayed = record.replay() ?: run {
+            clear()
+            return null
+        }
         return KeptMonth(record, replayed)
     }
 
