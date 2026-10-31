@@ -1104,12 +1104,17 @@ html:has(.walk-town) {
   border-radius: 12px;
 }
 
-/* The map's credit, small at the card's foot. */
+/* The map's credit, small at the card's foot, its licence's name a link. */
 .guide-credit {
   margin-top: 12px;
   font-size: 11px;
   line-height: 1.4;
   opacity: 0.75;
+}
+
+.guide-credit a {
+  color: inherit;
+  text-decoration: underline;
 }
 
 @media (prefers-reduced-motion: no-preference) {

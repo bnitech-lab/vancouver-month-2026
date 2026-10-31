@@ -1,0 +1,19 @@
+Map data notice
+
+The town in this page is traced from City of Vancouver open data. The map data built into vancouver-month.js
+(VancouverMapData: the grid of land, water, park and shore, the shoreline, the park's outline, the rail line, the line
+in Burrard Inlet, the city blocks and small parks) is derived from these datasets of the City of Vancouver Open Data
+Portal, https://opendata.vancouver.ca, fetched on 2026-10-31:
+
+  Shoreline 2002
+  Parks - polygon representation
+  Rapid transit lines
+  City boundary
+  Local area boundary
+  Block outlines
+
+Contains information licensed under the Open Government Licence – Vancouver.
+https://opendata.vancouver.ca/pages/licence/
+
+The map data is offered under that licence (version 1.0), not under the MIT licence of the game's code. The City of
+Vancouver does not endorse this game.

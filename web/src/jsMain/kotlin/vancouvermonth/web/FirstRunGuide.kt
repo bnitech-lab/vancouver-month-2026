@@ -1,6 +1,7 @@
 package vancouvermonth.web
 
 import kotlinx.browser.document
+import org.w3c.dom.HTMLAnchorElement
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.asList
@@ -53,8 +54,16 @@ internal class FirstRunGuide(private val memory: Memory) {
         val start = card.add("button", "primary", Guide.START) as HTMLButtonElement
         start.type = "button"
         start.onclick = { close() }
-        // The town is traced from the City of Vancouver's open data, whose licence asks for this line where it shows.
-        card.add("p", "guide-credit", Guide.MAP_CREDIT)
+        // The town is traced from the City of Vancouver's open data, whose licence asks for this line where it shows,
+        // with a link to the licence: its name links there, in a new tab, so the game stays where it is.
+        val credit = card.add("p", "guide-credit")
+        val name = Guide.MAP_CREDIT.indexOf(Guide.MAP_LICENCE)
+        credit.appendChild(document.createTextNode(Guide.MAP_CREDIT.substring(0, name)))
+        val link = credit.add("a", text = Guide.MAP_LICENCE) as HTMLAnchorElement
+        link.href = Guide.MAP_LICENCE_URL
+        link.target = "_blank"
+        link.rel = "noopener"
+        credit.appendChild(document.createTextNode(Guide.MAP_CREDIT.substring(name + Guide.MAP_LICENCE.length)))
         for (under in root.children.asList()) {
             if (under is HTMLElement && !under.hasAttribute("inert")) {
                 under.setAttribute("inert", "")
@@ -95,7 +104,10 @@ internal class FirstRunGuide(private val memory: Memory) {
         button.onclick = { open(root) }
     }
 
-    /** Escape closes the card; Tab stays on its one button. A card taken off the page with the town lets go here. */
+    /**
+     * Escape closes the card; Tab and Shift+Tab go round its button and its link to the licence, and never leave it.
+     * A card taken off the page with the town lets go here.
+     */
     private fun key(event: KeyboardEvent) {
         val cover = shown ?: return
         if (!cover.isConnected) {
@@ -109,7 +121,14 @@ internal class FirstRunGuide(private val memory: Memory) {
             }
             "Tab" -> {
                 event.preventDefault()
-                (cover.querySelector("button") as? HTMLElement)?.focus()
+                val stops = cover.querySelectorAll("button, a[href]").asList().map { it as HTMLElement }
+                val at = stops.indexOf(document.activeElement)
+                val next = when {
+                    at < 0 -> 0
+                    event.shiftKey -> (at + stops.size - 1) % stops.size
+                    else -> (at + 1) % stops.size
+                }
+                stops[next].focus()
             }
         }
     }
