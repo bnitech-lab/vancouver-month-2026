@@ -69,11 +69,17 @@ class SynthTest {
         }
 
     @Test
-    fun `switching off fades the sound out to silence, echo and all`(): Promise<Unit> =
+    fun `switching off fades the sound out to silence, echo and all, not in one cut`(): Promise<Unit> =
         render(5.0, Mood.DAY) { mixer -> mixer.fadeOut(2.0) }.then { buffer ->
             val (before, _) = levels(buffer, from = 1.0, until = 2.0)
             val (after, _) = levels(buffer, from = 2.0 + Mixer.FADE_OUT + 0.05)
             assertTrue(before > 0.02, "Nothing played before the fade: $before")
             assertTrue(after < 1e-4, "Still heard after the fade: $after")
+            // Just after the fade starts the sound is still well heard, and it is quieter later in the fade.
+            val justBefore = levels(buffer, from = 1.85, until = 2.0).second
+            val justAfter = levels(buffer, from = 2.0, until = 2.15).second
+            val later = levels(buffer, from = 2.45, until = 2.6).second
+            assertTrue(justAfter > 0.4 * justBefore, "A cut, not a fade: $justBefore then $justAfter")
+            assertTrue(later < justAfter, "The fade does not go down: $justAfter then $later")
         }
 }

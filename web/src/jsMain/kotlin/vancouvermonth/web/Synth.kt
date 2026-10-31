@@ -28,6 +28,13 @@ internal class Mixer(private val context: BaseAudioContext) {
     private val bell = context.createGain()
     private var mood: Mood? = null
 
+    // The fade's own plan: from one level at one time to another level at a later time, in a straight line. The
+    // level at any moment is worked out from this, never read back from the browser, which may not report a ramp.
+    private var fadeFrom = 0.0
+    private var fadeFromTime = 0.0
+    private var fadeTo = 0.0
+    private var fadeToTime = 0.0
+
     init {
         limiter.threshold.value = -12.0
         limiter.knee.value = 6.0
@@ -79,15 +86,26 @@ internal class Mixer(private val context: BaseAudioContext) {
         bed.gain.towards(BED * mood.noise)
     }
 
-    fun fadeIn(time: Double) = fadeTo(1.0, time, FADE_IN)
+    fun fadeIn(time: Double) = fade(fadeLevelAt(time), 1.0, time, FADE_IN)
 
-    fun fadeOut(time: Double) = fadeTo(0.0, time, FADE_OUT)
+    fun fadeOut(time: Double) = fade(fadeLevelAt(time), 0.0, time, FADE_OUT)
 
-    private fun fadeTo(level: Double, time: Double, seconds: Double) {
-        val from = fade.gain.value
+    /** The fade's level at [time], from its plan. */
+    private fun fadeLevelAt(time: Double): Double = when {
+        time <= fadeFromTime -> fadeFrom
+        time >= fadeToTime -> fadeTo
+        else -> fadeFrom + (fadeTo - fadeFrom) * (time - fadeFromTime) / (fadeToTime - fadeFromTime)
+    }
+
+    /** From [time], a straight fade from [from] to [to] over [seconds], in place of whatever was planned after it. */
+    private fun fade(from: Double, to: Double, time: Double, seconds: Double) {
         fade.gain.cancelScheduledValues(time)
         fade.gain.setValueAtTime(from, time)
-        fade.gain.linearRampToValueAtTime(level, time + seconds)
+        fade.gain.linearRampToValueAtTime(to, time + seconds)
+        fadeFrom = from
+        fadeFromTime = time
+        fadeTo = to
+        fadeToTime = time + seconds
     }
 
     /** A music-box note: a soft triangle with a quieter sine an octave up, struck and left to die away over [ring]. */
