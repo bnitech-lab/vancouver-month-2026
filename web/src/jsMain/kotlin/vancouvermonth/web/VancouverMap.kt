@@ -16,8 +16,11 @@ enum class Terrain(val symbol: Char) {
  */
 class TerrainMap(val columns: Int, val rows: Int, private val squares: List<Terrain>) {
     /** What [cell] is. Every square outside the map is water. */
-    fun terrainAt(cell: Cell): Terrain =
-        if (cell.x in 0 until columns && cell.z in 0 until rows) squares[cell.z * columns + cell.x] else Terrain.WATER
+    fun terrainAt(cell: Cell): Terrain = terrainAt(cell.x, cell.z)
+
+    /** What the square in column [x] and row [z] is, with nothing new made. Every square outside the map is water. */
+    fun terrainAt(x: Int, z: Int): Terrain =
+        if (x in 0 until columns && z in 0 until rows) squares[z * columns + x] else Terrain.WATER
 
     /** Every square of [terrain], row by row from the north. */
     fun cellsOf(terrain: Terrain): List<Cell> = squares.indices
@@ -53,7 +56,7 @@ fun pointsOf(text: String): List<Spot> = text.split(' ').filter { it.isNotEmpty(
 /**
  * Real Vancouver, traced from the City of Vancouver's open data by `tools/vancouver_map`: the ground, the shoreline,
  * the big park, the rail on its guideway, the line the mountains stand behind, and a square for each of the five
- * places. Nothing draws it yet; stage 20b rebuilds the town on it.
+ * places. [Neighbourhood] builds the town on it.
  */
 object RealVancouver {
     val map: TerrainMap by lazy { TerrainMap.parse(VancouverMapData.rows) }

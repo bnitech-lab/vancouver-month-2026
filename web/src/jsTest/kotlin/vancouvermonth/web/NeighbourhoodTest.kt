@@ -39,8 +39,11 @@ class NeighbourhoodTest {
             assertEquals(venue.place, Neighbourhood.placeAt(venue.door), "${venue.place}'s door")
             assertEquals(venue.place, Neighbourhood.placeAt(venue.talkSpot), "${venue.place}'s person")
         }
-        assertNull(Neighbourhood.placeAt(Spot(28.0, 13.5)))
-        assertNull(Neighbourhood.placeAt(Spot(20.0, 1.0)))
+        // On the wide street between 회사 and 도서관, and on the West End street between 내 방 and the seawall.
+        for (street in listOf(Spot(162.5, 70.5), Spot(140.5, 99.5))) {
+            assertTrue(Neighbourhood.grid.isFree(Neighbourhood.grid.cellAt(street)), "$street is not open street")
+            assertNull(Neighbourhood.placeAt(street))
+        }
     }
 
     @Test
@@ -132,17 +135,21 @@ class NeighbourhoodTest {
         val free = town.freeCells()
         val west = town.centreOf(free.minBy { it.x })
         val far = town.centreOf(free.maxBy { it.x + it.z })
-        town.route(west, far)
-        val start = Date().getTime()
+        // The best of three, so a pause of the browser's own in one of them does not count against the search.
+        val millis = (1..3).minOf {
+            val start = Date().getTime()
+            town.route(west, far)
+            Date().getTime() - start
+        }
         val route = town.route(west, far)
-        val millis = Date().getTime() - start
         assertEquals(far, route.last())
         assertTrue(route.zipWithNext { a, b -> hypot(b.x - a.x, b.z - a.z) }.sum() > 300.0, "$route")
-        assertTrue(millis < 200, "took $millis ms")
+        // About 5 ms on the laptop the town was built on; the bound leaves room for a slower machine.
+        assertTrue(millis < 50, "took $millis ms")
     }
 
     @Test
-    fun `every free square can be reached from 내 방's door, the garden by the campfire included`() {
+    fun `every free square can be reached from 내 방's door, and only a few walled-in squares were blocked for it`() {
         val door = town.cellAt(Neighbourhood.venue(Place.HOME).door)
         val reached = town.reachableFrom(door)
         val free = town.freeCells()
@@ -150,6 +157,36 @@ class NeighbourhoodTest {
         // A square in the garden, by the fire.
         val home = Neighbourhood.venue(Place.HOME)
         assertTrue(Cell(home.x - 1, home.z + 1) in reached)
+        // Squares the character could never reach are blocked; there must be only a few, or the layout cut off a part
+        // of the town.
+        assertTrue(Neighbourhood.pockets < 20, "${Neighbourhood.pockets} squares were walled in")
+    }
+
+    @Test
+    fun `a tap on the water stops on the near shore, never leading round the creek to the far one`() {
+        val cafe = Neighbourhood.venue(Place.CAFE).door
+        // Out in False Creek, south of the café, nearer its south shore than its north one.
+        val creek = Spot(180.0, 134.5)
+        assertEquals(Terrain.WATER, RealVancouver.map.terrainAt(town.cellAt(creek)))
+        val landing = Neighbourhood.landing(cafe, creek)
+        assertTrue(town.isFree(town.cellAt(landing)), "$landing")
+        assertTrue(landing.z > cafe.z && landing.z < creek.z, "$landing is not on the café's side of the creek")
+        // Straight down to the water's edge, not round the head of the creek.
+        val walk = town.route(cafe, landing)
+        assertTrue(walk.zipWithNext { a, b -> hypot(b.x - a.x, b.z - a.z) }.sum() < 30.0, "$walk")
+        // A tap on land goes where it was tapped.
+        assertEquals(Spot(162.5, 70.5), Neighbourhood.landing(cafe, Spot(162.5, 70.5)))
+    }
+
+    @Test
+    fun `the farthest walk between two places, along the streets, takes no more than 35 seconds`() {
+        val spots = venues.flatMap { listOf(it.door, it.talkSpot) }
+        val seconds = spots.flatMapIndexed { index, a ->
+            spots.drop(index + 1).map { b ->
+                town.route(a, b).zipWithNext { p, q -> hypot(q.x - p.x, q.z - p.z) }.sum() / Trip.WALK_SPEED
+            }
+        }
+        assertTrue(seconds.max() <= 35.0, "${seconds.max()} s")
     }
 
     @Test
@@ -168,7 +205,7 @@ class NeighbourhoodTest {
     }
 
     @Test
-    fun `the city stands on the real blocks, off the water, clear of the five places and under no guideway`() {
+    fun `the city stands on the real blocks, off the water, clear of the places and the guideway, none overlapping`() {
         val map = RealVancouver.map
         val lots = Neighbourhood.cityLots
         assertTrue(lots.size > 300, "only ${lots.size} buildings")
@@ -182,7 +219,8 @@ class NeighbourhoodTest {
             assertTrue(places.none { it.overlaps(lot) }, "$lot")
             assertTrue(rail.none { lot.isNear(it.x, it.z, 0.5) }, "$lot is under the guideway")
         }
-        // Streets run between them: no two buildings touch.
+        // No two overlap. Pieces of one block cut round a place may meet; between the real blocks a street runs (see
+        // VancouverMapTest).
         for ((index, a) in lots.withIndex()) {
             for (b in lots.drop(index + 1)) assertFalse(a.overlaps(b), "$a and $b")
         }

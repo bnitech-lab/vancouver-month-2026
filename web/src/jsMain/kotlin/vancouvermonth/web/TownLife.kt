@@ -425,7 +425,7 @@ object Rain {
 
     /** True where the map has sea under [x], [z]: a splash there flashes on the water. */
     private fun isSea(x: Double, z: Double): Boolean =
-        RealVancouver.map.terrainAt(Cell(floor(x).toInt(), floor(z).toInt())) == Terrain.WATER
+        RealVancouver.map.terrainAt(floor(x).toInt(), floor(z).toInt()) == Terrain.WATER
 
     /**
      * Puddles left on the street in front of each place on a rainy day, catching the grey sky: flat boxes just over

@@ -83,7 +83,7 @@ data class Lot(val x: Int, val z: Int, val width: Int, val depth: Int) {
         ).filter { it.width > 0 && it.depth > 0 }
     }
 
-    /** True when the point [x], [z] lies within [margin] of this lot. */
+    /** True when the point [px], [pz] lies within [margin] of this lot. */
     fun isNear(px: Double, pz: Double, margin: Double): Boolean =
         px > x - margin && px < x + width + margin && pz > z - margin && pz < z + depth + margin
 }
@@ -210,6 +210,9 @@ object Neighbourhood {
 
     val grid: Grid
 
+    /** How many free squares were blocked because the character could never walk to them: walled-in pockets. */
+    val pockets: Int
+
     // Set before the town is laid out, which picks from them.
     private val TOWER_COLOURS = listOf(0xA9C7E3, 0xBFD0DC, 0x9FB7C9, 0xC9D6DF, 0xB4C9D6)
     private val MID_COLOURS = listOf(0xE6DCCB, 0xD9CDB8, 0xCFD8DC, 0xE2E6E0, 0xD6E2EA)
@@ -243,11 +246,32 @@ object Neighbourhood {
         // A pocket of ground walled in by buildings, trees and the water is no ground to walk on.
         val open = Grid(COLUMNS, ROWS, blocked)
         val reached = open.reachableFrom(open.cellAt(home.door))
-        grid = Grid(COLUMNS, ROWS, blocked + open.freeCells().filter { it !in reached })
+        val walledIn = open.freeCells().filter { it !in reached }
+        pockets = walledIn.size
+        grid = Grid(COLUMNS, ROWS, blocked + walledIn)
     }
 
     /** The extra height a roof adds on top of the walls. */
     fun roofHeight(venue: Venue): Double = if (venue.pitched) PITCHED_ROOF else FLAT_ROOF
+
+    /**
+     * Where a tap at [tapped] sends a character standing at [from]: the spot itself on land, and on the water the last
+     * free square on the straight way from [from] toward it before the water, so a tap on False Creek stops on the near
+     * shore rather than leading all the way round the creek's head to the far one.
+     */
+    fun landing(from: Spot, tapped: Spot): Spot {
+        val map = RealVancouver.map
+        if (map.terrainAt(grid.cellAt(tapped)) != Terrain.WATER) return tapped
+        val steps = max(1, ceil(distanceBetween(from, tapped) / LANDING_STEP).toInt())
+        var last: Cell? = null
+        for (step in 0..steps) {
+            val spot = Spot(from.x + (tapped.x - from.x) * step / steps, from.z + (tapped.z - from.z) * step / steps)
+            val cell = grid.cellAt(spot)
+            if (map.terrainAt(cell) == Terrain.WATER) break
+            if (grid.isFree(cell)) last = cell
+        }
+        return last?.let { grid.centreOf(it) } ?: from
+    }
 
     /** The squares a box stands on. A box from x = 6.0 to 13.0 stands on columns 6 to 12. */
     private fun cellsUnder(box: Block): List<Cell> {
@@ -272,6 +296,9 @@ object Neighbourhood {
     private const val PAST_THE_EDGE = 170.0
     private const val FORECOURT = 4
     private const val GARDEN = 5
+
+    /** How finely a tap's straight way is looked along for the water's edge. */
+    private const val LANDING_STEP = 0.25
 
     /** How far past the grid the land goes on, and the mountains past the line across the inlet. */
     private const val LAND_BEYOND = 200.0
@@ -705,6 +732,9 @@ object Neighbourhood {
                     if (map.terrainAt(Cell(x, z)) == Terrain.PARK) forest.add(Spot(x + 0.5, z + 0.5))
                 }
             }
+            // No trunk beside a passerby's way, so nobody walks through the leaves.
+            val ways = Strolls.all().flatMap { it.stroll.legs }
+            forest.removeAll { tree -> ways.any { (a, b) -> distanceToLine(tree, a, b) < CLEAR_OF_WAYS } }
             val door = home.door
             val nearest = forest.sortedBy { distanceBetween(it, door) }
             for ((index, spot) in nearest.withIndex()) {
@@ -787,6 +817,16 @@ object Neighbourhood {
         }
     }
 
+    /** How far [spot] is from the line between [a] and [b], ends included. */
+    private fun distanceToLine(spot: Spot, a: Spot, b: Spot): Double {
+        val dx = b.x - a.x
+        val dz = b.z - a.z
+        val length = dx * dx + dz * dz
+        val share = if (length == 0.0) 0.0 else ((spot.x - a.x) * dx + (spot.z - a.z) * dz) / length
+        val along = share.coerceIn(0.0, 1.0)
+        return hypot(spot.x - (a.x + dx * along), spot.z - (a.z + dz * along))
+    }
+
     /** Rectangles written as "x,z,width,depth x,z,width,depth ...", as [VancouverMapData] keeps its blocks. */
     private fun lotsOf(text: String): List<Lot> = text.split(' ').filter { it.isNotEmpty() }.map { group ->
         val (x, z, width, depth) = group.split(',').map { it.toInt() }
@@ -805,6 +845,7 @@ object Neighbourhood {
     private const val STATION_LENGTH = 8.0
     private const val PILLAR_GAP = 7.0
     private const val TREE_GAP = 6
+    private const val CLEAR_OF_WAYS = 1.6
     private const val GREEN_TREES_WITHIN = 45.0
     private const val FLOWERS_PER_GREEN = 12
     private const val BEYOND_STEP = 9
