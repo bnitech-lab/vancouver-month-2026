@@ -3,9 +3,13 @@ package vancouvermonth.web
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.sin
 import kotlin.random.Random
+import org.khronos.webgl.Float32Array
+import org.khronos.webgl.set
+import vancouvermonth.text.Weather
 
 // The town's small motions, each worked out from the town's own time in milliseconds and nothing else, so a test can
 // ask where anything is at any moment without drawing.
@@ -182,4 +186,168 @@ object Clouds {
     }
 
     private const val CLOUD = 0xFFFFFF
+
+    /** The clouds' colour under [weather]'s sky: white on a sunny day, grey on a cloudy one, darker in the rain. */
+    fun colour(weather: Weather): Int = when (weather) {
+        Weather.SUNNY -> CLOUD
+        Weather.CLOUDY -> 0xDCE1E6
+        Weather.RAINY -> 0xAEB6BF
+    }
+}
+
+/**
+ * Rain on a rainy day: thin streaks falling in a box of sky around [centre][write], a light wind from the west
+ * slanting them, and small splashes flashing on the ground. Each streak keeps its own place in the town, so the rain
+ * stays put as the camera moves; one that leaves the box on one side comes back on the other, so the box is always
+ * full and [DROPS] streaks are enough. Worked out from the town's time alone, like the rest of its life.
+ */
+object Rain {
+    const val DROPS = 420
+    const val SPLASHES = 48
+
+    /** How wide and deep the box of sky is, and how high it reaches from the ground. */
+    const val SPAN = 40.0
+    const val TOP = 14.0
+
+    /** A streak's length and thickness. */
+    const val STREAK = 0.8
+    const val THIN = 0.03
+
+    /** How far east a streak drifts for each unit it falls. */
+    const val SLANT = 0.15
+
+    /** How fast the rain falls, in units a millisecond, give or take a seventh. */
+    const val FALL = 0.012
+
+    /** How long one splash lasts, out of its round of [SPLASH_MILLIS], and how wide it is when it starts. */
+    const val SPLASH_MILLIS = 650.0
+    const val SPLASH_SHOWS = 0.18
+    const val SPLASH_SIZE = 0.22
+
+    /** How high a splash sits: just over the street and the pavements, or just over the sea. */
+    const val SPLASH_HEIGHT = 0.09
+    private const val SEA_SPLASH_HEIGHT = Shimmer.SEA_TOP + 0.02
+
+    /** Each streak's place in the town, before the box is moved round it, its speed and where it starts its fall. */
+    private val dropX = DoubleArray(DROPS)
+    private val dropZ = DoubleArray(DROPS)
+    private val dropSpeed = DoubleArray(DROPS)
+    private val dropPhase = DoubleArray(DROPS)
+
+    init {
+        val random = Random(17)
+        for (index in 0 until DROPS) {
+            dropX[index] = random.nextDouble() * SPAN
+            dropZ[index] = random.nextDouble() * SPAN
+            dropSpeed[index] = FALL * (0.86 + 0.28 * random.nextDouble())
+            dropPhase[index] = random.nextDouble()
+        }
+    }
+
+    /** How far through its fall streak [index] is at [millis], from 0.0 at the top of the box to nearly 1.0 at the ground. */
+    private fun fallen(index: Int, millis: Double): Double {
+        val fall = millis * dropSpeed[index] / TOP + dropPhase[index]
+        return fall - floor(fall)
+    }
+
+    /** [value] brought into the box of [SPAN] that starts at [from], round and round. */
+    private fun wrap(value: Double, from: Double): Double {
+        val inside = (value - from) % SPAN
+        return from + if (inside < 0) inside + SPAN else inside
+    }
+
+    /** The top of streak [index] at [millis], with the box of sky centred on [centreX], [centreZ]. */
+    fun dropAt(index: Int, millis: Double, centreX: Double, centreZ: Double): Point {
+        val fall = fallen(index, millis)
+        return Point(
+            wrap(dropX[index] + SLANT * TOP * fall, centreX - SPAN / 2),
+            TOP * (1 - fall),
+            wrap(dropZ[index], centreZ - SPAN / 2),
+        )
+    }
+
+    /** Where splash [index] is at [millis] around [centreX], [centreZ], and how wide: next to nothing between splashes. */
+    fun splashAt(index: Int, millis: Double, centreX: Double, centreZ: Double): Block {
+        val beat = millis / SPLASH_MILLIS + index * 0.37
+        val round = floor(beat)
+        val through = beat - round
+        // A new spot every round, from the round and the splash's number alone.
+        val x = wrap(SPAN * scatter(index * 7.13 + round * 1.71), centreX - SPAN / 2)
+        val z = wrap(SPAN * scatter(index * 3.31 + round * 2.93 + 0.5), centreZ - SPAN / 2)
+        val size = if (through < SPLASH_SHOWS) SPLASH_SIZE * (0.4 + through / SPLASH_SHOWS) else MIN_SIZE
+        val y = if (z < SEA_EDGE) SEA_SPLASH_HEIGHT else SPLASH_HEIGHT
+        return Block(x - size / 2, y, z - size / 2, size, 0.01, size, 0)
+    }
+
+    /**
+     * Writes every streak and then every splash at [millis] into [into], sixteen numbers each, column by column as
+     * Three.js keeps a matrix, with the box of sky centred on [centreX], [centreZ]. It makes nothing new, since it runs
+     * on every beat of the town's life.
+     */
+    fun write(millis: Double, centreX: Double, centreZ: Double, into: Float32Array) {
+        val west = centreX - SPAN / 2
+        val north = centreZ - SPAN / 2
+        for (index in 0 until DROPS) {
+            val fall = fallen(index, millis)
+            val at = index * 16
+            // Stretched to a thin streak whose top leans west, as the wind blows it east on the way down.
+            into[at] = THIN.toFloat()
+            into[at + 1] = 0f
+            into[at + 2] = 0f
+            into[at + 3] = 0f
+            into[at + 4] = (-SLANT * STREAK).toFloat()
+            into[at + 5] = STREAK.toFloat()
+            into[at + 6] = 0f
+            into[at + 7] = 0f
+            into[at + 8] = 0f
+            into[at + 9] = 0f
+            into[at + 10] = THIN.toFloat()
+            into[at + 11] = 0f
+            into[at + 12] = (wrap(dropX[index] + SLANT * TOP * fall, west) + SLANT * STREAK / 2).toFloat()
+            into[at + 13] = (TOP * (1 - fall) - STREAK / 2).toFloat()
+            into[at + 14] = wrap(dropZ[index], north).toFloat()
+            into[at + 15] = 1f
+        }
+        for (index in 0 until SPLASHES) {
+            val splash = splashAt(index, millis, centreX, centreZ)
+            val at = (DROPS + index) * 16
+            for (offset in 0 until 16) into[at + offset] = 0f
+            into[at] = splash.width.toFloat()
+            into[at + 5] = splash.height.toFloat()
+            into[at + 10] = splash.depth.toFloat()
+            into[at + 12] = (splash.x + splash.width / 2).toFloat()
+            into[at + 13] = (splash.y + splash.height / 2).toFloat()
+            into[at + 14] = (splash.z + splash.depth / 2).toFloat()
+            into[at + 15] = 1f
+        }
+    }
+
+    /** A number from 0.0 to 1.0 that looks random but comes from [seed] alone. */
+    private fun scatter(seed: Double): Double {
+        val value = sin(seed * 12.9898) * 43_758.5453
+        return value - floor(value)
+    }
+
+    /**
+     * Puddles left on the street and the pavements on a rainy day, catching the grey sky: flat boxes just over the
+     * stone, which stay where they are.
+     */
+    val puddles: List<Block> = listOf(
+        Block(3.2, 0.052, 12.6, 1.6, 0.012, 0.8, PUDDLE),
+        Block(11.0, 0.052, 13.9, 1.1, 0.012, 0.7, PUDDLE),
+        Block(15.4, 0.062, 10.4, 1.3, 0.012, 0.6, PUDDLE),
+        Block(21.6, 0.052, 12.4, 1.8, 0.012, 0.9, PUDDLE),
+        Block(25.2, 0.062, 15.5, 1.2, 0.012, 0.7, PUDDLE),
+        Block(33.8, 0.052, 13.6, 1.5, 0.012, 0.8, PUDDLE),
+        Block(40.6, 0.062, 10.5, 1.0, 0.012, 0.6, PUDDLE),
+        Block(44.2, 0.052, 12.9, 1.4, 0.012, 0.9, PUDDLE),
+        Block(-4.5, 0.052, 13.2, 1.3, 0.012, 0.7, PUDDLE),
+        Block(8.6, 0.032, 0.6, 1.4, 0.012, 0.7, PUDDLE),
+        Block(30.5, 0.032, 1.1, 1.6, 0.012, 0.6, PUDDLE),
+    )
+
+    /** North of this the box of sky is over the sea, past the seawall's edge. */
+    private const val SEA_EDGE = -0.4
+    private const val MIN_SIZE = 0.001
+    private const val PUDDLE = 0x9DB2C4
 }

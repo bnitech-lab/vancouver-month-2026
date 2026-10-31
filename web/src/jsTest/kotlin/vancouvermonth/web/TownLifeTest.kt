@@ -5,6 +5,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+import org.khronos.webgl.Float32Array
+import org.khronos.webgl.get
+import vancouvermonth.text.Weather
 
 class TownLifeTest {
     /** The town's time every [step] milliseconds over [millis]. */
@@ -154,5 +157,109 @@ class TownLifeTest {
             }
             last = now
         }
+    }
+
+    @Test
+    fun `every streak of rain stays in its box of sky and falls, wherever the box is`() {
+        for ((centreX, centreZ) in listOf(0.0 to 0.0, 24.3 to 13.5, -37.2 to 51.9, 47.0 to -5.0)) {
+            val west = centreX - Rain.SPAN / 2
+            val north = centreZ - Rain.SPAN / 2
+            var falling = 0
+            var wrapped = 0
+            for (t in times(3_000.0, 40.0)) {
+                for (index in 0 until Rain.DROPS) {
+                    val drop = Rain.dropAt(index, t, centreX, centreZ)
+                    assertTrue(drop.x >= west && drop.x < west + Rain.SPAN, "streak $index at $t: x ${drop.x}")
+                    assertTrue(drop.z >= north && drop.z < north + Rain.SPAN, "streak $index at $t: z ${drop.z}")
+                    assertTrue(drop.y > 0.0 && drop.y <= Rain.TOP, "streak $index at $t: y ${drop.y}")
+                    val next = Rain.dropAt(index, t + 20.0, centreX, centreZ)
+                    when {
+                        next.y < drop.y -> {
+                            falling += 1
+                            // Down by about the speed of rain, and a little east with the wind, nothing more.
+                            val fall = drop.y - next.y
+                            assertTrue(fall in 20 * Rain.FALL * 0.85..20 * Rain.FALL * 1.15, "streak $index fell $fall")
+                            assertEquals(drop.z, next.z, "streak $index moved north or south")
+                        }
+                        else -> wrapped += 1
+                    }
+                }
+            }
+            // A streak goes back to the top only once a fall, about every second.
+            assertTrue(wrapped < falling / 40, "$wrapped went back up, $falling fell")
+        }
+    }
+
+    @Test
+    fun `rain stays put in the town as the box of sky moves with the camera`() {
+        // Moving the box by a little leaves every streak still in it exactly where it was.
+        for (index in 0 until Rain.DROPS) {
+            val here = Rain.dropAt(index, 500.0, 20.0, 13.0)
+            val there = Rain.dropAt(index, 500.0, 21.0, 13.5)
+            val inBoth = here.x >= 21.0 - Rain.SPAN / 2 && here.z >= 13.5 - Rain.SPAN / 2
+            if (!inBoth) continue
+            assertEquals(here.x, there.x, 1e-9, "streak $index")
+            assertEquals(here.y, there.y, 1e-9, "streak $index")
+            assertEquals(here.z, there.z, 1e-9, "streak $index")
+        }
+    }
+
+    @Test
+    fun `the rain written for drawing is the rain worked out, streaks and splashes`() {
+        val numbers = Float32Array((Rain.DROPS + Rain.SPLASHES) * 16)
+        Rain.write(1_234.0, 24.3, 13.5, numbers)
+        for (index in listOf(0, 17, Rain.DROPS - 1)) {
+            val drop = Rain.dropAt(index, 1_234.0, 24.3, 13.5)
+            val at = index * 16
+            // The streak's middle: half a streak under its top, half a lean east of it.
+            assertEquals(drop.x + Rain.SLANT * Rain.STREAK / 2, numbers[at + 12].toDouble(), 1e-4)
+            assertEquals(drop.y - Rain.STREAK / 2, numbers[at + 13].toDouble(), 1e-4)
+            assertEquals(drop.z, numbers[at + 14].toDouble(), 1e-4)
+            assertEquals(Rain.STREAK, numbers[at + 5].toDouble(), 1e-6)
+        }
+        for (index in 0 until Rain.SPLASHES) {
+            val splash = Rain.splashAt(index, 1_234.0, 24.3, 13.5)
+            val at = (Rain.DROPS + index) * 16
+            assertEquals(splash.x + splash.width / 2, numbers[at + 12].toDouble(), 1e-4)
+            assertEquals(splash.width, numbers[at].toDouble(), 1e-6)
+        }
+    }
+
+    @Test
+    fun `splashes flash on the ground or the sea for a moment, each time somewhere else`() {
+        var shown = 0
+        val spots = mutableSetOf<Pair<Int, Int>>()
+        for (t in times(Rain.SPLASH_MILLIS * 6, 25.0)) {
+            for (index in 0 until Rain.SPLASHES) {
+                val splash = Rain.splashAt(index, t, 24.3, 13.5)
+                assertTrue(splash.width <= Rain.SPLASH_SIZE * 1.4 + 1e-9, "$splash")
+                assertTrue(splash.y == Rain.SPLASH_HEIGHT || splash.z + splash.depth / 2 < 0.0, "a splash in the air: $splash")
+                assertTrue(splash.x >= 24.3 - Rain.SPAN / 2 - 1.0 && splash.x <= 24.3 + Rain.SPAN / 2, "$splash")
+                if (splash.width > 0.01) {
+                    shown += 1
+                    spots += splash.x.toInt() to splash.z.toInt()
+                }
+            }
+        }
+        val share = shown.toDouble() / (Rain.SPLASHES * times(Rain.SPLASH_MILLIS * 6, 25.0).size)
+        assertTrue(share in Rain.SPLASH_SHOWS * 0.7..Rain.SPLASH_SHOWS * 1.3, "shown $share of the time")
+        assertTrue(spots.size > Rain.SPLASHES * 3, "splashes keep to the same spots: ${spots.size}")
+    }
+
+    @Test
+    fun `puddles lie flat on the street, the pavements or the seawall, just over the stone`() {
+        for (puddle in Rain.puddles) {
+            assertTrue(puddle.height < 0.02 && puddle.y in 0.03..0.07, "$puddle")
+            val onStreet = puddle.z >= Neighbourhood.STREET_NORTH && puddle.z + puddle.depth <= Neighbourhood.STREET_SOUTH
+            val onSeawall = puddle.z >= 0.0 && puddle.z + puddle.depth <= 2.0
+            assertTrue(onStreet || onSeawall, "$puddle")
+        }
+    }
+
+    @Test
+    fun `the clouds grey with the weather`() {
+        assertEquals(0xFFFFFF, Clouds.colour(Weather.SUNNY))
+        assertTrue(DayLight.lightness(Clouds.colour(Weather.RAINY)) < DayLight.lightness(Clouds.colour(Weather.CLOUDY)))
+        assertTrue(DayLight.lightness(Clouds.colour(Weather.CLOUDY)) < DayLight.lightness(Clouds.colour(Weather.SUNNY)))
     }
 }
