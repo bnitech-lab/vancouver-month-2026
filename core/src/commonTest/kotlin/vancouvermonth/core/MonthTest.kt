@@ -67,6 +67,47 @@ class MonthTest {
     }
 
     @Test
+    fun `without energy every action but rest is blocked for lack of energy`() {
+        val month = month()
+        repeat(Month.MAX_ENERGY) { month.take(Action.WORK) }
+        for (action in Action.entries) {
+            assertEquals(if (action == Action.REST) null else Blocked.NO_ENERGY, month.blockedBy(action), "$action")
+        }
+    }
+
+    @Test
+    fun `a booked interview blocks only another application`() {
+        val month = month(lucky = true)
+        month.take(Action.APPLY)
+        assertEquals(Blocked.INTERVIEW_BOOKED, month.blockedBy(Action.APPLY))
+        for (action in Action.entries - Action.APPLY) assertNull(month.blockedBy(action), "$action")
+    }
+
+    @Test
+    fun `late in the month applications are blocked as closed`() {
+        val month = month(balance = 5_000, lucky = false)
+        while (month.canStillApplyThisMonth) month.take(Action.REST)
+        assertEquals(Blocked.APPLICATIONS_CLOSED, month.blockedBy(Action.APPLY))
+        for (action in Action.entries - Action.APPLY) assertNull(month.blockedBy(action), "$action")
+    }
+
+    @Test
+    fun `an interview day blocks every action, rest included`() {
+        val month = month(lucky = true)
+        month.take(Action.APPLY)
+        month.take(Action.REST)
+        assertTrue(month.hasInterviewToday)
+        for (action in Action.entries) assertEquals(Blocked.INTERVIEW_TODAY, month.blockedBy(action), "$action")
+    }
+
+    @Test
+    fun `a finished month blocks every action`() {
+        val month = month(balance = 5_000)
+        while (!month.isOver) month.take(Action.REST)
+        for (action in Action.entries) assertEquals(Blocked.MONTH_OVER, month.blockedBy(action), "$action")
+    }
+
+    @Test
     fun `a lucky application books a phone screen and blocks another application`() {
         val month = month(lucky = true)
         val events = month.take(Action.APPLY)

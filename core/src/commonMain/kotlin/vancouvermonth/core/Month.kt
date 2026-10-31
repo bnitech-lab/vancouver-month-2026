@@ -23,6 +23,24 @@ enum class Ending {
     SURVIVED,
 }
 
+/** Why an action cannot be taken today. */
+enum class Blocked {
+    /** The month has ended. */
+    MONTH_OVER,
+
+    /** Today belongs to the interview that falls on it. */
+    INTERVIEW_TODAY,
+
+    /** Out of energy: only rest is possible. */
+    NO_ENERGY,
+
+    /** An application is already in progress. */
+    INTERVIEW_BOOKED,
+
+    /** An application now could not get both interviews done by the 30th. */
+    APPLICATIONS_CLOSED,
+}
+
 /** What happened on a day, in order, for the screen to show. */
 sealed interface Event {
     data class Earned(val amount: Int) : Event
@@ -81,13 +99,18 @@ class Month(
     val canStillApplyThisMonth: Boolean
         get() = day + PHONE_SCREEN_DELAY.first <= LAST_PHONE_SCREEN_DAY
 
-    fun canTake(action: Action): Boolean = when {
-        isOver || hasInterviewToday -> false
-        action == Action.REST -> true
-        energy == 0 -> false
-        action == Action.APPLY -> interview == null && canStillApplyThisMonth
-        else -> true
+    /** Why [action] cannot be taken today, or null when it can. */
+    fun blockedBy(action: Action): Blocked? = when {
+        isOver -> Blocked.MONTH_OVER
+        hasInterviewToday -> Blocked.INTERVIEW_TODAY
+        action == Action.REST -> null
+        energy == 0 -> Blocked.NO_ENERGY
+        action == Action.APPLY && interview != null -> Blocked.INTERVIEW_BOOKED
+        action == Action.APPLY && !canStillApplyThisMonth -> Blocked.APPLICATIONS_CLOSED
+        else -> null
     }
+
+    fun canTake(action: Action): Boolean = blockedBy(action) == null
 
     /** Spends today on [action]. */
     fun take(action: Action): List<Event> {

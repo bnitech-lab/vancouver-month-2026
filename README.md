@@ -79,16 +79,35 @@ BNI Tech
 
 A test plays this seed and checks that the screen still matches this sample.
 
+### On a phone screen
+
+The same game, drawn for a phone held upright, also works in a desktop browser. Build it, then open
+`web/build/dist/js/productionExecutable/index.html` from disk or put that folder on any static host:
+
+```sh
+./gradlew :web:jsBrowserDistribution
+open web/build/dist/js/productionExecutable/index.html   # add ?seed=1011 to replay a seed
+```
+
+The first build downloads Node.js and the npm packages the Kotlin/JS build uses.
+
 ## How it is built
 
 | Part | What | Notes |
 |---|---|---|
-| `core` | The rules: rooms, the score, the month, interviews, endings | Kotlin standard library only, so the same rules can later run in a browser or on a server. All luck goes through one `Dice` interface, so tests can control it |
+| `core` | The rules: rooms, the score, the month, interviews, endings | Kotlin Multiplatform, standard library only, so the same rules run on the JVM and in a browser. All luck goes through one `Dice` interface, so tests can control it |
+| `text` | The Korean lines both screens share (amounts, dates, actions, events, endings) and how a typed amount is read | Kotlin Multiplatform, no layout |
 | `terminal` | The text screen | Kotlin on the JVM |
+| `web` | The phone screen in a browser | Kotlin/JS drawing the page with the DOM, plain CSS, no framework |
 
 ```sh
-./gradlew test        # rules, balance and screen tests
+./gradlew test                                  # rules, balance and screen tests, on the JVM and in headless Chrome
+./gradlew :core:jvmTest --tests '*MonthTest*'   # one test class, on the JVM only
 ```
+
+The browser tests run in Chrome, so `./gradlew test` needs Chrome installed. `./gradlew test` does not take
+`--tests`: to run some tests only, name the module's JVM test task, which is `jvmTest` in `core` and `text`
+and `test` in `terminal` (for example `./gradlew :terminal:test --tests '*TerminalGameTest*'`).
 
 Rooms come from a seed. Farther zones have lower rent and a dearer pass, and utilities may or may not be
 included, so the room with the lowest rent has the lowest total in only a bit more than half of the deals.
@@ -110,7 +129,7 @@ or wage.
 
 ## What comes next
 
-A phone screen in the browser, then the town drawn as a small 3D map.
+The town drawn as a small 3D map.
 
 ## Licence
 
