@@ -182,8 +182,9 @@ darker one in the evening (from 18:00), and at night (from 22:00) only a quiet b
 like the sea, under a few slow notes. A talk opens with a soft blip, a line types out with very quiet ticks (at most
 one every 110 ms), and the change of day rings a gentle chime.
 
-Sound is off until the player turns it on with the switch (소리 켜기 / 소리 끄기, a toggle button with `aria-pressed`) in
-the town's top card, at the top of the button screen, and by the title on the room and ending screens. The browser's
+Sound is off until the player turns it on with the switch in the town's top card, at the top of the button screen, and
+by the title on the room and ending screens. It is a plain button whose words say what a tap does, 소리 켜기 or 소리 끄기;
+it has no `aria-pressed`, since ARIA's guidance for toggle buttons keeps a toggle's name steady. The browser's
 audio is made only on that tap, as browsers require. The choice is kept in `localStorage`; when it was left on, the
 sound comes back on the first tap anywhere. It pauses while the page is hidden, fades in and out, and plays quietly
 through a limiter. Where the browser has no Web Audio there is no switch, and where storage is refused nothing is

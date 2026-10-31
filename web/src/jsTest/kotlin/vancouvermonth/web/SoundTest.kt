@@ -109,19 +109,21 @@ class SoundTest {
         sound.button(root)
         val button = switchIn()
         assertEquals("소리 켜기", button.textContent)
-        assertEquals("false", button.getAttribute("aria-pressed"))
         assertEquals("button", button.type)
+        // A plain action button: its words say what a tap does, so it carries no pressed state.
+        assertNull(button.getAttribute("aria-pressed"))
         assertEquals(0, made, "The sound was made before a tap")
 
         button.click()
         assertEquals("소리 끄기", button.textContent)
-        assertEquals("true", button.getAttribute("aria-pressed"))
+        assertNull(button.getAttribute("aria-pressed"))
+        assertTrue(button.classList.contains("on"))
         assertEquals(1, made)
         assertEquals(listOf("on"), speaker.asked)
 
         button.click()
         assertEquals("소리 켜기", button.textContent)
-        assertEquals("false", button.getAttribute("aria-pressed"))
+        assertTrue(!button.classList.contains("on"))
         button.click()
         assertEquals(1, made, "The same sound plays again")
         assertEquals(listOf("on", "off", "on"), speaker.asked)
@@ -136,7 +138,6 @@ class SoundTest {
 
         // The page opens again with the same storage: the switch is on, but nothing plays before a tap.
         sound(store).button(root)
-        assertEquals("true", switchIn().getAttribute("aria-pressed"))
         assertEquals("소리 끄기", switchIn().textContent)
         made = 0
         speaker.asked.clear()
@@ -150,7 +151,7 @@ class SoundTest {
         switchIn().click()
         root.innerHTML = ""
         sound(store).button(root)
-        assertEquals("false", switchIn().getAttribute("aria-pressed"))
+        assertEquals("소리 켜기", switchIn().textContent)
     }
 
     @Test
@@ -159,7 +160,7 @@ class SoundTest {
         store.setItem("vancouver-month.sound", "on")
         sound(store).button(root)
         switchIn().click()
-        assertEquals("false", switchIn().getAttribute("aria-pressed"))
+        assertEquals("소리 켜기", switchIn().textContent)
         assertEquals(0, made, "The sound was made only to be turned off")
         assertEquals("off", store.items["vancouver-month.sound"])
     }
@@ -170,9 +171,9 @@ class SoundTest {
             root.innerHTML = ""
             val sound = Sound(memory, { made += 1; speaker }).also { sounds += it }
             sound.button(root)
-            assertEquals("false", switchIn().getAttribute("aria-pressed"))
+            assertEquals("소리 켜기", switchIn().textContent)
             switchIn().click()
-            assertEquals("true", switchIn().getAttribute("aria-pressed"))
+            assertEquals("소리 끄기", switchIn().textContent)
         }
         assertEquals(2, made)
     }

@@ -52,7 +52,11 @@ internal class Sound(
         }
     }
 
-    /** Adds the switch to [parent]: its words say what a tap does, and it is pressed while the sound is on. */
+    /**
+     * Adds the switch to [parent]: a plain button whose words say what a tap does, filled while the sound is on. It is
+     * not a toggle button with aria-pressed, since its words change: ARIA's guidance for toggle buttons keeps the name
+     * steady, or a screen reader would read two states at once.
+     */
     fun button(parent: HTMLElement) {
         if (makeSpeaker == null) return
         val button = document.createElement("button") as HTMLButtonElement
@@ -68,7 +72,7 @@ internal class Sound(
 
     private fun show(button: HTMLButtonElement) {
         button.textContent = soundLabel(isOn)
-        button.setAttribute("aria-pressed", isOn.toString())
+        button.classList.toggle("on", isOn)
     }
 
     private fun toggle() {

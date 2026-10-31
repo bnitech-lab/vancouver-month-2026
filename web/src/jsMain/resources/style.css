@@ -949,7 +949,7 @@ html:has(.walk-town) {
   border-radius: 999px;
 }
 
-.sound-switch[aria-pressed="true"] {
+.sound-switch.on {
   color: var(--on-accent);
   background: var(--accent);
 }

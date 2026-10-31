@@ -66,7 +66,7 @@ class SoundInGameTest {
         switchIn().click()
         startSeed1011(root)
         val topbar = assertNotNull(root.querySelector(".topbar") as? HTMLElement)
-        assertEquals("true", switchIn(topbar).getAttribute("aria-pressed"))
+        assertEquals("소리 끄기", switchIn(topbar).textContent)
         root.button("영어 공부").click()
         assertEquals(listOf("on", "chime"), speaker.asked)
     }
@@ -81,7 +81,7 @@ class SoundInGameTest {
         startSeed1011(root)
         val hud = assertNotNull(root.querySelector(".hud") as? HTMLElement)
         switchIn(hud).click()
-        assertEquals("true", switchIn().getAttribute("aria-pressed"))
+        assertEquals("소리 끄기", switchIn().textContent)
 
         // The town tells the game the player turned to the café's person, as a tap on her would.
         town.onPlace(Place.CAFE)
