@@ -424,6 +424,19 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     /** True while the camera follows the train under downtown, at the station there, rather than on the line. */
     private var focusUnderground = false
 
+    /**
+     * Where a ride's vehicle, and the loop's bus or boat, are worked out in place, as x, z and the turn: nothing new is
+     * made for them each frame.
+     */
+    private val ridePlace = DoubleArray(3)
+    private val loopPlace = DoubleArray(3)
+    private val trainPlace = DoubleArray(3)
+
+    /** Where the character stands on the water bus, worked out each frame of the ride. */
+    private var aboardX = 0.0
+    private var aboardY = 0.0
+    private var aboardZ = 0.0
+
     /** Where the camera was when the names were last laid out, and whether the town was resized since. */
     private var labelsEye: Point? = null
     private var labelsFocus: Point? = null
@@ -977,8 +990,11 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         marker.visible = false
         rentAt = -1
         stopAt = -1
-        // A vehicle of the same kind still going on from the last ride gives way to this one.
-        if (leaving?.transport == transport) leaving = null
+        // A vehicle still going on from the last ride gives way to this one, rather than stand still in the street.
+        if (leaving != null) {
+            leaving = null
+            hideRideVehicle()
+        }
         val now = window.performance.now()
         journey = made
         journeyStarted = now
@@ -1014,7 +1030,10 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         Transport.WATER_BUS -> {
             val docks = TransitLines.docks
             val (way, distance) = Journey.roundLoop(TransitLines.boatLoop, docks[from].along, docks[to].along, Journey.GOING_ON)
-            Journey(transport, way, distance, docks[to].wait, Journey.BOAT_SPEED, Journey.BOAT_RAMP)
+            Journey(
+                transport, way, distance, docks[to].wait, Journey.BOAT_SPEED, Journey.BOAT_RAMP,
+                from = docks[from].wait,
+            )
         }
         Transport.TAXI -> taxiWay(TransitLines.taxiStops[to].second)?.let { route ->
             val there = route.zipWithNext { a, b -> distanceBetween(a, b) }.sum()
@@ -1117,16 +1136,17 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     /** The character, and the camera's subject, where the vehicle is [elapsed] into [going]. */
     private fun followRide(going: Journey, elapsed: Double) {
+        val place = ridePlace
         if (going.transport == Transport.SKYTRAIN) {
             val along = going.alongAt(elapsed)
             val underground = along < UNDER_DOWNTOWN
             if (underground) {
-                val station = TransitLines.stations.first { it.underground }
-                spot = station.door
+                spot = DOWNTOWN_DOOR
                 focusHeight = FOCUS_HEIGHT
             } else {
-                spot = Neighbourhood.guideway.spotAt(along)
-                heading = Neighbourhood.guideway.turnAt(along) + PI / 2
+                Neighbourhood.guideway.placeAt(along, place)
+                spot = Spot(place[0], place[1])
+                heading = place[2] + PI / 2
                 focusHeight = Neighbourhood.DECK_HEIGHT + TRAIN_FOCUS
             }
             if (underground != focusUnderground) {
@@ -1136,25 +1156,70 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             }
             return
         }
-        val along = going.travelled(elapsed)
-        spot = going.way.spotAt(along)
-        heading = going.way.turnAt(along) + PI / 2
+        going.way.placeAt(going.travelled(elapsed), place)
+        spot = Spot(place[0], place[1])
+        heading = place[2] + PI / 2
         focusHeight = FOCUS_HEIGHT
+        if (going.transport == Transport.WATER_BUS) standAboard(going, elapsed, place[0], place[1], place[2])
+    }
+
+    /**
+     * Where the character stands on the water bus at [x], [z] turned [turn]: on the open deck ahead of the cabin; while
+     * getting on, along the pier from the dock to there, and while stepping out, from there to the dock it gets out at.
+     */
+    private fun standAboard(going: Journey, elapsed: Double, x: Double, z: Double, turn: Double) {
+        val deckX = x + TransitLines.BOAT_STAND * cos(turn)
+        val deckZ = z - TransitLines.BOAT_STAND * sin(turn)
+        val from = going.from
+        val off = elapsed - (going.millis - Journey.ALIGHT_MILLIS)
+        val share: Double
+        val startX: Double
+        val startZ: Double
+        val endX: Double
+        val endZ: Double
+        if (elapsed < Journey.BOARD_MILLIS && from != null) {
+            share = elapsed / Journey.BOARD_MILLIS
+            startX = from.x
+            startZ = from.z
+            endX = deckX
+            endZ = deckZ
+        } else if (off > 0) {
+            share = off / Journey.ALIGHT_MILLIS
+            startX = deckX
+            startZ = deckZ
+            endX = going.out.x
+            endZ = going.out.z
+        } else {
+            aboardX = deckX
+            aboardY = TransitLines.DECK
+            aboardZ = deckZ
+            return
+        }
+        val eased = share.coerceIn(0.0, 1.0)
+        aboardX = startX + (endX - startX) * eased
+        aboardZ = startZ + (endZ - startZ) * eased
+        // Down from the pier onto the deck, and back up.
+        val onDeck = if (off > 0) 1 - eased else eased
+        aboardY = TransitLines.DECK * onDeck
     }
 
     /** Draws the vehicle of [going] where it is [elapsed] into the ride. */
     private fun placeRideVehicle(going: Journey, elapsed: Double) {
-        val along = going.travelled(elapsed)
-        val at = going.way.spotAt(along)
-        val turn = going.way.turnAt(along)
-        val (slot, model) = when (going.transport) {
-            Transport.BUS -> RIDE_BUS to TransitLines.bus
-            Transport.WATER_BUS -> RIDE_BOAT to TransitLines.boat
-            else -> TAXI to TransitLines.taxi
+        val place = ridePlace
+        going.way.placeAt(going.travelled(elapsed), place)
+        val slot = when (going.transport) {
+            Transport.BUS -> RIDE_BUS
+            Transport.WATER_BUS -> RIDE_BOAT
+            else -> TAXI
+        }
+        val model = when (going.transport) {
+            Transport.BUS -> TransitLines.bus
+            Transport.WATER_BUS -> TransitLines.boat
+            else -> TransitLines.taxi
         }
         if (vehicleShown != null && vehicleShown != going.transport) hideRideVehicle()
         vehicleShown = going.transport
-        VehicleBoxes.write(model, slot, at.x, 0.0, at.z, turn, false, vehicles.instanceMatrix.array)
+        VehicleBoxes.write(model, slot, place[0], 0.0, place[1], place[2], false, vehicles.instanceMatrix.array)
         vehicles.instanceMatrix.needsUpdate = true
     }
 
@@ -1210,15 +1275,14 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     /** How fast the ridden train goes now, for its rumble. */
     private var trainRideSpeed = 0.0
 
-    /** The bus and the water bus on their loops, where the town's clock at [millis] has them. */
+    /** The bus and the water bus on their loops, where the town's clock at [millis] has them. It makes nothing new. */
     private fun placeLoopVehicles(millis: Double) {
         val array = vehicles.instanceMatrix.array
-        val bus = busRun.alongAt(millis)
-        val busAt = TransitLines.busLoop.spotAt(bus)
-        VehicleBoxes.write(TransitLines.bus, BUS_ON_LOOP, busAt.x, 0.0, busAt.z, TransitLines.busLoop.turnAt(bus), false, array)
-        val boat = boatRun.alongAt(millis)
-        val boatAt = TransitLines.boatLoop.spotAt(boat)
-        VehicleBoxes.write(TransitLines.boat, BOAT_ON_LOOP, boatAt.x, 0.0, boatAt.z, TransitLines.boatLoop.turnAt(boat), false, array)
+        val place = loopPlace
+        TransitLines.busLoop.placeAt(busRun.alongAt(millis), place)
+        VehicleBoxes.write(TransitLines.bus, BUS_ON_LOOP, place[0], 0.0, place[1], place[2], false, array)
+        TransitLines.boatLoop.placeAt(boatRun.alongAt(millis), place)
+        VehicleBoxes.write(TransitLines.boat, BOAT_ON_LOOP, place[0], 0.0, place[1], place[2], false, array)
         vehicles.instanceMatrix.needsUpdate = true
     }
 
@@ -1966,10 +2030,13 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             val west = Neighbourhood.TRAIN_STOP + shift + car * Neighbourhood.CAR_SPACING
             val middle = west + Neighbourhood.CAR_LENGTH / 2
             val inTunnel = middle + Neighbourhood.CAR_LENGTH / 2 < 0
-            val spot = Neighbourhood.guideway.spotAt(middle)
-            val turn = Neighbourhood.guideway.turnAt(middle)
-            TrainCars.write(Neighbourhood.trainCar, car, spot, turn, inTunnel, trainCars.instanceMatrix.array)
-            TrainCars.write(Neighbourhood.trainCarWindows, car, spot, turn, inTunnel, trainWindows.instanceMatrix.array)
+            val place = trainPlace
+            Neighbourhood.guideway.placeAt(middle, place)
+            val x = place[0]
+            val z = place[1]
+            val turn = place[2]
+            TrainCars.write(Neighbourhood.trainCar, car, x, z, turn, inTunnel, trainCars.instanceMatrix.array)
+            TrainCars.write(Neighbourhood.trainCarWindows, car, x, z, turn, inTunnel, trainWindows.instanceMatrix.array)
         }
         trainCars.instanceMatrix.needsUpdate = true
         trainWindows.instanceMatrix.needsUpdate = true
@@ -2163,7 +2230,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             character.visible = aboard
             mount.visible = false
             if (aboard) {
-                character.position.set(spot.x, TransitLines.DECK, spot.z)
+                character.position.set(aboardX, aboardY, aboardZ)
                 character.rotation.y = heading
                 leftLeg.rotation.x = 0.0
                 rightLeg.rotation.x = 0.0
@@ -2361,6 +2428,9 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
          * station there.
          */
         val UNDER_DOWNTOWN = -(Neighbourhood.TRAIN_LENGTH / 2 + 1.0)
+
+        /** The door of the station under downtown, where the camera waits while the train is in the tunnel. */
+        val DOWNTOWN_DOOR = TransitLines.stations.first { it.underground }.door
 
         /** A place this near needs no taxi. */
         const val TAXI_NOT_NEEDED = 2.0

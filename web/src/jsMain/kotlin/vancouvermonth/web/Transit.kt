@@ -204,15 +204,21 @@ object TransitLines {
         Block(0.85, 0.0, -0.6, 0.5, 0.32, 1.2, TYRE),
     )
 
-    /** A small water bus: a hull, a deck, a cabin with windows, and a roof over it. */
+    /**
+     * A small water bus, its bow ahead (+x): a hull, a deck, a cabin with windows and a roof at the stern, and the open
+     * deck ahead of it, where the character stands ([BOAT_STAND]).
+     */
     val boat: List<Block> = listOf(
         Block(-1.5, -0.62, -0.58, 3.0, 0.5, 1.16, HULL),
         Block(-1.45, -0.14, -0.54, 2.9, 0.06, 1.08, PLANK),
-        Block(-0.9, -0.08, -0.48, 1.3, 0.62, 0.96, CABIN),
-        Block(-0.85, 0.2, -0.5, 1.2, 0.24, 1.0, WINDOW),
-        Block(-1.05, 0.54, -0.55, 1.6, 0.08, 1.1, ROOF),
+        Block(-1.4, -0.08, -0.48, 1.1, 0.62, 0.96, CABIN),
+        Block(-1.36, 0.2, -0.5, 1.02, 0.24, 1.0, WINDOW),
+        Block(-1.5, 0.54, -0.55, 1.3, 0.08, 1.1, ROOF),
         Block(1.2, -0.14, -0.08, 0.38, 0.12, 0.16, HULL),
     )
+
+    /** How far ahead of the water bus's middle the character stands, on the open deck clear of the cabin. */
+    const val BOAT_STAND = 0.5
 
     /** A taxi: a pale body, a cabin with dark windows, a light on its roof, and four wheels. */
     val taxi: List<Block> = listOf(
@@ -305,6 +311,8 @@ class Journey(
     ramp: Double,
     val railFrom: Double = 0.0,
     private val railWay: Double = 1.0,
+    /** Where the character gets on from, for a ride it is seen on: the dock it waits at for the water bus. */
+    val from: Spot? = null,
 ) {
     private val there = Glide(stopAt, cruise, ramp)
     private val away = Glide(way.length - stopAt, cruise, ramp)

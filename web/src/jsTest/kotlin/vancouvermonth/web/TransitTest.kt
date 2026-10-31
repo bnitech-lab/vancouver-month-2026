@@ -154,6 +154,39 @@ class TransitTest {
     }
 
     @Test
+    fun `on the water bus the character stands on the open deck, clear of the cabin, its roof and its windows`() {
+        // The character's footprint, a little wider than it is drawn, ahead of the boat's middle.
+        val half = 0.3
+        val stand = TransitLines.BOAT_STAND
+        val above = TransitLines.boat.filter { it.y + it.height > TransitLines.DECK + 0.1 }
+        assertTrue(above.size >= 3, "the cabin, its windows and its roof")
+        for (box in above) {
+            val clear = stand - half >= box.x + box.width || stand + half <= box.x ||
+                half <= box.z || -half >= box.z + box.depth
+            assertTrue(clear, "the character at $stand stands in $box")
+        }
+        // On the boat, ahead of its middle and short of the bow.
+        val hull = TransitLines.boat.first()
+        assertTrue(stand > 0 && stand + half < hull.x + hull.width, "$stand")
+    }
+
+    @Test
+    fun `a line placed in place is where its spot and turn say, before it, along it and past it`() {
+        val out = DoubleArray(3)
+        for (line in listOf(guideway, TransitLines.busLoop, TransitLines.boatLoop)) {
+            var along = -40.0
+            while (along < line.length + 40) {
+                line.placeAt(along, out)
+                val spot = line.spotAt(along)
+                assertEquals(spot.x, out[0], 1e-9, "$along")
+                assertEquals(spot.z, out[1], 1e-9, "$along")
+                assertEquals(line.turnAt(along), out[2], 1e-9, "$along")
+                along += 0.37
+            }
+        }
+    }
+
+    @Test
     fun `a glide speeds up, goes on at its speed and slows to a stop, and a short one never reaches it`() {
         val long = Glide(100.0, 10.0, 1_000.0)
         assertEquals(11_000.0, long.millis, 1e-6)

@@ -75,14 +75,18 @@ object SkyTrainRun {
         val up = ear.y - (Neighbourhood.DECK_HEIGHT + 0.9)
         var nearest = Double.MAX_VALUE
         val steps = (Neighbourhood.TRAIN_LENGTH / 0.5).toInt()
+        val place = alongLine
         for (step in 0..steps) {
-            val spot = Neighbourhood.guideway.spotAt(west + Neighbourhood.TRAIN_LENGTH * step / steps)
-            val across = ear.x - spot.x
-            val side = ear.z - spot.z
+            Neighbourhood.guideway.placeAt(west + Neighbourhood.TRAIN_LENGTH * step / steps, place)
+            val across = ear.x - place[0]
+            val side = ear.z - place[1]
             nearest = minOf(nearest, sqrt(across * across + up * up + side * side))
         }
         return nearest
     }
+
+    /** Where a point of the train is, worked out in place: nothing new is made for each one. */
+    private val alongLine = DoubleArray(3)
 
     /** How loud a rumble [distance] away sounds: 1.0 right by it, half as loud [RUMBLE_NEAR] away, little far off. */
     fun loudnessAt(distance: Double): Double = 1 / (1 + square(distance / RUMBLE_NEAR))
@@ -481,7 +485,11 @@ object TrainCars {
      * Writes [boxes], car number [car]'s, turned by [turn] about the vertical and set down at [spot], into their
      * slots of [into]: from car times the number of boxes on. A car [hidden] in the tunnel is shrunk to nothing.
      */
-    fun write(boxes: List<Block>, car: Int, spot: Spot, turn: Double, hidden: Boolean, into: Float32Array) {
+    fun write(boxes: List<Block>, car: Int, spot: Spot, turn: Double, hidden: Boolean, into: Float32Array) =
+        write(boxes, car, spot.x, spot.z, turn, hidden, into)
+
+    /** As the other [write], set down at [x], [z]: it makes nothing new. */
+    fun write(boxes: List<Block>, car: Int, x: Double, z: Double, turn: Double, hidden: Boolean, into: Float32Array) {
         val across = cos(turn)
         val toward = sin(turn)
         for ((index, box) in boxes.withIndex()) {
@@ -496,9 +504,9 @@ object TrainCars {
             into[at + 5] = box.height.toFloat()
             into[at + 8] = (toward * box.depth).toFloat()
             into[at + 10] = (across * box.depth).toFloat()
-            into[at + 12] = (spot.x + middleX * across + middleZ * toward).toFloat()
+            into[at + 12] = (x + middleX * across + middleZ * toward).toFloat()
             into[at + 13] = (box.y + box.height / 2).toFloat()
-            into[at + 14] = (spot.z - middleX * toward + middleZ * across).toFloat()
+            into[at + 14] = (z - middleX * toward + middleZ * across).toFloat()
         }
     }
 }
