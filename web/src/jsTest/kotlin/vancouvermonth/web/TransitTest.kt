@@ -237,6 +237,14 @@ class TransitTest {
     }
 
     @Test
+    fun `the small map marks every station, bus stop and dock, and the bike shop`() {
+        assertEquals(TransitLines.stations.size, Minimap.marksOf(0))
+        assertEquals(TransitLines.busStops.size, Minimap.marksOf(1))
+        assertEquals(TransitLines.docks.size, Minimap.marksOf(2))
+        assertEquals(1, Minimap.marksOf(3))
+    }
+
+    @Test
     fun `a tap on each station, bus stop and dock finds it`() {
         assertEquals(TransitLines.tapStops.size, TransitLines.tapBoxes.size)
         assertEquals(TransitLines.stations.size + TransitLines.busStops.size + TransitLines.docks.size, TransitLines.tapStops.size)
