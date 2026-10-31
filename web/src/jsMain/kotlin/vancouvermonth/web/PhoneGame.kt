@@ -53,11 +53,11 @@ class PhoneGame(
 
     fun show() {
         root.clear()
-        val month = month
+        val current = month
         when {
-            month == null -> showRooms()
-            month.isOver -> showEnding(month)
-            else -> showDay(month)
+            current == null -> showRooms()
+            current.isOver -> showEnding(current)
+            else -> showDay(current)
         }
     }
 
