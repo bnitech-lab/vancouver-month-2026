@@ -20,6 +20,9 @@ fun placeFor(action: Action): Place = when (action) {
     Action.REST -> Place.HOME
 }
 
+/** The action a day at [place] is spent on: the other way round from [placeFor]. */
+fun actionAt(place: Place): Action = Action.entries.first { placeFor(it) == place }
+
 /** Interviews are at the office, where the applications went. */
 val INTERVIEW_PLACE: Place = Place.OFFICE
 

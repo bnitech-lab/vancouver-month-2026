@@ -122,43 +122,63 @@ different runs.
 
 ### The 3D town
 
-On the phone screen, the days of September show a small town under the top bar, drawn in 3D with
-[Three.js](https://threejs.org) from boxes only, with no image files: 내 방, 카페, 도서관, 코워킹 and 회사 in a row
-along a road, a SkyTrain station on an elevated guideway with a train, trees, the water, and the North Shore
-mountains across it. The day's buttons come right under the town, then the day's log, so even a 375x667 phone
-shows the town and every button at once. The character starts at 내 방, whose name is marked. Each tap sends it
-walking to the day's building, in under a second, while the day's log appears, and it stays there until the next
-day:
+On the phone screen, September is played in a small 3D town that fills the screen, drawn with
+[Three.js](https://threejs.org) from boxes only, with no image files. It aims for a cosy, storybook feel: soft colours,
+cartoon shading, a warm sun with soft shadows, round-headed people, round trees in leaf or blossom, flowers, fences,
+street lamps and a campfire. The five places stand on a stone street with brick pavements: 내 방 (the room picked on
+September 1st) with its garden, the 카페, the 도서관, 코워킹 and the 회사 tower, with a park and a pond, a seawall path by
+the water, a SkyTrain guideway with a station and a train, and mountains across the water. Each building's name floats
+over it. The day's figures sit thinly over the top of the screen. The month's first view looks down the street from
+its west end, high enough to show four of the buildings and their names.
 
-| Tap | Building |
+| Do | What happens |
 |---|---|
-| 카페 알바 | 카페 |
-| 영어 공부 | 도서관 |
-| 코딩 연습 | 코워킹 |
-| 지원서 넣기, 면접 보기 | 회사 |
-| 쉬기 | 내 방 |
+| Tap the ground | The character walks there, around buildings, people, trees and fences, with a marker where it goes |
+| Tap twice quickly | It dashes there instead |
+| Drag | The camera turns around the character, and tilts within limits that keep the ground in view |
+| Pinch, or the mouse wheel | The camera comes nearer or goes farther |
+| Tap a person, a building or its name, or walk up to a door or a person | The character goes to that place's person, and a talk opens (a second quick tap only hurries it there) |
 
-The town draws no frames while nothing moves, and at most two pixels per point however sharp the phone. Where the
-phone asks for less motion, the character is simply at the building, with no walk. The town is made when
-September starts, so the room screen does not wait for it, and at the ending it lets go of its drawing; the room
-screen and the ending have no town.
+A talk ignores taps for a moment after it opens, so the finger that opened it cannot also answer it. While a day
+changes into the next, the town takes no taps, drags, pinches or names, and no talk opens, until the morning.
 
-Where the browser has no WebGL 2, which Three.js needs, the town is left out and the game plays exactly as before,
-in the same order as before. If Three.js fails, the town is left out too, and the error goes to the console. A
-test forces the path without WebGL.
+Each place has one person, all invented: 하나 at the 카페, 레오 at the 도서관, 수진 at 코워킹, 마커스 at the 회사 desk and
+the neighbour grandmother by the bench at 내 방. A talk shows their name, a small face drawn from their colours, and a
+line typed one letter at a time (a tap shows all of it) that fits the day: a first meeting, low energy, money running
+short, an interview booked or failed, the first or the last week, and so on. The answers are the place's action with its
+effect (알바하기, 영어 공부, 코딩 연습, 지원서 넣기, 쉬기) or the reason it cannot be done today, 이야기 for small talk,
+and 그만. On an interview day only 회사 offers 면접 보기, and its name is marked.
 
-The layout, the building for each tap, the walk and the camera are plain Kotlin with tests (`TownMap`, `Walk` and
-`TownCamera` in `web`). `TownScene` draws them, and `Three.kt` declares only the parts of Three.js the town uses.
-Three.js makes the page's script about 575 KB instead of 70 KB (about 145 KB instead of 24 KB gzipped).
+An answer that spends the day ends it: a golden evening, a night with the windows, lamps and campfire lit, and the
+morning, in 1.5 seconds, with the character back at 내 방's door and the day's log over the top of the screen. On a day
+of rest the character spends the night sitting on the bench by the campfire, with the camera come round to the far side
+of the fire; in the morning it stands at 내 방's door and the camera is the player's own again. Every answer goes to the same rules as the buttons, so the same seed and the
+same choices end the same way in the town and with buttons; a test plays a whole month both ways. After an offer in the
+town, the neighbour has a word on the ending.
+
+The town draws no frames while nothing moves (a walk, the camera gliding, the change of day), at most two pixels per
+point however sharp the phone, and every box of a kind in one draw.
+
+Where the phone asks for less motion, the month is played with buttons, under the small fixed town of the first version,
+where the character simply appears at each day's building. Where the browser has no WebGL 2, which Three.js needs, there
+is no town and the game plays with buttons, as before. If Three.js fails, the buttons take over and the error goes to the
+console. Tests force each of these.
+
+The town's rules are plain Kotlin with tests: `Neighbourhood` (the layout, the people, which place a spot belongs to),
+`Grid` (the A* search for the way around things), `Trip` (a walk or a dash, and the double tap), `FollowCamera`
+(turning, zooming, keeping out of walls, and what a tap lands on) and `DayLight` (the light through the change of day).
+The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`). `WalkableTown` draws all of it, and
+`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js included, is about 635 KB (about
+166 KB gzipped).
 
 ## How it is built
 
 | Part | What | Notes |
 |---|---|---|
 | `core` | The rules: rooms, the score, the month, interviews, endings, and the run number for a date | Kotlin Multiplatform, standard library only, so the same rules run on the JVM and in a browser. All luck goes through one `Dice` interface, so tests can control it |
-| `text` | The Korean lines both screens share (amounts, dates, actions, events, endings, today's result line) and how a typed amount is read | Kotlin Multiplatform, no layout |
+| `text` | The Korean lines both screens share (amounts, dates, actions, events, endings, today's result line, the townspeople's lines) and how a typed amount is read | Kotlin Multiplatform, no layout |
 | `terminal` | The text screen | Kotlin on the JVM |
-| `web` | The phone screen in a browser, with the 3D town | Kotlin/JS drawing the page with the DOM, plain CSS, no framework. The town is drawn with Three.js |
+| `web` | The phone screen in a browser, with the 3D town to walk in | Kotlin/JS drawing the page with the DOM, plain CSS, no framework. The town is drawn with Three.js |
 
 ```sh
 ./gradlew test                                  # rules, balance and screen tests, on the JVM and in headless Chrome
@@ -190,7 +210,8 @@ or wage.
 
 ## What comes next
 
-Dawn plays the first version of the 3D town and decides what it shows next.
+Dawn plays the town to walk in and decides what changes. The plan's next stage adds people who walk the streets, a train
+that passes, and sound.
 
 ## Licence
 

@@ -17,6 +17,11 @@
   --sky-top: #9fcdea;
   --sky-bottom: #e2f1f8;
   --radius: 14px;
+  --talk-bg: #fff8ea;
+  --talk-border: #cdb089;
+  --talk-text: #3b2f25;
+  --talk-muted: #76603f;
+  --keyword-bg: #f6ead2;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -36,6 +41,11 @@
     --energy: #f0ad45;
     --sky-top: #5f8fb2;
     --sky-bottom: #a9c6d6;
+    --talk-bg: #2b241d;
+    --talk-border: #6b5a44;
+    --talk-text: #f1e6d2;
+    --talk-muted: #c2ab8a;
+    --keyword-bg: #3a3027;
   }
 }
 
@@ -595,4 +605,297 @@ a:focus-visible {
 .result-status {
   font-size: 14px;
   color: var(--muted);
+}
+
+/* The town to walk in. It fills the screen (set in code, with the finger kept for the town); the day's figures
+   sit over its top and a talk with a place's person over its bottom. */
+
+html:has(.walk-town) {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.walk-town {
+  background: #bfe3f5;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Each building's name floats over the picture, which looks the same in both themes, so its colours stay fixed.
+   The name is a button: a tap on it talks to the place's person. */
+.place-name {
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+  color: #3b2f25;
+  background: rgba(255, 250, 238, 0.92);
+  border: 1px solid rgba(122, 82, 51, 0.35);
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgba(59, 47, 37, 0.25);
+  will-change: transform;
+}
+
+/* The name is easy to hit: its tap area reaches past the pill on every side, to 48 points tall. */
+.place-name::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+
+.place-name.here {
+  color: #ffffff;
+  background: #1d6b57;
+  border-color: #1d6b57;
+}
+
+/* A name whose building is behind the camera stays in the page for screen readers, out of sight. */
+.place-name.behind {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.over-town {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom));
+  /* Fingers pass through to the town, except on the talk. */
+  pointer-events: none;
+}
+
+.over-town > * {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.hud {
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.hud-figures {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hud .figure-label {
+  font-size: 11px;
+}
+
+.hud .figure-value {
+  font-size: 15px;
+}
+
+.hud-stats {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-note {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.over-town .log {
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+}
+
+.over-town .log h2 {
+  margin-bottom: 2px;
+  font-size: 12px;
+}
+
+.over-town .log ul {
+  font-size: 13px;
+}
+
+/* A talk with a place's person, as in a storybook: the person's face and name, their line, and the answers. */
+.talk {
+  margin-top: auto;
+  padding: 12px 14px 14px;
+  color: var(--talk-text);
+  background: var(--talk-bg);
+  border: 2px solid var(--talk-border);
+  border-radius: 18px;
+  box-shadow: 0 6px 18px rgba(59, 47, 37, 0.25);
+  pointer-events: auto;
+  /* Two fingers on the talk do nothing, so a pinch there never zooms the page. */
+  touch-action: none;
+}
+
+.talk:focus {
+  outline: none;
+}
+
+.talk:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* How to get about, at the bottom on the first day, where the talks open later. */
+.town-hint {
+  margin-top: auto;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .talk {
+    animation: talk-up 180ms ease-out;
+  }
+}
+
+@keyframes talk-up {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+}
+
+.talk-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.talk-name {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.talk-name strong {
+  font-size: 17px;
+}
+
+.talk-role {
+  font-size: 13px;
+  color: var(--talk-muted);
+}
+
+/* A face drawn with boxes, as the town is: hair over skin, two eyes, on the colour of the person's clothes. */
+.face {
+  display: grid;
+  place-items: end center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  border: 2px solid var(--talk-border);
+  border-radius: 12px;
+}
+
+.face-skin {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 2px;
+  border-radius: 6px;
+}
+
+.face-hair {
+  position: absolute;
+  inset: -2px -2px auto;
+  height: 11px;
+  border-radius: 6px 6px 2px 2px;
+}
+
+.face-eyes {
+  position: absolute;
+  top: 15px;
+  left: 8px;
+  width: 4px;
+  height: 6px;
+  background: #2a2220;
+  border-radius: 2px;
+  box-shadow: 10px 0 #2a2220;
+}
+
+.talk-line {
+  min-height: 3em;
+  margin: 10px 0 12px;
+  font-size: 16px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.keywords {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.keyword {
+  min-height: 44px;
+  padding: 6px 12px;
+  font-weight: 700;
+  color: var(--talk-text);
+  background: var(--keyword-bg);
+  border: 1px solid var(--talk-border);
+  border-radius: 999px;
+}
+
+.keyword.spend {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "name effect"
+    "why why";
+  align-items: center;
+  column-gap: 12px;
+  text-align: left;
+  border-radius: 14px;
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.keyword.spend .action-effect {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.keyword.spend:disabled {
+  color: var(--talk-muted);
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--talk-border);
+}
+
+.keyword.spend:disabled .action-effect {
+  color: var(--talk-muted);
+}
+
+.ending-word {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* Read by a screen reader, not shown. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

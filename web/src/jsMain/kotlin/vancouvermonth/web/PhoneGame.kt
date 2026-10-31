@@ -10,6 +10,7 @@ import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.HTMLLabelElement
 import org.w3c.dom.Range
 import vancouvermonth.core.Action
+import vancouvermonth.core.Ending
 import vancouvermonth.core.Event
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.Month
@@ -22,15 +23,19 @@ import vancouvermonth.text.cheapestLine
 import vancouvermonth.text.date
 import vancouvermonth.text.endingLine
 import vancouvermonth.text.eventLine
+import vancouvermonth.text.greeting
 import vancouvermonth.text.guessLine
+import vancouvermonth.text.keyword
 import vancouvermonth.text.money
 import vancouvermonth.text.monthStartLines
 import vancouvermonth.text.parseAmount
 import vancouvermonth.text.passPrices
 import vancouvermonth.text.percent
+import vancouvermonth.text.smallTalk
 import vancouvermonth.text.stageName
 import vancouvermonth.text.todaysRunName
 import vancouvermonth.text.todaysRunResult
+import vancouvermonth.text.Townsperson
 import vancouvermonth.text.utilitiesLabel
 import vancouvermonth.text.utilitiesPrices
 import vancouvermonth.text.whyNot
@@ -39,8 +44,9 @@ import vancouvermonth.text.whyNot
  * Draws one run in [root]: the room on September 1st, then one action a day, then the ending.
  * The rules are in core and the wording in text; this only shows the state and passes each tap on.
  * Every tap redraws the whole screen from that state. A run comes from a seed or from today's date, never both.
- * The month's days show a town under the top bar: [makeTown] makes it on the first day, and it is closed at the
- * ending. When [makeTown] gives none, the game plays the same without it.
+ * The month is played in a town the player walks in, which [makeWalkableTown] makes on the first day: each day is
+ * spent by talking to a place's person. Where it gives none, the month is played with buttons, under a town that
+ * is a picture when [makeTown] gives one. Either town is closed at the ending.
  */
 class PhoneGame private constructor(
     private val root: HTMLElement,
@@ -48,14 +54,25 @@ class PhoneGame private constructor(
     private val today: TodaysRun?,
     private val playAgain: () -> Unit,
     private val makeTown: () -> Town?,
+    private val makeWalkableTown: () -> WalkableTown?,
 ) {
     /** A run from a seed, as in `?seed=1011`. */
-    constructor(root: HTMLElement, seed: Int, playAgain: () -> Unit, makeTown: () -> Town? = { null }) :
-        this(root, seed, null, playAgain, makeTown)
+    constructor(
+        root: HTMLElement,
+        seed: Int,
+        playAgain: () -> Unit,
+        makeTown: () -> Town? = { null },
+        makeWalkableTown: () -> WalkableTown? = { null },
+    ) : this(root, seed, null, playAgain, makeTown, makeWalkableTown)
 
     /** Today's run: its date picks the seed, and its ending shows the result line to copy. */
-    constructor(root: HTMLElement, today: TodaysRun, playAgain: () -> Unit, makeTown: () -> Town? = { null }) :
-        this(root, today.seed, today, playAgain, makeTown)
+    constructor(
+        root: HTMLElement,
+        today: TodaysRun,
+        playAgain: () -> Unit,
+        makeTown: () -> Town? = { null },
+        makeWalkableTown: () -> WalkableTown? = { null },
+    ) : this(root, today.seed, today, playAgain, makeTown, makeWalkableTown)
 
     private val game = FirstMinute(seed)
     private var picked: Int? = null
@@ -63,14 +80,42 @@ class PhoneGame private constructor(
     private var reveal: Reveal? = null
     private var month: Month? = null
     private var town: Town? = null
+    private var walkable: WalkableTown? = null
+    private var playedInTown = false
 
-    /** The day the last action was spent on, and what happened, written when it happened. */
+    /** The day the last action was spent on, and what happened, as the month told it and as written. */
     private var lastDay = 0
+    private var lastEvents: List<Event> = emptyList()
     private var lastLines: List<String> = emptyList()
 
+    /** The place whose person the player is talking to in the town, or null; what they say; who has been met. */
+    private var talkingAt: Place? = null
+    private var talkLine = ""
+    private var smallTalks = 0
+    private val met = mutableSetOf<Townsperson>()
+
+    /** The timer typing the person's line, while it types. */
+    private var typing: Int? = null
+
+    /** When the open talk opened: for [talkSettleMillis] after that, taps on it do nothing. A test may change it. */
+    private var talkOpened = 0.0
+    internal var talkSettleMillis = TALK_SETTLE_MILLIS
+
+    /** True from an answer until the town's morning: meanwhile no talk opens. */
+    private var dayChanging = false
+
+    /** What takes the focus once the screen is drawn again: a talk that opened, or the day's log after an answer. */
+    private var focusNext: String? = null
+
     fun show() {
-        root.clear()
+        stopTyping()
         val current = month
+        val walking = walkable
+        if (current != null && !current.isOver && walking != null) {
+            showTownDay(current, walking)
+            return
+        }
+        root.clear()
         when {
             current == null -> showRooms()
             current.isOver -> showEnding(current)
@@ -184,7 +229,8 @@ class PhoneGame private constructor(
             button("primary", text = "${date(Month.FIRST_DAY)} 시작하기") {
                 onclick = {
                     month = game.startMonth(checkNotNull(picked))
-                    town = makeTown()
+                    walkable = makeWalkableTown()?.also { listenTo(it) }
+                    if (walkable == null) town = makeTown()
                     show()
                     window.scrollTo(0.0, 0.0)
                 }
@@ -265,6 +311,11 @@ class PhoneGame private constructor(
         showLog()
         root.child("section", "card ending ending-${ending.name.lowercase().replace('_', '-')}") {
             child("p", "ending-line", endingLine(ending, month.day, month.room.totalMonthlyCost, month.balance))
+            // After a month in the town, the neighbour has a word on the day of an offer.
+            if (playedInTown && ending == Ending.OFFER) {
+                val word = greeting(Townsperson.GRANDMA, month, firstMeeting = false, yesterday = lastEvents)
+                child("p", "ending-word", "${Townsperson.GRANDMA.title}: $word")
+            }
             child("div", "figures") {
                 figure("방 고르기 점수", "${reveal.score}/${FirstMinute.MAX_SCORE}")
                 figure("영어", "${month.english}/${Month.MAX_SKILL}")
@@ -289,9 +340,9 @@ class PhoneGame private constructor(
         }
     }
 
-    private fun showLog() {
+    private fun showLog(parent: HTMLElement = root) {
         if (lastLines.isEmpty()) return
-        root.child("section", "card log") {
+        parent.child("section", "card log") {
             setAttribute("aria-live", "polite")
             child("h2", text = "${date(lastDay)}에 있었던 일")
             child("ul") { lastLines.forEach { child("li", text = it) } }
@@ -304,8 +355,21 @@ class PhoneGame private constructor(
      */
     private fun spend(month: Month, place: Place, today: Month.() -> List<Event>) {
         lastDay = month.day
-        lastLines = month.today().map { eventLine(it, month) }
-        if (month.isOver) closeTown() else town?.walkTo(place)
+        lastEvents = month.today()
+        lastLines = lastEvents.map { eventLine(it, month) }
+        talkingAt = null
+        if (month.isOver) {
+            closeTown()
+        } else {
+            town?.walkTo(place)
+            val walking = walkable
+            if (walking != null) {
+                // Until the morning, the town takes no input and no talk opens. The day's log takes the focus.
+                dayChanging = true
+                focusNext = ".over-town .log"
+                walking.endDay(place)
+            }
+        }
         show()
         window.scrollTo(0.0, 0.0)
     }
@@ -314,6 +378,191 @@ class PhoneGame private constructor(
     private fun closeTown() {
         town?.close()
         town = null
+        walkable?.close()
+        walkable = null
+    }
+
+    /** The town tells the game where the player turns, and when it can no longer draw: then buttons take over. */
+    private fun listenTo(town: WalkableTown) {
+        playedInTown = true
+        town.onPlace = { place -> if (!dayChanging && place != talkingAt) talkTo(place) }
+        town.onMorning = { dayChanging = false }
+        town.onFail = {
+            walkable = null
+            talkingAt = null
+            dayChanging = false
+            show()
+        }
+    }
+
+    /** Opens the talk with [place]'s person, who greets the player as the day suggests, or closes it for null. */
+    private fun talkTo(place: Place?) {
+        val current = month ?: return
+        talkingAt = place
+        smallTalks = 0
+        if (place != null) {
+            val person = personAt(place)
+            talkLine = greeting(person, current, firstMeeting = person !in met, yesterday = lastEvents)
+            met.add(person)
+            talkOpened = window.performance.now()
+            focusNext = ".talk"
+        }
+        show()
+    }
+
+    /**
+     * A day in the town: the town fills the screen, the day's figures sit over its top, and a talk with a place's
+     * person opens over its bottom. The town stays on the page all month, so its picture never blinks; only what
+     * lies over it is drawn again.
+     */
+    private fun showTownDay(month: Month, town: WalkableTown) {
+        if (town.element.parentElement != root) {
+            root.clear()
+            root.appendChild(town.element)
+        }
+        root.querySelector(".over-town")?.remove()
+        town.mark(if (month.hasInterviewToday) INTERVIEW_PLACE else null)
+        root.child("div", "over-town") {
+            child("header", "hud") {
+                setAttribute("tabindex", "-1")
+                child("div", "hud-figures") {
+                    figure("오늘", date(month.day))
+                    figure("남은 날", "${month.daysLeft}일")
+                    figure("잔고", money(month.balance))
+                    figure("10월 총비용", money(month.room.totalMonthlyCost))
+                }
+                child(
+                    "p",
+                    "hud-stats",
+                    "영어 ${month.english}/${Month.MAX_SKILL} · 코딩 ${month.coding}/${Month.MAX_SKILL} · " +
+                        "체력 ${month.energy}/${Month.MAX_ENERGY}",
+                )
+                val interview = month.interview
+                when {
+                    month.hasInterviewToday -> child("p", "hud-note", "오늘은 면접 날이에요. 회사로 가세요.")
+                    interview != null -> child(
+                        "p",
+                        "hud-note",
+                        "${stageName(interview.stage)} ${date(interview.day)} · " +
+                            "통과 확률 ${percent(month.passChance(interview.stage))}",
+                    )
+                }
+            }
+            showLog(this)
+            querySelector(".log")?.setAttribute("tabindex", "-1")
+            val talking = talkingAt
+            if (talking != null) {
+                talk(month, talking)
+            } else if (lastLines.isEmpty()) {
+                // On the first day, at the bottom where the talks open, how to get about.
+                child("p", "town-hint", "땅을 누르면 걷고, 두 번 누르면 달려요. 사람이나 건물을 누르면 말을 걸어요.")
+            }
+        }
+        // A keyboard or a screen reader follows what happens: into a talk that opens, to the log after an answer.
+        focusNext?.let { (root.querySelector(it) as? HTMLElement)?.focus() }
+        focusNext = null
+    }
+
+    /** The talk with [place]'s person: who they are, their line typed out, and what the player can answer. */
+    private fun HTMLElement.talk(month: Month, place: Place) {
+        val person = personAt(place)
+        child("section", "talk") {
+            setAttribute("role", "dialog")
+            setAttribute("aria-label", person.title)
+            setAttribute("tabindex", "-1")
+            // The tap that opened the talk can land on it a moment later, as the second tap of a double tap or a
+            // finger lifted late. For a short while after the talk opens, taps on it do nothing.
+            addEventListener("click", { event ->
+                if (window.performance.now() - talkOpened < talkSettleMillis) {
+                    event.stopPropagation()
+                    event.preventDefault()
+                }
+            }, true)
+            child("div", "talk-head") {
+                face(Figures.lookOf(person))
+                child("p", "talk-name") {
+                    child("strong", text = person.title)
+                    child("span", "talk-role", "${person.role} · ${place.label}")
+                }
+            }
+            val line = child("p", "talk-line")
+            // The letters come one at a time for the eyes; a screen reader gets the whole line at once.
+            val typed = line.child("span") { setAttribute("aria-hidden", "true") }
+            line.child("span", "visually-hidden", talkLine)
+            typeOut(typed, talkLine)
+            // A tap on the line shows the rest of it at once.
+            line.onclick = {
+                stopTyping()
+                typed.textContent = talkLine
+            }
+            child("div", "keywords") {
+                answer(month, place)
+                button("keyword", text = "이야기") {
+                    onclick = {
+                        talkLine = smallTalk(person, month, smallTalks)
+                        smallTalks += 1
+                        focusNext = ".talk"
+                        show()
+                    }
+                }
+                button("keyword", text = "그만") {
+                    onclick = {
+                        talkingAt = null
+                        focusNext = ".hud"
+                        show()
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * The answer that spends the day: the place's action with what it does, or why it cannot be done today. On an
+     * interview day the office offers the interview instead.
+     */
+    private fun HTMLElement.answer(month: Month, place: Place) {
+        val interview = month.interview
+        if (month.hasInterviewToday && place == INTERVIEW_PLACE && interview != null) {
+            button("keyword spend") {
+                child("span", "action-name", "면접 보기")
+                val chance = percent(month.passChance(interview.stage))
+                child("span", "action-effect", "${stageName(interview.stage)} · 통과 확률 $chance")
+                onclick = { spend(month, INTERVIEW_PLACE) { attendInterview() } }
+            }
+            return
+        }
+        val action = actionAt(place)
+        val blocked = month.blockedBy(action)
+        button("keyword spend") {
+            disabled = blocked != null
+            child("span", "action-name", keyword(action))
+            child("span", "action-effect", actionEffect(action, month))
+            if (blocked != null) child("span", "action-why", whyNot(blocked))
+            onclick = { spend(month, place) { take(action) } }
+        }
+    }
+
+    /** Types [line] into [element] one letter at a time. */
+    private fun typeOut(element: HTMLElement, line: String) {
+        var shown = 0
+        typing = window.setInterval({
+            shown += 1
+            element.textContent = line.take(shown)
+            if (shown >= line.length) stopTyping()
+        }, TYPE_MILLIS)
+    }
+
+    private fun stopTyping() {
+        typing?.let { window.clearInterval(it) }
+        typing = null
+    }
+
+    private companion object {
+        /** How long each letter of a person's line takes to appear. */
+        const val TYPE_MILLIS = 35
+
+        /** How long a talk ignores taps after it opens. */
+        const val TALK_SETTLE_MILLIS = 400.0
     }
 }
 
@@ -413,6 +662,22 @@ internal external interface Selection {
 
 /** The browser's own getSelection(), the same function as window.getSelection(). */
 internal external fun getSelection(): Selection?
+
+/** A small face drawn from a person's colours: hair over a face with two eyes, on the colour of their clothes. */
+private fun HTMLElement.face(look: Look) {
+    child("span", "face") {
+        setAttribute("aria-hidden", "true")
+        style.background = css(look.top)
+        child("span", "face-skin") {
+            style.background = css(look.skin)
+            child("span", "face-hair") { style.background = css(look.hair) }
+            child("span", "face-eyes")
+        }
+    }
+}
+
+/** 0xRRGGBB as CSS writes it: "#rrggbb". */
+private fun css(colour: Int): String = "#" + colour.toString(16).padStart(6, '0')
 
 private fun HTMLElement.point(line: String, points: Int) {
     child("li") {

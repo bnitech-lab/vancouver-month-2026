@@ -218,8 +218,8 @@ private class TownScene(private val canvas: HTMLCanvasElement, context: Renderin
     }
 }
 
-/** The browser's ResizeObserver, which Kotlin's DOM declarations leave out. */
-private external class ResizeObserver(callback: () -> Unit) {
+/** The browser's ResizeObserver, which Kotlin's DOM declarations leave out. Both towns use it. */
+internal external class ResizeObserver(callback: () -> Unit) {
     fun observe(target: Element)
     fun disconnect()
 }

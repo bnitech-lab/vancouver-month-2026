@@ -10,19 +10,21 @@ import vancouvermonth.core.TodaysRun
 
 /**
  * Plays the run the address asks for (see [openingFor]), then makes the address name that run.
- * The month is played in a 3D town where the browser can draw one.
+ * The month is played in a 3D town the player walks in, where the browser can draw one.
  */
 fun main() {
     val root = document.getElementById("app") as? HTMLElement ?: return
     val opening = openingFor(window.location.search, Date(), newSeed())
     val playAgain = { window.location.search = "?seed=${newSeed()}" }
     val today = opening.today
-    // The town is made when the month starts, not now, so the room screen does not wait for WebGL.
+    // The towns are made when the month starts, not now, so the room screen does not wait for WebGL.
+    // The town to walk in comes first; the picture of a town is for a phone that asks for less motion.
     val makeTown = { openTown() }
+    val makeWalkableTown = { openWalkableTown() }
     val game = if (today != null) {
-        PhoneGame(root, today, playAgain, makeTown)
+        PhoneGame(root, today, playAgain, makeTown, makeWalkableTown)
     } else {
-        PhoneGame(root, opening.seed, playAgain, makeTown)
+        PhoneGame(root, opening.seed, playAgain, makeTown, makeWalkableTown)
     }
     game.show()
     // The game is drawn first, so the screen does not depend on the address changing.
