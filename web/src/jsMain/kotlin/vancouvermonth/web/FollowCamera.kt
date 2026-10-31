@@ -7,6 +7,7 @@ import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.round
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
@@ -58,6 +59,15 @@ class FollowCamera(focus: Point) {
     fun orbit(dx: Double, dy: Double) {
         yaw -= dx * TURN_PER_PIXEL
         pitch = (pitch + dy * TURN_PER_PIXEL).coerceIn(MIN_PITCH, MAX_PITCH)
+    }
+
+    /**
+     * Turns the camera to [yaw] on its own, as for the night by the campfire; it glides there the short way round,
+     * like a drag.
+     */
+    fun turnTo(yaw: Double) {
+        val turns = round((this.yaw - yaw) / (2 * PI))
+        this.yaw = yaw + turns * 2 * PI
     }
 
     /** Moves the camera [factor] times as far away: under 1 comes nearer, over 1 goes farther. */
