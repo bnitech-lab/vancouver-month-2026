@@ -134,4 +134,14 @@ class NeighbourhoodTest {
         assertTrue(route.size >= 2)
         assertTrue(millis < 200, "took $millis ms")
     }
+
+    @Test
+    fun `every free square can be reached from 내 방's door, the garden by the campfire included`() {
+        val door = town.cellAt(Neighbourhood.venue(Place.HOME).door)
+        val reached = town.reachableFrom(door)
+        val free = town.freeCells()
+        assertEquals(free.size, reached.size, "cut off: ${free.filter { it !in reached }}")
+        // A square in the garden, by the fire.
+        assertTrue(Cell(3, 20) in reached)
+    }
 }

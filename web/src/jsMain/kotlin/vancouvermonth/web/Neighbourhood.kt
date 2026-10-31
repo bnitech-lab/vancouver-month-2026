@@ -302,7 +302,8 @@ object Neighbourhood {
             addSolid(0.0, 0.0, 22.85, 5.0, 0.7, 0.15, WOOD)
             add(-0.02, 0.45, 17.0, 0.19, 0.08, 6.0, WOOD_DARK)
             add(0.0, 0.45, 22.83, 5.0, 0.08, 0.19, WOOD_DARK)
-            addBench(benchSeat.x, benchSeat.z, facingSouth = true)
+            // A short bench, so there is a way past it into the garden.
+            addBench(benchSeat.x, benchSeat.z, facingSouth = true, length = 1.3)
             // Stones in a ring, two crossed logs, and the fire, which glows after dark.
             val fire = campfire
             val stones = listOf(
@@ -413,12 +414,13 @@ object Neighbourhood {
             add(x - 0.3, 2.4, z - 0.3, 0.6, 0.25, 0.6, light)
         }
 
-        /** A wooden bench, its back on the side away from where it faces. */
-        fun addBench(x: Double, z: Double, facingSouth: Boolean) {
+        /** A wooden bench [length] long, its back on the side away from where it faces. */
+        fun addBench(x: Double, z: Double, facingSouth: Boolean, length: Double = 1.7) {
             val back = if (facingSouth) z - 0.25 else z + 0.17
-            addSolid(x - 0.85, 0.0, z - 0.25, 1.7, SEAT_HEIGHT - 0.08, 0.5, WOOD_DARK)
-            add(x - 0.9, SEAT_HEIGHT - 0.08, z - 0.27, 1.8, 0.08, 0.54, WOOD)
-            add(x - 0.9, SEAT_HEIGHT, back, 1.8, 0.4, 0.08, WOOD)
+            val half = length / 2
+            addSolid(x - half, 0.0, z - 0.25, length, SEAT_HEIGHT - 0.08, 0.5, WOOD_DARK)
+            add(x - half - 0.05, SEAT_HEIGHT - 0.08, z - 0.27, length + 0.1, 0.08, 0.54, WOOD)
+            add(x - half - 0.05, SEAT_HEIGHT, back, length + 0.1, 0.4, 0.08, WOOD)
         }
 
         /** A street lamp: an iron post and a lamp that lights up after dark. */
