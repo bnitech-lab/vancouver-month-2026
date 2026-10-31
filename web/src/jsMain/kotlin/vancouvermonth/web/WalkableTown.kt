@@ -106,7 +106,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private val scene = Scene()
     private val camera = PerspectiveCamera(60.0, 1.0, FollowCamera.NEAR_PLANE, FollowCamera.FAR_PLANE)
     private val sky = Color(DayLight.MORNING.sky)
-    private val haze = Fog(DayLight.MORNING.sky, HAZE_NEAR, HAZE_FAR)
+    private val haze = Fog(DayLight.MORNING.sky, Neighbourhood.HAZE_NEAR, Neighbourhood.HAZE_FAR)
     private val ambient = HemisphereLight(DayLight.MORNING.ambientColour, GROUND_LIGHT, DayLight.MORNING.ambient)
     private val sun = DirectionalLight(DayLight.MORNING.sunColour, DayLight.MORNING.sun)
 
@@ -139,6 +139,11 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private var chatting: Passerby? = null
 
     private val train = Group()
+
+    /** The train fades out far down the line, so it has materials of its own that can fade. */
+    private val trainMaterial = MeshToonMaterial(json("gradientMap" to shades, "transparent" to true))
+    private val trainGlowMaterial =
+        MeshToonMaterial(json("gradientMap" to shades, "emissive" to GLOW, "transparent" to true))
     private val flames = Group()
     private val flameMaterial = MeshToonMaterial(json("gradientMap" to shades, "emissive" to GLOW))
     private val fireLight = PointLight(FIRE_COLOUR, 0.0, FIRE_REACH, 2.0)
@@ -353,8 +358,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
      * blossom petals and clouds, which cast no shadow.
      */
     private fun addLife() {
-        train.add(boxes(Neighbourhood.train, material))
-        train.add(boxes(Neighbourhood.trainWindows, glowMaterial))
+        train.add(boxes(Neighbourhood.train, trainMaterial))
+        train.add(boxes(Neighbourhood.trainWindows, trainGlowMaterial))
         scene.add(train)
         val fire = Neighbourhood.campfire
         flames.add(boxes(Neighbourhood.flames, flameMaterial).also { it.castShadow = false })
@@ -487,6 +492,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         cube.dispose()
         material.dispose()
         glowMaterial.dispose()
+        trainMaterial.dispose()
+        trainGlowMaterial.dispose()
         passerbyMaterial.dispose()
         flameMaterial.dispose()
         shades.dispose()
@@ -796,7 +803,10 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         passerbyBoxes.instanceMatrix.needsUpdate = true
         trainShift = SkyTrainRun.shiftAt(now)
         train.position.set(Neighbourhood.TRAIN_STOP + trainShift, 0.0, 0.0)
-        train.visible = SkyTrainRun.isShownAt(now)
+        val trainShows = SkyTrainRun.opacityAt(now)
+        trainMaterial.opacity = trainShows
+        trainGlowMaterial.opacity = trainShows
+        train.visible = trainShows > 0.0
         val flicker = Campfire.flicker(now)
         val spread = 1 + (flicker - 1) * 0.4
         flames.scale.set(spread, flicker, spread)
@@ -896,6 +906,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         sun.intensity = lighting.sun
         sun.color.setHex(lighting.sunColour)
         glowMaterial.emissiveIntensity = lighting.glow
+        trainGlowMaterial.emissiveIntensity = lighting.glow
         glowLevel = lighting.glow
     }
 
@@ -985,8 +996,6 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         const val WHEEL_ZOOM = 0.0015
         const val MAX_STEP_MILLIS = 50.0
 
-        const val HAZE_NEAR = 70.0
-        const val HAZE_FAR = 230.0
         const val GROUND_LIGHT = 0x8FAF6A
         const val GLOW = 0xFFC46B
         const val MARKER = 0xFFE08A

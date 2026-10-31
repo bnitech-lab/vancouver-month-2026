@@ -1,6 +1,7 @@
 package vancouvermonth.web
 
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sin
@@ -12,6 +13,7 @@ import kotlin.random.Random
 /**
  * The SkyTrain's round, every [PERIOD]: it stands at the station for [DWELL], pulls out east faster and faster until
  * it is far down the guideway, is away for a while, then comes in from the west, slowing all the way into the station.
+ * Far down the line it fades into the haze, so it never pops out of sight or into it.
  */
 object SkyTrainRun {
     const val PERIOD = 32_000.0
@@ -22,6 +24,9 @@ object SkyTrainRun {
 
     /** How far down the guideway the train goes before it is away, either way from the station. */
     const val REACH = 155.0
+
+    /** How far down the guideway the train starts to fade; it is gone by [REACH]. */
+    const val FADE_FROM = 90.0
 
     /** How far east of its stop at the station the train is at [millis]; west is below 0. */
     fun shiftAt(millis: Double): Double {
@@ -34,11 +39,11 @@ object SkyTrainRun {
         }
     }
 
-    /** False while the train is away, beyond the guideway's ends in the haze, and should not be drawn. */
-    fun isShownAt(millis: Double): Boolean {
-        val t = ((millis % PERIOD) + PERIOD) % PERIOD
-        return t !in (DWELL + LEAVE)..(DWELL + LEAVE + AWAY)
-    }
+    /** How much of the train shows at [millis]: all of it near the town, fading to none far down the line. */
+    fun opacityAt(millis: Double): Double = ((REACH - abs(shiftAt(millis))) / (REACH - FADE_FROM)).coerceIn(0.0, 1.0)
+
+    /** False while the train is away, faded out far down the guideway, and need not be drawn. */
+    fun isShownAt(millis: Double): Boolean = opacityAt(millis) > 0.0
 
     private fun square(value: Double) = value * value
 }
@@ -135,22 +140,31 @@ object Petals {
     private const val PETAL_LIGHT = 0xFCE1E8
 }
 
-/** A few flat clouds high over the water, drifting east and coming round again from the west. */
+/**
+ * A few flat clouds high over the water, drifting east and coming round again from the west. They come round only
+ * where the haze hides them from anywhere the camera can be: past the grid and the camera's farthest reach, beyond
+ * [Neighbourhood.HAZE_FAR].
+ */
 object Clouds {
     private class Cloud(val x: Double, val y: Double, val z: Double, val size: Double)
 
     private val clouds = listOf(
-        Cloud(-60.0, 30.0, -45.0, 9.0),
-        Cloud(-5.0, 34.0, -70.0, 12.0),
-        Cloud(40.0, 28.0, -38.0, 7.0),
-        Cloud(95.0, 33.0, -62.0, 11.0),
+        Cloud(-250.0, 32.0, -55.0, 10.0),
+        Cloud(-160.0, 30.0, -45.0, 9.0),
+        Cloud(-60.0, 34.0, -70.0, 12.0),
+        Cloud(-5.0, 28.0, -38.0, 7.0),
+        Cloud(60.0, 33.0, -62.0, 11.0),
         Cloud(150.0, 31.0, -50.0, 8.0),
+        Cloud(240.0, 29.0, -66.0, 10.0),
     )
 
     /** How fast they drift, in units a millisecond. */
     const val DRIFT = 0.0006
-    const val WEST = -120.0
-    const val EAST = 170.0
+
+    /** The largest cloud, and where they come round: the haze's depth, plus the camera's reach, plus that cloud. */
+    const val LARGEST = 12.0
+    const val WEST = -(FollowCamera.FAR + Neighbourhood.HAZE_FAR + LARGEST)
+    const val EAST = Neighbourhood.COLUMNS + FollowCamera.FAR + Neighbourhood.HAZE_FAR + LARGEST
 
     val count: Int
         get() = clouds.size * 3

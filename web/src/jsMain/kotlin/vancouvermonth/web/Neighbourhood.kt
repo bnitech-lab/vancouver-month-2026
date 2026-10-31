@@ -75,6 +75,10 @@ object Neighbourhood {
     /** How close to a door or a person the character must stop for the place to open. */
     const val REACH = 0.9
 
+    /** Far things fade into the sky's colour from this far from the camera, and are gone into it by [HAZE_FAR]. */
+    const val HAZE_NEAR = 70.0
+    const val HAZE_FAR = 230.0
+
     val venues: List<Venue> = listOf(
         Venue(Place.HOME, 5, 17, 5, 5, 4.2, 0xF6E7CB, 0xC0584A, false, Spot(4.6, 17.6), pitched = true),
         Venue(Place.CAFE, 13, 17, 5, 4, 3.2, 0xF2C28B, 0x8A5A3A, false, Spot(17.5, 16.5), pitched = true),

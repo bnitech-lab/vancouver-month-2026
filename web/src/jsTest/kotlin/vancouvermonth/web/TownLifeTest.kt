@@ -118,4 +118,41 @@ class TownLifeTest {
         val first = Clouds.at(0.0).first().x
         assertEquals(first + 1_000 * Clouds.DRIFT, Clouds.at(1_000.0).first().x, 1e-9)
     }
+
+    @Test
+    fun `far down the line the train fades out smoothly, and near the town it is all there`() {
+        var last: Double? = null
+        for (t in times(2 * SkyTrainRun.PERIOD)) {
+            val shows = SkyTrainRun.opacityAt(t)
+            assertTrue(shows in 0.0..1.0)
+            if (abs(SkyTrainRun.shiftAt(t)) <= SkyTrainRun.FADE_FROM) assertEquals(1.0, shows, "at $t")
+            last?.let { assertTrue(abs(shows - it) < 0.1, "at $t it went from $it to $shows") }
+            last = shows
+            assertEquals(shows > 0.0, SkyTrainRun.isShownAt(t))
+        }
+        // All there while any of it is over the town.
+        assertTrue(Neighbourhood.TRAIN_STOP + SkyTrainRun.FADE_FROM > Neighbourhood.COLUMNS + Neighbourhood.TRAIN_LENGTH)
+    }
+
+    @Test
+    fun `clouds come round only where the haze hides them from anywhere the camera can be`() {
+        val nearest = -FollowCamera.FAR
+        val farthest = Neighbourhood.COLUMNS + FollowCamera.FAR
+        var last = Clouds.at(0.0)
+        for (t in times(Clouds.EAST * 2 / Clouds.DRIFT * 1.1, 1_000.0).drop(1)) {
+            val now = Clouds.at(t)
+            for (cloud in 0 until Clouds.count / 3) {
+                val before = last.subList(cloud * 3, cloud * 3 + 3)
+                val after = now.subList(cloud * 3, cloud * 3 + 3)
+                if (after[0].x < before[0].x) {
+                    // It came round: where it left and where it came back are both lost in the haze.
+                    val leftFrom = before.minOf { it.x }
+                    val cameBackTo = after.maxOf { it.x + it.width }
+                    assertTrue(leftFrom - farthest >= Neighbourhood.HAZE_FAR, "left from $leftFrom at $t")
+                    assertTrue(nearest - cameBackTo >= Neighbourhood.HAZE_FAR, "came back at $cameBackTo at $t")
+                }
+            }
+            last = now
+        }
+    }
 }
