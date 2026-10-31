@@ -358,6 +358,9 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         if ((event as? KeyboardEvent)?.key == "Escape") showLargeMinimap(false)
     }
 
+    /** A name taking the keyboard's focus brings the larger map back, so it never lies over the name in focus. */
+    private val onFocusIn: (Event) -> Unit = { showLargeMinimap(false) }
+
     /** True while the phone has taken WebGL back from the page: the town waits, drawing nothing, until it returns. */
     private var contextLost = false
 
@@ -403,6 +406,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         resizeObserver.observe(canvas)
         minimapObserver.observe(minimap.element)
         minimap.element.addEventListener("click", onMinimap)
+        element.addEventListener("focusin", onFocusIn)
         // Each finger is captured on press, so its moves and its lift come to the canvas even off it.
         canvas.addEventListener("pointerdown", onPress)
         canvas.addEventListener("pointermove", onMove)
@@ -707,6 +711,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         document.removeEventListener("visibilitychange", onVisibility)
         lessMotion.removeEventListener("change", onMotionPreference)
         minimap.element.removeEventListener("click", onMinimap)
+        element.removeEventListener("focusin", onFocusIn)
         document.removeEventListener("keydown", onMinimapKey)
         for (mesh in meshes) mesh.dispose()
         renderer.dispose()
@@ -1025,6 +1030,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         camera.fov = view.fov
         camera.updateProjectionMatrix()
         across = 2 * atan(tan(view.fov * PI / 360) * view.aspect)
+        // The camera's wedge on the map is as wide as it sees, which a turned phone changes.
+        mapStale = true
         askForFrame()
     }
 
@@ -1500,6 +1507,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             mapTop = top
             minimap.element.style.top = "${top}px"
         }
+        // The larger map is never taller than the room under it, as on a phone turned on its side.
+        minimap.roomBelow = height - top - MAP_GAP
         // The names are all one line, so the first one tells how tall a name is.
         val tall = labels.values.first().offsetHeight.toDouble()
         for ((place, label) in labels) {

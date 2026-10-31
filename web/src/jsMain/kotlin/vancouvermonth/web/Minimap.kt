@@ -4,6 +4,7 @@ import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -70,9 +71,26 @@ internal class Minimap {
         get() = element.classList.contains("large")
         set(value) {
             element.classList.toggle("large", value)
-            element.style.width = if (value) LARGE_WIDTH else SMALL_WIDTH
+            element.style.width = if (value) largeWidth() else SMALL_WIDTH
             element.style.zIndex = if (value) "1" else ""
         }
+
+    /**
+     * How much room there is under the map's top, in CSS pixels: the larger map is never taller, as on a phone turned
+     * on its side. Set as the town lays itself out; the width is worked out again only when it changes.
+     */
+    var roomBelow = Double.POSITIVE_INFINITY
+        set(value) {
+            if (value == field) return
+            field = value
+            if (isLarge) element.style.width = largeWidth()
+        }
+
+    private fun largeWidth(): String {
+        if (!roomBelow.isFinite()) return LARGE_WIDTH
+        val widest = max(SMALLEST_LARGE, roomBelow * Neighbourhood.COLUMNS / Neighbourhood.ROWS)
+        return "min($LARGE_WIDTH_RULE, ${widest}px)"
+    }
 
     init {
         element.className = "minimap"
@@ -157,7 +175,6 @@ internal class Minimap {
                 else -> PLACE
             }
             dot(px, pz, (if (special) BIG_DOT else DOT) * scale, fill, square = venue.place == Place.HOME)
-            if (large) name(venue.place.label, px, pz - BIG_DOT * scale - 3)
         }
         // The character, an arrow the way it faces.
         val left = map.left(x)
@@ -178,6 +195,15 @@ internal class Minimap {
         c.lineWidth = 1.2
         c.strokeStyle = INK
         c.stroke()
+        // The names on the larger map, last, over the wedge and the arrow.
+        if (large) {
+            for (at in 0 until venues.size) {
+                val venue = venues[at]
+                val px = map.left(venue.x + venue.width / 2.0)
+                val pz = map.top(venue.z + venue.depth / 2.0)
+                name(venue.place.label, px, pz - BIG_DOT * scale - 3)
+            }
+        }
         // A screen reader hears the place the character is nearest, told again only when that changes.
         val near = nearestPlace(x, z)
         if (near != nearest) {
@@ -293,6 +319,10 @@ internal class Minimap {
 
         /** How wide the map is: small, about 112 points on a 375-point phone, or larger, four fifths of the town. */
         private const val SMALL_WIDTH = "clamp(96px, 30vw, 120px)"
-        private const val LARGE_WIDTH = "min(80%, 480px)"
+        private const val LARGE_WIDTH_RULE = "80%, 480px"
+        private const val LARGE_WIDTH = "min($LARGE_WIDTH_RULE)"
+
+        /** The larger map is never narrower than this, however little room there is under it. */
+        private const val SMALLEST_LARGE = 160.0
     }
 }

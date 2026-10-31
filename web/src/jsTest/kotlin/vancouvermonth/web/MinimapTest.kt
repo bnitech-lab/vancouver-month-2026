@@ -65,6 +65,24 @@ class MinimapTest {
     }
 
     @Test
+    fun `the larger map is never taller than the room under it`() {
+        val minimap = Minimap()
+        document.body!!.appendChild(minimap.element)
+        shown += minimap.element
+        // As on a phone turned on its side: 100 pixels under the map's top.
+        minimap.roomBelow = 100.0
+        minimap.isLarge = true
+        assertEquals(160.0, minimap.element.getBoundingClientRect().width, 0.5)
+        // With room to spare, four fifths of the page, at most 480 pixels.
+        minimap.roomBelow = 280.0
+        assertEquals(280.0 * Neighbourhood.COLUMNS / Neighbourhood.ROWS, minimap.element.getBoundingClientRect().width, 0.5)
+        minimap.roomBelow = 2_000.0
+        assertEquals(480.0, minimap.element.getBoundingClientRect().width, 0.5)
+        minimap.isLarge = false
+        assertTrue(minimap.element.getBoundingClientRect().width <= 120.0)
+    }
+
+    @Test
     fun `a screen reader hears the place the character is nearest`() {
         for (venue in Neighbourhood.venues) {
             assertEquals(venue.place, Minimap.nearestPlace(venue.door.x, venue.door.z))

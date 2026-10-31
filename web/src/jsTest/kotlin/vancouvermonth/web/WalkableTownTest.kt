@@ -1175,6 +1175,10 @@ class WalkableTownTest {
                 map.click()
                 escape()
                 assertFalse(map.classList.contains("large"), "Escape left it large")
+                // A name taking the keyboard's focus brings it back, so it never lies over the name in focus.
+                map.click()
+                (assertNotNull(root.querySelector(".place-name")) as HTMLElement).focus()
+                assertFalse(map.classList.contains("large"), "a name took the focus under the larger map")
                 map.click()
                 talkTo(Place.HOME)
                 assertNotNull(root.querySelector(".talk"))
