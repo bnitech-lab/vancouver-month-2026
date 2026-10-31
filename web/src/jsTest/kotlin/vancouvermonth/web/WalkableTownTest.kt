@@ -829,6 +829,7 @@ class WalkableTownTest {
                     return
                 }
                 assertTrue(town.isRaining, "no rain on day $day")
+                assertTrue(town.isRainOnePassLast, "the rain is drawn twice, or before the passersby")
                 assertEquals(Weather.RAINY, town.weatherShown)
                 assertEquals("날씨 비", word)
                 assertTrue("오늘9월 ${day}일" in screen, screen)

@@ -24,6 +24,9 @@ external open class Object3D {
     /** Whether it is left out when it seems off screen; false for boxes that move about, whose bounds go stale. */
     var frustumCulled: Boolean
 
+    /** Where it comes among things drawn alike, lowest first; see-through things are drawn after solid ones. */
+    var renderOrder: Int
+
     /** Where it is, how it is turned and how big, all in one; [updateMatrix] works it out from those three. */
     val matrix: Matrix4
     fun updateMatrix()
@@ -147,6 +150,11 @@ external val DoubleSide: Int
 
 /** How a surface looks. Each kind below takes options such as `color`. */
 external open class Material {
+    /**
+     * True to draw a see-through surface seen from both sides in one pass. Otherwise three.js draws it twice a frame,
+     * back faces then front, switching its shader between the two.
+     */
+    var forceSinglePass: Boolean
     fun dispose()
 }
 

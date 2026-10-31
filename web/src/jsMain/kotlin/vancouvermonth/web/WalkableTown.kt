@@ -197,7 +197,10 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             "depthWrite" to false,
             "side" to DoubleSide,
         ),
-    )
+    ).also {
+        // Both faces in one pass: one plain colour gains nothing from three.js drawing the back faces first.
+        it.forceSinglePass = true
+    }
 
     /** The flat square each streak of rain and each splash is drawn from. */
     private val drop = PlaneGeometry(1.0, 1.0)
@@ -436,6 +439,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         rain.frustumCulled = false
         rain.instanceMatrix.setUsage(DynamicDrawUsage)
         rain.visible = false
+        // After the see-through passersby and train, so a streak in front of them is not covered by them.
+        rain.renderOrder = 1
         meshes.add(rain)
         scene.add(rain)
         puddles = boxes(Rain.puddles, material)
@@ -632,6 +637,10 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     internal val isRaining: Boolean
         get() = rain.visible
+
+    /** True when the rain is drawn in one pass, after the other see-through things, for tests. */
+    internal val isRainOnePassLast: Boolean
+        get() = rainMaterial.forceSinglePass && rain.renderOrder > 0
 
     /** How high the first streak of rain was last drawn, for tests: it falls as the town's time goes on. */
     internal val firstStreakHeight: Double
