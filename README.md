@@ -147,8 +147,9 @@ cartoon shading, a warm sun with soft shadows, round-headed people, round trees 
 street lamps and a campfire. The five places stand on a stone street with brick pavements: 내 방 (the room picked on
 September 1st) with its garden, the 카페, the 도서관, 코워킹 and the 회사 tower, with a park and a pond, a seawall path by
 the water, a SkyTrain guideway with a station and a train, and mountains across the water. Each building's name floats
-over it. The day's figures sit thinly over the top of the screen. The month's first view looks down the street from
-its west end, high enough to show four of the buildings and their names.
+over it. The day's figures sit thinly over the top of the screen, and a name that would sit under them or the day's log
+hides there. The month's first view looks down the street from its west end, high enough to show four of the buildings
+and their names.
 
 | Do | What happens |
 |---|---|
@@ -218,7 +219,7 @@ when the passersby are out, and how each weather greys it), `Passersby` (their l
 crackle, the glints, petals, clouds and rain, all worked out from the time) and `FramePace` (which frames are drawn).
 The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`, and `Passersby.kt` for the passersby's),
 and so is each day's weather (`Weather.kt`). `WalkableTown` draws all of it, and `Three.kt` declares only the parts of
-Three.js in use. The page's script, Three.js included, is about 716 KB (about 193 KB gzipped).
+Three.js in use. The page's script, Three.js included, is about 717 KB (about 193 KB gzipped).
 
 ### Sound and the first-run guide
 
