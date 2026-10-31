@@ -12,6 +12,12 @@ class ContinueTest {
     }
 
     @Test
+    fun `another run's start card names the day of the month it would drop, not a run number`() {
+        assertEquals("시작하면 이어하던 9월 14일의 한 달은 지워져요.", replacesKept(14))
+        assertTrue(replacesKept(30).length <= 28)
+    }
+
+    @Test
     fun `its words are short, and say that starting over drops the kept month`() {
         assertEquals("이어하기", Continue.CONTINUE)
         assertEquals("새로 시작", Continue.NEW)
