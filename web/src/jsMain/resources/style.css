@@ -965,6 +965,11 @@ html:has(.walk-town) {
   right: 0;
 }
 
+/* The title keeps the switch's width free beside it, so the two never touch on a small phone or a wider font. */
+.title:has(.sound-switch) h1 {
+  padding-right: 84px;
+}
+
 /* The card on how to play, over the town the first time it opens. The town waits under a soft shade. On a short
    screen (a phone on its side, or large text) the card is never taller than the screen: it scrolls instead, and the
    shade can scroll too, with "safe" centring so nothing is pushed off the top. */
