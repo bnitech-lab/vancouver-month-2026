@@ -1,0 +1,154 @@
+package vancouvermonth.core
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+/** Money spent in the town: off the balance, never a day, and never the month's luck. */
+class SpendTest {
+    private val room = Room(rent = 1_020, zone = Zone.TWO, utilitiesIncluded = true, utilities = 0)
+
+    private fun month(balance: Int = 1_800, seed: Int = 7) = Month(room, balance, RandomDice(seed))
+
+    /** Everything a month decides with, money and what was bought aside (and so how a month without an offer ends). */
+    private fun Month.rest(): List<Any?> = listOf(day, english, coding, energy, interview, isOver, daysLeft)
+
+    @Test
+    fun `the prices are the plan's, and only a bike and an e-scooter are kept`() {
+        assertEquals(listOf(350, 550, 3, 4), Spending.entries.map { it.price })
+        assertEquals(Item.BIKE, Spending.BIKE.buys)
+        assertEquals(Item.E_SCOOTER, Spending.E_SCOOTER.buys)
+        assertNull(Spending.SHARED_BIKE_RIDE.buys)
+        assertNull(Spending.SHARED_E_SCOOTER_RIDE.buys)
+        for (kind in Spending.entries) {
+            assertTrue(kind.costs(kind.price), "$kind")
+            assertFalse(kind.costs(kind.price + 1), "$kind")
+            assertFalse(kind.costs(0), "$kind")
+        }
+    }
+
+    @Test
+    fun `buying a bike takes its price off the balance and keeps the bike, and the day goes on`() {
+        val month = month()
+        val before = month.rest()
+        val event = month.spend(Spending.BIKE, 350)
+        assertEquals(Event.Spent(Spending.BIKE, 350), event)
+        assertEquals(1_800 - 350, month.balance)
+        assertEquals(setOf(Item.BIKE), month.owned)
+        assertTrue(month.owns(Item.BIKE))
+        assertFalse(month.owns(Item.E_SCOOTER))
+        assertEquals(before, month.rest())
+        assertEquals(Month.FIRST_DAY, month.day)
+    }
+
+    @Test
+    fun `a ride's fare can be paid again and again, and keeps nothing`() {
+        val month = month()
+        repeat(5) {
+            assertEquals(Event.Spent(Spending.SHARED_E_SCOOTER_RIDE, 4), month.spend(Spending.SHARED_E_SCOOTER_RIDE))
+        }
+        month.spend(Spending.SHARED_BIKE_RIDE, 3)
+        assertEquals(1_800 - 5 * 4 - 3, month.balance)
+        assertEquals(emptySet(), month.owned)
+    }
+
+    @Test
+    fun `a bike already bought is not bought again`() {
+        val month = month()
+        month.spend(Spending.BIKE)
+        assertEquals(SpendBlocked.ALREADY_OWNED, month.spendBlockedBy(Spending.BIKE))
+        assertFalse(month.canSpend(Spending.BIKE, 350))
+        assertFailsWith<IllegalArgumentException> { month.spend(Spending.BIKE) }
+        assertEquals(1_800 - 350, month.balance)
+        // The other one can still be bought.
+        assertNull(month.spendBlockedBy(Spending.E_SCOOTER))
+        month.spend(Spending.E_SCOOTER)
+        assertEquals(setOf(Item.BIKE, Item.E_SCOOTER), month.owned)
+    }
+
+    @Test
+    fun `a short balance refuses, and the very last dollar can be spent`() {
+        val month = month(balance = 549)
+        assertEquals(SpendBlocked.NOT_ENOUGH_MONEY, month.spendBlockedBy(Spending.E_SCOOTER))
+        assertFailsWith<IllegalArgumentException> { month.spend(Spending.E_SCOOTER) }
+        assertEquals(549, month.balance)
+        assertEquals(emptySet(), month.owned)
+        val exact = month(balance = 550)
+        exact.spend(Spending.E_SCOOTER)
+        assertEquals(0, exact.balance)
+        assertEquals(SpendBlocked.NOT_ENOUGH_MONEY, exact.spendBlockedBy(Spending.SHARED_BIKE_RIDE))
+    }
+
+    @Test
+    fun `a spend for another amount than the price is refused`() {
+        val month = month()
+        assertFalse(month.canSpend(Spending.BIKE, 300))
+        assertFailsWith<IllegalArgumentException> { month.spend(Spending.BIKE, 300) }
+        assertFailsWith<IllegalArgumentException> { month.spend(Spending.SHARED_BIKE_RIDE, 0) }
+        assertEquals(1_800, month.balance)
+        assertEquals(emptySet(), month.owned)
+    }
+
+    @Test
+    fun `nothing is spent once the month is over`() {
+        val month = month()
+        while (!month.isOver) month.take(Action.REST)
+        for (kind in Spending.entries) {
+            assertEquals(SpendBlocked.MONTH_OVER, month.spendBlockedBy(kind), "$kind")
+            assertFalse(month.canSpend(kind), "$kind")
+        }
+        assertFailsWith<IllegalArgumentException> { month.spend(Spending.SHARED_BIKE_RIDE) }
+    }
+
+    @Test
+    fun `money can be spent on an interview day, and the interview still takes the day`() {
+        val month = Month(room, 1_800, object : Dice {
+            override fun succeeds(chance: Double) = true
+            override fun daysLater(range: IntRange) = range.first
+        })
+        month.take(Action.APPLY)
+        while (!month.hasInterviewToday) month.take(Action.REST)
+        assertNull(month.spendBlockedBy(Spending.BIKE))
+        month.spend(Spending.BIKE)
+        assertTrue(month.hasInterviewToday)
+        assertFalse(month.canTake(Action.WORK))
+        month.attendInterview()
+        assertTrue(month.owns(Item.BIKE))
+    }
+
+    /**
+     * Two months on the same luck, one spending between its days and one not: every day, interview and ending is the
+     * same, so spending uses no luck and changes nothing but the balance.
+     */
+    @Test
+    fun `spending between days changes the balance only, never the days or the luck`() {
+        for (seed in 1..60) {
+            val plain = FirstMinute(seed).startMonth(0)
+            val spender = FirstMinute(seed).startMonth(0)
+            var spent = 0
+            var turn = 0
+            while (!plain.isOver) {
+                // A ride most days, and a bike once there is room for it.
+                if (turn % 2 == 0 && spender.canSpend(Spending.SHARED_BIKE_RIDE)) {
+                    spent += spender.spend(Spending.SHARED_BIKE_RIDE).amount
+                }
+                if (turn == 5 && spender.canSpend(Spending.BIKE)) spent += spender.spend(Spending.BIKE).amount
+                val events = if (plain.hasInterviewToday) {
+                    plain.attendInterview().also { assertEquals(it, spender.attendInterview()) }
+                } else {
+                    val action = listOf(Action.APPLY, Action.STUDY_ENGLISH, Action.PRACTISE_CODING, Action.REST)
+                        .first { plain.canTake(it) }
+                    plain.take(action).also { assertEquals(it, spender.take(action)) }
+                }
+                assertTrue(events.none { it is Event.Spent }, "a day's own events hold no spending")
+                assertEquals(plain.rest(), spender.rest(), "seed $seed, day ${plain.day}")
+                assertEquals(plain.balance - spent, spender.balance, "seed $seed, day ${plain.day}")
+                turn += 1
+            }
+            if (plain.ending == Ending.OFFER) assertEquals(Ending.OFFER, spender.ending, "seed $seed")
+        }
+    }
+}

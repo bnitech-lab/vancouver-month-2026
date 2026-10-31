@@ -13,6 +13,8 @@ import vancouvermonth.core.Reveal
 import vancouvermonth.core.Room
 import vancouvermonth.core.RoomDealer
 import vancouvermonth.core.Skill
+import vancouvermonth.core.SpendBlocked
+import vancouvermonth.core.Spending
 import vancouvermonth.core.TodaysRun
 import vancouvermonth.core.Zone
 
@@ -115,6 +117,25 @@ fun eventLine(event: Event, month: Month): String = when (event) {
     is Event.Rested -> "푹 쉬었어요. 체력 ${event.energy}/${Month.MAX_ENERGY}"
     is Event.InterviewHeld -> interviewResult(event, month.canStillApplyThisMonth)
     is Event.LivingCost -> "생활비 -${money(event.amount)}, 잔고 ${money(month.balance)}"
+    is Event.Spent -> spentLine(event)
+}
+
+/** Money spent in the town: "자전거를 샀어요. -$350", "공유 퀵보드를 빌렸어요. -$4". */
+fun spentLine(event: Event.Spent): String {
+    val what = when (event.kind) {
+        Spending.BIKE -> "자전거를 샀어요."
+        Spending.E_SCOOTER -> "전동 퀵보드를 샀어요."
+        Spending.SHARED_BIKE_RIDE -> "공유 자전거를 빌렸어요."
+        Spending.SHARED_E_SCOOTER_RIDE -> "공유 퀵보드를 빌렸어요."
+    }
+    return "$what -${money(event.amount)}"
+}
+
+/** Why money cannot be spent now, from the reason the month gives. */
+fun whyNotSpend(blocked: SpendBlocked): String = when (blocked) {
+    SpendBlocked.MONTH_OVER -> "9월이 끝났어요."
+    SpendBlocked.ALREADY_OWNED -> "이미 있어요."
+    SpendBlocked.NOT_ENOUGH_MONEY -> "잔고가 모자라요."
 }
 
 private fun applied(interview: Interview?): String =

@@ -16,6 +16,8 @@ import vancouvermonth.core.Month
 import vancouvermonth.core.Room
 import vancouvermonth.core.RoomDealer
 import vancouvermonth.core.Skill
+import vancouvermonth.core.SpendBlocked
+import vancouvermonth.core.Spending
 import vancouvermonth.core.TodaysRun
 import vancouvermonth.core.Zone
 
@@ -241,5 +243,29 @@ class KoreanTest {
             eventLine(Event.InterviewHeld(InterviewStage.PHONE_SCREEN, true, Interview(InterviewStage.TECHNICAL, 9)), month),
         )
         assertEquals("생활비 -\$40, 잔고 \$1,800", eventLine(Event.LivingCost(40), month))
+    }
+
+    @Test
+    fun `money spent in the town reads as what it bought or rented, and its price`() {
+        val month = month()
+        val lines = Spending.entries.map { eventLine(Event.Spent(it, it.price), month) }
+        assertEquals(
+            listOf(
+                "자전거를 샀어요. -\$350",
+                "전동 퀵보드를 샀어요. -\$550",
+                "공유 자전거를 빌렸어요. -\$3",
+                "공유 퀵보드를 빌렸어요. -\$4",
+            ),
+            lines,
+        )
+        for (line in lines) assertFalse('\u2014' in line, line)
+    }
+
+    @Test
+    fun `every reason money cannot be spent reads as Korean`() {
+        assertEquals(
+            listOf("9월이 끝났어요.", "이미 있어요.", "잔고가 모자라요."),
+            SpendBlocked.entries.map { whyNotSpend(it) },
+        )
     }
 }
