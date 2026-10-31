@@ -340,4 +340,20 @@ class SoundTest {
         assertEquals(1, speaker.nearby.size, "The town's sounds went on while off")
         assertEquals(listOf("on", "off"), speaker.asked)
     }
+
+    @Test
+    fun `a silence reaches the sound even while it is off, so nothing rumbles on once the town has gone`() {
+        val sound = sound()
+        sound.button(root)
+        switchIn().click()
+        sound.nearby(0.6, 0.5, 1.0)
+        // Switched off with the train passing and the fire near, then the town closes and says all is quiet.
+        switchIn().click()
+        sound.nearby(0.0, 0.0, 0.0)
+        assertEquals(Triple(0.0, 0.0, 0.0), speaker.nearby.last(), "The rumble and the crackle were left on")
+        // Switched on again later, nothing is still playing from the town.
+        switchIn().click()
+        assertEquals(Triple(0.0, 0.0, 0.0), speaker.nearby.last())
+        assertEquals(listOf("on", "off", "on"), speaker.asked)
+    }
 }

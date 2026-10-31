@@ -115,9 +115,13 @@ internal class Sound(
         speaker?.weather(rain)
     }
 
-    /** How loud the town's train and fire are where the player is, and how dark its night is, while the sound is on. */
+    /**
+     * How loud the town's train and fire are where the player is, and how dark its night is, while the sound is on. A
+     * silence always goes through, even while off: a train still rumbling when the sound was switched off must not come
+     * back with the sound after the town has gone, with nothing left to quiet it.
+     */
     fun nearby(train: Double, fire: Double, night: Double) {
-        if (isOn) speaker?.nearby(train, fire, night)
+        if (isOn || (train == 0.0 && fire == 0.0)) speaker?.nearby(train, fire, night)
     }
 
     /** Stops waiting for a tap and watching whether the page is hidden, as a test does when it is over. */
