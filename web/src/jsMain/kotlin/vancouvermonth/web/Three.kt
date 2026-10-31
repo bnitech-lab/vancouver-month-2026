@@ -135,10 +135,9 @@ external class MeshLambertMaterial(parameters: Json) : Material
 
 /**
  * Cartoon shading: light falls in a few flat shades, picked from `gradientMap`, instead of a smooth fade.
- * [emissive] is light a surface gives off itself, as a lit window does, as strong as [emissiveIntensity].
+ * The option `emissive` is light a surface gives off itself, as a lit window does, as strong as [emissiveIntensity].
  */
 external class MeshToonMaterial(parameters: Json) : Material {
-    val emissive: Color
     var emissiveIntensity: Double
 }
 
