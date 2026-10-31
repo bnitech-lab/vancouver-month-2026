@@ -92,12 +92,6 @@ object Figures {
         return body(look) + extra
     }
 
-    /** Every box of [parts] placed on the figure itself, for a figure that never moves its legs or arms. */
-    fun standing(parts: List<Part>): List<Block> = parts.map { part ->
-        val pivot = part.limb.pivot
-        part.block.copy(x = part.block.x + pivot.x, y = part.block.y + pivot.y, z = part.block.z + pivot.z)
-    }
-
     fun lookOf(passer: Passer): Look = when (passer) {
         Passer.OLIVER -> Look(skin = 0xE8C3A0, hair = 0x8B5A2B, top = 0x4FA3A5, bottom = 0x2F3440, shoes = 0xF2F2F2)
         Passer.MINA -> Look(skin = 0xF6D6BD, hair = 0x2B1E1A, top = 0xF2D16B, bottom = 0x4A5568, shoes = 0x7A4E3A)

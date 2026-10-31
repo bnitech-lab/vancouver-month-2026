@@ -27,11 +27,13 @@ import vancouvermonth.core.Action
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.text.actionName
 import vancouvermonth.text.money
+import vancouvermonth.text.Passer
 
 /** A town to walk in that draws nothing, so a test can make it fail on purpose. Its nights pass at once. */
 private class SilentTown : WalkableTown {
     override val element = (document.createElement("div") as HTMLElement).also { it.className = "walk-town" }
     override var onPlace: (Place?) -> Unit = {}
+    override var onPasserby: (Passer) -> Unit = {}
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
 
