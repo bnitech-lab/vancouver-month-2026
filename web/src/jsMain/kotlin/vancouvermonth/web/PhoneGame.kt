@@ -39,24 +39,30 @@ import vancouvermonth.text.whyNot
  * Draws one run in [root]: the room on September 1st, then one action a day, then the ending.
  * The rules are in core and the wording in text; this only shows the state and passes each tap on.
  * Every tap redraws the whole screen from that state. A run comes from a seed or from today's date, never both.
+ * The month's days show a town under the top bar: [makeTown] makes it on the first day, and it is closed at the
+ * ending. When [makeTown] gives none, the game plays the same without it.
  */
 class PhoneGame private constructor(
     private val root: HTMLElement,
     seed: Int,
     private val today: TodaysRun?,
     private val playAgain: () -> Unit,
+    private val makeTown: () -> Town?,
 ) {
     /** A run from a seed, as in `?seed=1011`. */
-    constructor(root: HTMLElement, seed: Int, playAgain: () -> Unit) : this(root, seed, null, playAgain)
+    constructor(root: HTMLElement, seed: Int, playAgain: () -> Unit, makeTown: () -> Town? = { null }) :
+        this(root, seed, null, playAgain, makeTown)
 
     /** Today's run: its date picks the seed, and its ending shows the result line to copy. */
-    constructor(root: HTMLElement, today: TodaysRun, playAgain: () -> Unit) : this(root, today.seed, today, playAgain)
+    constructor(root: HTMLElement, today: TodaysRun, playAgain: () -> Unit, makeTown: () -> Town? = { null }) :
+        this(root, today.seed, today, playAgain, makeTown)
 
     private val game = FirstMinute(seed)
     private var picked: Int? = null
     private var guess = ""
     private var reveal: Reveal? = null
     private var month: Month? = null
+    private var town: Town? = null
 
     /** The day the last action was spent on, and what happened, written when it happened. */
     private var lastDay = 0
@@ -178,6 +184,7 @@ class PhoneGame private constructor(
             button("primary", text = "${date(Month.FIRST_DAY)} 시작하기") {
                 onclick = {
                     month = game.startMonth(checkNotNull(picked))
+                    town = makeTown()
                     show()
                     window.scrollTo(0.0, 0.0)
                 }
@@ -192,26 +199,48 @@ class PhoneGame private constructor(
             figure("잔고", money(month.balance))
             figure("10월 1일에 낼 총비용", money(month.room.totalMonthlyCost))
         }
-        showLog()
+        val shownTown = town
+        if (shownTown == null) {
+            showLog()
+            showStats(month)
+            showInterview(month)
+            showActions(month)
+        } else {
+            // The same town every day, so the character stays where the last day left it. The town takes room,
+            // so the day's buttons come right under it, where a small phone still shows them without scrolling.
+            root.appendChild(shownTown.element)
+            showActions(month)
+            showLog()
+            showStats(month)
+            showInterview(month)
+        }
+    }
+
+    private fun showStats(month: Month) {
         root.child("section", "card stats") {
             meter("영어", "english", month.english, Month.MAX_SKILL)
             meter("코딩", "coding", month.coding, Month.MAX_SKILL)
             meter("체력", "energy", month.energy, Month.MAX_ENERGY)
         }
-        month.interview?.let { interview ->
-            root.child("section", "card interview") {
-                child("h2", text = "면접")
-                child("p") {
-                    child("span", text = "${stageName(interview.stage)} ${date(interview.day)} · ")
-                    child("strong", "chance", "통과 확률 ${percent(month.passChance(interview.stage))}")
-                }
+    }
+
+    private fun showInterview(month: Month) {
+        val interview = month.interview ?: return
+        root.child("section", "card interview") {
+            child("h2", text = "면접")
+            child("p") {
+                child("span", text = "${stageName(interview.stage)} ${date(interview.day)} · ")
+                child("strong", "chance", "통과 확률 ${percent(month.passChance(interview.stage))}")
             }
         }
+    }
+
+    private fun showActions(month: Month) {
         root.child("section", "actions") {
             if (month.hasInterviewToday) {
                 child("h2", text = "오늘은 면접 날이에요.")
                 button("primary", text = "면접 보기") {
-                    onclick = { spend(month) { attendInterview() } }
+                    onclick = { spend(month, INTERVIEW_PLACE) { attendInterview() } }
                 }
             } else {
                 child("h2", text = "오늘 할 일 하나")
@@ -222,7 +251,7 @@ class PhoneGame private constructor(
                         child("span", "action-name", actionName(action))
                         child("span", "action-effect", actionEffect(action, month))
                         if (blocked != null) child("span", "action-why", whyNot(blocked))
-                        onclick = { spend(month) { take(action) } }
+                        onclick = { spend(month, placeFor(action)) { take(action) } }
                     }
                 }
             }
@@ -269,12 +298,22 @@ class PhoneGame private constructor(
         }
     }
 
-    /** Spends today, keeps what happened for the next screen, and goes back to the top of the page. */
-    private fun spend(month: Month, today: Month.() -> List<Event>) {
+    /**
+     * Spends today at [place], keeps what happened for the next screen, and goes back to the top of the page.
+     * The character sets off for [place] as the day's log appears.
+     */
+    private fun spend(month: Month, place: Place, today: Month.() -> List<Event>) {
         lastDay = month.day
         lastLines = month.today().map { eventLine(it, month) }
+        if (month.isOver) closeTown() else town?.walkTo(place)
         show()
         window.scrollTo(0.0, 0.0)
+    }
+
+    /** The ending has no town, so the town lets go of its drawing. */
+    private fun closeTown() {
+        town?.close()
+        town = null
     }
 }
 

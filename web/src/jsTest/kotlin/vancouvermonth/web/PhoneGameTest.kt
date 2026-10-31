@@ -10,12 +10,28 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.browser.document
 import org.w3c.dom.HTMLButtonElement
+import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.asList
 import org.w3c.dom.events.Event
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.TodaysRun
+
+/** A town that only notes where the character was sent and whether it was closed, so a test needs no WebGL. */
+private class NotingTown : Town {
+    override val element = (document.createElement("div") as HTMLElement).also { it.className = "town" }
+    val visits = mutableListOf<Place>()
+    var closed = false
+
+    override fun walkTo(place: Place) {
+        visits += place
+    }
+
+    override fun close() {
+        closed = true
+    }
+}
 
 /** Plays the page in the test browser by tapping its buttons, the way a player would. */
 class PhoneGameTest {
@@ -262,5 +278,79 @@ class PhoneGameTest {
             tap("총비용 확인하기")
             assertTrue("내 짐작과 차이 \$45+55" in screen, typed)
         }
+    }
+
+    @Test
+    fun `the town sits under the top bar, and each action sends the character to its building`() {
+        val town = NotingTown()
+        PhoneGame(root, 1011, playAgain = {}, makeTown = { town }).show()
+        assertNull(root.querySelector(".town"), "the room screen has no town")
+        startMonth(room = 3, amount = "1165")
+        assertSame(town.element, root.querySelector(".topbar")?.nextElementSibling)
+        // The day's buttons come right under the town, and what happened comes after them.
+        assertSame(root.querySelector(".actions"), town.element.nextElementSibling)
+        for (action in listOf("카페 알바", "영어 공부", "코딩 연습", "지원서 넣기", "쉬기")) tap(action)
+        assertSame(root.querySelector(".log"), root.querySelector(".actions")?.nextElementSibling)
+        assertEquals(listOf(Place.CAFE, Place.LIBRARY, Place.COWORKING, Place.OFFICE, Place.HOME), town.visits)
+        // Every day redraws the screen around the same town, so the character stays where it was.
+        assertSame(town.element, root.querySelector(".topbar")?.nextElementSibling)
+        assertEquals(1, root.querySelectorAll(".town").length)
+    }
+
+    @Test
+    fun `on an interview day the character goes to the office`() {
+        val town = NotingTown()
+        PhoneGame(root, 1011, playAgain = {}, makeTown = { town }).show()
+        startMonth(room = 3, amount = "1165")
+        while ("오늘은 면접 날이에요." !in screen) {
+            val apply = button("지원서 넣기")
+            if (apply.disabled) tap("쉬기") else apply.click()
+        }
+        assertSame(town.element, root.querySelector(".topbar")?.nextElementSibling)
+        assertSame(root.querySelector(".actions"), town.element.nextElementSibling)
+        town.visits.clear()
+        tap("면접 보기")
+        assertEquals(listOf(Place.OFFICE), town.visits)
+    }
+
+    @Test
+    fun `the town is made on the first day of the month and closed at the ending`() {
+        val town = NotingTown()
+        var made = 0
+        PhoneGame(root, 1011, playAgain = {}, makeTown = { made++; town }).show()
+        tap("3번 방")
+        type("1165")
+        tap("총비용 확인하기")
+        assertEquals(0, made, "the room screen makes no town")
+        tap("시작하기")
+        assertEquals(1, made)
+        while ("다시 하기" !in screen) tap("쉬기")
+        assertEquals(1, made)
+        assertTrue(town.closed)
+        assertNull(root.querySelector(".town"))
+    }
+
+    @Test
+    fun `without WebGL there is no town, and the month plays as it did before`() {
+        val canvas = document.createElement("canvas") as HTMLCanvasElement
+        // A browser without WebGL: asking the canvas for a context gives nothing.
+        canvas.asDynamic().getContext = { _: String, _: Any? -> null }
+        assertNull(openTown(canvas))
+
+        PhoneGame(root, 1011, playAgain = {}, makeTown = { openTown(canvas) }).show()
+        startMonth(room = 3, amount = "1165")
+        assertNull(root.querySelector(".town"))
+        assertSame(root.querySelector(".stats"), root.querySelector(".topbar")?.nextElementSibling)
+        tap("카페 알바")
+        assertNull(root.querySelector(".town"))
+        assertSame(root.querySelector(".log"), root.querySelector(".topbar")?.nextElementSibling)
+        assertTrue("카페에서 일했어요. +\$110" in screen)
+    }
+
+    @Test
+    fun `a canvas that fails while handing out WebGL gives no town either`() {
+        val canvas = document.createElement("canvas") as HTMLCanvasElement
+        canvas.asDynamic().getContext = { _: String, _: Any? -> throw IllegalStateException("No GPU") }
+        assertNull(openTown(canvas))
     }
 }

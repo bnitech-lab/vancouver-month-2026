@@ -5,6 +5,8 @@ plugins {
 
 kotlin {
     js {
+        // ES modules let webpack leave out the parts of Three.js the town does not use, about a quarter of it.
+        useEsModules()
         browser {
             commonWebpackConfig {
                 outputFileName = "vancouver-month.js"
@@ -16,9 +18,18 @@ kotlin {
     sourceSets {
         jsMain.dependencies {
             implementation(project(":text"))
+            // Draws the town in 3D. An exact version, so every build bundles the same code.
+            implementation(npm("three", "0.169.0"))
         }
         jsTest.dependencies {
             implementation(kotlin("test"))
         }
+    }
+}
+
+// The page bundles Three.js, so the distribution carries its MIT licence in full, next to the script.
+tasks.named<Sync>("jsBrowserDistribution") {
+    from(rootProject.layout.buildDirectory.file("js/node_modules/three/LICENSE")) {
+        rename { "three-LICENSE.txt" }
     }
 }
