@@ -33,6 +33,7 @@ import vancouvermonth.text.guessLine
 import vancouvermonth.text.keyword
 import vancouvermonth.text.money
 import vancouvermonth.text.monthStartLines
+import vancouvermonth.text.replacesKept
 import vancouvermonth.text.parseAmount
 import vancouvermonth.text.Passer
 import vancouvermonth.text.passerLine
@@ -142,6 +143,9 @@ class PhoneGame private constructor(
     private var record: MonthRecord? = null
     private var kept: KeptMonth? = null
     private var keptRead = false
+
+    /** The day another run's kept month goes on from, read with [kept]: starting this run replaces that month. */
+    private var replacing: Int? = null
 
     fun show() {
         stopTyping()
@@ -264,7 +268,9 @@ class PhoneGame private constructor(
             child("ul", "notes") {
                 for (text in monthStartLines(room)) child("li", text = text)
             }
+            replacing?.let { child("p", "replaces", replacesKept(it)).id = "replaces" }
             button("primary", text = "${date(Month.FIRST_DAY)} 시작하기") {
+                if (replacing != null) setAttribute("aria-describedby", "replaces")
                 onclick = {
                     val room = checkNotNull(picked)
                     beginMonth(game.startMonth(room), MonthRecord(game.seed, today, room, reveal.guess))
@@ -291,6 +297,7 @@ class PhoneGame private constructor(
         if (!keptRead) {
             keptRead = true
             kept = slot?.keptFor(game.seed, today)
+            replacing = slot?.otherRunDay(game.seed, today)
         }
         return kept
     }

@@ -371,6 +371,13 @@ a:focus-visible {
   gap: 8px;
 }
 
+/* On another run's start card: starting it drops the kept month. */
+.start .replaces {
+  margin: -4px 0 12px;
+  font-size: 14px;
+  color: var(--warn);
+}
+
 /* The month */
 
 /* The 3D town. Its shape (aspect-ratio) comes from TownCamera, so the picture and the names over it line up. */

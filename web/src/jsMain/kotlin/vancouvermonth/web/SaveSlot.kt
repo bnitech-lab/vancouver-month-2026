@@ -45,6 +45,16 @@ internal class SaveSlot(
     }
 
     /**
+     * The day another run's kept month goes on from, or null when the slot holds none that replays. Starting the run
+     * of [seed] (and [today]) would replace it.
+     */
+    fun otherRunDay(seed: Int, today: TodaysRun?): Int? {
+        val record = record() ?: return null
+        if (record.seed == seed && record.today == today) return null
+        return replayed(record)?.month?.day
+    }
+
+    /**
      * [record] replayed, or null when it does not replay. A throw counts as not replaying: the rules check each day
      * before playing it, but a rule added to core later that they do not know of must not leave the page blank.
      */

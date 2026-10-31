@@ -26,6 +26,7 @@ import vancouvermonth.text.continueFrom
 import vancouvermonth.text.date
 import vancouvermonth.text.greeting
 import vancouvermonth.text.money
+import vancouvermonth.text.replacesKept
 
 /** The month in progress survives a reload: kept after every day, offered on opening, and let go at the ending. */
 class ContinueMonthTest {
@@ -66,14 +67,19 @@ class ContinueMonthTest {
         return game
     }
 
-    /** Starts September for [seed] in [into]: the cheapest room, an exact guess, and 시작하기. */
-    private fun startRun(seed: Int, into: HTMLElement = root) {
+    /** Picks [seed]'s cheapest room in [into] and reveals it with an exact guess, up to the start card. */
+    private fun revealRun(seed: Int, into: HTMLElement = root) {
         val game = FirstMinute(seed)
         into.button("${game.cheapestRoomIndex + 1}번 방").click()
         val input = into.querySelector("input") as HTMLInputElement
         input.value = "${game.lowestTotal}"
         input.dispatchEvent(Event("input"))
         into.button("총비용 확인하기").click()
+    }
+
+    /** Starts September for [seed] in [into]: the cheapest room, an exact guess, and 시작하기. */
+    private fun startRun(seed: Int, into: HTMLElement = root) {
+        revealRun(seed, into)
         into.button("시작하기").click()
     }
 
@@ -287,11 +293,31 @@ class ContinueMonthTest {
         open(seed = 2022)
         assertNull(card, "Seed 1011's month was offered on seed 2022")
         assertEquals(first, kept, "Opening another run dropped the kept month")
-        startRun(2022)
+        revealRun(2022)
+        // The start card says, by its day and not by a run number, which month starting drops.
+        assertEquals(replacesKept(Month.FIRST_DAY + 1), text(".start .replaces"))
+        assertEquals("replaces", root.button("시작하기").getAttribute("aria-describedby"))
+        assertEquals(first, kept, "Revealing a room dropped the kept month")
+        root.button("시작하기").click()
         assertEquals(2022, kept?.seed)
 
         open()
         assertNull(card, "Seed 1011's month came back after seed 2022's started")
+    }
+
+    @Test
+    fun `the start card says nothing of a kept month when there is none, or it is this run's`() {
+        open()
+        revealRun(1011)
+        assertNull(root.querySelector(".replaces"))
+        assertNull(root.button("시작하기").getAttribute("aria-describedby"))
+        root.button("시작하기").click()
+        root.button("영어 공부").click()
+
+        open()
+        root.button(Continue.NEW).click()
+        revealRun(1011)
+        assertNull(root.querySelector(".replaces"), "The run's own month, just dropped, was named")
     }
 
     @Test
