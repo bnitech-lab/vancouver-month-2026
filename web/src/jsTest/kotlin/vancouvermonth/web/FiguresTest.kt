@@ -9,6 +9,7 @@ import org.khronos.webgl.Float32Array
 import org.khronos.webgl.get
 import vancouvermonth.text.Passer
 import vancouvermonth.text.Townsperson
+import vancouvermonth.text.Weather
 
 class FiguresTest {
     private val k = Figures.SCALE
@@ -119,6 +120,51 @@ class FiguresTest {
                     assertEquals(1f, numbers[at + 15])
                 }
             }
+        }
+    }
+
+    @Test
+    fun `on a rainy day two passersby hold an umbrella open over their heads, and nobody does on a dry day`() {
+        val headTop = 1.44
+        for (passer in Passer.entries) {
+            for (weather in Weather.entries) {
+                val parts = Figures.passer(passer, weather)
+                val over = parts.filter { it.limb == Limb.BODY && it.block.y >= headTop + 0.2 }
+                if (Figures.holdsUmbrella(passer, weather)) {
+                    // A canopy above the head that covers all of it, and a shaft down beside it to the hand.
+                    val canopy = over.maxBy { it.block.width }.block
+                    assertTrue(canopy.x <= -0.37 && canopy.x + canopy.width >= 0.37, "$passer: $canopy")
+                    assertTrue(canopy.z <= -0.33 && canopy.z + canopy.depth >= 0.33, "$passer: $canopy")
+                    val shaft = parts.single { it.block.height > 1.0 }.block
+                    assertTrue(shaft.x + shaft.width < -0.37, "$passer: the shaft goes through the head")
+                    assertTrue(shaft.y + shaft.height >= canopy.y - 1e-9, "$passer: the shaft stops short")
+                } else {
+                    assertTrue(over.isEmpty(), "$passer on a $weather day has $over over the head")
+                }
+            }
+        }
+        assertTrue(Figures.holdsUmbrella(Passer.MINA, Weather.RAINY) && Figures.holdsUmbrella(Passer.PRIYA, Weather.RAINY))
+        // 미나 carries her umbrella closed when it does not rain, and has no closed one when it is open.
+        assertTrue(Figures.passer(Passer.MINA).any { it.limb == Limb.LEFT_ARM && it.block.y < -0.5 })
+        assertTrue(Figures.passer(Passer.MINA, Weather.RAINY).none { it.limb == Limb.LEFT_ARM && it.block.y < -0.5 })
+        // 올리버 runs and 테오 keeps his hat: the same in any weather.
+        for (passer in listOf(Passer.OLIVER, Passer.THEO)) {
+            assertEquals(Figures.passer(passer), Figures.passer(passer, Weather.RAINY))
+        }
+    }
+
+    @Test
+    fun `the hand holding an umbrella reaches its shaft`() {
+        for (passer in listOf(Passer.MINA, Passer.PRIYA)) {
+            val parts = Figures.passer(passer, Weather.RAINY)
+            val placed = Figures.place(parts, Pose(Spot(0.0, 0.0), 0.0, wave = Figures.UMBRELLA_ARM))
+            val hand = parts.indices.single { parts[it].limb == Limb.LEFT_ARM && parts[it].block.y < -0.4 }
+            val shaft = parts.indices.single { parts[it].block.height > 1.0 }
+            val handAt = middle(placed[hand])
+            val shaftAt = middle(placed[shaft])
+            assertTrue(abs(handAt.x - shaftAt.x) < 0.08, "$passer: hand at $handAt, shaft at $shaftAt")
+            val shaftBottom = shaftAt.y - placed[shaft][5] / 2
+            assertTrue(handAt.y in shaftBottom..shaftBottom + 0.2, "$passer: hand at $handAt, shaft from $shaftBottom")
         }
     }
 }
