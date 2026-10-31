@@ -714,8 +714,9 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         // A phone that asks for less motion keeps the town's own life still, and draws only for the player. The life
         // moves on the beat only, even on frames drawn at the screen's full rate for the player.
         val still = lessMotion.matches
-        if (!still && pace.stepsLife) stepLife()
         try {
+            // Inside the try, so that if the life ever failed the town would hand over to the buttons, not freeze.
+            if (!still && pace.stepsLife) stepLife()
             renderer.shadowMap.needsUpdate = pace.drawsShadows
             renderer.render(scene, camera)
         } catch (error: Throwable) {
