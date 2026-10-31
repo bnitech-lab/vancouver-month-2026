@@ -164,11 +164,18 @@ external class InstancedMesh(geometry: BoxGeometry, material: Material, count: I
     val instanceMatrix: InstanceMatrices
 }
 
-/** The numbers behind [InstancedMesh.instanceMatrix]; [needsUpdate] sends changed ones to the graphics card. */
+/**
+ * The numbers behind [InstancedMesh.instanceMatrix]; [needsUpdate] sends changed ones to the graphics card, and
+ * [setUsage] with [DynamicDrawUsage] tells it they change often.
+ */
 external interface InstanceMatrices {
     val array: Float32Array
     var needsUpdate: Boolean
+    fun setUsage(usage: Int)
 }
+
+/** For numbers sent to the graphics card again and again, such as boxes that move every frame. */
+external val DynamicDrawUsage: Int
 
 /** Several objects that move and turn together, such as the parts of the character. */
 external class Group : Object3D

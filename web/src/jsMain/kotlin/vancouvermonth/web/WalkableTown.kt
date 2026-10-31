@@ -213,7 +213,17 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private val onRelease: (Event) -> Unit = { release(it as PointerEvent, cancelled = false) }
     private val onCancel: (Event) -> Unit = { release(it as PointerEvent, cancelled = true) }
     private val onWheel: (Event) -> Unit = { wheel(it as WheelEvent) }
-    private val onRestored: (Event) -> Unit = { askForFrame() }
+    private val onLost: (Event) -> Unit = { contextLost = true }
+    private val onRestored: (Event) -> Unit = {
+        contextLost = false
+        askForFrame()
+    }
+
+    /** A phone that stops asking for less motion gets the town's life back at once, not at the next touch. */
+    private val onMotionPreference: (Event) -> Unit = { askForFrame() }
+
+    /** True while the phone has taken WebGL back from the page: the town waits, drawing nothing, until it returns. */
+    private var contextLost = false
 
     /** Back on screen, the town draws again at once; while hidden, it asks for no frames at all. */
     private val onVisibility: (Event) -> Unit = {
@@ -257,8 +267,10 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         canvas.addEventListener("lostpointercapture", onCancel)
         canvas.addEventListener("wheel", onWheel, json("passive" to false))
         // A phone may take WebGL back from a page in the background; Three.js sets it up again, and the town redraws.
+        canvas.addEventListener("webglcontextlost", onLost)
         canvas.addEventListener("webglcontextrestored", onRestored)
         document.addEventListener("visibilitychange", onVisibility)
+        lessMotion.addEventListener("change", onMotionPreference)
     }
 
     /** The sky and its haze, soft light from all round, and a warm sun whose shadows fall around the character. */
@@ -325,6 +337,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val mesh = boxes(parts.flatten().map { it.block }, material)
         // The figures move about, so the bounds worked out from where they first stood would soon be wrong.
         mesh.frustumCulled = false
+        mesh.instanceMatrix.setUsage(DynamicDrawUsage)
         scene.add(mesh)
         return mesh
     }
@@ -347,6 +360,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         drifting.castShadow = false
         drifting.receiveShadow = false
         drifting.frustumCulled = false
+        drifting.instanceMatrix.setUsage(DynamicDrawUsage)
         scene.add(drifting)
     }
 
@@ -453,8 +467,10 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         canvas.removeEventListener("pointercancel", onCancel)
         canvas.removeEventListener("lostpointercapture", onCancel)
         canvas.removeEventListener("wheel", onWheel)
+        canvas.removeEventListener("webglcontextlost", onLost)
         canvas.removeEventListener("webglcontextrestored", onRestored)
         document.removeEventListener("visibilitychange", onVisibility)
+        lessMotion.removeEventListener("change", onMotionPreference)
         for (mesh in meshes) mesh.dispose()
         renderer.dispose()
         cube.dispose()
@@ -694,10 +710,10 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     private fun drawFrame(now: Double) {
         if (closed) return
-        val hidden = pageHidden()
+        val hidden = pageHidden() || contextLost
         val moving = urgent || trip != null || nightFell != null || gliding
         if (!pace.shouldDraw(now, moving, hidden)) {
-            // Hidden, nothing more is asked for until the page shows again; otherwise the town's life waits its turn.
+            // Hidden or without WebGL, nothing more is asked for until that ends; otherwise the life waits its turn.
             if (!hidden) nextFrame()
             return
         }
