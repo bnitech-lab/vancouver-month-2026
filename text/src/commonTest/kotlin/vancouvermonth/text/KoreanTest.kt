@@ -2,6 +2,8 @@ package vancouvermonth.text
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import vancouvermonth.core.Action
 import vancouvermonth.core.Blocked
 import vancouvermonth.core.Dice
@@ -103,6 +105,65 @@ class KoreanTest {
         assertEquals("내 짐작과 차이 \$45", guessLine(game.reveal(2, 1_200)))
         assertEquals("월세 \$1,050 + 공과금 \$150 + 교통 \$145", breakdown(rooms[1]))
         assertEquals("공과금 별도", utilitiesLabel(rooms[1]))
+    }
+
+    @Test
+    fun `the first screen's story names the starting money and the goal, and asks for a room first`() {
+        val lines = arrivalLines(FirstMinute.STARTING_BALANCE)
+        assertEquals(
+            listOf(
+                "8월 31일, ${money(FirstMinute.STARTING_BALANCE)}만 들고 밴쿠버에 도착했어요.",
+                goalLine(),
+                "먼저 9월 한 달 지낼 방부터 구해야 해요.",
+            ),
+            lines,
+        )
+        assertEquals("8월 31일, \$3,000만 들고 밴쿠버에 도착했어요.", lines[0])
+        assertEquals("8월 31일, \$500만 들고 밴쿠버에 도착했어요.", arrivalLines(500)[0])
+        for (line in lines) assertTrue(line.length <= 40, "Too long for a phone: $line")
+    }
+
+    @Test
+    fun `why the total matters is said with October's date and the living cost, and no room's total`() {
+        val lines = whyTotalLines()
+        assertEquals(
+            listOf(
+                "총비용은 오늘 내고, ${date(Month.LAST_DAY + 1)}에 또 내요.",
+                "매일 생활비 ${money(Month.DAILY_LIVING_COST)}도 나가니, 쌀수록 9월이 넉넉해요.",
+            ),
+            lines,
+        )
+        assertEquals("총비용은 오늘 내고, 10월 1일에 또 내요.", lines[0])
+        assertEquals("매일 생활비 \$40도 나가니, 쌀수록 9월이 넉넉해요.", lines[1])
+        for (line in lines) assertTrue(line.length <= 40, "Too long for a phone: $line")
+    }
+
+    @Test
+    fun `after the reveal the pick is tied to the month, a tie counting as the cheapest`() {
+        val rooms = listOf(
+            Room(rent = 1_140, zone = Zone.ONE, utilitiesIncluded = true, utilities = 0),
+            Room(rent = 1_050, zone = Zone.TWO, utilitiesIncluded = false, utilities = 150),
+            Room(rent = 930, zone = Zone.THREE, utilitiesIncluded = false, utilities = 120),
+        )
+        val game = FirstMinute(seed = 0, rooms = rooms)
+        val extra = rooms[1].totalMonthlyCost - game.lowestTotal
+        assertEquals(
+            "가장 싼 방보다 한 달에 ${money(extra)} 더 내요. ${date(Month.LAST_DAY + 1)}에도 그만큼 더 나가요.",
+            monthCostLine(game, game.reveal(1, 1_300)),
+        )
+        assertEquals("가장 싼 방보다 한 달에 \$100 더 내요. 10월 1일에도 그만큼 더 나가요.", monthCostLine(game, game.reveal(1, 0)))
+        // Rooms 1 and 3 tie for the lowest total: either is the cheapest.
+        val cheapest = "가장 싼 방이라 9월을 버틸 돈이 가장 많이 남아요."
+        assertEquals(cheapest, monthCostLine(game, game.reveal(0, 1_245)))
+        assertEquals(cheapest, monthCostLine(game, game.reveal(2, 0)))
+    }
+
+    @Test
+    fun `no line of the first screen or the reveal has an em dash`() {
+        val game = FirstMinute(1011)
+        val lines = arrivalLines(game.startingBalance) + whyTotalLines() +
+            game.rooms.indices.map { monthCostLine(game, game.reveal(it, 0)) }
+        for (line in lines) assertFalse('\u2014' in line, line)
     }
 
     @Test
