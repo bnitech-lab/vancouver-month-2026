@@ -29,8 +29,9 @@ sealed interface Picked {
  * The camera behind and above the character, which the player turns by dragging and brings nearer or farther by
  * pinching. [yaw], [pitch] and [distance] are what the player asked for, already kept in their limits; the camera
  * moves toward them a little each frame, so it glides instead of jumping. It follows the character ([subject]) and
- * looks at it ([focus]). It never looks at the character through anything: a wall, the SkyTrain deck or a canopy in
- * the way pulls it in front, or lifts it over when that would bring it too close.
+ * looks at it ([focus]). It never looks at the character through anything that matters: one of the five places, the
+ * SkyTrain deck and station, or a canopy in the way pulls it in front, or lifts it over when that would bring it too
+ * close. The city's buildings do not move it; they fold down out of its way instead ([Cutaway]).
  */
 class FollowCamera(subject: Point) {
     /** The turn around the character, in radians. 0 puts the camera south of it; -PI / 2 puts it west, looking east. */
@@ -140,9 +141,10 @@ class FollowCamera(subject: Point) {
     /**
      * What a tap at [left], [top] (0.0 to 1.0 across and down the screen) lands on: the nearest building or
      * person of a place, or of [passersby] (each one's box where they are now), else the ground. A tap on another
-     * building walks to its foot. Null for the sky and the far distance.
+     * building walks to its foot. The city's buildings are as tall as [cutaway] draws them: a folded one is only its
+     * low plinth, so a tap meant for the ground behind it lands there. Null for the sky and the far distance.
      */
-    fun pick(left: Double, top: Double, passersby: List<Block> = emptyList()): Picked? {
+    fun pick(left: Double, top: Double, passersby: List<Block> = emptyList(), cutaway: Cutaway? = null): Picked? {
         val ray = rayThrough(left, top)
         var nearest = Double.MAX_VALUE
         var wallHit: Wall? = null
@@ -154,6 +156,21 @@ class FollowCamera(subject: Point) {
                 wallHit = wall
             }
         }
+        var cityHit = false
+        for ((index, building) in Neighbourhood.foldables.withIndex()) {
+            val box = building.box
+            val height = cutaway?.heightOf(index) ?: box.height
+            val hit = enterAt(
+                eye.x, eye.y, eye.z, ray.x, ray.y, ray.z,
+                box.x, box.y, box.z, box.x + box.width, box.y + height, box.z + box.depth,
+            )
+            // The camera may stand inside one, as it folds out of the way; it is seen through from in there.
+            if (hit > 0.0 && hit < nearest && hit <= MAX_TAP_DISTANCE) {
+                nearest = hit
+                cityHit = true
+            }
+        }
+        if (cityHit) wallHit = null
         val ground = if (ray.y < 0) -eye.y / ray.y else Double.MAX_VALUE
         var passerby: Int? = null
         for ((index, box) in passersby.withIndex()) {
@@ -164,8 +181,8 @@ class FollowCamera(subject: Point) {
             }
         }
         if (passerby != null && nearest < ground) return Picked.AtPasserby(passerby)
-        if (wallHit != null && nearest < ground) {
-            val place = wallHit.place
+        if ((wallHit != null || cityHit) && nearest < ground) {
+            val place = wallHit?.place
             if (place != null) return Picked.AtPlace(place)
             val foot = eye + ray * nearest
             return Picked.OnGround(Spot(foot.x, foot.z))
@@ -190,11 +207,11 @@ class FollowCamera(subject: Point) {
     }
 
     /**
-     * Behind and above the character at the shown turn, tilt and distance, with nothing between them: a wall in the
-     * way pulls the camera in front of it. Downtown, where a slanting look meets a wall at once, it first looks along
-     * one of the two streets either side of its turn, if that keeps it [ALONG_A_STREET] away or more; and when it would
-     * still come too close, it rises over the wall instead. It makes nothing new on the way, as it runs every frame
-     * the camera glides.
+     * Behind and above the character at the shown turn, tilt and distance, with nothing that matters between them: a
+     * wall in the way pulls the camera in front of it. Where a slanting look meets such a wall at once, it first looks
+     * along one of the two streets either side of its turn, if that keeps it [ALONG_A_STREET] away or more; and when it
+     * would still come too close, it rises over the wall instead. The city's buildings are not walls to it. It makes
+     * nothing new on the way, as it runs every frame the camera glides.
      */
     private fun eyeFor(): Point {
         refreshNear(subject, shownDistance)
@@ -282,11 +299,12 @@ class FollowCamera(subject: Point) {
         const val START_DISTANCE = 21.0
 
         /**
-         * The walls within [reach] of [from] on the ground: the only ones a camera that far off can meet. For tests and
-         * one-off checks; the camera itself keeps its own list.
+         * The walls the camera keeps out of within [reach] of [from] on the ground: the only ones a camera that far off
+         * can meet. For tests and one-off checks; the camera itself keeps its own list.
          */
         fun wallsNear(from: Point, reach: Double): List<Block> = Neighbourhood.walls.mapNotNull { wall ->
             val box = wall.box
+            if (wall.folds) return@mapNotNull null
             val dx = max(0.0, max(box.x - from.x, from.x - box.x - box.width))
             val dz = max(0.0, max(box.z - from.z, from.z - box.z - box.depth))
             if (dx * dx + dz * dz <= reach * reach) box else null
@@ -317,9 +335,13 @@ class FollowCamera(subject: Point) {
         /** How far the subject may move before the walls near it are gathered again. */
         private const val NEAR_SLACK = 1.0
 
-        /** Every wall's box as six numbers, its low and high corners, gathered once. */
+        /**
+         * The box of every wall the camera keeps out of as six numbers, its low and high corners, gathered once: the
+         * five places, the SkyTrain deck, station and tunnel mouth, the awning and the canopy, never the city's
+         * buildings.
+         */
         private val WALLS: DoubleArray by lazy {
-            val walls = Neighbourhood.walls
+            val walls = Neighbourhood.walls.filter { !it.folds }
             DoubleArray(walls.size * 6).also { numbers ->
                 for ((index, wall) in walls.withIndex()) {
                     val box = wall.box
@@ -333,8 +355,11 @@ class FollowCamera(subject: Point) {
             }
         }
 
-        /** What a tap can land on: every building and wall, and the five places' people, gathered once. */
-        private val TAPPABLE: List<Wall> by lazy { Neighbourhood.walls + Neighbourhood.people }
+        /**
+         * What a tap can land on besides the city's buildings, which fold: every other wall, and the five places'
+         * people, gathered once.
+         */
+        private val TAPPABLE: List<Wall> by lazy { Neighbourhood.walls.filter { !it.folds } + Neighbourhood.people }
 
         const val NEAR_PLANE = 0.1
         /** Past the haze nothing shows, so nothing past it is drawn: a little beyond [Neighbourhood.HAZE_FAR]. */

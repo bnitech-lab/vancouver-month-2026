@@ -3,6 +3,12 @@ package vancouvermonth.text
 /** The sound switch's words: what a tap on it does now. */
 fun soundLabel(on: Boolean): String = if (on) "소리 끄기" else "소리 켜기"
 
+/**
+ * What a screen reader hears for the small map in the town's corner, which is a picture: roughly where the character
+ * is, by the name of the place it is nearest.
+ */
+fun minimapLabel(nearest: String): String = "지도: $nearest 근처"
+
 /** The card that shows how to play the first time the town opens, and the button that opens it again. */
 object Guide {
     const val TITLE = "마을에서 지내는 법"

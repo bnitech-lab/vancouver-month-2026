@@ -4,6 +4,7 @@ import kotlin.js.Date
 import kotlin.js.Promise
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.sqrt
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,6 +22,8 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.asList
 import org.w3c.dom.events.Event
+import org.w3c.dom.events.KeyboardEvent
+import org.w3c.dom.events.KeyboardEventInit
 import org.w3c.dom.events.WheelEvent
 import org.w3c.dom.events.WheelEventInit
 import org.w3c.dom.pointerevents.PointerEvent
@@ -64,10 +67,19 @@ class WalkableTownTest {
     private val root = (document.createElement("main") as HTMLElement).also { document.body!!.appendChild(it) }
     private var town: NeighbourhoodScene? = null
 
+    /**
+     * The page's own style sheet, put on the page for a test that checks the layout as it is published, and the rule
+     * that pins the cards over the town to a phone's size, as the town itself is pinned.
+     */
+    private var pageStyle: HTMLElement? = null
+    private var phoneStyle: HTMLElement? = null
+
     @AfterTest
     fun removeScreen() {
         town?.close()
         root.remove()
+        pageStyle?.remove()
+        phoneStyle?.remove()
         for (left in document.querySelectorAll(".walk-town").asList()) (left as HTMLElement).remove()
     }
 
@@ -1099,6 +1111,304 @@ class WalkableTownTest {
             Step("one second later", after(1_000)) {
                 val drawn = town.framesDrawn - from
                 assertTrue(drawn in 1..FramePace.AMBIENT_FPS.toInt() + 1, "$drawn frames in a second")
+            },
+        )
+    }
+
+    @Test
+    fun `a small map sits in the corner under the top card, and its arrow moves as the character walks`(): Promise<Unit> {
+        val town = startInTown()
+        val start = town.characterSpot
+        // Beside 내 방, east and a little south, in front of the first view.
+        val target = Spot(start.x + 3.0, start.z + 1.0)
+        val map = town.minimapElement
+        var before = 0.0 to 0.0
+        return play(
+            Step("the town drew its map", { town.isStill }) {
+                assertSame(town.element, map.parentElement)
+                assertEquals("img", map.getAttribute("role"))
+                assertEquals("지도: 내 방 근처", map.getAttribute("aria-label"))
+                // In the town's top right corner, under the top card, never over it, and small.
+                val frame = map.getBoundingClientRect()
+                val hud = assertNotNull(root.querySelector(".hud")).getBoundingClientRect()
+                assertTrue(frame.top >= hud.bottom, "the map's top ${frame.top} is over the card, which ends at ${hud.bottom}")
+                assertEquals(375.0 - 8.0, frame.right, 1.0)
+                assertTrue(frame.width in 96.0..122.0, "${frame.width} wide")
+                // The arrow is where the character stands.
+                val width = map.clientWidth.toDouble()
+                before = town.minimapDot
+                assertEquals(start.x * width / Neighbourhood.COLUMNS, before.first, 1e-6)
+                assertEquals(start.z * map.clientHeight / Neighbourhood.ROWS, before.second, 1e-6)
+                tapScreen(town, onScreen(town, Point(target.x, 0.0, target.z)))
+            },
+            Step("walked there", { town.isStill }) {
+                val after = town.minimapDot
+                val width = map.clientWidth.toDouble()
+                assertEquals(target.x * width / Neighbourhood.COLUMNS, after.first, 1e-6)
+                assertEquals(target.z * map.clientHeight / Neighbourhood.ROWS, after.second, 1e-6)
+                assertTrue(after.first > before.first && after.second > before.second, "$before to $after")
+            },
+        )
+    }
+
+    @Test
+    fun `a tap on the small map shows it larger, and a tap, Escape or a talk brings it back`(): Promise<Unit> {
+        val town = startInTown()
+        val map = town.minimapElement
+        var small = 0.0
+        fun escape() = document.dispatchEvent(KeyboardEvent("keydown", KeyboardEventInit(key = "Escape")))
+        return play(
+            Step("tap the map", { town.isStill }) {
+                small = map.getBoundingClientRect().width
+                map.click()
+                assertTrue(map.classList.contains("large"))
+                // About four fifths of the 375-point town.
+                assertEquals(300.0, map.getBoundingClientRect().width, 2.0)
+                assertNull(town.markerSpot, "a tap on the map walked the character")
+            },
+            Step("drawn larger", { town.isStill }) {
+                val canvas = map.querySelector("canvas") as HTMLCanvasElement
+                assertTrue(canvas.width >= map.clientWidth, "the larger map is drawn at ${canvas.width} pixels")
+                map.click()
+                assertFalse(map.classList.contains("large"))
+                assertEquals(small, map.getBoundingClientRect().width, 0.5)
+                map.click()
+                escape()
+                assertFalse(map.classList.contains("large"), "Escape left it large")
+                // A name taking the keyboard's focus brings it back, so it never lies over the name in focus.
+                map.click()
+                (assertNotNull(root.querySelector(".place-name")) as HTMLElement).focus()
+                assertFalse(map.classList.contains("large"), "a name took the focus under the larger map")
+                map.click()
+                talkTo(Place.HOME)
+                assertNotNull(root.querySelector(".talk"))
+                assertFalse(map.classList.contains("large"), "a talk opened over the larger map")
+                // While the talk covers the town, it does not grow under it.
+                map.click()
+                assertFalse(map.classList.contains("large"))
+            },
+        )
+    }
+
+    /** Lays the page out with its own style sheet, as it is published (web/karma.config.d/style.js hands it over). */
+    private fun usePageStyle() {
+        val style = document.createElement("style") as HTMLElement
+        style.textContent = js("window.__karma__.config.pageStyle") as String
+        document.head!!.appendChild(style)
+        pageStyle = style
+    }
+
+    /** Pins the town and the cards over it to a phone [width] by [height] points, in the test browser's window. */
+    private fun pinPhone(town: NeighbourhoodScene, width: Int, height: Int) {
+        town.element.style.width = "${width}px"
+        town.element.style.height = "${height}px"
+        val style = phoneStyle ?: (document.createElement("style") as HTMLElement).also {
+            document.head!!.appendChild(it)
+            phoneStyle = it
+        }
+        style.textContent = ".over-town { inset: auto; left: 0; top: 0; width: ${width}px; height: ${height}px; }"
+    }
+
+    private fun rectOf(selector: String) =
+        assertNotNull(root.querySelector(selector), "no $selector: $screen").getBoundingClientRect()
+
+    /** A finger's press, lift and click at [x], [y] on whatever the page has there, as the browser would send them. */
+    private fun pressAt(x: Double, y: Double): HTMLElement {
+        val hit = assertNotNull(document.elementFromPoint(x, y), "nothing at $x, $y") as HTMLElement
+        for (type in listOf("pointerdown", "pointerup")) {
+            hit.dispatchEvent(PointerEvent(type, PointerEventInit(pointerId = 1, isPrimary = true, clientX = x.toInt(),
+                clientY = y.toInt(), bubbles = true)))
+        }
+        hit.click()
+        return hit
+    }
+
+    @Test
+    fun `laid out as published, the small map sits under the cards and the day's log, above a talk, and takes its taps`():
+        Promise<Unit> {
+        usePageStyle()
+        val town = startInTown(night = 50.0)
+        pinPhone(town, 375, 812)
+        val map = town.minimapElement
+        fun clearOfTheCards(phone: String) {
+            val frame = map.getBoundingClientRect()
+            val log = rectOf(".over-town .log")
+            val talk = rectOf(".talk")
+            assertTrue(frame.top >= log.bottom, "$phone: the map's top ${frame.top} is over the log, which ends at ${log.bottom}")
+            assertTrue(frame.bottom <= talk.top, "$phone: the map's bottom ${frame.bottom} is over the talk at ${talk.top}")
+        }
+        return play(
+            Step("the first morning", { town.isStill }) {
+                val frame = map.getBoundingClientRect()
+                assertTrue(frame.top >= rectOf(".hud").bottom, "the map's top ${frame.top} is over the top card")
+                // A finger at the map's middle lands on the map, not the town under it: it grows, and nobody walks.
+                val hit = pressAt(frame.left + frame.width / 2, frame.top + frame.height / 2)
+                assertTrue(map.contains(hit), "a finger on the map lands on ${hit.tagName}.${hit.className}")
+                assertTrue(map.classList.contains("large"), "the tap did not show the map larger")
+                assertNull(town.markerSpot, "a tap on the map walked the character")
+                val larger = map.getBoundingClientRect()
+                pressAt(larger.left + larger.width / 2, larger.top + larger.height / 2)
+                assertFalse(map.classList.contains("large"))
+                assertNull(town.markerSpot, "a tap on the larger map walked the character")
+                talkTo(Place.HOME)
+                spendButton().click()
+            },
+            Step("the morning after, with the day's log", { !town.isChangingDay && town.isStill }) {
+                val frame = map.getBoundingClientRect()
+                val log = rectOf(".over-town .log")
+                assertTrue(frame.top >= log.bottom, "the map's top ${frame.top} is over the log, which ends at ${log.bottom}")
+                talkTo(Place.HOME)
+            },
+            Step("with a talk open under the log", { town.isStill }) {
+                clearOfTheCards("375 by 812")
+                pinPhone(town, 320, 568)
+            },
+            Step("on a 320 by 568 phone", { town.isStill && map.getBoundingClientRect().top < 300.0 }) {
+                assertTrue(rectOf(".talk").bottom <= 568.0, "the talk runs off the small phone")
+                clearOfTheCards("320 by 568")
+            },
+        )
+    }
+
+    @Test
+    fun `a fault in the small map hides it, and the town goes on walking`(): Promise<Unit> {
+        val town = startInTown()
+        val map = town.minimapElement
+        val start = town.characterSpot
+        val target = Spot(start.x + 3.0, start.z + 1.0)
+        return play(
+            Step("break the map's drawing, then walk", { town.isStill }) {
+                val canvas = map.querySelector("canvas") as HTMLCanvasElement
+                canvas.getContext("2d").asDynamic().drawImage = { throw IllegalStateException("broken on purpose") }
+                tapScreen(town, onScreen(town, Point(target.x, 0.0, target.z)))
+            },
+            Step("walked there all the same", { town.isStill }) {
+                assertTrue(map.hidden, "the broken map still shows")
+                assertTrue(distanceBetween(town.characterSpot, target) < 0.01, "the walk stopped at ${town.characterSpot}")
+            },
+        )
+    }
+
+    /** The five places' own walls, by where they are among the town's still boxes. */
+    private fun placeBodies(): List<Pair<Venue, Int>> = Neighbourhood.venues.map { venue ->
+        venue to Neighbourhood.blocks.indexOfFirst {
+            it.x == venue.x.toDouble() && it.z == venue.z.toDouble() && it.height == venue.height && it.y == 0.0
+        }
+    }
+
+    /**
+     * From [spot], a turn of the camera at the first view's tilt and distance from which one of the city's buildings at
+     * least [tall] stands between the camera and the character, though none of them does at the first view's turn:
+     * the turn and that building's number. Worked out with the same camera and the same folding rule as the town.
+     */
+    private fun turnWithBuildingInTheWay(spot: Spot, tall: Double): Pair<Double, Int> {
+        val boxes = Neighbourhood.foldables.map { it.box }
+        fun inTheWay(yaw: Double): List<Int> {
+            val focus = Point(spot.x, 1.0, spot.z)
+            val camera = FollowCamera(focus)
+            camera.aspect = 375.0 / 812
+            camera.aim(yaw, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+            camera.jumpTo(focus)
+            val eye = camera.eye
+            val head = Point(spot.x, 1.6, spot.z)
+            val length = sqrt((head.x - eye.x) * (head.x - eye.x) + (head.y - eye.y) * (head.y - eye.y) +
+                (head.z - eye.z) * (head.z - eye.z))
+            val way = Point((head.x - eye.x) / length, (head.y - eye.y) / length, (head.z - eye.z) / length)
+            return boxes.indices.filter { index ->
+                val hit = distanceToBox(eye, way, boxes[index])
+                hit != null && hit < length && boxes[index].height >= tall
+            }
+        }
+        val cutaway = Cutaway(boxes)
+        val start = FollowCamera(Point(spot.x, 1.0, spot.z)).also { it.aspect = 375.0 / 812 }.eye
+        cutaway.aim(start.x, start.y, start.z, spot.x, 1.6, spot.z)
+        for (step in 0 until 48) {
+            val yaw = FollowCamera.START_YAW + step * 2 * PI / 48
+            val index = inTheWay(yaw).firstOrNull { !cutaway.isFolding(it) } ?: continue
+            return yaw to index
+        }
+        error("No turn from $spot puts a building $tall tall in the camera's way")
+    }
+
+    @Test
+    fun `a tall city building between the camera and the character folds down, and stands again once clear`():
+        Promise<Unit> {
+        val town = startInTown()
+        // Downtown, at 도서관's door, among the towers.
+        val door = Neighbourhood.venue(Place.LIBRARY).door
+        val (yaw, index) = turnWithBuildingInTheWay(door, tall = 8.0)
+        val building = Neighbourhood.foldables[index]
+        val full = Neighbourhood.blocks[building.body].height
+        val places = placeBodies()
+        fun placesStand() {
+            for ((venue, body) in places) assertEquals(venue.height, town.drawnHeight(body), 1e-4, "${venue.place}")
+        }
+        return play(
+            Step("stand at 도서관's door", { town.isStill }) {
+                town.standAt(door)
+                town.aimCamera(FollowCamera.START_YAW, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+            },
+            Step("at the first view's turn, the building stands", { town.isStill }) {
+                assertFalse(town.isFolded(index))
+                assertEquals(full, town.drawnHeight(building.body), 1e-4)
+                placesStand()
+                town.aimCamera(yaw, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+            },
+            Step("turned so it stands in the way, it folds", { town.isStill }) {
+                assertTrue(town.isFolded(index), "${building.box} did not fold")
+                assertEquals(Cutaway.PLINTH, town.drawnHeight(building.body), 1e-4)
+                // The camera keeps the whole distance the player asked for.
+                assertEquals(FollowCamera.START_DISTANCE, town.cameraReach, 1e-6)
+                placesStand()
+                town.aimCamera(FollowCamera.START_YAW, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+            },
+            Step("turned back, it stands again", { town.isStill }) {
+                assertFalse(town.isFolded(index))
+                assertEquals(full, town.drawnHeight(building.body), 1e-4)
+                placesStand()
+            },
+        )
+    }
+
+    @Test
+    fun `the five places never fold, even with the camera turned all the way round each`(): Promise<Unit> {
+        val town = startInTown()
+        val places = placeBodies()
+        assertTrue(places.all { it.second >= 0 }, "a place's walls are missing: $places")
+        val steps = mutableListOf<Step>()
+        for (venue in Neighbourhood.venues) {
+            steps += Step("stand at ${venue.place}'s door", { town.isStill }) { town.standAt(venue.door) }
+            for (turn in 0 until 4) {
+                steps += Step("${venue.place}, turn $turn", { town.isStill }) {
+                    for ((place, body) in places) {
+                        assertEquals(place.height, town.drawnHeight(body), 1e-4, "${place.place} at ${venue.place}")
+                    }
+                    town.aimCamera(turn * PI / 2, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+                }
+            }
+        }
+        steps += Step("last turn", { town.isStill }) {
+            for ((place, body) in places) assertEquals(place.height, town.drawnHeight(body), 1e-4, "${place.place}")
+        }
+        return play(*steps.toTypedArray())
+    }
+
+    @Test
+    fun `downtown, the camera at the first view's turn keeps its whole distance, the city folding out of its way`():
+        Promise<Unit> {
+        val town = startInTown()
+        val door = Neighbourhood.venue(Place.LIBRARY).door
+        return play(
+            Step("stand at 도서관's door at the first view's turn", { town.isStill }) {
+                town.standAt(door)
+                town.aimCamera(FollowCamera.START_YAW, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+            },
+            Step("settled", { town.isStill }) {
+                // Not pulled in, not lifted, not turned to look along a street: just where the player put it.
+                assertEquals(FollowCamera.START_DISTANCE, town.cameraReach, 1e-6)
+                assertEquals(FollowCamera.START_YAW, town.cameraEyeTurn, 1e-6)
+                assertTrue(Neighbourhood.foldables.indices.any { town.isFolded(it) }, "nothing folded downtown")
+                assertEquals("지도: 도서관 근처", town.minimapElement.getAttribute("aria-label"))
             },
         )
     }

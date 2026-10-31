@@ -168,6 +168,14 @@ out of its tunnel by the station. Each building's name floats over it, and no ot
 sit thinly over the top of the screen, and a name that would sit under them or the day's log hides there. The month's
 first view looks over 내 방 toward downtown, high enough to show four of the buildings and their names.
 
+A small map of the whole town sits in the top right corner, just under the day's figures and the day's log, so the
+player always knows roughly where the character is. It lies as the game map lies, never turned: the land, the water,
+the big park and the seawall, the city's blocks faintly, the five places (내 방 a red square, the others dots, 회사 green
+on an interview day as its name is), the camera's view as a pale wedge, and the character as a gold arrow pointing the
+way it faces. It is drawn again only when the character or the camera moves. A tap shows it larger, about four fifths
+of the screen wide with the places' names; a tap or Escape brings it back, and a talk or the guide closes it. It is a
+picture: a screen reader hears only which place the character is nearest, as in "지도: 내 방 근처".
+
 | Do | What happens |
 |---|---|
 | Tap the ground | The character walks there, around buildings, people, trees and fences, with a marker where it goes |
@@ -175,9 +183,16 @@ first view looks over 내 방 toward downtown, high enough to show four of the b
 | Drag | The camera turns around the character, and tilts within limits that keep the ground in view |
 | Pinch, or the mouse wheel | The camera comes nearer or goes farther |
 | Tap a person, a building or its name, or walk up to a door or a person | The character goes to that place's person, and a talk opens (a second quick tap only hurries it there) |
+| Tap the small map | It shows larger; a tap or Escape brings it back |
 
-Downtown, where buildings stand close, the camera looks along the nearest street rather than come too close, and as
-the character reaches a place it comes round to the street side of the door, unless the player turned it on the way.
+The city's buildings never get in the way. One that stands between the camera and the character, or fills the view
+just in front of the camera, folds down in a quarter of a second to a low outline of its footprint in its own colour,
+and rises again once clear; a tap meant for the ground behind a folded one lands there. So downtown the camera keeps the
+distance and the turn the player gave it. Only the five places, the SkyTrain's deck, its station and the station's
+roof, the tunnel's mouth, the café's awning and the office's canopy still pull it in front or lift it over; where one of
+them stands right behind the character, it first looks along the nearest street. A building the camera would come
+inside folds at once, and the near view widens with the view, so nothing out of sight folds. As the character reaches a place the camera comes round to the street side of
+the door, unless the player turned it on the way.
 A tap on the water walks to the near shore. A talk ignores taps for a moment after it opens, so the finger that opened
 it cannot also answer it. While a day changes into the next, the town takes no taps, drags, pinches or names, and no
 talk opens, until the morning.
@@ -236,14 +251,16 @@ console. Tests force each of these.
 The town's rules are plain Kotlin with tests: `Neighbourhood` (the layout on the real map, the people, which place a
 spot belongs to), `VancouverMap` (the map's squares and lines, read from the generated `VancouverMapData`), `RailLine`
 (the guideway the train follows), `Grid` (the A* search for the way around things), `Trip` (a walk or a dash, and the
-double tap), `FollowCamera` (turning, zooming, keeping out of walls, and what a tap lands on), `DayLight` (the light
+double tap), `FollowCamera` (turning, zooming, keeping out of the places' walls, and what a tap lands on), `Cutaway`
+(which of the city's buildings fold down out of the camera's way, and how far), `Minimap` (where the grid lies on the
+small map, and which place is nearest), `DayLight` (the light
 through the change of day, and when the passersby are out, and how each weather greys it), `Passersby` (their loops, and
 stopping for the character), `Greeter` (the five turning and waving), `TownLife` (the train's round and how loud it
 rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, all worked out from the time) and
 `FramePace` (which frames are drawn). The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`, and
 `Passersby.kt` for the passersby's), and so is each day's weather (`Weather.kt`). `WalkableTown` draws all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the map included, is about 791 KB
-(about 211 KB gzipped).
+`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the map included, is about 806 KB
+(about 216 KB gzipped).
 
 ### Sound and the first-run guide
 

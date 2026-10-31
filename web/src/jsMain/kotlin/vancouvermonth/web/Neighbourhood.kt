@@ -60,8 +60,19 @@ data class Venue(
 /** The person at [place]: the one who offers the action a day there is spent on. */
 fun personAt(place: Place): Townsperson = Townsperson.entries.first { it.offers == actionAt(place) }
 
-/** A box the camera stays out of and a tap stops at. [place] is set when it belongs to one of the five places. */
-data class Wall(val box: Block, val place: Place?)
+/**
+ * A box a tap stops at. [place] is set when it belongs to one of the five places. The camera stays out of it, unless it
+ * [folds]: one of the city's buildings, which fold down out of the camera's way instead (see [Cutaway]).
+ */
+data class Wall(val box: Block, val place: Place?, val folds: Boolean = false)
+
+/**
+ * One of the city's buildings, or a low block past the grid's edge: none of the places the month is about, so it folds
+ * down out of the camera's way rather than push the camera in. [box] is the whole building, roof included. [body] and
+ * [roof] are where its walls and the plant room on its roof are in [Neighbourhood.blocks], and [glassNorth] and
+ * [glassSouth] where its glass is in [Neighbourhood.glowing]; -1 for a part it does not have.
+ */
+data class Foldable(val box: Block, val body: Int, val roof: Int, val glassNorth: Int, val glassSouth: Int)
 
 /** A rectangle of grid squares: columns [x] to [x] + [width] - 1, and rows [z] to [z] + [depth] - 1. */
 data class Lot(val x: Int, val z: Int, val width: Int, val depth: Int) {
@@ -203,10 +214,17 @@ object Neighbourhood {
     private val footprints: List<Block>
 
     /**
-     * What the camera stays out of and never looks through: the buildings (the five places among them), the
-     * SkyTrain deck, the station and its roof, the tunnel's mouth, the café's awning and the office's canopy.
+     * What a tap stops at: the buildings (the five places among them), the SkyTrain deck, the station and its roof,
+     * the tunnel's mouth, the café's awning and the office's canopy. The camera stays out of all but the city's
+     * buildings, which fold down out of its way instead ([foldables]).
      */
     val walls: List<Wall>
+
+    /**
+     * The buildings that fold down out of the camera's way: the city's, and the low blocks past the grid's edges. The
+     * five places, the station, the guideway and the train, 내 방's garden and the people never do.
+     */
+    val foldables: List<Foldable>
 
     val grid: Grid
 
@@ -238,7 +256,9 @@ object Neighbourhood {
         blossoms = town.blossoms
         cityLots = town.cityLots
         footprints = town.footprints
-        walls = venues.map { Wall(it.box, it.place) } + town.otherWalls.map { Wall(it, null) }
+        foldables = town.foldables
+        walls = venues.map { Wall(it.box, it.place) } + town.otherWalls.map { Wall(it, null) } +
+            foldables.map { Wall(it.box, null, folds = true) }
         // Each person stands on one square, which the character walks around; the water is never walked on.
         val people = venues.map { Cell(floor(it.person.x).toInt(), floor(it.person.z).toInt()) }
         val water = RealVancouver.map.cellsOf(Terrain.WATER)
@@ -292,6 +312,9 @@ object Neighbourhood {
     private const val PITCHED_ROOF = 1.5
     private const val FLAT_ROOF = 0.3
 
+    /** How tall the plant room on a tall tower's roof is. */
+    private const val PLANT_ROOM = 0.5
+
     /** How far the guideway carries on past the grid's edge, and how deep a place's square is in front of it. */
     private const val PAST_THE_EDGE = 170.0
     private const val FORECOURT = 4
@@ -316,6 +339,7 @@ object Neighbourhood {
         val blossoms = mutableListOf<Spot>()
         val footprints = mutableListOf<Block>()
         val otherWalls = mutableListOf<Block>()
+        val foldables = mutableListOf<Foldable>()
         val cityLots = mutableListOf<Lot>()
         private val map = RealVancouver.map
         private val random = Random(2026)
@@ -442,8 +466,10 @@ object Neighbourhood {
         private fun addBeyond(x: Double, z: Double) {
             val height = 3.0 + random.nextDouble() * 3.5
             val colour = LOW_COLOURS[random.nextInt(LOW_COLOURS.size)]
+            val body = blocks.size
             add(x, 0.0, z, BEYOND_BLOCK.toDouble(), height, BEYOND_BLOCK.toDouble(), colour)
-            otherWalls.add(Block(x, 0.0, z, BEYOND_BLOCK.toDouble(), height, BEYOND_BLOCK.toDouble(), colour))
+            val box = Block(x, 0.0, z, BEYOND_BLOCK.toDouble(), height, BEYOND_BLOCK.toDouble(), colour)
+            foldables.add(Foldable(box, body, roof = -1, glassNorth = -1, glassSouth = -1))
         }
 
         /** The runs of numbers that follow on from each other in [numbers]: where each starts, and how long it is. */
@@ -703,20 +729,26 @@ object Neighbourhood {
             val z = lot.z + 0.15
             val width = lot.width - 0.3
             val depth = lot.depth - 0.3
+            val body = blocks.size
             add(x, 0.0, z, width, height, depth, colour)
             footprints.add(Block(x, 0.0, z, width, height, depth, colour))
             var top = height
+            var roof = -1
+            var glass = -1
             if (height >= 8.0 && width > 1.5 && depth > 1.5) {
                 // The tallest towers have a plant room on the roof.
                 if (height >= 11.0) {
-                    add(x + 0.35, height, z + 0.35, width - 0.7, 0.5, depth - 0.7, ROOF_GREY)
-                    top += 0.5
+                    roof = blocks.size
+                    add(x + 0.35, height, z + 0.35, width - 0.7, PLANT_ROOM, depth - 0.7, ROOF_GREY)
+                    top += PLANT_ROOM
                 }
                 // The glass of a tower, on its north and south sides, lit after dark.
+                glass = glowing.size
                 glow(x + 0.3, 1.0, z - 0.05, width - 0.6, height - 1.6, 0.05, WINDOW)
                 glow(x + 0.3, 1.0, z + depth, width - 0.6, height - 1.6, 0.05, WINDOW)
             }
-            otherWalls.add(Block(x, 0.0, z, width, top, depth, colour))
+            val box = Block(x, 0.0, z, width, top, depth, colour)
+            foldables.add(Foldable(box, body, roof, glassNorth = glass, glassSouth = if (glass < 0) -1 else glass + 1))
         }
 
         /**

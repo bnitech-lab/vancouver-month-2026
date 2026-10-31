@@ -3,6 +3,10 @@ package vancouvermonth.web
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.hypot
+import kotlin.math.sin
 import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.math.tan
@@ -25,6 +29,23 @@ class FollowCameraTest {
         camera.jumpTo(focus)
         return camera
     }
+
+    /** The city's buildings as the town folds them for [camera], looking at the character at [focus], once settled. */
+    private fun folded(camera: FollowCamera, focus: Point): Cutaway {
+        val cutaway = Cutaway(Neighbourhood.foldables.map { it.box })
+        cutaway.aim(camera.eye.x, camera.eye.y, camera.eye.z, focus.x, 1.6, focus.z)
+        cutaway.step(Cutaway.FOLD_MILLIS)
+        return cutaway
+    }
+
+    /** How far the eye is from the focus, and the turn it is really at. */
+    private fun reachOf(camera: FollowCamera): Double {
+        val eye = camera.eye
+        val focus = camera.focus
+        return sqrt((eye.x - focus.x).pow(2) + (eye.y - focus.y).pow(2) + (eye.z - focus.z).pow(2))
+    }
+
+    private fun turnOf(camera: FollowCamera): Double = atan2(camera.eye.x - camera.focus.x, camera.eye.z - camera.focus.z)
 
     @Test
     fun `dragging turns the camera, and the tilt stays between its limits`() {
@@ -102,19 +123,23 @@ class FollowCameraTest {
             val yaw = if (venue.doorFacesSouth) 0.0 else PI
             val spot = Point(venue.talkSpot.x, 1.0, venue.talkSpot.z)
             val camera = camera(spot, yaw)
+            // The city's buildings between the camera and the character fold down, as they do in the town.
+            val cutaway = folded(camera, spot)
             val head = assertNotNull(camera.screenPoint(Point(venue.person.x, 1.2, venue.person.z)), "${venue.place}")
-            assertEquals(Picked.AtPlace(venue.place), camera.pick(head.left, head.top), "${venue.place}")
+            assertEquals(Picked.AtPlace(venue.place), camera.pick(head.left, head.top, cutaway = cutaway), "${venue.place}")
             // Its wall, halfway up, above the person and in line with the camera.
             val front = if (venue.doorFacesSouth) venue.z + venue.depth else venue.z
             val x = venue.person.x.coerceIn(venue.x + 0.6, venue.x + venue.width - 0.6)
             val wall = assertNotNull(camera.screenPoint(Point(x, venue.height / 2, front.toDouble())), "${venue.place}")
             assertTrue(wall.left in 0.0..1.0 && wall.top in 0.0..1.0, "${venue.place}'s wall is at $wall")
-            assertEquals(Picked.AtPlace(venue.place), camera.pick(wall.left, wall.top), "${venue.place}'s wall")
+            val picked = camera.pick(wall.left, wall.top, cutaway = cutaway)
+            assertEquals(Picked.AtPlace(venue.place), picked, "${venue.place}'s wall")
             // Close in, the person is still picked.
             camera.zoom(0.35)
             camera.jumpTo(spot)
+            val closer = folded(camera, spot)
             val near = assertNotNull(camera.screenPoint(Point(venue.person.x, 1.2, venue.person.z)), "${venue.place}")
-            assertEquals(Picked.AtPlace(venue.place), camera.pick(near.left, near.top), "${venue.place}, near")
+            assertEquals(Picked.AtPlace(venue.place), camera.pick(near.left, near.top, cutaway = closer), "${venue.place}, near")
         }
     }
 
@@ -157,6 +182,113 @@ class FollowCameraTest {
                 }
             }
         }
+    }
+
+    /** Every free street square with one of the city's buildings within two squares, in the busiest districts. */
+    private val downtown: List<Spot> by lazy {
+        val grid = Neighbourhood.grid
+        grid.freeCells().map { grid.centreOf(it) }.filter { spot ->
+            (hypot(spot.x - 157.0, spot.z - 58.0) < 20.0 || hypot(spot.x - 172.0, spot.z - 76.0) < 24.0) &&
+                Neighbourhood.cityLots.any { it.isNear(spot.x, spot.z, 2.0) }
+        }
+    }
+
+    @Test
+    fun `downtown the camera keeps its distance and the player's turn, as the city's buildings fold instead`() {
+        assertTrue(downtown.size > 1_000, "only ${downtown.size} squares")
+        var whole = 0
+        for (spot in downtown) {
+            val focus = Point(spot.x, 1.0, spot.z)
+            val camera = camera(focus)
+            val reach = reachOf(camera)
+            val tilt = kotlin.math.asin((camera.eye.y - focus.y) / reach)
+            // Never pulled in close, never looking down from overhead: the close views downtown are gone.
+            assertTrue(reach >= FollowCamera.ALONG_A_STREET, "$spot: only $reach away")
+            assertTrue(tilt < 1.2, "$spot: tilted $tilt")
+            // Where nothing that matters stands on the way out to where the player put it, the camera is right there,
+            // whatever of the city's stands in between.
+            val yaw = FollowCamera.START_YAW
+            val pitch = FollowCamera.START_PITCH
+            val out = Point(cos(pitch) * sin(yaw), sin(pitch), cos(pitch) * cos(yaw))
+            val blocked = FollowCamera.wallsNear(focus, FollowCamera.START_DISTANCE + 1.0).any { box ->
+                val hit = distanceToBox(focus, out, box)
+                hit != null && hit < FollowCamera.START_DISTANCE + 0.5
+            }
+            if (!blocked) {
+                assertEquals(FollowCamera.START_DISTANCE, reach, 1e-9, "$spot")
+                assertEquals(yaw, turnOf(camera), 1e-9, "$spot")
+                whole++
+            }
+        }
+        assertTrue(whole > downtown.size * 4 / 5, "only $whole of ${downtown.size} squares are clear of the places")
+    }
+
+    @Test
+    fun `the places, the station and the deck still pull the camera in or lift it, the city's buildings never`() {
+        // South of the station, looked at from the north, over it.
+        val station = Neighbourhood.guideway.points.first()
+        val south = Point(station.x + 4.0, 1.0, station.z + 2.5)
+        assertTrue(Neighbourhood.grid.isFree(Neighbourhood.grid.cellAt(Spot(south.x, south.z))), "$south")
+        val overStation = camera(south, yaw = PI)
+        assertTrue(reachOf(overStation) < FollowCamera.START_DISTANCE - 1.0, "the station did not move the camera")
+        // At 회사's door, looked at from the south, over the tower.
+        val office = Neighbourhood.venue(Place.OFFICE)
+        val door = Point(office.door.x, 1.0, office.door.z)
+        val overOffice = camera(door, yaw = 0.0)
+        val reach = reachOf(overOffice)
+        val tilt = kotlin.math.asin((overOffice.eye.y - door.y) / reach)
+        assertTrue(reach < FollowCamera.START_DISTANCE || tilt > FollowCamera.START_PITCH + 0.05, "회사 did not")
+        // The walls the camera keeps out of are never the city's.
+        val city = Neighbourhood.foldables.map { it.box }.toSet()
+        for (spot in downtown.filterIndexed { index, _ -> index % 50 == 0 }) {
+            val near = FollowCamera.wallsNear(Point(spot.x, 1.0, spot.z), FollowCamera.FAR)
+            assertTrue(near.none { it in city }, "$spot")
+        }
+    }
+
+    @Test
+    fun `a folded building no longer catches a tap meant for the ground behind it, and a standing one still does`() {
+        var checked = 0
+        var reached = 0
+        for (spot in downtown) {
+            val focus = Point(spot.x, 1.0, spot.z)
+            val camera = camera(focus)
+            // A tap on the character's feet, on the ground.
+            val feet = Point(spot.x, 0.0, spot.z)
+            val onScreen = camera.screenPoint(feet) ?: continue
+            val standing = camera.pick(onScreen.left, onScreen.top) as? Picked.OnGround ?: continue
+            // Only where one of the city's buildings stands in front of the feet, and the way to them passes over
+            // where its plinth will be.
+            if (distanceBetween(standing.spot, spot) < 1.0) continue
+            val inTheWay = Neighbourhood.foldables.indexOfFirst { building ->
+                val box = building.box
+                standing.spot.x in box.x - 1e-6..box.x + box.width + 1e-6 &&
+                    standing.spot.z in box.z - 1e-6..box.z + box.depth + 1e-6
+            }
+            if (inTheWay < 0) continue
+            val box = Neighbourhood.foldables[inTheWay].box
+            val eye = camera.eye
+            val length = sqrt((feet.x - eye.x).pow(2) + (feet.y - eye.y).pow(2) + (feet.z - eye.z).pow(2))
+            val way = Point((feet.x - eye.x) / length, (feet.y - eye.y) / length, (feet.z - eye.z) / length)
+            val plinth = Block(box.x, 0.0, box.z, box.width, Cutaway.PLINTH, box.depth, 0)
+            if (distanceToBox(eye, way, plinth) != null) continue
+            // Standing, as the town has it before it folds anything, the building takes the tap, as it always did.
+            val unfolded = Cutaway(Neighbourhood.foldables.map { it.box })
+            assertEquals(standing, camera.pick(onScreen.left, onScreen.top, cutaway = unfolded), "$spot")
+            // Folded, the tap goes past it.
+            val cutaway = folded(camera, focus)
+            assertTrue(cutaway.isFolding(inTheWay), "$spot: $box stands")
+            val picked = camera.pick(onScreen.left, onScreen.top, cutaway = cutaway)
+            val landed = assertNotNull(picked as? Picked.OnGround, "$spot: $picked")
+            val onIt = landed.spot.x in box.x - 1e-6..box.x + box.width + 1e-6 &&
+                landed.spot.z in box.z - 1e-6..box.z + box.depth + 1e-6
+            assertFalse(onIt, "$spot: the folded $box still took the tap, at ${landed.spot}")
+            if (distanceBetween(landed.spot, spot) < 1e-6) reached++
+            checked++
+            if (checked == 20) break
+        }
+        assertEquals(20, checked, "too few places downtown where a building stood in front of the character")
+        assertTrue(reached >= 10, "only $reached of $checked taps reached the character's feet")
     }
 
     @Test

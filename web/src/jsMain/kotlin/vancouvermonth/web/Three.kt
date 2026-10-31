@@ -201,12 +201,14 @@ external interface InstanceColours {
 
 /**
  * The numbers behind [InstancedMesh.instanceMatrix]; [needsUpdate] sends changed ones to the graphics card, and
- * [setUsage] with [DynamicDrawUsage] tells it they change often.
+ * [setUsage] with [DynamicDrawUsage] tells it they change often. [addUpdateRange] narrows the next send to [count]
+ * numbers from [start]; with none given, all of them go.
  */
 external interface InstanceMatrices {
     val array: Float32Array
     var needsUpdate: Boolean
     fun setUsage(usage: Int)
+    fun addUpdateRange(start: Int, count: Int)
 }
 
 /** For numbers sent to the graphics card again and again, such as boxes that move every frame. */
