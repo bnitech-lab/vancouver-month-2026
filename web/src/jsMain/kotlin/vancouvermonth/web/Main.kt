@@ -32,21 +32,16 @@ fun seedFrom(query: String): Int? = URLSearchParams(query).get("seed")?.trim()?.
 
 /**
  * Today's run from a query such as "?today" or "?today=2026-10-30", or null when the query has no "today".
- * A bare "?today", or a date that does not read, means [now] on the browser's own calendar.
+ * A bare "?today", or a date that is not a real one, means [now] on the browser's own calendar.
+ * Null too when that calendar is outside 2000 to 2099, so the page plays a new run instead of failing.
  */
 fun todayFrom(query: String, now: Date): TodaysRun? {
     val value = URLSearchParams(query).get("today") ?: return null
-    val match = Regex("""(\d{4})-(\d{1,2})-(\d{1,2})""").matchEntire(value.trim())
-    if (match != null) {
-        val (year, month, day) = match.destructured.toList().map { it.toInt() }
-        if (month in 1..12 && day in 1..31) return TodaysRun(year, month, day)
-    }
     // A JavaScript date counts months from 0.
-    return TodaysRun(now.getFullYear(), now.getMonth() + 1, now.getDate())
+    return TodaysRun.parse(value) ?: TodaysRun.parse("${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}")
 }
 
 /** "?today=2026-10-30", the address of a date's run. */
-fun todayQuery(run: TodaysRun): String =
-    "?today=${run.year}-${run.month.toString().padStart(2, '0')}-${run.day.toString().padStart(2, '0')}"
+fun todayQuery(run: TodaysRun): String = "?today=$run"
 
 private fun newSeed(): Int = Random.nextInt(1_000, 10_000)

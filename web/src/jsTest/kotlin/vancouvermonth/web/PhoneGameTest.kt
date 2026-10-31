@@ -171,6 +171,9 @@ class PhoneGameTest {
         assertEquals(TodaysRun(2026, 10, 29), todayFrom("?today=2026-10-29", now))
         assertEquals(TodaysRun(2026, 10, 30), todayFrom("?today=soon", now))
         assertEquals(TodaysRun(2026, 10, 30), todayFrom("?today=2026-13-01", now))
+        assertEquals(TodaysRun(2026, 10, 30), todayFrom("?today=2026-02-30", now))
+        assertEquals(TodaysRun(2026, 10, 30), todayFrom("?today=0999-01-01", now))
+        assertNull(todayFrom("?today", Date(2100, 0, 1)), "a clock past 2099 plays a new run instead")
         assertNull(todayFrom("?seed=1011", now))
         assertNull(todayFrom("", now))
     }
