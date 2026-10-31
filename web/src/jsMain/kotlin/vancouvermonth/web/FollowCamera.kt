@@ -12,9 +12,14 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
 
-/** What a tap on the screen lands on: a place (its building or its person), a spot on the ground, or the sky. */
+/**
+ * What a tap on the screen lands on: a place (its building or its person), a passerby (by their number in the list
+ * the tap was checked against), a spot on the ground, or the sky.
+ */
 sealed interface Picked {
     data class AtPlace(val place: Place) : Picked
+
+    data class AtPasserby(val index: Int) : Picked
 
     data class OnGround(val spot: Spot) : Picked
 }
@@ -134,10 +139,10 @@ class FollowCamera(subject: Point) {
 
     /**
      * What a tap at [left], [top] (0.0 to 1.0 across and down the screen) lands on: the nearest building or
-     * person of a place, else the ground. A tap on another building walks to its foot. Null for the sky and the far
-     * distance.
+     * person of a place, or of [passersby] (each one's box where they are now), else the ground. A tap on another
+     * building walks to its foot. Null for the sky and the far distance.
      */
-    fun pick(left: Double, top: Double): Picked? {
+    fun pick(left: Double, top: Double, passersby: List<Block> = emptyList()): Picked? {
         val ray = rayThrough(left, top)
         var nearest = Double.MAX_VALUE
         var wallHit: Wall? = null
@@ -149,6 +154,15 @@ class FollowCamera(subject: Point) {
             }
         }
         val ground = if (ray.y < 0) -eye.y / ray.y else Double.MAX_VALUE
+        var passerby: Int? = null
+        for ((index, box) in passersby.withIndex()) {
+            val hit = distanceToBox(eye, ray, box) ?: continue
+            if (hit < nearest) {
+                nearest = hit
+                passerby = index
+            }
+        }
+        if (passerby != null && nearest < ground) return Picked.AtPasserby(passerby)
         if (wallHit != null && nearest < ground) {
             val place = wallHit.place
             if (place != null) return Picked.AtPlace(place)

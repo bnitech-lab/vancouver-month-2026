@@ -47,6 +47,23 @@ object DayLight {
         1.0 to MORNING,
     )
 
+    /**
+     * How much of the passersby is out at [progress] of the change of day, from 1.0 (all out) to 0.0: they go home
+     * through the evening, stay in through the night, and are out again by the end of dawn.
+     */
+    fun outdoors(progress: Double): Double = when {
+        progress < GO_HOME_FROM -> 1.0
+        progress < GO_HOME_BY -> 1 - (progress - GO_HOME_FROM) / (GO_HOME_BY - GO_HOME_FROM)
+        progress < COME_OUT_FROM -> 0.0
+        progress < COME_OUT_BY -> (progress - COME_OUT_FROM) / (COME_OUT_BY - COME_OUT_FROM)
+        else -> 1.0
+    }
+
+    private const val GO_HOME_FROM = 0.15
+    private const val GO_HOME_BY = 0.35
+    private const val COME_OUT_FROM = 0.75
+    private const val COME_OUT_BY = 0.95
+
     fun at(progress: Double): Lighting {
         val p = progress.coerceIn(0.0, 1.0)
         val (endAt, end) = steps.first { it.first >= p }

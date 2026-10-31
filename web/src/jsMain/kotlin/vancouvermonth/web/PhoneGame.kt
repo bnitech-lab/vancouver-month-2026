@@ -29,6 +29,8 @@ import vancouvermonth.text.keyword
 import vancouvermonth.text.money
 import vancouvermonth.text.monthStartLines
 import vancouvermonth.text.parseAmount
+import vancouvermonth.text.Passer
+import vancouvermonth.text.passerLine
 import vancouvermonth.text.passPrices
 import vancouvermonth.text.percent
 import vancouvermonth.text.smallTalk
@@ -93,6 +95,13 @@ class PhoneGame private constructor(
     private var talkLine = ""
     private var smallTalks = 0
     private val met = mutableSetOf<Townsperson>()
+
+    /** The passerby the player has stopped for a word, or null. No day is spent on them. */
+    private var chattingWith: Passer? = null
+
+    /** How many words each passerby has had on [chatsDay], so the same person says something new each time. */
+    private val chats = mutableMapOf<Passer, Int>()
+    private var chatsDay = 0
 
     /** The timer typing the person's line, while it types. */
     private var typing: Int? = null
@@ -395,7 +404,8 @@ class PhoneGame private constructor(
     /** The town tells the game where the player turns, and when it can no longer draw: then buttons take over. */
     private fun listenTo(town: WalkableTown) {
         playedInTown = true
-        town.onPlace = { place -> if (!dayChanging && place != talkingAt) talkTo(place) }
+        town.onPlace = { place -> if (!dayChanging && (place != talkingAt || chattingWith != null)) talkTo(place) }
+        town.onPasserby = { passer -> if (!dayChanging) chatWith(passer) }
         town.onMorning = { dayChanging = false }
         town.onFail = {
             walkable = null
@@ -409,6 +419,8 @@ class PhoneGame private constructor(
     private fun talkTo(place: Place?) {
         val current = month ?: return
         talkingAt = place
+        if (chattingWith != null) walkable?.endChat()
+        chattingWith = null
         smallTalks = 0
         if (place != null) {
             val person = personAt(place)
@@ -433,6 +445,7 @@ class PhoneGame private constructor(
         }
         root.querySelector(".over-town")?.remove()
         town.mark(if (month.hasInterviewToday) INTERVIEW_PLACE else null)
+        town.isCovered = talkingAt != null || chattingWith != null
         root.child("div", "over-town") {
             child("header", "hud") {
                 setAttribute("tabindex", "-1")
@@ -465,8 +478,11 @@ class PhoneGame private constructor(
             showLog(this)
             querySelector(".log")?.setAttribute("tabindex", "-1")
             val talking = talkingAt
+            val chatting = chattingWith
             if (talking != null) {
                 talk(month, talking)
+            } else if (chatting != null) {
+                chat(chatting)
             } else if (lastLines.isEmpty()) {
                 // On the first day, at the bottom where the talks open, how to get about.
                 child("p", "town-hint", "땅을 누르면 걷고, 두 번 누르면 빨리 가요. 사람이나 건물을 누르면 말을 걸어요.")
@@ -564,6 +580,64 @@ class PhoneGame private constructor(
             child("span", "action-effect", actionEffect(action, month))
             if (blocked != null) child("span", "action-why", whyNot(blocked))
             onclick = { spend(month, place) { take(action) } }
+        }
+    }
+
+    /** Stops [passer] for a word: a line of small talk, typed out, and nothing to answer but 그만. */
+    private fun chatWith(passer: Passer) {
+        val current = month ?: return
+        talkingAt = null
+        if (current.day != chatsDay) {
+            chats.clear()
+            chatsDay = current.day
+        }
+        val count = chats[passer] ?: 0
+        chats[passer] = count + 1
+        chattingWith = passer
+        talkLine = passerLine(passer, current.day, count)
+        talkOpened = window.performance.now()
+        focusNext = ".talk"
+        show()
+    }
+
+    /** The talk with a passerby: who they are, their line typed out, and 그만. No answer spends the day. */
+    private fun HTMLElement.chat(passer: Passer) {
+        child("section", "talk") {
+            setAttribute("role", "dialog")
+            setAttribute("aria-label", passer.title)
+            setAttribute("tabindex", "-1")
+            // As in a talk with a place's person, the tap that opened it does nothing on it for a moment.
+            addEventListener("click", { event ->
+                if (window.performance.now() - talkOpened < talkSettleMillis) {
+                    event.stopPropagation()
+                    event.preventDefault()
+                }
+            }, true)
+            child("div", "talk-head") {
+                face(Figures.lookOf(passer))
+                child("p", "talk-name") {
+                    child("strong", text = passer.title)
+                    child("span", "talk-role", passer.role)
+                }
+            }
+            val line = child("p", "talk-line")
+            val typed = line.child("span") { setAttribute("aria-hidden", "true") }
+            line.child("span", "visually-hidden", talkLine)
+            typeOut(typed, talkLine)
+            line.onclick = {
+                stopTyping()
+                typed.textContent = talkLine
+            }
+            child("div", "keywords") {
+                button("keyword", text = "그만") {
+                    onclick = {
+                        chattingWith = null
+                        walkable?.endChat()
+                        focusNext = ".hud"
+                        show()
+                    }
+                }
+            }
         }
     }
 

@@ -3,6 +3,7 @@
 package vancouvermonth.web
 
 import kotlin.js.Json
+import org.khronos.webgl.Float32Array
 import org.khronos.webgl.Uint8Array
 
 // Kotlin declarations for the parts of Three.js (https://threejs.org) the town uses, and nothing more.
@@ -19,6 +20,9 @@ external open class Object3D {
     /** Whether the sun's shadow falls from this, and onto this. */
     var castShadow: Boolean
     var receiveShadow: Boolean
+
+    /** Whether it is left out when it seems off screen; false for boxes that move about, whose bounds go stale. */
+    var frustumCulled: Boolean
 
     /** Where it is, how it is turned and how big, all in one; [updateMatrix] works it out from those three. */
     val matrix: Matrix4
@@ -97,10 +101,15 @@ external class WebGLRenderer(parameters: Json) {
     fun dispose()
 }
 
-/** Whether the renderer draws shadows, and how soft their edges are. */
+/**
+ * Whether the renderer draws shadows, and how soft their edges are. With [autoUpdate] off, the shadows are drawn again
+ * only on a frame that sets [needsUpdate].
+ */
 external interface ShadowMapSettings {
     var enabled: Boolean
     var type: Int
+    var autoUpdate: Boolean
+    var needsUpdate: Boolean
 }
 
 /** Shadows with soft edges. */
@@ -136,9 +145,11 @@ external class MeshLambertMaterial(parameters: Json) : Material
 /**
  * Cartoon shading: light falls in a few flat shades, picked from `gradientMap`, instead of a smooth fade.
  * The option `emissive` is light a surface gives off itself, as a lit window does, as strong as [emissiveIntensity].
+ * With the option `transparent`, [opacity] fades it out, from 1.0 (solid) to 0.0 (gone).
  */
 external class MeshToonMaterial(parameters: Json) : Material {
     var emissiveIntensity: Double
+    var opacity: Double
 }
 
 external class Mesh(geometry: BoxGeometry, material: Material) : Object3D
@@ -148,7 +159,23 @@ external class InstancedMesh(geometry: BoxGeometry, material: Material, count: I
     fun setMatrixAt(index: Int, matrix: Matrix4)
     fun setColorAt(index: Int, color: Color)
     fun dispose()
+
+    /** Every copy's place, size and turn, sixteen numbers each, column by column, to change while it moves. */
+    val instanceMatrix: InstanceMatrices
 }
+
+/**
+ * The numbers behind [InstancedMesh.instanceMatrix]; [needsUpdate] sends changed ones to the graphics card, and
+ * [setUsage] with [DynamicDrawUsage] tells it they change often.
+ */
+external interface InstanceMatrices {
+    val array: Float32Array
+    var needsUpdate: Boolean
+    fun setUsage(usage: Int)
+}
+
+/** For numbers sent to the graphics card again and again, such as boxes that move every frame. */
+external val DynamicDrawUsage: Int
 
 /** Several objects that move and turn together, such as the parts of the character. */
 external class Group : Object3D
@@ -159,6 +186,11 @@ external class HemisphereLight(skyColor: Int, groundColor: Int, intensity: Doubl
 
     /** The colour of the light from the sky. */
     val color: Color
+}
+
+/** Light from one point all round, like a fire, fading out by [distance]. */
+external class PointLight(color: Int, intensity: Double, distance: Double, decay: Double) : Object3D {
+    var intensity: Double
 }
 
 /** Light from one direction, like the sun, shining from its position toward its [target]. */
