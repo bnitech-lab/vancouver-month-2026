@@ -148,6 +148,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private val onRelease: (Event) -> Unit = { release(it as PointerEvent, cancelled = false) }
     private val onCancel: (Event) -> Unit = { release(it as PointerEvent, cancelled = true) }
     private val onWheel: (Event) -> Unit = { wheel(it as WheelEvent) }
+    private val onRestored: (Event) -> Unit = { askForFrame() }
 
     init {
         element.className = "walk-town"
@@ -174,13 +175,15 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         addLabels()
 
         resizeObserver.observe(canvas)
+        // Each finger is captured on press, so its moves and its lift come to the canvas even off it.
         canvas.addEventListener("pointerdown", onPress)
-        window.addEventListener("pointermove", onMove)
-        window.addEventListener("pointerup", onRelease)
-        window.addEventListener("pointercancel", onCancel)
+        canvas.addEventListener("pointermove", onMove)
+        canvas.addEventListener("pointerup", onRelease)
+        canvas.addEventListener("pointercancel", onCancel)
+        canvas.addEventListener("lostpointercapture", onCancel)
         canvas.addEventListener("wheel", onWheel, json("passive" to false))
         // A phone may take WebGL back from a page in the background; Three.js sets it up again, and the town redraws.
-        canvas.addEventListener("webglcontextrestored", { askForFrame() })
+        canvas.addEventListener("webglcontextrestored", onRestored)
     }
 
     /** The sky and its haze, soft light from all round, and a warm sun whose shadows fall around the character. */
@@ -326,9 +329,13 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         if (closed) return
         closed = true
         resizeObserver.disconnect()
-        window.removeEventListener("pointermove", onMove)
-        window.removeEventListener("pointerup", onRelease)
-        window.removeEventListener("pointercancel", onCancel)
+        canvas.removeEventListener("pointerdown", onPress)
+        canvas.removeEventListener("pointermove", onMove)
+        canvas.removeEventListener("pointerup", onRelease)
+        canvas.removeEventListener("pointercancel", onCancel)
+        canvas.removeEventListener("lostpointercapture", onCancel)
+        canvas.removeEventListener("wheel", onWheel)
+        canvas.removeEventListener("webglcontextrestored", onRestored)
         for (mesh in meshes) mesh.dispose()
         renderer.dispose()
         cube.dispose()
@@ -372,6 +379,13 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     private fun press(event: PointerEvent) {
         if (event.button.toInt() != 0 || nightFell != null) return
+        // The first finger of a new touch: any finger still on record lost its lift somewhere, so it is forgotten.
+        if (event.isPrimary) pointers.clear()
+        try {
+            canvas.setPointerCapture(event.pointerId)
+        } catch (error: Throwable) {
+            // A pointer that is no longer down cannot be captured; its moves still come while it is over the canvas.
+        }
         pointers[event.pointerId] = event.x to event.y
         if (pointers.size == 1) {
             pressX = event.x
