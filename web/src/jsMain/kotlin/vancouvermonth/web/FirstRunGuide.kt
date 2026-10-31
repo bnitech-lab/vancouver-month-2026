@@ -3,6 +3,7 @@ package vancouvermonth.web
 import kotlinx.browser.document
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
+import org.w3c.dom.asList
 import org.w3c.dom.events.Event
 import org.w3c.dom.events.KeyboardEvent
 import vancouvermonth.text.Guide
@@ -10,11 +11,15 @@ import vancouvermonth.text.goalLine
 
 /**
  * One card on how to play, over the town the first time it opens and again from the "?" in the town's top card.
- * It is a dialog: it takes the focus, 시작 or Escape closes it, and the focus goes back to the "?". Closing it is
+ * It is a dialog: it takes the focus, 시작 or Escape closes it, and the focus goes back to the "?". While it is open the
+ * town and its top card under it are inert, out of reach of taps, keys and screen readers. Closing it is
  * remembered in [memory], so it does not open by itself again; where the browser remembers nothing, it opens each time.
  */
 internal class FirstRunGuide(private val memory: Memory) {
     private var shown: HTMLElement? = null
+
+    /** What was made inert under the card, to give back when it closes. */
+    private val stilled = mutableListOf<HTMLElement>()
 
     val isOpen: Boolean
         get() = shown?.isConnected == true
@@ -35,13 +40,22 @@ internal class FirstRunGuide(private val memory: Memory) {
         card.setAttribute("role", "dialog")
         card.setAttribute("aria-modal", "true")
         card.setAttribute("aria-labelledby", "guide-title")
+        // The focus lands on 시작, so a screen reader is pointed to the lines and the goal as the card's description.
+        card.setAttribute("aria-describedby", "guide-lines guide-goal")
         card.add("h2", "guide-title", Guide.TITLE).id = "guide-title"
         val lines = card.add("ul", "guide-lines")
+        lines.id = "guide-lines"
         for (line in Guide.LINES) lines.add("li", text = line)
-        card.add("p", "guide-goal", goalLine())
+        card.add("p", "guide-goal", goalLine()).id = "guide-goal"
         val start = card.add("button", "primary", Guide.START) as HTMLButtonElement
         start.type = "button"
         start.onclick = { close() }
+        for (under in root.children.asList()) {
+            if (under is HTMLElement && !under.hasAttribute("inert")) {
+                under.setAttribute("inert", "")
+                stilled += under
+            }
+        }
         root.appendChild(cover)
         shown = cover
         document.addEventListener("keydown", onKey)
@@ -53,6 +67,9 @@ internal class FirstRunGuide(private val memory: Memory) {
         val cover = shown ?: return
         shown = null
         document.removeEventListener("keydown", onKey)
+        // Before the focus can go back, what is under the card must take it again.
+        stilled.forEach { it.removeAttribute("inert") }
+        stilled.clear()
         // A card taken off the page with the town was never closed by the player, so it is not counted as seen.
         if (!cover.isConnected) return
         cover.remove()

@@ -66,9 +66,26 @@ class FirstRunGuideTest {
         val text = card.textContent.orEmpty()
         for (line in Guide.LINES) assertTrue(line in text, "Missing: $line")
         assertTrue(goalLine() in text)
+        // The lines and the goal describe the card, since the focus lands on its button.
+        val described = card.getAttribute("aria-describedby")!!.split(" ").map { document.getElementById(it)!!.textContent }
+        assertEquals(listOf(Guide.LINES.joinToString(""), goalLine()), described)
         assertSame(root.button(Guide.START), document.activeElement)
         // Over the town, its top card and its first-day hint.
         assertTrue(root.querySelector(".over-town") != null && root.querySelector(".guide") != null)
+    }
+
+    @Test
+    fun `while the card is open the town and its top card are inert, and after it they are not`() {
+        startMonth(FakeStore())
+        val under = listOf(".walk-town", ".over-town").map { assertNotNull(root.querySelector(it), it) }
+        for (element in under) assertTrue(element.hasAttribute("inert"), "${element.className} is not inert")
+        assertTrue(!card!!.hasAttribute("inert"))
+        root.button(Guide.START).click()
+        for (element in under) assertTrue(!element.hasAttribute("inert"), "${element.className} stayed inert")
+        helpButton().click()
+        for (element in under) assertTrue(element.hasAttribute("inert"))
+        press("Escape")
+        assertNull(root.querySelector("[inert]"))
     }
 
     @Test
