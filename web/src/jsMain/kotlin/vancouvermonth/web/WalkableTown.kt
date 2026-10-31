@@ -154,6 +154,11 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private val marker = Group()
     private val labels = mutableMapOf<Place, HTMLButtonElement>()
 
+    /** Where the camera was when the names were last laid out, and whether the town was resized since. */
+    private var labelsEye: Point? = null
+    private var labelsFocus: Point? = null
+    private var labelsStale = true
+
     private val home = Neighbourhood.venue(Place.HOME)
     private val view = FollowCamera(Point(home.door.x, FOCUS_HEIGHT, home.door.z))
     private val taps = TapTimer()
@@ -658,6 +663,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         // Off the page the town has no size. It is fitted again when it comes back.
         if (width == 0 || height == 0) return
         renderer.setSize(width, height, false)
+        labelsStale = true
         view.aspect = width.toDouble() / height
         camera.aspect = view.aspect
         camera.fov = view.fov
@@ -716,7 +722,15 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             fail(error)
             return
         }
-        placeLabels()
+        // The names move only with the camera, so they are laid out again only when it moved or the town was resized.
+        val eye = view.eye
+        val focus = view.focus
+        if (labelsStale || eye != labelsEye || focus != labelsFocus) {
+            placeLabels()
+            labelsEye = eye
+            labelsFocus = focus
+            labelsStale = false
+        }
         framesDrawn += 1
         if (walking || night || gliding || !still) nextFrame()
     }
