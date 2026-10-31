@@ -96,15 +96,18 @@ The first build downloads Node.js and the npm packages the Kotlin/JS build uses.
 | Part | What | Notes |
 |---|---|---|
 | `core` | The rules: rooms, the score, the month, interviews, endings | Kotlin Multiplatform, standard library only, so the same rules run on the JVM and in a browser. All luck goes through one `Dice` interface, so tests can control it |
-| `text` | The Korean lines both screens share: amounts, dates, actions, events, endings | Kotlin Multiplatform, no layout |
+| `text` | The Korean lines both screens share (amounts, dates, actions, events, endings) and how a typed amount is read | Kotlin Multiplatform, no layout |
 | `terminal` | The text screen | Kotlin on the JVM |
 | `web` | The phone screen in a browser | Kotlin/JS drawing the page with the DOM, plain CSS, no framework |
 
 ```sh
-./gradlew test        # rules, balance and screen tests, on the JVM and in headless Chrome
+./gradlew test                                  # rules, balance and screen tests, on the JVM and in headless Chrome
+./gradlew :core:jvmTest --tests '*MonthTest*'   # one test class, on the JVM only
 ```
 
-The browser tests run in Chrome, so `./gradlew test` needs Chrome installed.
+The browser tests run in Chrome, so `./gradlew test` needs Chrome installed. `./gradlew test` does not take
+`--tests`: to run some tests only, name the module's JVM test task, which is `jvmTest` in `core` and `text`
+and `test` in `terminal` (for example `./gradlew :terminal:test --tests '*TerminalGameTest*'`).
 
 Rooms come from a seed. Farther zones have lower rent and a dearer pass, and utilities may or may not be
 included, so the room with the lowest rent has the lowest total in only a bit more than half of the deals.
