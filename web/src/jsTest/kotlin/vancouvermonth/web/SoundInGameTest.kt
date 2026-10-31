@@ -34,8 +34,11 @@ internal class QuietTown : WalkableTown {
 
     override fun endChat() {}
 
+    /** As the real town: on nothing while already riding. A shared one stands for one the character has reached. */
+    override fun canRide(ride: Ride): Boolean = riding == null
+
     override fun ride(ride: Ride) {
-        riding = ride
+        if (canRide(ride)) riding = ride
     }
 
     override fun getOff() {

@@ -61,6 +61,13 @@ interface WalkableTown {
     val riding: Ride?
 
     /**
+     * True when [ride] would get the character on now: not by night, nor sitting by the fire, nor already riding; a
+     * shared one only when the character has just reached one of its kind. The game pays a fare only when this is
+     * true, so the fare and the ride never part.
+     */
+    fun canRide(ride: Ride): Boolean
+
+    /**
      * Gets on [ride]: one of the player's own, or the shared one the character has just reached (asked for through
      * [onRent]). From here the character goes at the ride's speed, along the same streets. Not by night, nor sitting by
      * the fire, nor already riding.
@@ -797,12 +804,18 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     override val riding: Ride?
         get() = ride
 
+    override fun canRide(ride: Ride): Boolean {
+        if (sitting || nightFell != null || this.ride != null) return false
+        // A shared one only as the character reaches it, and of its kind.
+        return !ride.shared || (renting >= 0 && Rides.shared[renting].vehicle == ride.vehicle)
+    }
+
     override fun ride(ride: Ride) {
-        if (sitting || nightFell != null || this.ride != null) return
+        if (!canRide(ride)) return
+        // A shared one the character was on its way to rent is not rented once it rides anything.
+        rentAt = -1
         if (ride.shared) {
-            // Only the shared one the character has just reached, and of its kind.
             val at = renting
-            if (at < 0 || Rides.shared[at].vehicle != ride.vehicle) return
             renting = -1
             rentedFrom = at
             showParked(at, false)
@@ -1601,7 +1614,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
      * front along the street rather than down between the towers.
      */
     private fun arrive(end: Spot) {
-        if (rentAt >= 0) {
+        if (rentAt >= 0 && ride == null) {
             askToRent(rentAt)
             return
         }

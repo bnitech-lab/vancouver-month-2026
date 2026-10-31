@@ -31,8 +31,10 @@ import org.w3c.dom.pointerevents.PointerEventInit
 import vancouvermonth.core.Action
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.Month
+import vancouvermonth.core.Spending
 import vancouvermonth.save.Choice
 import vancouvermonth.save.MonthRecord
+import vancouvermonth.save.Spend
 import vancouvermonth.text.Continue
 import vancouvermonth.text.actionName
 import vancouvermonth.text.money
@@ -60,8 +62,11 @@ private class SilentTown : WalkableTown {
 
     override fun endChat() {}
 
+    /** As the real town: on nothing while already riding. A shared one stands for one the character has reached. */
+    override fun canRide(ride: Ride): Boolean = riding == null
+
     override fun ride(ride: Ride) {
-        riding = ride
+        if (canRide(ride)) riding = ride
     }
 
     override fun getOff() {
@@ -1572,8 +1577,7 @@ class WalkableTownTest {
                 assertFalse(town.isParkedShown(index), "the rented one still stands on its corner")
                 assertTrue(town.isRideDrawn(Ride.SHARED_E_SCOOTER))
                 assertTrue(money(firstBalance - 4) in hud(), hud())
-                assertEquals("공유 퀵보드를 빌렸어요. -\$4", root.querySelector(".hud-spent")?.textContent)
-                assertTrue("공유 퀵보드 타는 중" in hud(), hud())
+                assertEquals("공유 퀵보드 타는 중 · -\$4", root.querySelector(".hud-riding")?.textContent)
             },
             Step("talk to the neighbour", { town.isStill }) {
                 talkTo(Place.HOME)
@@ -1626,5 +1630,79 @@ class WalkableTownTest {
         assertTrue(bike.disabled)
         assertTrue("잔고가 모자라요." in bike.textContent.orEmpty(), bike.textContent)
         assertTrue("9월 30일" in hud(), hud())
+    }
+
+    @Test
+    fun `getting on the bike on the way to a shared e-scooter pays no fare, and leaves it on its corner`():
+        Promise<Unit> {
+        val town = startInTown()
+        val index = Rides.shared.indexOfFirst { it.vehicle == Vehicle.E_SCOOTER }
+        val scooter = Rides.shared[index]
+        return play(
+            Step("buy a bike, then stand a few steps east of the e-scooter", { town.isStill }) {
+                town.shopName.click()
+                buyButton("자전거 사기").click()
+                tap("그만")
+                town.standAt(Spot(scooter.spot.x + 3.5, scooter.spot.z + 0.4))
+                town.aimCamera(PI / 2, 0.6, 10.0)
+            },
+            Step("tap the e-scooter, then get on the bike on the way", { town.isStill }) {
+                tapScreen(town, onScreen(town, Point(scooter.spot.x, 0.5, scooter.spot.z)))
+                assertNotNull(town.markerSpot, "no walk to it")
+                tap("자전거 타기")
+                assertEquals(Ride.BIKE, town.riding)
+            },
+            Step("arrived on the bike", { town.isStill }) {
+                assertTrue(distanceBetween(town.characterSpot, scooter.spot) < 0.05, "${town.characterSpot}")
+                assertEquals(Ride.BIKE, town.riding)
+                assertTrue(money(firstBalance - 350) in hud(), "charged for a ride not taken: ${hud()}")
+                assertTrue(town.isParkedShown(index), "the e-scooter left its corner")
+                assertFalse(town.isRideDrawn(Ride.SHARED_E_SCOOTER))
+            },
+        )
+    }
+
+    @Test
+    fun `on a 320 by 568 phone, a bike, its riding row and a busy day's log leave the talk whole and answerable`():
+        Promise<Unit> {
+        usePageStyle()
+        val store = FakeStore()
+        val game = FirstMinute(1011)
+        // On 9월 2일 a bike and five shared rides, then a day of rest: the log of 9월 2일 opens 9월 3일.
+        val rides = List(5) { Spend(Spending.SHARED_BIKE_RIDE, 3) }
+        val moves = listOf(Spend(Spending.BIKE, 350)) + rides + Choice.Take(Action.REST)
+        store.items[SaveSlot.KEY] = MonthRecord(1011, null, game.cheapestRoomIndex, game.lowestTotal, moves).encode()
+        openKept(store)
+        tap(Continue.CONTINUE)
+        val town = assertNotNull(town)
+        pinPhone(town, 320, 568)
+        val log = root.querySelectorAll(".log li").asList().map { it.textContent }
+        assertEquals(listOf("자전거를 샀어요. -\$350", "그 밖에 5건 -\$15"), log.take(2))
+        assertEquals(4, log.size, "$log")
+        tap("자전거 타기")
+        assertEquals(Ride.BIKE, town.riding)
+        talkTo(Place.HOME)
+        assertNull(town.riding, "the talk did not get off")
+        /** True once the talk has risen into place: its opening animation is over. */
+        fun settled(): Boolean {
+            val talk = root.querySelector(".talk") ?: return false
+            return (talk.asDynamic().getAnimations().length as Int) == 0
+        }
+        return play(
+            Step("the talk in place", { town.isStill && settled() }) {
+                val talk = rectOf(".talk")
+                val above = maxOf(rectOf(".hud").bottom, rectOf(".over-town .log").bottom)
+                assertTrue(talk.top >= above, "the talk at ${talk.top} is under the cards, which end at $above")
+                assertTrue(talk.bottom <= 568.0, "the talk runs off the small phone: ${talk.bottom}")
+                val answer = rectOf(".talk .spend")
+                assertTrue(answer.bottom <= 568.0, "the answer is off the screen: ${answer.bottom}")
+                // Wherever the small map and the talk meet, the talk lies over it: the map is in the town's own
+                // layer, the talk in the cards' layer above it.
+                assertTrue(town.element.contains(town.minimapElement))
+                val cards = root.querySelector(".over-town") as HTMLElement
+                assertTrue(cards.contains(root.querySelector(".talk")))
+                assertEquals("1", window.getComputedStyle(cards).getPropertyValue("z-index"))
+            },
+        )
     }
 }

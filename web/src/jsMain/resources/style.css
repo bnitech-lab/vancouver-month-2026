@@ -850,11 +850,10 @@ html:has(.walk-town) {
   inset: -7px -2px;
 }
 
-/* The last money spent today, or why a ride could not be rented. */
-.hud-spent {
-  margin-top: 2px;
+/* Why a shared one could not be rented. */
+.hud-ride-note {
   font-size: 13px;
-  color: var(--muted);
+  color: var(--warn);
 }
 
 .hud .sound-switch,
@@ -882,7 +881,10 @@ html:has(.walk-town) {
   border-radius: 50%;
 }
 
+/* The log gives up its lower lines before a talk is pushed off a small screen: the talk always stays whole. */
 .over-town .log {
+  min-height: 0;
+  overflow: hidden;
   padding: 8px 12px;
   background: color-mix(in srgb, var(--surface) 90%, transparent);
 }

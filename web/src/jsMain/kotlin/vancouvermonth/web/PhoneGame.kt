@@ -31,8 +31,8 @@ import vancouvermonth.text.breakdown
 import vancouvermonth.text.cheapestLine
 import vancouvermonth.text.continueFrom
 import vancouvermonth.text.date
+import vancouvermonth.text.dayLog
 import vancouvermonth.text.endingLine
-import vancouvermonth.text.eventLine
 import vancouvermonth.text.goalLine
 import vancouvermonth.text.greeting
 import vancouvermonth.text.guessLine
@@ -126,11 +126,11 @@ class PhoneGame private constructor(
     private var shopTalks = 0
 
     /**
-     * The money spent today so far, which goes at the top of today's log when the day is spent, and the line on the
-     * top card about the last spend, or why it could not be made, until the day ends.
+     * The money spent today so far, which goes at the top of today's log when the day is spent; and, on the top card
+     * until the next ride or the day's end, why a shared one could not be rented.
      */
     private var spentToday: List<Event> = emptyList()
-    private var spentNote: String? = null
+    private var rideNote: String? = null
 
     /** How many words each passerby has had on [chatsDay], so the same person says something new each time. */
     private val chats = mutableMapOf<Passer, Int>()
@@ -389,7 +389,7 @@ class PhoneGame private constructor(
         if (record.days.isNotEmpty()) {
             lastDay = month.day - 1
             lastEvents = offer.replayed.lastEvents
-            lastLines = lastEvents.map { eventLine(it, month) }
+            lastLines = dayLog(lastEvents, month)
         }
         // What was bought is the month's own; what was spent today goes into today's log, as if never closed.
         spentToday = offer.replayed.spentToday
@@ -523,9 +523,9 @@ class PhoneGame private constructor(
     private fun spend(month: Month, place: Place, choice: Choice) {
         lastDay = month.day
         lastEvents = spentToday + month.play(choice)
-        lastLines = lastEvents.map { eventLine(it, month) }
+        lastLines = dayLog(lastEvents, month)
         spentToday = emptyList()
-        spentNote = null
+        rideNote = null
         talkingAt = null
         atShop = false
         record = record?.after(choice)
@@ -649,7 +649,6 @@ class PhoneGame private constructor(
                     )
                 }
                 rides(month, town)
-                spentNote?.let { child("p", "hud-spent", it).setAttribute("aria-live", "polite") }
             }
             showLog(this)
             querySelector(".log")?.setAttribute("tabindex", "-1")
@@ -832,15 +831,24 @@ class PhoneGame private constructor(
     }
 
     /**
-     * On the town's top card, for what the player owns: a button to get on each, or, while riding, what is ridden and
-     * 내리기. Nothing until something is owned or rented. Taps while the day changes do nothing, as the town's do.
+     * One row on the town's top card, for what the player owns: a button to get on each, or, while riding, what is
+     * ridden (with the fare for a shared one) and 내리기; and why a shared one could not be rented. Nothing until
+     * something is owned, ridden or refused. Taps while the day changes do nothing, as the town's do.
      */
     private fun HTMLElement.rides(month: Month, town: WalkableTown) {
         val riding = town.riding
-        if (riding == null && month.owned.isEmpty()) return
+        val note = rideNote
+        if (riding == null && month.owned.isEmpty() && note == null) return
         child("div", "hud-ride") {
+            note?.let { child("span", "hud-ride-note", it).setAttribute("aria-live", "polite") }
             if (riding != null) {
-                child("span", "hud-riding", Riding.now(riding.vehicle.item, riding.shared))
+                val fare = riding.fare
+                val now = if (fare == null) {
+                    Riding.now(riding.vehicle.item, shared = false)
+                } else {
+                    Riding.rented(riding.vehicle.item, fare.price)
+                }
+                child("span", "hud-riding", now)
                 button("hud-ride-button", text = Riding.GET_OFF) {
                     onclick = {
                         if (!dayChanging) {
@@ -859,6 +867,7 @@ class PhoneGame private constructor(
                         if (!dayChanging) {
                             // Getting on ends a talk, as a talk ends a ride.
                             closeTalks()
+                            rideNote = null
                             town.ride(Ride.own(item))
                             focusNext = ".hud-ride-button"
                             show()
@@ -960,28 +969,33 @@ class PhoneGame private constructor(
         show()
     }
 
-    /** Rents a shared bike or e-scooter for [ride]'s fare, and the character gets on; or says why it cannot. */
+    /**
+     * Rents a shared bike or e-scooter for [ride]'s fare, and the character gets on; or says why it cannot. The fare is
+     * paid only when the town will get on it, so a fare is never paid for a ride not taken.
+     */
     private fun rent(ride: Ride) {
         val current = month ?: return
+        val town = walkable ?: return
         val fare = ride.fare ?: return
+        if (!town.canRide(ride)) return
         val blocked = current.spendBlockedBy(fare)
         if (blocked != null) {
-            spentNote = Riding.cannotRent(fare, blocked)
+            rideNote = Riding.cannotRent(fare, blocked)
         } else if (pay(current, fare)) {
-            walkable?.ride(ride)
+            rideNote = null
+            town.ride(ride)
         }
         show()
     }
 
     /**
-     * Spends [kind]'s price through the month's rules, without spending the day: kept for today's log and in the slot,
-     * and told on the top card. False when the month does not allow it.
+     * Spends [kind]'s price through the month's rules, without spending the day: kept for today's log and in the slot.
+     * False when the month does not allow it.
      */
     private fun pay(month: Month, kind: Spending): Boolean {
         if (!month.canSpend(kind)) return false
         val spent = month.spend(kind)
         spentToday = spentToday + spent
-        spentNote = eventLine(spent, month)
         record = record?.after(Spend(kind, spent.amount))
         record?.let { slot?.keep(it) }
         sound?.blip()

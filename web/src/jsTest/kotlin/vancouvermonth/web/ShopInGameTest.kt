@@ -94,12 +94,12 @@ class ShopInGameTest {
         buyButton(Item.BIKE).click()
         val hud = text(".hud")
         assertTrue(date(Month.FIRST_DAY) in hud && money(startBalance - 350) in hud, hud)
-        assertEquals("자전거를 샀어요. -\$350", text(".hud-spent"))
         assertTrue(Shop.bought(Item.BIKE) in text(".talk"))
-        // What is owned shows as owned; the other can still be bought.
+        // What is owned shows as owned; the other would leave too little for September's 29 days of living cost.
         assertTrue(buyButton(Item.BIKE).disabled)
         assertTrue("이미 있어요." in buyButton(Item.BIKE).textContent.orEmpty())
-        assertFalse(buyButton(Item.E_SCOOTER).disabled)
+        assertTrue(buyButton(Item.E_SCOOTER).disabled)
+        assertTrue("이걸 사면 9월 생활비가 모자라요." in buyButton(Item.E_SCOOTER).textContent.orEmpty())
         assertTrue(hasButton(Riding.getOn(Item.BIKE)))
         assertFalse(hasButton(Riding.getOn(Item.E_SCOOTER)))
         assertNull(town.riding)
@@ -153,8 +153,7 @@ class ShopInGameTest {
         town.onRent(Ride.SHARED_E_SCOOTER)
         assertEquals(Ride.SHARED_E_SCOOTER, town.riding)
         assertTrue(money(startBalance - 4) in text(".hud"))
-        assertEquals("공유 퀵보드를 빌렸어요. -\$4", text(".hud-spent"))
-        assertTrue(Riding.now(Item.E_SCOOTER, shared = true) in text(".hud"))
+        assertEquals(Riding.rented(Item.E_SCOOTER, 4), text(".hud-riding"))
         root.button(Riding.GET_OFF).click()
         assertNull(town.riding)
         assertTrue(money(startBalance - 4) in text(".hud"))
@@ -164,14 +163,16 @@ class ShopInGameTest {
 
     @Test
     fun `a short balance says why at the shop, and why a shared one cannot be rented`() {
-        // 28 days of rest bring 9월 30일; a bike and 91 shared e-scooter rides leave a dollar.
+        // 28 days of rest bring 9월 30일; a bike and 81 shared e-scooter rides leave $41, a day's living cost and $1.
         val rest = Choice.Take(Action.REST)
         val bike = Spend(Spending.BIKE, 350)
         val ride = Spend(Spending.SHARED_E_SCOOTER_RIDE, 4)
-        val kept = record(*Array(28) { rest }, bike, *Array(91) { ride })
+        val kept = record(*Array(28) { rest }, bike, *Array(81) { ride })
         val month = assertNotNull(kept.replay()).month
         assertEquals(Month.LAST_DAY, month.day)
-        assertEquals(1, month.balance)
+        assertEquals(41, month.balance)
+        // One more ride would have left less than today's living cost, so the record could not hold it.
+        assertNull(record(*Array(28) { rest }, bike, *Array(82) { ride }).replay())
         val town = QuietTown()
         continued(kept, town)
         town.onShop()
@@ -182,9 +183,30 @@ class ShopInGameTest {
 
         town.onRent(Ride.SHARED_E_SCOOTER)
         assertNull(town.riding)
-        assertEquals("공유 퀵보드를 빌리지 못했어요. 잔고가 모자라요.", text(".hud-spent"))
-        assertTrue(money(1) in text(".hud"))
+        assertEquals("공유 퀵보드를 빌리면 9월 생활비가 모자라요.", text(".hud-ride-note"))
+        assertTrue(money(41) in text(".hud"))
         assertEquals(kept.encode(), store.items[SaveSlot.KEY], "a refused rental was kept")
+        // Getting on the bike clears the note.
+        root.button(Riding.getOn(Item.BIKE)).click()
+        assertNull(root.querySelector(".hud-ride-note"))
+    }
+
+    @Test
+    fun `on the way to a shared one, getting on the bike means no fare is paid, then or on arrival`() {
+        val town = QuietTown()
+        open(town)
+        startSeed1011(root)
+        town.onShop()
+        buyButton(Item.BIKE).click()
+        root.button(Riding.getOn(Item.BIKE)).click()
+        assertEquals(Ride.BIKE, town.riding)
+        val kept = store.items[SaveSlot.KEY]
+        // The town reaches a shared e-scooter it was sent to before the bike: the game pays nothing.
+        town.onRent(Ride.SHARED_E_SCOOTER)
+        assertEquals(Ride.BIKE, town.riding)
+        assertTrue(money(startBalance - 350) in text(".hud"), text(".hud"))
+        assertEquals(kept, store.items[SaveSlot.KEY], "a fare without a ride was kept")
+        assertNull(root.querySelector(".hud-ride-note"))
     }
 
     @Test
@@ -204,7 +226,7 @@ class ShopInGameTest {
         assertEquals("공유 퀵보드를 빌렸어요. -\$4", log[1])
         assertTrue(log[2].orEmpty().startsWith("영어 실력이 올랐어요."), "$log")
         assertTrue(money(startBalance - 350 - 4 - Month.DAILY_LIVING_COST) in log[3].orEmpty(), "$log")
-        assertNull(root.querySelector(".hud-spent"), "the last spend outlived its day")
+        assertNull(root.querySelector(".hud-riding"), "the ride outlived its day")
         assertNull(town.riding, "the night ended the ride")
         val kept = record(
             Spend(Spending.BIKE, 350),
@@ -212,6 +234,22 @@ class ShopInGameTest {
             Choice.Take(Action.STUDY_ENGLISH),
         )
         assertEquals(kept.encode(), store.items[SaveSlot.KEY])
+    }
+
+    @Test
+    fun `a busy day's spends take two lines of the next day's log`() {
+        val town = QuietTown()
+        open(town)
+        startSeed1011(root)
+        for (ride in listOf(Ride.SHARED_BIKE, Ride.SHARED_E_SCOOTER, Ride.SHARED_BIKE, Ride.SHARED_BIKE)) {
+            town.onRent(ride)
+            root.button(Riding.GET_OFF).click()
+        }
+        town.onPlace(Place.HOME)
+        (root.querySelector(".talk .spend") as HTMLButtonElement).click()
+        val log = root.querySelectorAll(".log li").asList().map { it.textContent }
+        assertEquals(listOf("공유 자전거를 빌렸어요. -\$3", "그 밖에 3건 -\$10"), log.take(2))
+        assertEquals(4, log.size, "$log")
     }
 
     @Test
