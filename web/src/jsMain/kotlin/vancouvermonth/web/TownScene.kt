@@ -100,6 +100,7 @@ private class TownScene(private val canvas: HTMLCanvasElement, context: Renderin
             element.appendChild(label)
             labels[building.place] = label
         }
+        highlight(place)
 
         // The town is drawn again when it gets a size: when it first appears, and when the phone turns.
         ResizeObserver { fit() }.observe(canvas)
@@ -117,8 +118,13 @@ private class TownScene(private val canvas: HTMLCanvasElement, context: Renderin
         walk = Walk(this.place, place)
         walkStarted = window.performance.now()
         this.place = place
-        for ((labelPlace, label) in labels) label.classList.toggle("here", labelPlace == place)
+        highlight(place)
         askForFrame()
+    }
+
+    /** Marks the name of the building where the day goes, and only that one. */
+    private fun highlight(place: Place) {
+        for ((labelPlace, label) in labels) label.classList.toggle("here", labelPlace == place)
     }
 
     private fun stand(place: Place) {

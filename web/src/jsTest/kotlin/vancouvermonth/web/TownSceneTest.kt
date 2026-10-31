@@ -21,6 +21,17 @@ class TownSceneTest {
     }
 
     @Test
+    fun `the name of the building where the character is stands out, 내 방 from the first day`() {
+        val town = assertNotNull(openTown(), "The test browser has no WebGL 2")
+        fun marked() = town.element.querySelectorAll(".town-label.here").asList().map { it.textContent }
+        assertEquals(listOf("내 방"), marked())
+        town.walkTo(Place.CAFE)
+        assertEquals(listOf("카페"), marked())
+        town.walkTo(Place.HOME)
+        assertEquals(listOf("내 방"), marked())
+    }
+
+    @Test
     fun `the town draws a whole walk on the page without failing`(): Promise<Unit> {
         val town = assertNotNull(openTown(), "The test browser has no WebGL 2")
         town.element.style.width = "343px"
