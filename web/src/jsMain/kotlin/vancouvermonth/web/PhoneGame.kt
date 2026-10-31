@@ -29,6 +29,7 @@ import vancouvermonth.text.passPrices
 import vancouvermonth.text.percent
 import vancouvermonth.text.stageName
 import vancouvermonth.text.todaysRunName
+import vancouvermonth.text.todaysRunResult
 import vancouvermonth.text.utilitiesLabel
 import vancouvermonth.text.utilitiesPrices
 import vancouvermonth.text.whyNot
@@ -237,6 +238,7 @@ class PhoneGame(
                 figure("영어", "${month.english}/${Month.MAX_SKILL}")
                 figure("코딩", "${month.coding}/${Month.MAX_SKILL}")
             }
+            if (today != null) result(todaysRunResult(today, reveal.score, ending, month.day))
             button("primary", text = "다시 하기") {
                 onclick = { playAgain() }
             }
@@ -311,6 +313,41 @@ private fun HTMLElement.meter(label: String, kind: String, value: Int, max: Int)
             child("span", "meter-fill") { style.width = "${value * 100 / max}%" }
         }
         child("span", "meter-value", "$value/$max")
+    }
+}
+
+/**
+ * Today's result as one line, with a button that copies it. Where the browser refuses to copy,
+ * the line is selected instead, ready for the phone's own copy.
+ */
+private fun HTMLElement.result(line: String) {
+    child("div", "result") {
+        child("h2", text = "결과 한 줄")
+        val text = child("p", "result-line", line)
+        val copy = button("copy", text = "결과 복사")
+        val status = child("p", "result-status") { setAttribute("aria-live", "polite") }
+
+        fun selectInstead() {
+            status.textContent = "복사하지 못했어요. 선택된 줄을 직접 복사해 주세요."
+            val range = document.createRange()
+            range.selectNodeContents(text)
+            // Kotlin's DOM declarations have no getSelection, so this call goes to JavaScript directly.
+            val selection = window.asDynamic().getSelection()
+            selection.removeAllRanges()
+            selection.addRange(range)
+        }
+
+        copy.onclick = {
+            // The copy has to start inside the tap, or the browser refuses it.
+            try {
+                window.navigator.clipboard.writeText(line)
+                    .then { status.textContent = "복사했어요." }
+                    .catch { selectInstead() }
+            } catch (error: Throwable) {
+                // A page that is not on https, localhost or a file has no clipboard at all.
+                selectInstead()
+            }
+        }
     }
 }
 

@@ -497,3 +497,41 @@ input:focus-visible {
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
 }
+
+/* Today's result */
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.result h2 {
+  margin: 0;
+}
+
+.result-line {
+  padding: 10px 12px;
+  font-size: 15px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  /* One tap selects the whole line, for when the copy button is refused. */
+  -webkit-user-select: all;
+  user-select: all;
+}
+
+.copy {
+  width: 100%;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--surface);
+  border: 2px solid var(--accent);
+}
+
+.result-status {
+  font-size: 14px;
+  color: var(--muted);
+}

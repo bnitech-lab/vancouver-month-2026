@@ -13,6 +13,7 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.asList
 import org.w3c.dom.events.Event
+import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.TodaysRun
 
 /** Plays the page in the test browser by tapping its buttons, the way a player would. */
@@ -50,6 +51,14 @@ class PhoneGameTest {
         type(amount)
         tap("총비용 확인하기")
         tap("시작하기")
+    }
+
+    /** Plays [today]'s run with the cheapest room and an exact guess, then rests until September ends. */
+    private fun restThrough(today: TodaysRun) {
+        PhoneGame(root, today.seed, playAgain = { playedAgain = true }, today = today).show()
+        val game = FirstMinute(today.seed)
+        startMonth(room = game.cheapestRoomIndex + 1, amount = "${game.lowestTotal}")
+        while ("다시 하기" !in screen) tap("쉬기")
     }
 
     @Test
@@ -177,6 +186,28 @@ class PhoneGameTest {
         val today = TodaysRun(2026, 10, 30)
         PhoneGame(root, today.seed, playAgain = {}, today = today).show()
         assertTrue("10월 30일 오늘의 판 · 판 번호 ${today.seed}" in screen)
+    }
+
+    @Test
+    fun `today's run ends with its result line and a copy button`() {
+        restThrough(TodaysRun(2026, 10, 30))
+        assertEquals(
+            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 200/200 · 10월 월세 모자람",
+            root.querySelector(".result-line")?.textContent,
+        )
+        assertFalse(button("결과 복사").disabled)
+        assertEquals("polite", root.querySelector(".result-status")?.getAttribute("aria-live"))
+        tap("다시 하기")
+        assertTrue(playedAgain)
+    }
+
+    @Test
+    fun `a run from a seed ends without a result line`() {
+        open(1011)
+        startMonth(room = 3, amount = "1165")
+        while ("다시 하기" !in screen) tap("쉬기")
+        assertNull(root.querySelector(".result-line"))
+        assertTrue(buttons().none { "결과 복사" in it.textContent.orEmpty() })
     }
 
     @Test
