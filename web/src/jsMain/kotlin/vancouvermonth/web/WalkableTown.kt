@@ -67,6 +67,13 @@ interface WalkableTown {
      */
     var onSounds: (train: Double, fire: Double, night: Double) -> Unit
 
+    /**
+     * How far down from the town's top edge, in CSS pixels, cards cover it now: the top card and the day's log. A
+     * building's name that would reach up under them is hidden, so it never peeks out from under a card. It is asked
+     * each time the names are laid out; setting it lays them out again.
+     */
+    var coveredTop: () -> Double
+
     /** Marks the name of [place], as on an interview day, or no name when null. */
     fun mark(place: Place?)
 
@@ -504,6 +511,13 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         meshes.add(mesh)
         return mesh
     }
+
+    override var coveredTop: () -> Double = { 0.0 }
+        set(value) {
+            field = value
+            labelsStale = true
+            askForFrame()
+        }
 
     override var isCovered: Boolean
         get() = pace.isCovered
@@ -1146,10 +1160,17 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private fun placeLabels() {
         val width = canvas.clientWidth.toDouble()
         val height = canvas.clientHeight.toDouble()
+        val covered = coveredTop()
+        // The names are all one line, so the first one tells how tall a name is.
+        val tall = labels.values.first().offsetHeight.toDouble()
         for ((place, label) in labels) {
             val point = view.screenPoint(Neighbourhood.venue(place).labelAnchor)
             val shown = point != null && point.left in 0.0..1.0 && point.top in 0.0..1.0
             label.classList.toggle("behind", !shown)
+            // A name that would reach up under the top card or the day's log is hidden there, and out of the finger's
+            // way; it stays for the keyboard and a screen reader, as its place's person is still there to talk to.
+            val under = covered > 0.0 && shown && point != null && point.top * height - tall < covered
+            label.classList.toggle("under", under)
             label.tabIndex = if (shown) 0 else -1
             if (shown) label.removeAttribute("aria-hidden") else label.setAttribute("aria-hidden", "true")
             if (point != null) {

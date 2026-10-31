@@ -44,6 +44,7 @@ private class SilentTown : WalkableTown {
     override var isCovered = false
     override var weather = Weather.SUNNY
     override var onSounds: (Double, Double, Double) -> Unit = { _, _, _ -> }
+    override var coveredTop: () -> Double = { 0.0 }
 
     override fun mark(place: Place?) {}
 
@@ -926,6 +927,41 @@ class WalkableTownTest {
                 assertEquals(sunny, rainy)
             }
         }.then { }
+    }
+
+    /** The building names on screen (not behind the camera), each with whether it hides under the cards. */
+    private fun namesOnScreen(): List<Pair<HTMLElement, Boolean>> =
+        root.querySelectorAll(".place-name").asList().map { it as HTMLElement }
+            .filter { !it.classList.contains("behind") }
+            .map { it to it.classList.contains("under") }
+
+    @Test
+    fun `a building's name hides where the top card or the day's log would cover it, and nowhere else`(): Promise<Unit> {
+        val town = startInTown()
+        return play(
+            Step("the names under the game's own cards", { town.isStill }) {
+                val hud = assertNotNull(root.querySelector(".over-town .hud") as? HTMLElement)
+                val cover = hud.getBoundingClientRect().bottom
+                val names = namesOnScreen()
+                assertTrue(names.isNotEmpty())
+                for ((name, under) in names) {
+                    val reaches = name.getBoundingClientRect().top < cover
+                    assertEquals(reaches, under, "${name.textContent} reaches ${name.getBoundingClientRect().top}")
+                }
+                town.coveredTop = { 0.0 }
+            },
+            // With no card, every name shows, even one that reaches past the top of the screen.
+            Step("nothing covered", { town.isStill && namesOnScreen().none { it.second } }) {
+                town.coveredTop = { 812.0 }
+            },
+            Step("all covered", { town.isStill && namesOnScreen().all { it.second } }) {
+                // Hidden names stay in the keyboard's reach and a screen reader's.
+                for ((name, _) in namesOnScreen()) {
+                    assertEquals(0, (name as HTMLButtonElement).tabIndex, "${name.textContent}")
+                    assertNull(name.getAttribute("aria-hidden"), "${name.textContent}")
+                }
+            },
+        )
     }
 
     @Test

@@ -692,6 +692,12 @@ html:has(.walk-town) {
   pointer-events: none;
 }
 
+/* A name that would sit under the top card or the day's log hides there, so it never peeks out from under them. */
+.place-name.under {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .over-town {
   position: fixed;
   inset: 0;

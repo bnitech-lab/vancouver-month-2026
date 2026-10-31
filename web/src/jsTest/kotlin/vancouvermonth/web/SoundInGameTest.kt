@@ -25,6 +25,7 @@ internal class QuietTown : WalkableTown {
     override var isCovered = false
     override var weather = Weather.SUNNY
     override var onSounds: (Double, Double, Double) -> Unit = { _, _, _ -> }
+    override var coveredTop: () -> Double = { 0.0 }
 
     override fun mark(place: Place?) {}
 

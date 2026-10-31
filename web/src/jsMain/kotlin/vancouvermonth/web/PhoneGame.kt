@@ -9,6 +9,7 @@ import org.w3c.dom.HTMLFormElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.HTMLLabelElement
 import org.w3c.dom.Range
+import org.w3c.dom.asList
 import vancouvermonth.core.Action
 import vancouvermonth.core.Ending
 import vancouvermonth.core.Event
@@ -619,9 +620,18 @@ class PhoneGame private constructor(
                 child("p", "town-hint", "땅을 누르면 걷고, 두 번 누르면 빨리 가요. 사람이나 건물을 누르면 말을 걸어요.")
             }
         }
+        // The names of the buildings hide where the top card and the day's log cover the town.
+        town.coveredTop = { coverOf(town) }
         // A keyboard or a screen reader follows what happens: into a talk that opens, to the log after an answer.
         focusNext?.let { (root.querySelector(it) as? HTMLElement)?.focus() }
         focusNext = null
+    }
+
+    /** How far down from the top of [town] the top card and the day's log reach, in CSS pixels. */
+    private fun coverOf(town: WalkableTown): Double {
+        val top = town.element.getBoundingClientRect().top
+        return root.querySelectorAll(".over-town .hud, .over-town .log").asList()
+            .maxOfOrNull { (it as HTMLElement).getBoundingClientRect().bottom - top } ?: 0.0
     }
 
     /** The sound switch and the "?" that shows how to play again, at the end of the town's top card. */
