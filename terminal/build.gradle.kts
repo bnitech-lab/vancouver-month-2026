@@ -10,6 +10,7 @@ kotlin {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":text"))
     testImplementation(kotlin("test"))
 }
 

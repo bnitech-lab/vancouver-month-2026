@@ -1,19 +1,26 @@
 package vancouvermonth.terminal
 
-import java.util.Locale
-import kotlin.math.roundToInt
 import vancouvermonth.core.Action
-import vancouvermonth.core.Ending
 import vancouvermonth.core.Event
 import vancouvermonth.core.FirstMinute
-import vancouvermonth.core.Interview
-import vancouvermonth.core.InterviewStage
 import vancouvermonth.core.Month
 import vancouvermonth.core.Reveal
 import vancouvermonth.core.Room
-import vancouvermonth.core.RoomDealer
-import vancouvermonth.core.Skill
-import vancouvermonth.core.Zone
+import vancouvermonth.text.actionEffect
+import vancouvermonth.text.actionName
+import vancouvermonth.text.breakdown
+import vancouvermonth.text.cheapestLine
+import vancouvermonth.text.date
+import vancouvermonth.text.endingLine
+import vancouvermonth.text.eventLine
+import vancouvermonth.text.guessLine
+import vancouvermonth.text.money
+import vancouvermonth.text.passPrices
+import vancouvermonth.text.percent
+import vancouvermonth.text.stageName
+import vancouvermonth.text.utilitiesLabel
+import vancouvermonth.text.utilitiesPrices
+import vancouvermonth.text.whyNot
 
 /**
  * Plays one run as text: the room on September 1st, then one action a day until the month ends.
@@ -62,9 +69,8 @@ class TerminalGame(
         line("       한 달 총비용 = 월세 + 공과금 + 교통 정기권")
         line()
         line("요금표")
-        line("  교통 정기권   " + Zone.entries.joinToString(" · ") { "${it.number}구역 ${money(it.monthlyPass)}" })
-        val utilities = RoomDealer.UTILITIES_RANGE
-        line("  공과금        포함이면 ${money(0)}, 별도면 한 달 ${money(utilities.first)}~${money(utilities.last)} (방마다 다름)")
+        line("  교통 정기권   " + passPrices())
+        line("  공과금        " + utilitiesPrices())
         line()
         game.rooms.forEachIndexed { index, room -> line("  ${index + 1}) ${describe(room)}") }
         line()
@@ -75,19 +81,10 @@ class TerminalGame(
         val room = reveal.room
         line()
         line("  한 달 총비용  ${money(room.totalMonthlyCost)}")
-        line("  월세 ${money(room.rent)} + 공과금 ${money(room.utilities)} + 교통 ${money(room.zone.monthlyPass)}")
+        line("  ${breakdown(room)}")
         line()
-        if (reveal.pickedCheapest) {
-            line("  총비용이 가장 싼 방을 골랐어요.   +${reveal.cheapestPoints}")
-        } else {
-            val rooms = game.cheapestRoomIndices.joinToString(", ") { "${it + 1}번" }
-            line("  총비용이 가장 싼 방은 ${rooms}이었어요 (${money(game.lowestTotal)}).   +${reveal.cheapestPoints}")
-        }
-        if (reveal.guessGap == 0) {
-            line("  짐작이 정확해요.   +${reveal.guessPoints}")
-        } else {
-            line("  내 짐작과 차이 ${money(reveal.guessGap)}   +${reveal.guessPoints}")
-        }
+        line("  ${cheapestLine(game, reveal)}   +${reveal.cheapestPoints}")
+        line("  ${guessLine(reveal)}   +${reveal.guessPoints}")
         line("  방 고르기 점수 ${reveal.score} / ${FirstMinute.MAX_SCORE}")
         line()
         line("  첫 달을 내고 남은 잔고 ${money(reveal.balanceAfterFirstMonth)}")
@@ -117,16 +114,7 @@ class TerminalGame(
     }
 
     private fun showEvents(month: Month, events: List<Event>) {
-        for (event in events) {
-            when (event) {
-                is Event.Earned -> line("  카페에서 일했어요. +${money(event.amount)}")
-                is Event.SkillUp -> line("  ${skillName(event.skill)} 실력이 올랐어요. ${skillName(event.skill)} ${event.level}/${Month.MAX_SKILL}")
-                is Event.Applied -> line(applied(event.interview))
-                is Event.Rested -> line("  푹 쉬었어요. 체력 ${event.energy}/${Month.MAX_ENERGY}")
-                is Event.InterviewHeld -> line(interviewResult(event, month.canStillApplyThisMonth))
-                is Event.LivingCost -> line("  생활비 -${money(event.amount)}, 잔고 ${money(month.balance)}")
-            }
-        }
+        for (event in events) line("  " + eventLine(event, month))
         line()
     }
 
@@ -179,79 +167,19 @@ class TerminalGame(
     private fun line(text: String = "") = output(text + "\n")
 }
 
-private fun describe(room: Room): String {
-    val utilities = if (room.utilitiesIncluded) "공과금 포함" else "공과금 별도"
-    return "월세 ${money(room.rent).padStart(6)}   교통 ${room.zone.number}구역   $utilities"
-}
+private fun describe(room: Room): String =
+    "월세 ${money(room.rent).padStart(6)}   교통 ${room.zone.number}구역   ${utilitiesLabel(room)}"
 
 private fun describe(action: Action, month: Month): String {
-    val (name, effect) = when (action) {
-        Action.WORK -> "카페 알바" to "+${money(Month.WORK_PAY)}, 체력 -1"
-        Action.STUDY_ENGLISH -> "영어 공부" to "영어 +1, 체력 -1"
-        Action.PRACTISE_CODING -> "코딩 연습" to "코딩 +1, 체력 -1"
-        Action.APPLY -> "지원서 넣기" to "면접이 잡힐 확률 ${percent(month.applyChance)}, 체력 -1"
-        Action.REST -> "쉬기" to "체력 +${Month.REST_GAIN}"
-    }
     val note = if (month.canTake(action)) "" else "   (${whyNot(action, month)})"
-    return padToColumns(name, 14) + effect + note
+    return padToColumns(actionName(action), 14) + actionEffect(action, month) + note
 }
-
-/** The first line of the ending screen. [rent] is October's total for the same room. */
-fun endingLine(ending: Ending, day: Int, rent: Int, balance: Int): String = when (ending) {
-    Ending.OFFER -> "축하해요! ${date(day)}에 취업 제안을 받았어요."
-    Ending.CANNOT_PAY_RENT ->
-        "9월이 끝났어요. 10월 총비용 ${money(rent)}를 내기엔 ${money(rent - balance)} 모자라요 (잔고 ${money(balance)})."
-    Ending.SURVIVED -> "9월이 끝났어요. 제안은 없었지만 10월 총비용 ${money(rent)}는 낼 수 있어요 (잔고 ${money(balance)})."
-}
-
-private fun whyNot(action: Action, month: Month): String = when {
-    action != Action.REST && month.energy == 0 -> "체력이 없어요. 쉬어야 해요."
-    action == Action.APPLY && month.interview != null -> "면접이 잡혀 있어요."
-    action == Action.APPLY && !month.canStillApplyThisMonth -> "지금 지원하면 9월 안에 면접을 다 볼 수 없어요."
-    else -> "오늘은 할 수 없어요."
-}
-
-private fun applied(interview: Interview?): String =
-    if (interview == null) {
-        "  지원서를 냈지만 아직 연락이 없어요."
-    } else {
-        "  연락이 왔어요! ${stageName(interview.stage)}이 ${date(interview.day)}에 잡혔어요."
-    }
-
-/** [canApplyAgain] is false late in the month, when applications have closed. */
-fun interviewResult(event: Event.InterviewHeld, canApplyAgain: Boolean): String {
-    val stage = stageName(event.stage)
-    val next = event.next
-    return when {
-        !event.passed && canApplyAgain -> "  ${stage}에서 떨어졌어요. 다시 지원할 수 있어요."
-        !event.passed -> "  ${stage}에서 떨어졌어요. 9월 안에는 다시 지원할 수 없어요."
-        next != null -> "  $stage 통과! ${stageName(next.stage)}이 ${date(next.day)}이에요."
-        else -> "  $stage 통과!"
-    }
-}
-
-private fun stageName(stage: InterviewStage): String = when (stage) {
-    InterviewStage.PHONE_SCREEN -> "1차 영어 면접"
-    InterviewStage.TECHNICAL -> "2차 기술 면접"
-}
-
-private fun skillName(skill: Skill): String = when (skill) {
-    Skill.ENGLISH -> "영어"
-    Skill.CODING -> "코딩"
-}
-
-/** Day 2 is "9월 2일". A day past the 30th falls in October. */
-fun date(day: Int): String = if (day <= Month.LAST_DAY) "9월 ${day}일" else "10월 ${day - Month.LAST_DAY}일"
-
-fun percent(chance: Double): String = "${(chance * 100).roundToInt()}%"
 
 /** Pads [text] to [columns] terminal columns, counting each Hangul syllable as two. */
 fun padToColumns(text: String, columns: Int): String {
     val width = text.sumOf { if (it in '가'..'힣') 2 else 1 }
     return text + " ".repeat(maxOf(1, columns - width))
 }
-
-fun money(amount: Int): String = "$" + String.format(Locale.US, "%,d", amount)
 
 /** "2" with three choices gives index 1. Anything else gives null. */
 fun parseRoomChoice(text: String, roomCount: Int): Int? {

@@ -5,12 +5,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import vancouvermonth.core.Ending
-import vancouvermonth.core.Event
 import vancouvermonth.core.FirstMinute
-import vancouvermonth.core.InterviewStage
 import vancouvermonth.core.Room
 import vancouvermonth.core.Zone
+import vancouvermonth.text.date
+import vancouvermonth.text.money
+import vancouvermonth.text.percent
 
 class TerminalGameTest {
     private fun playWith(seed: Int, vararg answers: String): Pair<Boolean, String> {
@@ -62,26 +62,6 @@ class TerminalGameTest {
         val (_, screen) = playWith(1011, "3", "1165", "1", "1", "1", "1", "1", "1")
         assertTrue("체력 0/5" in screen)
         assertTrue("지금은 못 해요. 체력이 없어요. 쉬어야 해요." in screen)
-    }
-
-    @Test
-    fun `each ending says what happened with the right amounts`() {
-        assertEquals("축하해요! 9월 19일에 취업 제안을 받았어요.", endingLine(Ending.OFFER, 19, 1_175, 900))
-        assertEquals(
-            "9월이 끝났어요. 10월 총비용 \$1,175를 내기엔 \$510 모자라요 (잔고 \$665).",
-            endingLine(Ending.CANNOT_PAY_RENT, 30, 1_175, 665),
-        )
-        assertEquals(
-            "9월이 끝났어요. 제안은 없었지만 10월 총비용 \$1,175는 낼 수 있어요 (잔고 \$1,300).",
-            endingLine(Ending.SURVIVED, 30, 1_175, 1_300),
-        )
-    }
-
-    @Test
-    fun `a failed interview says whether the player can still apply`() {
-        val failed = Event.InterviewHeld(InterviewStage.PHONE_SCREEN, passed = false, next = null)
-        assertEquals("  1차 영어 면접에서 떨어졌어요. 다시 지원할 수 있어요.", interviewResult(failed, canApplyAgain = true))
-        assertEquals("  1차 영어 면접에서 떨어졌어요. 9월 안에는 다시 지원할 수 없어요.", interviewResult(failed, canApplyAgain = false))
     }
 
     @Test
@@ -160,12 +140,6 @@ class TerminalGameTest {
         assertEquals(1200, parseAmount("$1200"))
         assertNull(parseAmount("abc"))
         assertNull(parseAmount("-5"))
-    }
-
-    @Test
-    fun `money is written with a dollar sign and commas`() {
-        assertEquals("$1,245", money(1245))
-        assertEquals("$960", money(960))
     }
 
     @Test
