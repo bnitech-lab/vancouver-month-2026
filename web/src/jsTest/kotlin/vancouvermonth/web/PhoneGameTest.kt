@@ -1,5 +1,6 @@
 package vancouvermonth.web
 
+import kotlin.js.Date
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,6 +13,7 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.asList
 import org.w3c.dom.events.Event
+import vancouvermonth.core.TodaysRun
 
 /** Plays the page in the test browser by tapping its buttons, the way a player would. */
 class PhoneGameTest {
@@ -150,6 +152,31 @@ class PhoneGameTest {
         assertEquals(42, seedFrom("?lang=ko&seed=42"))
         assertNull(seedFrom(""))
         assertNull(seedFrom("?seed=abc"))
+    }
+
+    @Test
+    fun `today's run comes from the query or the browser's date`() {
+        val now = Date(2026, 9, 30) // A JavaScript date counts months from 0, so this is October 30th.
+        assertEquals(TodaysRun(2026, 10, 30), todayFrom("?today", now))
+        assertEquals(TodaysRun(2026, 10, 29), todayFrom("?today=2026-10-29", now))
+        assertEquals(TodaysRun(2026, 10, 30), todayFrom("?today=soon", now))
+        assertEquals(TodaysRun(2026, 10, 30), todayFrom("?today=2026-13-01", now))
+        assertNull(todayFrom("?seed=1011", now))
+        assertNull(todayFrom("", now))
+    }
+
+    @Test
+    fun `the address names the date of today's run`() {
+        assertEquals("?today=2026-10-30", todayQuery(TodaysRun(2026, 10, 30)))
+        assertEquals("?today=2027-01-05", todayQuery(TodaysRun(2027, 1, 5)))
+        assertEquals(TodaysRun(2027, 1, 5), todayFrom(todayQuery(TodaysRun(2027, 1, 5)), Date()))
+    }
+
+    @Test
+    fun `today's run is named under the title`() {
+        val today = TodaysRun(2026, 10, 30)
+        PhoneGame(root, today.seed, playAgain = {}, today = today).show()
+        assertTrue("10월 30일 오늘의 판 · 판 번호 ${today.seed}" in screen)
     }
 
     @Test

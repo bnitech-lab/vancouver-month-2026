@@ -13,6 +13,7 @@ import vancouvermonth.core.Event
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.Month
 import vancouvermonth.core.Reveal
+import vancouvermonth.core.TodaysRun
 import vancouvermonth.text.actionEffect
 import vancouvermonth.text.actionName
 import vancouvermonth.text.breakdown
@@ -27,6 +28,7 @@ import vancouvermonth.text.parseAmount
 import vancouvermonth.text.passPrices
 import vancouvermonth.text.percent
 import vancouvermonth.text.stageName
+import vancouvermonth.text.todaysRunName
 import vancouvermonth.text.utilitiesLabel
 import vancouvermonth.text.utilitiesPrices
 import vancouvermonth.text.whyNot
@@ -34,13 +36,18 @@ import vancouvermonth.text.whyNot
 /**
  * Draws one run in [root]: the room on September 1st, then one action a day, then the ending.
  * The rules are in core and the wording in text; this only shows the state and passes each tap on.
- * Every tap redraws the whole screen from that state.
+ * Every tap redraws the whole screen from that state. [today] is set when this is today's run.
  */
 class PhoneGame(
     private val root: HTMLElement,
     seed: Int,
     private val playAgain: () -> Unit,
+    private val today: TodaysRun? = null,
 ) {
+    init {
+        require(today == null || today.seed == seed) { "Today's run is seed ${today?.seed}, not $seed" }
+    }
+
     private val game = FirstMinute(seed)
     private var picked: Int? = null
     private var guess = ""
@@ -240,7 +247,7 @@ class PhoneGame(
         root.child("header", "title") {
             child("p", "brand", "BNI Tech")
             child("h1", text = "밴쿠버 한 달 (가제)")
-            child("p", "run", "판 번호 ${game.seed}")
+            child("p", "run", if (today == null) "판 번호 ${game.seed}" else "${todaysRunName(today)} · 판 번호 ${game.seed}")
         }
     }
 
