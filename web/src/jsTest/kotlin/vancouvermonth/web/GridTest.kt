@@ -27,9 +27,9 @@ class GridTest {
     }
 
     @Test
-    fun `there is no route through a wall with no gap`() {
+    fun `a wall with no gap: the walk ends on this side of it, as near as it can get`() {
         val grid = Grid(5, 5, (0..4).map { Cell(2, it) })
-        assertEquals(emptyList(), grid.route(Spot(0.5, 0.5), Spot(4.5, 0.5)))
+        assertEquals(Spot(1.5, 0.5), grid.route(Spot(0.5, 0.5), Spot(4.5, 0.5)).last())
     }
 
     @Test
@@ -40,5 +40,28 @@ class GridTest {
         assertTrue(grid.isFree(grid.cellAt(end)), "$end")
         assertEquals(1.0, hypot(end.x - 2.5, end.z - 2.5), 1e-9)
         assertEquals(Cell(4, 0), grid.nearestFree(Cell(40, -9)))
+    }
+
+    @Test
+    fun `a walk to a square that is cut off ends at the nearest square the character can reach`() {
+        // A ring of blocked squares around (5, 5), which is free but cannot be reached.
+        val ring = (4..6).flatMap { x -> (4..6).map { z -> Cell(x, z) } }.filter { it != Cell(5, 5) }
+        val grid = Grid(10, 10, ring)
+        assertEquals(setOf(Cell(5, 5)), grid.reachableFrom(Cell(5, 5)))
+        val route = grid.route(Spot(0.5, 0.5), Spot(5.5, 5.5))
+        val end = route.last()
+        assertTrue(grid.isFree(grid.cellAt(end)) && grid.cellAt(end) != Cell(5, 5), "$route")
+        assertTrue(hypot(end.x - 5.5, end.z - 5.5) <= 2.0, "$end")
+        assertTrue(grid.walks(route), "$route")
+    }
+
+    @Test
+    fun `the open squares come out lowest score first`() {
+        val open = OpenSquares()
+        val scores = listOf(5.0, 1.0, 4.0, 1.5, 9.0, 0.5, 3.0, 7.0, 2.0)
+        for ((index, score) in scores.withIndex()) open.push(Cell(index, 0), score)
+        val order = mutableListOf<Double>()
+        while (open.isNotEmpty()) order.add(scores[open.pop().x])
+        assertEquals(scores.sorted(), order)
     }
 }
