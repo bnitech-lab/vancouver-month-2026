@@ -48,11 +48,18 @@ class FollowCamera(subject: Point) {
     var subject: Point = subject
         private set
 
-    /** The point in the middle of the screen. */
+    /**
+     * The point in the middle of the screen. From far back, on the street, it is nudged toward the street's middle
+     * to show both rows; the nearer the camera comes, the less, so close in the character stays in the picture.
+     */
     val focus: Point
         get() {
             val nudged = Neighbourhood.cameraFocus(Spot(subject.x, subject.z))
-            return Point(nudged.x, subject.y, nudged.z)
+            // How far the camera really is, after any wall pulled it in.
+            val reach = length(eye - subject)
+            val share = ((reach - NEAR) / (FULL_NUDGE_DISTANCE - NEAR)).coerceIn(0.0, 1.0)
+            val x = subject.x + (nudged.x - subject.x) * share
+            return Point(x, subject.y, subject.z + (nudged.z - subject.z) * share)
         }
 
     var eye: Point = eyeFor()
@@ -194,6 +201,9 @@ class FollowCamera(subject: Point) {
         const val MAX_PITCH = 1.3
         const val NEAR = 4.5
         const val FAR = 30.0
+
+        /** From this far back the focus is nudged all the way to the street's middle. */
+        const val FULL_NUDGE_DISTANCE = 15.0
 
         const val TURN_PER_PIXEL = 0.008
         const val TURN_MILLIS = 60.0

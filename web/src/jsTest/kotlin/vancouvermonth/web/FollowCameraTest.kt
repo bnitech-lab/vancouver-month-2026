@@ -153,6 +153,24 @@ class FollowCameraTest {
     }
 
     @Test
+    fun `however near the camera comes, the character stays in the picture`() {
+        // On the street the camera looks toward its middle; close in, less and less, so the character stays.
+        val door = Neighbourhood.venue(Place.HOME).door
+        for (yaw in listOf(-PI / 2, -PI / 4, 0.0, PI / 2, PI)) {
+            for (step in 0..12) {
+                val camera = camera(Point(door.x, 1.0, door.z), yaw)
+                camera.zoom(0.85.pow(step))
+                camera.jumpTo(Point(door.x, 1.0, door.z))
+                for (height in listOf(0.0, 1.6)) {
+                    val point = camera.screenPoint(Point(door.x, height, door.z))
+                    val inside = point != null && point.left in 0.0..1.0 && point.top in 0.0..1.0
+                    assertTrue(inside, "turn $yaw, distance ${camera.distance}: the character at $height is at $point")
+                }
+            }
+        }
+    }
+
+    @Test
     fun `backed against a building, the camera keeps its distance by rising over it`() {
         for (venue in Neighbourhood.venues) {
             val yaw = if (venue.doorFacesSouth) PI else 0.0
