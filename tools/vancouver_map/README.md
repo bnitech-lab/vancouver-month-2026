@@ -37,10 +37,11 @@ give a slightly different map; the SHA-1 of each file used is written at the top
    of land the character could never reach become water, and every land square beside the water becomes shore.
 6. Lines are simplified with Douglas-Peucker to within 0.35 of a square.
 7. Each real city block becomes a rectangle of plain land squares, drawn 0.4 of a square in from its outline on every
-   side so a street of at least one square always runs between blocks. A block turned off the grid (the older streets
-   to the east) becomes a square of the same area; one wider or deeper than 9 squares is cut into pieces with lanes
-   between; where two overlap, the larger keeps the ground. A block whose middle lies in one of the City's parks is a
-   small park, not buildings.
+   side. A block turned off the grid (the older streets to the east) becomes a square of the same area; one wider or
+   deeper than 9 squares is cut into pieces with lanes between; where two overlap, the larger keeps the ground; where
+   two still meet side to side, the smaller gives up the row or column along that side. So a street at least one
+   square wide runs between any two blocks side by side; two may still meet at a corner. A block whose middle lies in
+   one of the City's parks is a small park, not buildings.
 
 The five spots are rough points in a neighbourhood, chosen by its character, never an address or a business: 내 방 in
 the West End's residential streets, 카페 by the seawall on False Creek's north shore, 도서관 in the civic blocks in the
@@ -65,5 +66,7 @@ copying, changing and publishing the data, also commercially, with this attribut
 | [Block outlines](https://opendata.vancouver.ca/explore/dataset/block-outlines/) | The street grid's angle, the city blocks, and the comparison picture |
 | [Local area boundary](https://opendata.vancouver.ca/explore/dataset/local-area-boundary/) | Which blocks are downtown, and the area's size |
 
-Fetched on 2026-10-31. The map data in the game is derived from these datasets and published under the same
-attribution; the code that makes and reads it is MIT like the rest of the repository.
+Fetched on 2026-10-31. The map data in the game is derived from these datasets and licensed under the Open
+Government Licence – Vancouver 1.0, not MIT, with the same attribution and a link to the licence on the page;
+`web/src/jsMain/resources/MAP-DATA-NOTICE.txt` ships beside the script. The code that makes and reads it is MIT like
+the rest of the repository.

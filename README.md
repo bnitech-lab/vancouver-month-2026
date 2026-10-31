@@ -176,8 +176,11 @@ first view looks over 내 방 toward downtown, high enough to show four of the b
 | Pinch, or the mouse wheel | The camera comes nearer or goes farther |
 | Tap a person, a building or its name, or walk up to a door or a person | The character goes to that place's person, and a talk opens (a second quick tap only hurries it there) |
 
-A talk ignores taps for a moment after it opens, so the finger that opened it cannot also answer it. While a day
-changes into the next, the town takes no taps, drags, pinches or names, and no talk opens, until the morning.
+Downtown, where buildings stand close, the camera looks along the nearest street rather than come too close, and as
+the character reaches a place it comes round to the street side of the door, unless the player turned it on the way.
+A tap on the water walks to the near shore. A talk ignores taps for a moment after it opens, so the finger that opened
+it cannot also answer it. While a day changes into the next, the town takes no taps, drags, pinches or names, and no
+talk opens, until the morning.
 
 Each place has one person, all invented: 하나 at the 카페, 레오 at the 도서관, 수진 at 코워킹, 마커스 at the 회사 desk and
 the neighbour grandmother by the bench at 내 방. A talk shows their name, a small face drawn from their colours, and a
@@ -331,12 +334,15 @@ boundary, Block outlines and Local area boundary, fetched on 2026-10-31 from
 Contains information licensed under the
 [Open Government Licence – Vancouver](https://opendata.vancouver.ca/pages/licence/).
 
-The map data follows that licence and keeps its attribution; the code that makes and reads it is MIT. How to fetch
-the data again and rebuild the map is in [tools/vancouver_map/README.md](tools/vancouver_map/README.md).
+The map data is licensed under that licence (version 1.0), not MIT, and keeps its attribution: on the page, the
+card on how to play shows the statement with a link to the licence, and `MAP-DATA-NOTICE.txt` ships beside the
+script. The code that makes and reads the data is MIT. How to fetch the data again and rebuild the map is in
+[tools/vancouver_map/README.md](tools/vancouver_map/README.md).
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+MIT, except the map data: see [LICENSE](LICENSE), and Map data above for the map. The page carries both notices
+beside its script, `three-LICENSE.txt` and `MAP-DATA-NOTICE.txt`.
 
 The phone screen bundles [Three.js](https://github.com/mrdoob/three.js) 0.169.0, which is also under the MIT
 licence (Copyright © 2010-2024 three.js authors). The build copies its full licence text next to the script, as
