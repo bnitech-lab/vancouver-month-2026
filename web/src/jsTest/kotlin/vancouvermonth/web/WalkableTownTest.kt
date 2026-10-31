@@ -30,6 +30,7 @@ private class SilentTown : WalkableTown {
     override val element = (document.createElement("div") as HTMLElement).also { it.className = "walk-town" }
     override var onPlace: (Place?) -> Unit = {}
     override var onFail: () -> Unit = {}
+    override var onMorning: () -> Unit = {}
     var closed = false
 
     override fun mark(place: Place?) {}

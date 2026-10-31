@@ -97,6 +97,9 @@ class PhoneGame private constructor(
     /** The timer typing the person's line, while it types. */
     private var typing: Int? = null
 
+    /** True from an answer until the town's morning: meanwhile no talk opens. */
+    private var dayChanging = false
+
     fun show() {
         stopTyping()
         val current = month
@@ -352,7 +355,12 @@ class PhoneGame private constructor(
             closeTown()
         } else {
             town?.walkTo(place)
-            walkable?.endDay(place)
+            val walking = walkable
+            if (walking != null) {
+                // Until the morning, the town takes no input and no talk opens.
+                dayChanging = true
+                walking.endDay(place)
+            }
         }
         show()
         window.scrollTo(0.0, 0.0)
@@ -369,10 +377,12 @@ class PhoneGame private constructor(
     /** The town tells the game where the player turns, and when it can no longer draw: then buttons take over. */
     private fun listenTo(town: WalkableTown) {
         playedInTown = true
-        town.onPlace = { place -> if (place != talkingAt) talkTo(place) }
+        town.onPlace = { place -> if (!dayChanging && place != talkingAt) talkTo(place) }
+        town.onMorning = { dayChanging = false }
         town.onFail = {
             walkable = null
             talkingAt = null
+            dayChanging = false
             show()
         }
     }

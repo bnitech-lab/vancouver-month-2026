@@ -32,12 +32,18 @@ interface WalkableTown {
     /** Called once if the town stops drawing, so the game can go on with buttons. */
     var onFail: () -> Unit
 
+    /**
+     * Called when the change of day is over and the character stands at 내 방's door. From [endDay] until then, the
+     * town takes no taps, drags, pinches or names.
+     */
+    var onMorning: () -> Unit
+
     /** Marks the name of [place], as on an interview day, or no name when null. */
     fun mark(place: Place?)
 
     /**
      * Ends a day spent at [place]: a golden evening, a night with the lights on, then morning, with the character
-     * back at 내 방's door. A day of rest is spent on the bench by the campfire.
+     * back at 내 방's door and [onMorning] called. A day of rest is spent on the bench by the campfire.
      */
     fun endDay(place: Place)
 
@@ -74,6 +80,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     override val element = document.createElement("div") as HTMLElement
     override var onPlace: (Place?) -> Unit = {}
     override var onFail: () -> Unit = {}
+    override var onMorning: () -> Unit = {}
 
     private val renderer = WebGLRenderer(json("canvas" to canvas, "context" to context))
     private val scene = Scene()
@@ -110,13 +117,19 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     /** True when the end of the walk should open the place there: a walk the player sent by tapping the ground. */
     private var opensOnArrival = false
 
-    /** When the change of day began, or null outside one. */
+    /** When the change of day began, or null outside one. While it lasts, the town takes no input. */
     private var nightFell: Double? = null
     private var sitting = false
     private var wentHome = false
 
-    /** The player's own turn of the camera, kept while the camera looks at the campfire for the night. */
-    private var turnBeforeRest = 0.0
+    /** How long the change of day takes. A test may shorten it, to play a month quickly. */
+    internal var nightMillis = DayLight.MILLIS
+
+    /**
+     * The player's own turn, tilt and distance of the camera, kept while it looks at the campfire for a night of
+     * rest, to give back in the morning. Null on any other night.
+     */
+    private var viewBeforeRest: Triple<Double, Double, Double>? = null
 
     private var frameAsked = false
     private var lastFrame = 0.0
@@ -257,7 +270,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             label.style.position = "absolute"
             label.style.left = "0"
             label.style.top = "0"
-            label.onclick = { goTalk(venue.place, dash = false) }
+            label.onclick = { if (nightFell == null) goTalk(venue.place, dash = false) }
             element.appendChild(label)
             labels[venue.place] = label
         }
@@ -289,21 +302,23 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     override fun endDay(place: Place) {
         trip = null
         marker.visible = false
+        pointers.clear()
         sitting = place == Place.HOME
         if (sitting) {
-            // The camera comes round to the far side of the fire, to see the character's face in its light.
-            spot = Neighbourhood.benchSeat
-            turnBeforeRest = view.yaw
-            view.aim(FIRESIDE_TURN, view.pitch, view.distance)
+            // The camera comes round to the far side of the fire, near and low, to see the character's face in its
+            // light. The player's own view comes back in the morning.
+            if (viewBeforeRest == null) viewBeforeRest = Triple(view.yaw, view.pitch, view.distance)
+            view.aim(FIRESIDE_TURN, FIRESIDE_TILT, FIRESIDE_DISTANCE)
         }
+        wentHome = false
         if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
             // The phone asks for less motion, so the night passes at once.
-            wakeAtHome(jump = true)
+            goHome(jump = true)
+            morning()
             askForFrame()
             return
         }
         nightFell = window.performance.now()
-        wentHome = false
         askForFrame()
     }
 
@@ -339,15 +354,24 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     internal val isDashing: Boolean
         get() = trip?.speed == Trip.DASH_SPEED
 
-    /** The camera's turn and distance as the player asked, for tests. */
+    internal val isMarkerShown: Boolean
+        get() = marker.visible
+
+    internal val isChangingDay: Boolean
+        get() = nightFell != null
+
+    /** The camera's turn, tilt and distance as asked, for tests. */
     internal val cameraTurn: Double
         get() = view.yaw
+
+    internal val cameraTilt: Double
+        get() = view.pitch
 
     internal val cameraDistance: Double
         get() = view.distance
 
     private fun press(event: PointerEvent) {
-        if (event.button.toInt() != 0) return
+        if (event.button.toInt() != 0 || nightFell != null) return
         pointers[event.pointerId] = event.x to event.y
         if (pointers.size == 1) {
             pressX = event.x
@@ -363,6 +387,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private fun move(event: PointerEvent) {
         val last = pointers[event.pointerId] ?: return
         pointers[event.pointerId] = event.x to event.y
+        if (nightFell != null) return
         if (pointers.size >= 2) {
             // Fingers spreading apart bring the camera nearer; pinching them together takes it farther.
             val gap = gap()
@@ -386,6 +411,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     private fun wheel(event: WheelEvent) {
         event.preventDefault()
+        if (nightFell != null) return
         view.zoom(exp(event.deltaY * WHEEL_ZOOM))
         askForFrame()
     }
@@ -399,7 +425,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     /** A tap at [x], [y] on the page: talk to a place, or walk (on a double tap, dash) to a spot on the ground. */
     private fun tap(x: Double, y: Double) {
         val frame = canvas.getBoundingClientRect()
-        if (frame.width == 0.0 || frame.height == 0.0) return
+        if (frame.width == 0.0 || frame.height == 0.0 || nightFell != null) return
         val dash = taps.isDouble(window.performance.now(), x, y)
         when (val picked = view.pick((x - frame.left) / frame.width, (y - frame.top) / frame.height)) {
             is Picked.AtPlace -> goTalk(picked.place, dash)
@@ -461,7 +487,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val walking = stepWalk(now)
         val night = stepNight(now)
         placeCharacter()
-        val gliding = view.follow(Point(spot.x, FOCUS_HEIGHT, spot.z), millis)
+        val subject = if (sitting) Neighbourhood.benchSeat else spot
+        val gliding = view.follow(Point(subject.x, FOCUS_HEIGHT, subject.z), millis)
         placeCamera()
         try {
             renderer.render(scene, camera)
@@ -502,28 +529,40 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     /** Moves the light through evening, night and morning. True while the change of day goes on. */
     private fun stepNight(now: Double): Boolean {
         val start = nightFell ?: return false
-        val progress = ((now - start) / DayLight.MILLIS).coerceIn(0.0, 1.0)
+        val progress = ((now - start) / nightMillis).coerceIn(0.0, 1.0)
         light(DayLight.at(progress))
         // In the dark the character goes home, unless it spends the night by the fire.
         if (progress >= DayLight.HOME_AT && !wentHome && !sitting) {
             wentHome = true
-            wakeAtHome(jump = true)
+            goHome(jump = true)
         }
         if (progress < 1.0) return true
         nightFell = null
-        if (sitting) wakeAtHome(jump = false)
+        morning()
         return false
     }
 
-    /** The character stands at 내 방's door, facing the street, ready for the day. */
-    private fun wakeAtHome(jump: Boolean) {
-        if (sitting) view.aim(turnBeforeRest, view.pitch, view.distance)
+    /** The character stands at 내 방's door, facing the street; [jump] moves the camera there at once. */
+    private fun goHome(jump: Boolean) {
         sitting = false
         trip = null
+        marker.visible = false
         spot = home.door
         heading = home.facing
-        light(DayLight.MORNING)
         if (jump) view.jumpTo(Point(spot.x, FOCUS_HEIGHT, spot.z))
+    }
+
+    /**
+     * The morning: the character is up at 내 방's door with no walk and no marker, the light is the morning's, the
+     * camera is the player's own again after a night by the fire, and the town takes input again.
+     */
+    private fun morning() {
+        if (sitting) goHome(jump = false)
+        marker.visible = false
+        light(DayLight.MORNING)
+        viewBeforeRest?.let { (turn, tilt, distance) -> view.aim(turn, tilt, distance) }
+        viewBeforeRest = null
+        onMorning()
     }
 
     private fun light(lighting: Lighting) {
@@ -627,8 +666,10 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         const val SHADOW_PIXELS = 1024.0
         const val SHADOW_REACH = 18.0
 
-        /** The camera's turn for a night by the campfire: south of it, looking north at the bench. */
+        /** The camera for a night by the campfire: south of it, near and low, looking north at the bench. */
         const val FIRESIDE_TURN = 0.15
+        const val FIRESIDE_TILT = 0.5
+        const val FIRESIDE_DISTANCE = 9.0
 
         /** How high the body sits so the thighs rest on the bench seat. */
         val SITTING_LIFT = Neighbourhood.SEAT_HEIGHT - (Figures.HIP - 0.09) * Figures.SCALE
