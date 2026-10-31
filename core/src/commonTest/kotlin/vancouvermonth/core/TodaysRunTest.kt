@@ -28,6 +28,14 @@ class TodaysRunTest {
     }
 
     @Test
+    fun `every date from 2000 to 2099 gives the same run number on the JVM and in a browser`() {
+        val seeds = TodaysRun.YEARS.flatMap { daysOf(it) }.map { it.seed }
+        assertEquals(36_525, seeds.size)
+        // One number for all of them, summed the way String.hashCode is, so a single seed that differs changes it.
+        assertEquals(713_364_370, seeds.fold(0) { sum, seed -> sum * 31 + seed })
+    }
+
+    @Test
     fun `neighbouring days get different run numbers, far apart`() {
         val seeds = (daysOf(2026) + daysOf(2027)).map { it.seed }
         for (week in seeds.windowed(7)) {
