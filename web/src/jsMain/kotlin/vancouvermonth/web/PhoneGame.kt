@@ -22,6 +22,7 @@ import vancouvermonth.text.endingLine
 import vancouvermonth.text.eventLine
 import vancouvermonth.text.guessLine
 import vancouvermonth.text.money
+import vancouvermonth.text.parseAmount
 import vancouvermonth.text.passPrices
 import vancouvermonth.text.percent
 import vancouvermonth.text.stageName
@@ -104,10 +105,10 @@ class PhoneGame(
         row.child("span", "dollar", "$")
         val input = row.child("input") as HTMLInputElement
         input.id = "guess"
-        input.type = "number"
-        input.min = "0"
-        input.step = "1"
+        // Text, not number, so "1,300" and "$1,300" reach the same parser the terminal uses in every browser.
+        input.type = "text"
         input.setAttribute("inputmode", "numeric")
+        input.setAttribute("autocomplete", "off")
         input.placeholder = "예: 1200"
         input.value = guess
         if (reveal != null) {
@@ -119,7 +120,7 @@ class PhoneGame(
         submit.type = "submit"
 
         fun refresh() {
-            val amount = parseGuess(guess)
+            val amount = parseAmount(guess)
             hint.textContent = when {
                 picked == null -> "방을 먼저 고르세요."
                 guess.isNotBlank() && amount == null -> "숫자로 적어 주세요. 예: 1200"
@@ -134,7 +135,7 @@ class PhoneGame(
         form.onsubmit = { event ->
             event.preventDefault()
             val index = picked
-            val amount = parseGuess(guess)
+            val amount = parseAmount(guess)
             if (index != null && amount != null) {
                 reveal = game.reveal(index, amount)
                 show()
@@ -264,9 +265,6 @@ class PhoneGame(
         window.scrollTo(0.0, 0.0)
     }
 }
-
-/** A guess is a whole number of dollars, zero or more. */
-fun parseGuess(text: String): Int? = text.trim().toIntOrNull()?.takeIf { it >= 0 }
 
 private fun HTMLElement.child(
     tag: String,

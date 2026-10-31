@@ -1,5 +1,5 @@
-// The Korean wording both screens share: amounts, dates, actions, events and endings. No layout, and no
-// JVM-only APIs, so the terminal and the web screen read the same lines.
+// The Korean wording both screens share: amounts, dates, actions, events and endings, and how a typed amount
+// is read. No layout, and no JVM-only APIs, so the terminal and the web screen read the same lines.
 plugins {
     kotlin("multiplatform")
 }

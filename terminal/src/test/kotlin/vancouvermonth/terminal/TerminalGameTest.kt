@@ -134,15 +134,6 @@ class TerminalGameTest {
     }
 
     @Test
-    fun `amounts may carry a dollar sign or commas`() {
-        assertEquals(1200, parseAmount("1200"))
-        assertEquals(1050, parseAmount("1,050"))
-        assertEquals(1200, parseAmount("$1200"))
-        assertNull(parseAmount("abc"))
-        assertNull(parseAmount("-5"))
-    }
-
-    @Test
     fun `a seed can be given in either form`() {
         assertEquals(4821, parseSeed(arrayOf("--seed", "4821")))
         assertEquals(4821, parseSeed(arrayOf("--seed=4821")))

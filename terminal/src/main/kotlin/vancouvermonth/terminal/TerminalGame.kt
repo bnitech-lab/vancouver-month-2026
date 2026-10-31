@@ -15,6 +15,7 @@ import vancouvermonth.text.endingLine
 import vancouvermonth.text.eventLine
 import vancouvermonth.text.guessLine
 import vancouvermonth.text.money
+import vancouvermonth.text.parseAmount
 import vancouvermonth.text.passPrices
 import vancouvermonth.text.percent
 import vancouvermonth.text.stageName
@@ -186,11 +187,4 @@ fun padToColumns(text: String, columns: Int): String {
 fun parseRoomChoice(text: String, roomCount: Int): Int? {
     val number = text.trim().toIntOrNull() ?: return null
     return if (number in 1..roomCount) number - 1 else null
-}
-
-/** Reads amounts such as "1200", "1,200" or "$1200". Anything else, or a negative number, gives null. */
-fun parseAmount(text: String): Int? {
-    val digits = text.trim().removePrefix("$").replace(",", "")
-    val amount = digits.toIntOrNull() ?: return null
-    return if (amount >= 0) amount else null
 }

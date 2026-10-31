@@ -90,9 +90,11 @@ class PhoneGameTest {
 
         tap("1번 방")
         assertEquals("true", button("1번 방").getAttribute("aria-pressed"))
-        type("-5")
-        assertTrue(button("총비용 확인하기").disabled)
-        assertTrue("숫자로 적어 주세요. 예: 1200" in screen)
+        for (bad in listOf("-5", "abc", "12.5")) {
+            type(bad)
+            assertTrue(button("총비용 확인하기").disabled, bad)
+            assertTrue("숫자로 적어 주세요. 예: 1200" in screen, bad)
+        }
 
         type("1200")
         assertFalse(button("총비용 확인하기").disabled)
@@ -150,11 +152,14 @@ class PhoneGameTest {
     }
 
     @Test
-    fun `a guess is a whole number of dollars`() {
-        assertEquals(1200, parseGuess(" 1200 "))
-        assertEquals(0, parseGuess("0"))
-        assertNull(parseGuess("-5"))
-        assertNull(parseGuess("12.5"))
-        assertNull(parseGuess(""))
+    fun `a guess typed with a comma or a dollar sign reaches the reveal`() {
+        for (typed in listOf("1,300", "\$1,300")) {
+            open(1011)
+            tap("2번 방")
+            type(typed)
+            assertFalse(button("총비용 확인하기").disabled, typed)
+            tap("총비용 확인하기")
+            assertTrue("내 짐작과 차이 \$45+55" in screen, typed)
+        }
     }
 }
