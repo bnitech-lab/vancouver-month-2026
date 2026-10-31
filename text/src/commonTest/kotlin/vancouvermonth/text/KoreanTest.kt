@@ -255,10 +255,13 @@ class KoreanTest {
                 "퀵보드를 샀어요. -\$550",
                 "공유 자전거를 빌렸어요. -\$3",
                 "공유 퀵보드를 빌렸어요. -\$4",
+                "수상버스를 탔어요. -\$4",
+                "택시를 탔어요. -\$4",
             ),
             lines,
         )
         for (line in lines) assertFalse('\u2014' in line, line)
+        assertEquals("택시를 탔어요. -\$23", eventLine(Event.Spent(Spending.TAXI_RIDE, 23), month))
     }
 
     @Test

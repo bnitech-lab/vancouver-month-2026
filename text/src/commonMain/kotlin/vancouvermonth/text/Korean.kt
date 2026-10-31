@@ -120,13 +120,15 @@ fun eventLine(event: Event, month: Month): String = when (event) {
     is Event.Spent -> spentLine(event)
 }
 
-/** Money spent in the town: "자전거를 샀어요. -$350", "공유 퀵보드를 빌렸어요. -$4". */
+/** Money spent in the town: "자전거를 샀어요. -$350", "공유 퀵보드를 빌렸어요. -$4", "택시를 탔어요. -$12". */
 fun spentLine(event: Event.Spent): String {
     val what = when (event.kind) {
         Spending.BIKE -> "자전거를 샀어요."
         Spending.E_SCOOTER -> "퀵보드를 샀어요."
         Spending.SHARED_BIKE_RIDE -> "공유 자전거를 빌렸어요."
         Spending.SHARED_E_SCOOTER_RIDE -> "공유 퀵보드를 빌렸어요."
+        Spending.WATER_BUS_RIDE -> "수상버스를 탔어요."
+        Spending.TAXI_RIDE -> "택시를 탔어요."
     }
     return "$what -${money(event.amount)}"
 }
