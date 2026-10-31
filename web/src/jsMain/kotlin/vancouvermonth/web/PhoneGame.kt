@@ -582,12 +582,17 @@ class PhoneGame private constructor(
                     figure("10월 총비용", money(month.room.totalMonthlyCost))
                 }
                 child("div", "hud-line") {
-                    child(
-                        "p",
-                        "hud-stats",
-                        "영어 ${month.english}/${Month.MAX_SKILL} · 코딩 ${month.coding}/${Month.MAX_SKILL} · " +
+                    child("p", "hud-stats") {
+                        // On a narrow phone the line breaks between two skills, never inside one.
+                        listOf(
+                            "영어 ${month.english}/${Month.MAX_SKILL}",
+                            "코딩 ${month.coding}/${Month.MAX_SKILL}",
                             "체력 ${month.energy}/${Month.MAX_ENERGY}",
-                    )
+                        ).forEachIndexed { index, skill ->
+                            if (index > 0) appendChild(document.createTextNode(" · "))
+                            child("span", text = skill)
+                        }
+                    }
                     townControls()
                 }
                 val interview = month.interview

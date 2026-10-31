@@ -757,6 +757,11 @@ html:has(.walk-town) {
   margin-top: 0;
 }
 
+/* Each skill stays whole when the line wraps on a narrow phone. */
+.hud-stats span {
+  white-space: nowrap;
+}
+
 .hud-controls {
   display: flex;
   flex: none;
