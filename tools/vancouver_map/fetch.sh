@@ -15,7 +15,7 @@ for dataset in shoreline-2002 parks-polygon-representation rapid-transit-lines l
 done
 # Only the blocks around downtown, for the angle of its street grid and the comparison picture.
 curl -sS --fail --max-time 120 -G "$base/block-outlines/exports/geojson" \
-    --data-urlencode "where=in_bbox(geo_point_2d, 49.255, -123.165, 49.320, -123.085)" \
+    --data-urlencode "where=in_bbox(geo_point_2d, 49.250, -123.185, 49.325, -123.075)" \
     -o "$out/block-outlines-downtown.geojson"
 date -u +%Y-%m-%dT%H:%M:%SZ > "$out/fetched-at.txt"
 echo "Fetched into $out"

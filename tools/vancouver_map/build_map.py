@@ -53,6 +53,11 @@ SMALLEST_LAKE = 4
 # How far a simplified line may stray from the real one, in game units.
 SIMPLIFY = 0.35
 
+# A city block is drawn this much smaller on every side than its real outline, so a street of at least one square
+# always runs between two blocks; a block wider or deeper than SPLIT_OVER squares is cut into pieces with lanes.
+BLOCK_INSET = 0.4
+SPLIT_OVER = 9
+
 # The proposed squares for the five places, chosen by the character of each neighbourhood. Each is a rough point in
 # a neighbourhood, never an address: one square here is about 25 m across, so a square stands for a few lots.
 SPOTS = [
@@ -435,6 +440,15 @@ class Sources:
         if len(park) != 1 or park[0]["geometry"]["type"] != "Polygon":
             sys.exit("parks: expected one polygon for the big park")
         self.park_rings = [lonlat_list(r) for r in park[0]["geometry"]["coordinates"]]
+        # The other parks' outlines: a city block inside one is a green, not buildings.
+        self.other_parks = []
+        for f in parks:
+            if f["properties"].get("park_name") == "Stanley Park":
+                continue
+            geometry = f["geometry"]
+            polygons = [geometry["coordinates"]] if geometry["type"] == "Polygon" else geometry["coordinates"]
+            for polygon in polygons:
+                self.other_parks.append(lonlat_list(polygon[0]))
 
         rail = [f for f in load_features(raw, "rapid-transit-lines.geojson")
                 if f["properties"].get("line") == "Expo Line"]
@@ -539,6 +553,75 @@ class Map:
             if len(room) != 25 or any(kind != LAND for kind in room):
                 sys.exit(f"{name}: no room for a building at {(x, z)}")
 
+    def city_blocks(self):
+        """The real city blocks as rectangles of plain land squares: (x, z, width, depth) each, and whether the block
+        lies in a park (a green) or holds buildings. A block is drawn smaller than its outline so streets run between
+        blocks, a block turned off the grid's axes is drawn as a square of the same area, and a very big one is cut."""
+        f = self.frame
+        parks = [[project(*p) for p in ring] for ring in self.sources.other_parks]
+        built, greens = [], []
+        for ring in self.sources.blocks:
+            pts = [f.game(*p) for p in ring]
+            xs = [p[0] for p in pts]
+            zs = [p[1] for p in pts]
+            x0, x1, z0, z1 = min(xs), max(xs), min(zs), max(zs)
+            box = (x1 - x0) * (z1 - z0)
+            area = abs(sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(pts, pts[1:] + pts[:1]))) / 2
+            if box <= 0 or area < 1.0:
+                continue
+            fill = area / box
+            if fill < 0.75:
+                # Turned off the axes (the older streets to the east): a square of the same area round its middle.
+                shrink = math.sqrt(fill)
+                cx, cz = (x0 + x1) / 2, (z0 + z1) / 2
+                x0, x1 = cx - (cx - x0) * shrink, cx + (x1 - cx) * shrink
+                z0, z1 = cz - (cz - z0) * shrink, cz + (z1 - cz) * shrink
+            first_x = math.ceil(x0 + BLOCK_INSET - 0.5)
+            last_x = math.floor(x1 - BLOCK_INSET - 0.5)
+            first_z = math.ceil(z0 + BLOCK_INSET - 0.5)
+            last_z = math.floor(z1 - BLOCK_INSET - 0.5)
+            rect = self.trim_to_land(first_x, first_z, last_x, last_z)
+            if rect is None:
+                continue
+            middle = project(*[sum(c) / len(ring) for c in zip(*ring)])
+            green = any(point_in_ring(middle[0], middle[1], park) for park in parks)
+            for piece in split_rect(*rect):
+                (greens if green else built).append(piece)
+        # Where two outlines overlap once squared off, the larger block keeps the ground.
+        kept = []
+        for rect in sorted(built + greens, key=lambda r: (-r[2] * r[3], r)):
+            if not any(overlaps(rect, other) for other in kept):
+                kept.append(rect)
+        return [r for r in built if r in kept], [r for r in greens if r in kept]
+
+    def trim_to_land(self, x0, z0, x1, z1):
+        """The rectangle of squares x0..x1, z0..z1 cut down from its edges until every square in it is plain land,
+        as (x, z, width, depth), or None when too little is left."""
+        def bad(x, z):
+            return not (0 <= x < self.columns and 0 <= z < self.rows) or self.squares[z][x] != LAND
+        while x0 <= x1 and z0 <= z1:
+            edges = {
+                "west": sum(bad(x0, z) for z in range(z0, z1 + 1)),
+                "east": sum(bad(x1, z) for z in range(z0, z1 + 1)),
+                "north": sum(bad(x, z0) for x in range(x0, x1 + 1)),
+                "south": sum(bad(x, z1) for x in range(x0, x1 + 1)),
+            }
+            worst = max(edges, key=edges.get)
+            if edges[worst] == 0:
+                break
+            if worst == "west":
+                x0 += 1
+            elif worst == "east":
+                x1 -= 1
+            elif worst == "north":
+                z0 += 1
+            else:
+                z1 -= 1
+        width, depth = x1 - x0 + 1, z1 - z0 + 1
+        if width < 1 or depth < 1 or width * depth < 2:
+            return None
+        return x0, z0, width, depth
+
     def walks(self):
         walker = Walker(self.squares, self.columns, self.rows)
         names = [s[0] for s in SPOTS]
@@ -560,6 +643,28 @@ class Map:
         rail = simplify(rail_parts[0], SIMPLIFY) if rail_parts else []
         mountains = [f.game(*p) for p in self.sources.inlet_line]
         return shore_parts, park, rail, mountains
+
+
+def overlaps(a, b):
+    """True when rectangles a and b, each (x, z, width, depth) in squares, share a square."""
+    return a[0] < b[0] + b[2] and b[0] < a[0] + a[2] and a[1] < b[1] + b[3] and b[1] < a[1] + a[3]
+
+
+def split_rect(x, z, width, depth):
+    """A block cut into pieces no wider or deeper than SPLIT_OVER squares, with a lane of one square between them."""
+    def cuts(start, size):
+        if size <= SPLIT_OVER:
+            return [(start, size)]
+        count = math.ceil((size + 1) / (SPLIT_OVER + 1))
+        piece = (size - (count - 1)) // count
+        extra = (size - (count - 1)) - piece * count
+        out, at = [], start
+        for index in range(count):
+            length = piece + (1 if index < extra else 0)
+            out.append((at, length))
+            at += length + 1
+        return out
+    return [(px, pz, pw, pd) for px, pw in cuts(x, width) for pz, pd in cuts(z, depth)]
 
 
 def choose_scale(sources):
@@ -592,6 +697,20 @@ def points_text(points):
 def wrap_points(points, indent, width=112):
     """A long points string split into Kotlin string pieces joined with +."""
     text = points_text(points)
+    room = width - indent - 4
+    pieces = []
+    while len(text) > room:
+        cut = text.rfind(" ", 0, room)
+        pieces.append(text[:cut + 1])
+        text = text[cut + 1:]
+    pieces.append(text)
+    pad = " " * indent
+    return (" +\n" + pad).join(f'"{p}"' for p in pieces)
+
+
+def wrap_rects(rects, indent, width=112):
+    """Rectangles as "x,z,w,d" groups in Kotlin string pieces joined with +."""
+    text = " ".join(f"{x},{z},{w},{d}" for x, z, w, d in rects)
     room = width - indent - 4
     pieces = []
     while len(text) > room:
@@ -666,6 +785,17 @@ def write_kotlin(built, sources, fetched, hashes):
     out.append("     * stand past it, to the north.")
     out.append("     */")
     out.append("    const val MOUNTAINS = " + wrap_points(mountains, 8))
+    out.append("")
+    built_blocks, greens = built.city_blocks()
+    out.append("    /**")
+    out.append("     * The real city blocks, simplified to rectangles of plain land with a street between any two: "
+               "\"x,z,width,depth\"")
+    out.append("     * in squares, west and north sides first. Buildings stand on these.")
+    out.append("     */")
+    out.append("    const val BLOCKS = " + wrap_rects(built_blocks, 8))
+    out.append("")
+    out.append("    /** The city blocks that are small parks, as [BLOCKS]: grass and a few trees. */")
+    out.append("    const val GREENS = " + wrap_rects(greens, 8))
     out.append("")
     out.append("    /** The square proposed for each of the five places. Stage 20b builds them here. */")
     out.append("    val spots: Map<Place, Cell> = mapOf(")
@@ -791,6 +921,10 @@ def write_previews(built, walks, out_dir, png):
     svg.append(f'<rect x="0" y="{-band}" width="{width}" height="{band}" fill="{COLOURS[WATER]}"/>')
     svg.append(mountains_band())
     svg.append(svg_squares(built, px, COLOURS))
+    built_blocks, greens = built.city_blocks()
+    for (x, z, w, d), colour in [(r, "#B7AE9C") for r in built_blocks] + [(r, "#8DBF6A") for r in greens]:
+        svg.append(f'<rect x="{x * px:.1f}" y="{z * px:.1f}" width="{w * px:.1f}" height="{d * px:.1f}" '
+                   f'fill="{colour}"/>')
     for part in shore_parts:
         svg.append(f'<path d="{svg_path(part, px)}" fill="none" stroke="{SHORE_EDGE}" stroke-width="1.2" '
                    f'clip-path="url(#grid)"/>')
@@ -800,7 +934,8 @@ def write_previews(built, walks, out_dir, png):
                f'stroke-width="1.5"/>')
     svg.append("</g>")
     y = legend_top
-    keys = [(COLOURS[WATER], "물"), (COLOURS[LAND], "땅"), (COLOURS[PARK], "큰 공원"),
+    keys = [(COLOURS[WATER], "물"), (COLOURS[LAND], "길"), ("#B7AE9C", "블록"), ("#8DBF6A", "작은 공원"),
+            (COLOURS[PARK], "큰 공원"),
             (COLOURS[SHORE], "물가(방파제 길)"),
             ("#4D7A5E", "건너편 산 (배경)")]
     x = pad
