@@ -218,6 +218,15 @@ class PhoneGameTest {
     }
 
     @Test
+    fun `the copy fallback selects the whole line`() {
+        val line = document.createElement("p") as HTMLElement
+        line.textContent = "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 170/200 · 9월 17일 취업 제안"
+        root.appendChild(line)
+        assertTrue(selectAll(line))
+        assertEquals(line.textContent, getSelection().toString())
+    }
+
+    @Test
     fun `a run from a seed ends without a result line`() {
         open(1011)
         startMonth(room = 3, amount = "1165")

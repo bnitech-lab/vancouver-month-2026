@@ -8,6 +8,7 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLFormElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.HTMLLabelElement
+import org.w3c.dom.Range
 import vancouvermonth.core.Action
 import vancouvermonth.core.Event
 import vancouvermonth.core.FirstMinute
@@ -332,13 +333,11 @@ private fun HTMLElement.result(line: String) {
         val status = child("p", "result-status") { setAttribute("aria-live", "polite") }
 
         fun selectInstead() {
-            status.textContent = "복사하지 못했어요. 선택된 줄을 직접 복사해 주세요."
-            val range = document.createRange()
-            range.selectNodeContents(text)
-            // Kotlin's DOM declarations have no getSelection, so this call goes to JavaScript directly.
-            val selection = window.asDynamic().getSelection()
-            selection.removeAllRanges()
-            selection.addRange(range)
+            status.textContent = if (selectAll(text)) {
+                "복사하지 못했어요. 선택된 줄을 직접 복사해 주세요."
+            } else {
+                "복사하지 못했어요. 줄을 눌러 선택한 뒤 복사해 주세요."
+            }
         }
 
         copy.onclick = {
@@ -354,6 +353,25 @@ private fun HTMLElement.result(line: String) {
         }
     }
 }
+
+/** Selects all of [element]'s text, as a long press would. False when the page has no selection to use. */
+internal fun selectAll(element: HTMLElement): Boolean {
+    val selection = getSelection() ?: return false
+    val range = document.createRange()
+    range.selectNodeContents(element)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    return true
+}
+
+/** The page's text selection. Kotlin's DOM declarations leave it out, so these are the parts this page uses. */
+internal external interface Selection {
+    fun removeAllRanges()
+    fun addRange(range: Range)
+}
+
+/** The browser's own getSelection(), the same function as window.getSelection(). */
+internal external fun getSelection(): Selection?
 
 private fun HTMLElement.point(line: String, points: Int) {
     child("li") {
