@@ -63,10 +63,10 @@ class PatchNotesTest {
         val words = PatchNotes.ALL.flatMap { note -> listOf(note.headline) + note.sections.flatMap { it.second } }
         val makersOnly = listOf("PR", "#", "SwiftShader", "WebGL", "Kotlin", ".kt", "commit", "merge", "instanced")
         for (line in words) {
-            assertFalse('—' in line, "Em dash in: $line")
+            assertFalse('\u2014' in line, "Em dash in: $line")
             for (word in makersOnly) assertFalse(word in line, "\"$word\" in: $line")
         }
-        assertFalse('—' in PatchNotes.markdown())
+        assertFalse('\u2014' in PatchNotes.markdown())
     }
 
     @Test
