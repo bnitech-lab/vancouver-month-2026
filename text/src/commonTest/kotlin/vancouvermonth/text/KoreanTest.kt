@@ -3,6 +3,7 @@ package vancouvermonth.text
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import vancouvermonth.core.Action
+import vancouvermonth.core.Blocked
 import vancouvermonth.core.Dice
 import vancouvermonth.core.Ending
 import vancouvermonth.core.Event
@@ -85,25 +86,20 @@ class KoreanTest {
     }
 
     @Test
-    fun `actions show their effect and why they cannot be taken`() {
+    fun `actions show their effect`() {
         val month = month()
         assertEquals("카페 알바", actionName(Action.WORK))
         assertEquals("면접이 잡힐 확률 27%, 체력 -1", actionEffect(Action.APPLY, month))
         assertEquals("체력 +${Month.REST_GAIN}", actionEffect(Action.REST, month))
-
-        month.take(Action.APPLY)
-        assertEquals("면접이 잡혀 있어요.", whyNot(Action.APPLY, month))
-
-        val tired = month()
-        repeat(Month.MAX_ENERGY) { tired.take(Action.WORK) }
-        assertEquals("체력이 없어요. 쉬어야 해요.", whyNot(Action.WORK, tired))
     }
 
     @Test
-    fun `applications closing late in the month are explained`() {
-        val month = month()
-        while (month.canStillApplyThisMonth) month.take(Action.REST)
-        assertEquals("지금 지원하면 9월 안에 면접을 다 볼 수 없어요.", whyNot(Action.APPLY, month))
+    fun `every reason an action is blocked reads as Korean`() {
+        assertEquals("9월이 끝났어요.", whyNot(Blocked.MONTH_OVER))
+        assertEquals("오늘은 면접 날이에요.", whyNot(Blocked.INTERVIEW_TODAY))
+        assertEquals("체력이 없어요. 쉬어야 해요.", whyNot(Blocked.NO_ENERGY))
+        assertEquals("면접이 잡혀 있어요.", whyNot(Blocked.INTERVIEW_BOOKED))
+        assertEquals("지금 지원하면 9월 안에 면접을 다 볼 수 없어요.", whyNot(Blocked.APPLICATIONS_CLOSED))
     }
 
     @Test

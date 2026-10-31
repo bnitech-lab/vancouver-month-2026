@@ -2,6 +2,7 @@ package vancouvermonth.text
 
 import kotlin.math.roundToInt
 import vancouvermonth.core.Action
+import vancouvermonth.core.Blocked
 import vancouvermonth.core.Ending
 import vancouvermonth.core.Event
 import vancouvermonth.core.FirstMinute
@@ -57,12 +58,13 @@ fun actionEffect(action: Action, month: Month): String = when (action) {
     Action.REST -> "체력 +${Month.REST_GAIN}"
 }
 
-/** Why [action] cannot be taken today. Only meaningful when the month says it cannot. */
-fun whyNot(action: Action, month: Month): String = when {
-    action != Action.REST && month.energy == 0 -> "체력이 없어요. 쉬어야 해요."
-    action == Action.APPLY && month.interview != null -> "면접이 잡혀 있어요."
-    action == Action.APPLY && !month.canStillApplyThisMonth -> "지금 지원하면 9월 안에 면접을 다 볼 수 없어요."
-    else -> "오늘은 할 수 없어요."
+/** Why an action cannot be taken today, from the reason the month gives. */
+fun whyNot(blocked: Blocked): String = when (blocked) {
+    Blocked.MONTH_OVER -> "9월이 끝났어요."
+    Blocked.INTERVIEW_TODAY -> "오늘은 면접 날이에요."
+    Blocked.NO_ENERGY -> "체력이 없어요. 쉬어야 해요."
+    Blocked.INTERVIEW_BOOKED -> "면접이 잡혀 있어요."
+    Blocked.APPLICATIONS_CLOSED -> "지금 지원하면 9월 안에 면접을 다 볼 수 없어요."
 }
 
 /** One line for something that happened on a day. [month] is read after the day, for what it left. */

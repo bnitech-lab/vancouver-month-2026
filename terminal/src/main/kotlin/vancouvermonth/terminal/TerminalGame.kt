@@ -146,9 +146,10 @@ class TerminalGame(
         while (true) {
             val answer = ask("오늘 할 일? (1-${actions.size}) > ") ?: return null
             val index = parseRoomChoice(answer, actions.size)
+            val blocked = index?.let { month.blockedBy(actions[it]) }
             when {
                 index == null -> line("1부터 ${actions.size} 사이의 번호로 골라 주세요.")
-                !month.canTake(actions[index]) -> line("지금은 못 해요. ${whyNot(actions[index], month)}")
+                blocked != null -> line("지금은 못 해요. ${whyNot(blocked)}")
                 else -> return actions[index]
             }
         }
@@ -171,7 +172,7 @@ private fun describe(room: Room): String =
     "월세 ${money(room.rent).padStart(6)}   교통 ${room.zone.number}구역   ${utilitiesLabel(room)}"
 
 private fun describe(action: Action, month: Month): String {
-    val note = if (month.canTake(action)) "" else "   (${whyNot(action, month)})"
+    val note = month.blockedBy(action)?.let { "   (${whyNot(it)})" } ?: ""
     return padToColumns(actionName(action), 14) + actionEffect(action, month) + note
 }
 

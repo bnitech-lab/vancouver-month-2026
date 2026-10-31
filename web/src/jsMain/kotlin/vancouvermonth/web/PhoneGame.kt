@@ -209,12 +209,12 @@ class PhoneGame(
             } else {
                 child("h2", text = "오늘 할 일 하나")
                 for (action in Action.entries) {
-                    val allowed = month.canTake(action)
+                    val blocked = month.blockedBy(action)
                     button("action") {
-                        disabled = !allowed
+                        disabled = blocked != null
                         child("span", "action-name", actionName(action))
                         child("span", "action-effect", actionEffect(action, month))
-                        if (!allowed) child("span", "action-why", whyNot(action, month))
+                        if (blocked != null) child("span", "action-why", whyNot(blocked))
                         onclick = { spend(month) { take(action) } }
                     }
                 }
