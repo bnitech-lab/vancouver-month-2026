@@ -56,7 +56,7 @@ class TransitTest {
             "캐나다 라인", "트랜스링크", "컴퍼스", "아쿠아버스", "페리", "옐로", "캡", "체커", "블랙 탑", "우버", "리프트",
         )
         for (line in every) {
-            assertFalse('—' in line, line)
+            assertFalse('\u2014' in line, line)
             for (name in real) assertFalse(name in line, "$name in $line")
         }
     }
