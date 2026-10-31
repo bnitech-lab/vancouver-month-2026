@@ -19,7 +19,8 @@ internal class FirstRunGuide(private val memory: Memory) {
     val isOpen: Boolean
         get() = shown?.isConnected == true
 
-    private val onKey: (Event) -> Unit = { event -> key(event as KeyboardEvent) }
+    // A page or an extension may send a plain Event named "keydown"; only a real key press is read.
+    private val onKey: (Event) -> Unit = { event -> (event as? KeyboardEvent)?.let { key(it) } }
 
     /** Opens the card over [root], unless it was closed on an earlier visit. */
     fun openFirstTime(root: HTMLElement) {

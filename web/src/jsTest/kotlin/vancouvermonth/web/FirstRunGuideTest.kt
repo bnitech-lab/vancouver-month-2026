@@ -8,9 +8,11 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.browser.document
+import kotlinx.browser.window
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.asList
+import org.w3c.dom.events.Event
 import org.w3c.dom.events.KeyboardEvent
 import org.w3c.dom.events.KeyboardEventInit
 import vancouvermonth.text.Guide
@@ -20,8 +22,12 @@ import vancouvermonth.text.goalLine
 class FirstRunGuideTest {
     private val root = (document.createElement("main") as HTMLElement).also { document.body!!.appendChild(it) }
 
+    private val guides = mutableListOf<FirstRunGuide>()
+
     @AfterTest
     fun removeScreen() {
+        // A card left open would keep listening for keys on the page after the test.
+        guides.forEach { it.close() }
         root.remove()
         for (left in document.querySelectorAll(".walk-town").asList()) (left as HTMLElement).remove()
     }
@@ -32,7 +38,7 @@ class FirstRunGuideTest {
     private fun startMonth(store: KeyValueStore, inTown: Boolean = true) {
         root.innerHTML = ""
         val game = PhoneGame(root, 1011, playAgain = {}, makeWalkableTown = { if (inTown) town else null })
-        game.guide = FirstRunGuide(Memory { store })
+        game.guide = FirstRunGuide(Memory { store }).also { guides += it }
         game.talkSettleMillis = 0.0
         game.show()
         startSeed1011(root)
@@ -125,6 +131,25 @@ class FirstRunGuideTest {
         (root.querySelector(".talk .spend") as HTMLButtonElement).click()
         assertTrue("9월 2일에 있었던 일" in root.textContent.orEmpty())
         assertNotNull(helpButton())
+        assertNull(card)
+    }
+
+    @Test
+    fun `a plain event named keydown leaves the card open and breaks nothing`() {
+        startMonth(FakeStore())
+        // An error in a listener does not reach the one who sent the event; the page reports it to the window.
+        val errors = mutableListOf<String>()
+        val onError: (Event) -> Unit = { errors += it.asDynamic().message.toString() }
+        window.addEventListener("error", onError)
+        try {
+            document.dispatchEvent(Event("keydown"))
+            document.body!!.dispatchEvent(Event("keydown", js("({ bubbles: true })")))
+        } finally {
+            window.removeEventListener("error", onError)
+        }
+        assertEquals(emptyList(), errors)
+        assertNotNull(card)
+        press("Escape")
         assertNull(card)
     }
 }
