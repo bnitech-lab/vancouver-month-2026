@@ -317,7 +317,7 @@ a test (`PatchNotesFileTest`) fails when the two differ. **Every change players 
    `2026-11-01`, a headline, and at least one line under `added`, `improved`, `fixed` or `known`. Write to players in
    short, friendly Korean: no pull request numbers, file names or tools, and no em dash.
 2. Bump `CURRENT` to that version. Players who opened the notes on an older version see the dot again.
-3. Write the file again: `UPDATE_PATCH_NOTES=1 ./gradlew :text:jvmTest --tests '*PatchNotesFileTest*'`.
+3. Write the file again: `UPDATE_PATCH_NOTES=1 ./gradlew :text:jvmTest --tests '*PatchNotesFileTest*' --rerun`.
 
 `PatchNotesTest` checks the order (newest first, each version newer than the one below it), the dates, that `CURRENT`
 is the newest, and the lines' widths and words.

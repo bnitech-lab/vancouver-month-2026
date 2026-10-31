@@ -7,7 +7,7 @@ import kotlin.test.assertEquals
 /**
  * PATCH_NOTES.md at the repository's root is the patch notes as [PatchNotes.markdown] writes them, so the file and the
  * game never say different things. After changing the notes, write the file again with
- * `UPDATE_PATCH_NOTES=1 ./gradlew :text:jvmTest --tests '*PatchNotesFileTest*'`.
+ * `UPDATE_PATCH_NOTES=1 ./gradlew :text:jvmTest --tests '*PatchNotesFileTest*' --rerun`.
  */
 class PatchNotesFileTest {
     @Test
@@ -22,7 +22,7 @@ class PatchNotesFileTest {
             expected,
             written,
             "PATCH_NOTES.md differs from PatchNotes.kt. Write it again with " +
-                "UPDATE_PATCH_NOTES=1 ./gradlew :text:jvmTest --tests '*PatchNotesFileTest*'",
+                "UPDATE_PATCH_NOTES=1 ./gradlew :text:jvmTest --tests '*PatchNotesFileTest*' --rerun",
         )
     }
 }
