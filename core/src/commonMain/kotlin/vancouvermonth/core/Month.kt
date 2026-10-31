@@ -1,6 +1,7 @@
 package vancouvermonth.core
 
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /** What the player can do with one day. */
 enum class Action { WORK, STUDY_ENGLISH, PRACTISE_CODING, APPLY, REST }
@@ -45,22 +46,37 @@ enum class Blocked {
 enum class Item { BIKE, E_SCOOTER }
 
 /**
- * What money can go on in the town without spending a day: something to keep ([buys]), or one ride's fare. Each has
- * a fixed [price]; all of them are invented. A ride that is free with the month's pass (the SkyTrain, the bus) needs
- * no spending at all.
+ * What money can go on in the town without spending a day: something to keep ([buys]), or one ride's fare. Each costs
+ * [price]; a taxi's fare depends on the trip, so it may cost anything from its [price] up to [most] ([TaxiFare]). All
+ * of them are invented. A ride that is free with the month's pass (the SkyTrain, the bus) needs no spending at all.
  */
-enum class Spending(val price: Int, val buys: Item? = null) {
+enum class Spending(val price: Int, val buys: Item? = null, val most: Int = price) {
     BIKE(350, Item.BIKE),
     E_SCOOTER(550, Item.E_SCOOTER),
     SHARED_BIKE_RIDE(3),
     SHARED_E_SCOOTER_RIDE(4),
+    WATER_BUS_RIDE(4),
+    TAXI_RIDE(TaxiFare.BASE, most = TaxiFare.MOST),
     ;
 
-    /**
-     * True when [amount] is what this costs. A fare that depends on the trip (a taxi's, say) would check its own rule
-     * here; [Month.spend] already takes the amount.
-     */
-    fun costs(amount: Int): Boolean = amount == price
+    /** True when [amount] is what this costs: its price, or for a taxi any fare its meter can show. */
+    fun costs(amount: Int): Boolean = amount in price..most
+}
+
+/**
+ * A taxi's fare: [BASE] dollars, and [PER_TEN_SQUARES] more for every ten squares of the town's map driven (a square
+ * stands for 25 m), rounded to the dollar; the meter stops at [MOST]. Invented, like every price in the game.
+ */
+object TaxiFare {
+    const val BASE = 4
+    const val PER_TEN_SQUARES = 1.5
+    const val MOST = 60
+
+    /** The fare for a drive of [squares] squares along the streets. */
+    fun forDistance(squares: Double): Int {
+        val fare = (BASE + squares.coerceAtLeast(0.0) / 10 * PER_TEN_SQUARES).roundToInt()
+        return fare.coerceAtMost(MOST)
+    }
 }
 
 /** Why money cannot be spent now. */

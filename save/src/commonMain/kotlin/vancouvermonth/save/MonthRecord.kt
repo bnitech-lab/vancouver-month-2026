@@ -65,8 +65,9 @@ data class MonthRecord(
      * The month rebuilt from the record, with the same rooms and the same luck a fresh start has, then each move
      * played again in order. Null when it cannot be: today's run under another seed, a room that is not there, a
      * negative guess, a move the rules refuse (the interview on a day without one, an action the player had no energy
-     * for, a day after the month ended, a spend for another amount than its price, on what was already bought, or
-     * with too little money), or a month that ends with the last day, which leaves nothing to continue.
+     * for, a day after the month ended, a spend for another amount than its price or than a taxi's meter can show, on
+     * what was already bought, or with too little money), or a month that ends with the last day, which leaves nothing
+     * to continue.
      */
     fun replay(): ReplayedMonth? {
         if (today != null && today.seed != seed) return null
@@ -91,7 +92,10 @@ data class MonthRecord(
     }
 
     companion object {
-        /** Goes up whenever this line or the rules change so that an older record would play out differently. */
+        /**
+         * Goes up whenever this line or the rules change so that an older record would play out differently. A new
+         * kind of spend with a letter of its own does not: every older line still reads and plays out as before.
+         */
         const val VERSION = 2
 
         private const val SEPARATOR = "|"
@@ -114,6 +118,8 @@ data class MonthRecord(
             Spending.E_SCOOTER -> 'k'
             Spending.SHARED_BIKE_RIDE -> 's'
             Spending.SHARED_E_SCOOTER_RIDE -> 'q'
+            Spending.WATER_BUS_RIDE -> 'w'
+            Spending.TAXI_RIDE -> 't'
         }
 
         private val SPEND_LETTERS = Spending.entries.associateBy { letterOf(it) }
