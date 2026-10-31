@@ -1182,6 +1182,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val numbers = glowing.instanceMatrix.array
         numbers[index * 16 + 5] = (box.height * shrink).toFloat()
         numbers[index * 16 + 13] = ((box.y + box.height / 2) * shrink).toFloat()
+        // Only this box's numbers go to the graphics card again, not all the glass.
+        glowing.instanceMatrix.addUpdateRange(index * 16, 16)
         glowing.instanceMatrix.needsUpdate = true
     }
 
@@ -1192,6 +1194,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val numbers = mesh.instanceMatrix.array
         numbers[at + 5] = height.toFloat()
         numbers[at + 13] = (bottom + height / 2).toFloat()
+        mesh.instanceMatrix.addUpdateRange(at, 16)
         mesh.instanceMatrix.needsUpdate = true
     }
 
