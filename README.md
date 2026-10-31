@@ -237,7 +237,7 @@ rest), and on a small phone the log gives up its last lines before a talk would 
 button screen there is no shop and no riding.
 
 The SkyTrain, a bus, a water bus and taxis take the character across town, still without spending a day. The SkyTrain
-has four stations, named for their part of town: 다운타운역 under downtown, 경기장역 (the station by the tunnel's mouth,
+has four stations, named for their part of town: 다운타운역 under downtown, 터널 입구역 (the station by the tunnel's mouth,
 as before), 크릭 끝역 past the head of False Creek, and 동쪽역 out east, each up on the line with an entrance on the
 ground under its platform, but the first, whose entrance stands on a downtown street. A tap on a station's building
 walks the character to its door, and a card lists the other stations; the train comes in, the camera follows it along
@@ -246,8 +246,8 @@ steps out at the station chosen. A bus runs a loop on its own along the West End
 stops (공원 입구, 쇼핑 거리, 다운타운, 다운타운 남쪽, 웨스트엔드), each a shelter and a sign; a tap on one offers the
 others, and a bus takes the character there the shorter way round. Both are free with the month's pass, which the room's
 total already pays. A water bus crosses False Creek between three docks (카페 앞 by the café, 남쪽 기슭 on the far shore,
-크릭 끝 near its head) for $4 a ride, the character standing on its deck. 택시 부르기 on the top card, whenever no talk is
-open, lists the five places, the bike shop and the four stations with each fare: $4 and $1.50 for every ten squares
+크릭 끝 near its head) for $4 a ride, the character standing on its open deck. 택시 부르기 on the top card, whenever the
+character is on foot and no talk is open, lists the five places, the bike shop and the four stations with each fare: $4 and $1.50 for every ten squares
 along the streets, to the dollar (the meter would stop at $60, which no trip in town reaches); a taxi appears where the
 character stands and drives there fast, and its 내리기 lets the character out on the way. A fare is paid through core
 when the ride sets off and only then, heads that day's log ("수상버스를 탔어요. -$4", "택시를 탔어요. -$12"), is kept
