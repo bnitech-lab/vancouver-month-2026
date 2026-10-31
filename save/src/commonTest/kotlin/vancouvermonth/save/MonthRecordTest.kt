@@ -10,7 +10,10 @@ import vancouvermonth.core.Action
 import vancouvermonth.core.Ending
 import vancouvermonth.core.Event
 import vancouvermonth.core.FirstMinute
+import vancouvermonth.core.Interview
+import vancouvermonth.core.InterviewStage
 import vancouvermonth.core.Month
+import vancouvermonth.core.Skill
 import vancouvermonth.core.TodaysRun
 
 class MonthRecordTest {
@@ -168,6 +171,50 @@ class MonthRecordTest {
         if (month.canTake(Action.APPLY) && random.nextInt(3) == 0) return apply
         val legal = Action.entries.filter { month.canTake(it) }
         return Choice.Take(legal[random.nextInt(legal.size)])
+    }
+
+    /**
+     * Lines kept by this version, with the month each one replays to, written down by hand. If core's rules change
+     * (a price, a chance, a delay, the rooms, or Kotlin's Random), a kept line would replay to another month than the
+     * player left, so this fails and asks for a new [MonthRecord.VERSION], which drops the old lines instead.
+     */
+    @Test
+    fun `kept lines replay to the very months they were kept from`() {
+        val changed = "core's rules changed: bump MonthRecord.VERSION, then update these numbers"
+        val phoneScreen = Interview(InterviewStage.PHONE_SCREEN, 11)
+        val technical = Interview(InterviewStage.TECHNICAL, 13)
+        val golden = listOf(
+            // Study, work, code.
+            "1|1011||2|1165|EWC" to listOf(
+                5, 1_825, 2, 4, 2, null, 1_165,
+                listOf(Event.SkillUp(Skill.CODING, 4), Event.LivingCost(40)),
+            ),
+            // Four days of English, two of rest, and an application that books a phone screen.
+            "1|1002||1|1325|EEEERRA" to listOf(
+                9, 1_395, 5, 3, 4, phoneScreen, 1_325,
+                listOf(Event.Applied(phoneScreen), Event.LivingCost(40)),
+            ),
+            // Rest until the phone screen, pass it, and a technical interview is booked.
+            "1|1002||1|1325|EEEERRARRI" to listOf(
+                12, 1_275, 5, 3, 5, technical, 1_325,
+                listOf(Event.InterviewHeld(InterviewStage.PHONE_SCREEN, true, technical), Event.LivingCost(40)),
+            ),
+            // Rest a day and fail the technical interview.
+            "1|1002||1|1325|EEEERRARRIRI" to listOf(
+                14, 1_195, 5, 3, 5, null, 1_325,
+                listOf(Event.InterviewHeld(InterviewStage.TECHNICAL, false, null), Event.LivingCost(40)),
+            ),
+        )
+        for ((line, expected) in golden) {
+            val replayed = assertNotNull(MonthRecord.decode(line)?.replay(), "$changed ($line no longer replays)")
+            val month = replayed.month
+            val actual = listOf(
+                month.day, month.balance, month.english, month.coding, month.energy, month.interview,
+                month.room.totalMonthlyCost, replayed.lastEvents,
+            )
+            assertEquals(expected, actual, "$changed ($line)")
+            assertEquals(FirstMinute.MAX_SCORE, replayed.reveal.score, "$changed ($line)")
+        }
     }
 
     @Test
