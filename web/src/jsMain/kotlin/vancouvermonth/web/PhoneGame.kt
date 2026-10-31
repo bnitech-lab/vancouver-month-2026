@@ -605,7 +605,8 @@ class PhoneGame private constructor(
         town.onStop = { stop -> if (!dayChanging && town.travelling == null) choose(stop.transport, stop.index) }
         town.onTravelled = {
             travelPaid = null
-            focusNext = ".hud"
+            // Not out from under the guide, if it was opened on the way.
+            if (guide?.isOpen != true) focusNext = ".hud"
             show()
         }
         town.onMorning = { dayChanging = false }
@@ -1001,6 +1002,7 @@ class PhoneGame private constructor(
                 child("strong", text = title)
             }
             child("p", "talk-line", Transit.where(transport))
+            if (transport == Transport.TAXI && taxiFares.all { it == null }) child("p", "chooser-empty", Transit.NOWHERE)
             child("div", "keywords chooser-list") {
                 for (index in 0 until TransitLines.count(transport)) {
                     if (index == from) continue

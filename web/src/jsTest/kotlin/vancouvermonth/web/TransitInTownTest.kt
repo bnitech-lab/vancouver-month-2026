@@ -173,6 +173,16 @@ class TransitInTownTest {
         check()
     }
 
+    /** Ready once [millis] have passed since the step before was done. */
+    private fun after(millis: Double): () -> Boolean {
+        var since: Double? = null
+        return {
+            val now = Date.now()
+            val start = since ?: now.also { since = it }
+            now - start >= millis
+        }
+    }
+
     /** True once the ride is over and nothing of the player's moves. */
     private fun arrived(town: NeighbourhoodScene): () -> Boolean = { town.travelling == null && town.isStill }
 
@@ -188,7 +198,7 @@ class TransitInTownTest {
             Step("tap its building", { town.isStill }) {
                 tapStop(town, from)
                 assertNotNull(chooser(), "the chooser opens at once at the station: $screen")
-                assertTrue("스카이트레인 · 경기장역" in chooser()!!.textContent.orEmpty())
+                assertTrue("스카이트레인 · 터널 입구역" in chooser()!!.textContent.orEmpty())
                 assertTrue(Transit.PASS in goButton("크릭 끝역").textContent.orEmpty())
                 assertNull(chooser()!!.querySelector(".go:disabled"))
                 goButton("크릭 끝역").click()
@@ -197,7 +207,7 @@ class TransitInTownTest {
                 assertTrue(Transit.riding(Transport.SKYTRAIN, null) in hud(), hud())
                 assertNull(chooser())
             },
-            Step("on the line, the camera with the train", { town.characterSpot.x > 212.0 }) {
+            Step("on the line, the camera with the train", { town.travelling != null && town.characterSpot.x > 212.0 }) {
                 aboard = true
                 assertFalse(town.isCharacterShown, "the character rides inside")
                 val nearest = (0..120).minOf { distanceBetween(town.characterSpot, Neighbourhood.guideway.spotAt(it * 0.5)) }
@@ -231,7 +241,7 @@ class TransitInTownTest {
             Step("tap it and ride east", { town.isStill }) {
                 tapStop(town, from)
                 assertTrue("스카이트레인 · 다운타운역" in chooser()?.textContent.orEmpty(), screen)
-                goButton("경기장역").click()
+                goButton("터널 입구역").click()
                 assertEquals(Transport.SKYTRAIN, town.travelling)
             },
             Step("underground, the camera at the entrance", { town.travelling != null && !town.isCharacterShown }) {
@@ -251,6 +261,94 @@ class TransitInTownTest {
     }
 
     @Test
+    fun `from the station by the tunnel west into it, the camera cuts to the entrance under downtown`(): Promise<Unit> {
+        val town = startInTown()
+        val from = Stop(Transport.SKYTRAIN, 1)
+        val downtown = TransitLines.stations[0].door
+        return play(
+            Step("stand at the station by the tunnel", { town.isStill }) { standAt(town, from, 0.0) },
+            Step("ride west", { town.isStill }) {
+                tapStop(town, from)
+                goButton("다운타운역").click()
+                assertEquals(Transport.SKYTRAIN, town.travelling)
+            },
+            Step("into the tunnel: the camera at the entrance", {
+                town.travelling != null && town.characterSpot == downtown
+            }) {
+                assertFalse(town.isCharacterShown)
+            },
+            Step("out under downtown, the camera at the door", arrived(town)) {
+                assertEquals(downtown, town.characterSpot)
+                assertTrue(town.isCharacterShown)
+                val door = onScreen(town, Point(downtown.x, 1.0, downtown.z))
+                assertTrue(kotlin.math.abs(door.left - 0.5) < 0.05 && kotlin.math.abs(door.top - 0.5) < 0.05, "$door")
+                assertTrue(money(firstBalance) in hud(), hud())
+            },
+        )
+    }
+
+    @Test
+    fun `내리기 lets the character out of the taxi on the street, where a tap walks it on`(): Promise<Unit> {
+        val town = startInTown()
+        val route = Neighbourhood.grid.route(Neighbourhood.venue(Place.HOME).door, Neighbourhood.shop.door)
+        val paid = TaxiFare.forDistance(route.zipWithNext { a, b -> distanceBetween(a, b) }.sum())
+        return play(
+            Step("a taxi toward the bike shop", { town.isStill }) {
+                root.button(Transit.CALL_TAXI).click()
+                goButton("자전거 가게").click()
+                assertEquals(Transport.TAXI, town.travelling)
+                assertTrue(money(firstBalance - paid) in hud(), hud())
+            },
+            Step("on the way, get out", {
+                town.travelling != null && town.vehicleAt(Transport.TAXI) != null && town.characterSpot.x > 121.0
+            }) {
+                root.button("내리기").click()
+                assertNull(town.travelling)
+                assertTrue(town.isCharacterShown)
+                val cell = Neighbourhood.grid.cellAt(town.characterSpot)
+                assertTrue(Neighbourhood.grid.isFree(cell), "out at ${town.characterSpot}")
+                assertFalse("타는 중" in hud(), hud())
+                assertTrue(money(firstBalance - paid) in hud(), "nothing more paid: ${hud()}")
+            },
+            Step("a tap walks on", { town.isStill }) {
+                val here = town.characterSpot
+                tapScreen(town, onScreen(town, Point(here.x, 0.0, here.z - 2.0)))
+                assertNotNull(town.markerSpot, "no walk after getting out")
+            },
+        )
+    }
+
+    @Test
+    fun `a ride while the page is hidden draws nothing, and is over at the first frame back`(): Promise<Unit> {
+        val town = startInTown()
+        val from = Stop(Transport.WATER_BUS, 0)
+        val docks = TransitLines.docks
+        val (way, distance) = Journey.roundLoop(TransitLines.boatLoop, docks[0].along, docks[1].along, Journey.GOING_ON)
+        val ride = Journey(Transport.WATER_BUS, way, distance, docks[1].wait, Journey.BOAT_SPEED, Journey.BOAT_RAMP)
+        var drawn = 0
+        return play(
+            Step("stand at the café's dock", { town.isStill }) { standAt(town, from, PI / 2) },
+            Step("set off, and the page is hidden", { town.isStill }) {
+                tapStop(town, from)
+                goButton("남쪽 기슭").click()
+                town.pageHidden = { true }
+                drawn = town.framesDrawn
+            },
+            Step("hidden past the whole ride", after(ride.millis + 300.0)) {
+                assertTrue(town.framesDrawn <= drawn + 1, "drew ${town.framesDrawn - drawn} frames while hidden")
+                assertEquals(Transport.WATER_BUS, town.travelling)
+                town.pageHidden = { false }
+                document.dispatchEvent(Event("visibilitychange"))
+            },
+            Step("back on screen: out on the far shore", { town.travelling == null }) {
+                assertEquals(docks[1].wait, town.characterSpot)
+                assertFalse("타는 중" in hud(), hud())
+                assertTrue(money(firstBalance - 4) in hud(), hud())
+            },
+        )
+    }
+
+    @Test
     fun `the bus from 웨스트엔드 round the corner to the park, along the streets, on the pass`(): Promise<Unit> {
         val town = startInTown()
         val from = Stop(Transport.BUS, 4)
@@ -265,7 +363,7 @@ class TransitInTownTest {
                 goButton("공원 입구").click()
                 assertEquals(Transport.BUS, town.travelling)
             },
-            Step("on the bus", { town.vehicleAt(Transport.BUS) != null && town.characterSpot.x < 106.0 }) {
+            Step("on the bus", { town.travelling != null && town.vehicleAt(Transport.BUS) != null && town.characterSpot.x < 106.0 }) {
                 seen = true
                 assertFalse(town.isCharacterShown)
                 val bus = assertNotNull(town.vehicleAt(Transport.BUS))
@@ -303,7 +401,9 @@ class TransitInTownTest {
                 assertTrue(Transit.riding(Transport.WATER_BUS, 4) in hud(), hud())
                 assertTrue(store.items[SaveSlot.KEY].orEmpty().endsWith("|w4"), store.items[SaveSlot.KEY])
             },
-            Step("on the water", { town.vehicleAt(Transport.WATER_BUS) != null && town.characterSpot.x > 202.0 }) {
+            Step("on the water", {
+                town.travelling != null && town.vehicleAt(Transport.WATER_BUS) != null && town.characterSpot.x > 202.0
+            }) {
                 assertTrue(town.isCharacterShown, "standing on the deck")
                 val boat = assertNotNull(town.vehicleAt(Transport.WATER_BUS))
                 assertEquals(Terrain.WATER, RealVancouver.map.terrainAt(Neighbourhood.grid.cellAt(boat)))
@@ -337,7 +437,7 @@ class TransitInTownTest {
                 assertTrue(money(firstBalance - fare) in hud(), hud())
                 assertTrue(Transit.riding(Transport.TAXI, fare) in hud(), hud())
             },
-            Step("in the taxi", { town.vehicleAt(Transport.TAXI) != null && town.characterSpot.x > 125.0 }) {
+            Step("in the taxi", { town.travelling != null && town.vehicleAt(Transport.TAXI) != null && town.characterSpot.x > 125.0 }) {
                 assertFalse(town.isCharacterShown)
                 assertTrue(Neighbourhood.grid.isFree(Neighbourhood.grid.cellAt(town.characterSpot)))
             },
@@ -398,7 +498,7 @@ class TransitInTownTest {
                 goButton("공원 입구").click()
                 assertEquals(Transport.BUS, town.travelling)
             },
-            Step("on the way, try every way to a talk", { town.characterSpot.x < 110.0 }) {
+            Step("on the way, try every way to a talk", { town.travelling != null && town.characterSpot.x < 110.0 }) {
                 val name = root.querySelectorAll(".place-name").asList().map { it as HTMLButtonElement }
                     .first { it.textContent == Place.HOME.label }
                 name.click()

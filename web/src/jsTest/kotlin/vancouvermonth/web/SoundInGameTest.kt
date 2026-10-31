@@ -54,8 +54,12 @@ internal class QuietTown : WalkableTown {
 
     override fun taxiDistance(to: Spot): Double? = taxiSquares
 
+    /** False to make the town refuse to set off, as by night or away from the stop. */
+    var canTravelNow = true
+
     /** As the real town: not while already travelling. The character stands for one at any stop. */
-    override fun canTravel(transport: Transport, from: Int, to: Int): Boolean = travelling == null && from != to
+    override fun canTravel(transport: Transport, from: Int, to: Int): Boolean =
+        canTravelNow && travelling == null && from != to
 
     override fun travel(transport: Transport, from: Int, to: Int) {
         if (!canTravel(transport, from, to)) return

@@ -779,6 +779,8 @@ html:has(.walk-town) {
   padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom));
   /* Fingers pass through to the town, except on the talk. */
   pointer-events: none;
+  /* The cards over the town are laid out by the town's size: the chooser's list by the room on a small phone. */
+  container-type: size;
 }
 
 .over-town > * {
@@ -1126,7 +1128,7 @@ html:has(.walk-town) {
 }
 
 .chooser-list {
-  max-height: 34vh;
+  max-height: 34cqh;
   margin-bottom: 8px;
   overflow-y: auto;
   touch-action: pan-y;
@@ -1144,8 +1146,38 @@ html:has(.walk-town) {
   border-radius: 14px;
 }
 
+.keyword.go .action-name,
+.keyword.go .action-effect {
+  white-space: nowrap;
+}
+
 .keyword.go .action-effect {
   color: inherit;
+}
+
+/* On a narrow phone, one place to a row, so no name or fare is broken across two lines, and the rows a little lower. */
+@container (max-width: 359px) {
+  .chooser-list {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .keyword.go {
+    min-height: 40px;
+  }
+}
+
+/* On a short screen, or a phone turned on its side, the list takes less of it, so the card leaves the small map be. */
+@container (max-height: 640px) {
+  .chooser-list {
+    max-height: 18cqh;
+  }
+}
+
+.chooser-empty {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: var(--talk-muted);
 }
 
 .keyword.go .action-why {

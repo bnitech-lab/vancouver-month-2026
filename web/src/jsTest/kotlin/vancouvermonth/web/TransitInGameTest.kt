@@ -55,7 +55,7 @@ class TransitInGameTest {
         town.onStop(Stop(Transport.SKYTRAIN, 1))
         assertEquals(listOf("다운타운역", "크릭 끝역", "동쪽역"), goButtons().map { it.querySelector(".action-name")?.textContent })
         assertTrue(goButtons().all { Transit.PASS in it.textContent.orEmpty() && !it.disabled })
-        assertEquals("스카이트레인 · 경기장역", root.querySelector(".chooser")?.getAttribute("aria-label"))
+        assertEquals("스카이트레인 · 터널 입구역", root.querySelector(".chooser")?.getAttribute("aria-label"))
         // No taxi while the chooser lies over the town.
         assertFalse(Transit.CALL_TAXI in hud())
         root.button(Transit.STOP).click()
@@ -85,6 +85,38 @@ class TransitInGameTest {
         assertFalse("타는 중" in hud())
         val kept = assertNotNull(MonthRecord.decode(store.items[SaveSlot.KEY]))
         assertTrue(kept.encode().endsWith("|w4"), kept.encode())
+    }
+
+    @Test
+    fun `when the town cannot set off, a fare is not paid, kept or logged`() {
+        val town = QuietTown()
+        started(town)
+        val keptBefore = store.items[SaveSlot.KEY]
+        town.canTravelNow = false
+        town.onStop(Stop(Transport.WATER_BUS, 0))
+        goButton("남쪽 기슭").click()
+        root.button(Transit.STOP).click()
+        root.button(Transit.CALL_TAXI).click()
+        goButton("회사").click()
+        assertNull(town.travelling)
+        assertTrue(money(start) in hud(), hud())
+        assertEquals(keptBefore, store.items[SaveSlot.KEY])
+        // Nothing heads the next day's log either.
+        root.button(Transit.STOP).click()
+        town.onPlace(Place.HOME)
+        assertNotNull(root.querySelector(".talk .spend") as? HTMLButtonElement).click()
+        val log = root.querySelector(".log")?.textContent.orEmpty()
+        assertFalse("탔어요" in log, log)
+    }
+
+    @Test
+    fun `with nowhere a taxi can go, its card says so`() {
+        val town = QuietTown()
+        town.taxiSquares = null
+        started(town)
+        root.button(Transit.CALL_TAXI).click()
+        assertTrue(goButtons().isEmpty())
+        assertTrue(Transit.NOWHERE in root.querySelector(".chooser")?.textContent.orEmpty())
     }
 
     @Test
