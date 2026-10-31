@@ -278,20 +278,25 @@ internal class Band(private val mixer: Mixer, private val seed: Int, private val
         mixer.startBed(time, seed)
     }
 
-    /** Plays every bar that starts before [horizon], in seconds on the mixer's clock. */
-    fun scheduleUntil(horizon: Double) {
-        while (started && barTime < horizon) playBar()
+    /**
+     * Plays every bar that starts before [horizon], in seconds on the mixer's clock. A note due before [now] is left
+     * out: after the page stalls for a moment, the overdue notes would otherwise all start together.
+     */
+    fun scheduleUntil(horizon: Double, now: Double = Double.NEGATIVE_INFINITY) {
+        while (started && barTime < horizon) playBar(now)
     }
 
-    private fun playBar() {
-        val now = mood()
-        mixer.setMood(now, barTime)
-        val tune = tunes.getOrPut(now) { VillageTune.compose(seed, now, pass) }
+    private fun playBar(now: Double) {
+        val mood = mood()
+        mixer.setMood(mood, barTime)
+        val tune = tunes.getOrPut(mood) { VillageTune.compose(seed, mood, pass) }
         val first = bar * VillageTune.STEPS_PER_BAR
-        val inBar = { note: Note -> !note.isRest && note.step in first until first + VillageTune.STEPS_PER_BAR }
         val at = { step: Int -> barTime + (step - first) * VillageTune.SECONDS_PER_STEP }
+        val inBar = { note: Note ->
+            !note.isRest && note.step in first until first + VillageTune.STEPS_PER_BAR && at(note.step) >= now
+        }
         // Darker moods let each note ring longer.
-        val ring = RING * (2 - now.brightness)
+        val ring = RING * (2 - mood.brightness)
         for (note in tune.melody.filter(inBar)) mixer.pluck(at(note.step), note.pitches.single(), note.velocity, ring)
         for (note in tune.chords.filter(inBar)) mixer.chord(at(note.step), at(note.end), note.pitches, note.velocity)
         for (note in tune.bass.filter(inBar)) mixer.low(at(note.step), note.pitches.single(), note.velocity)
@@ -356,8 +361,8 @@ internal class WebAudioSpeaker(private val context: AudioContext, seed: Int, hou
         val now = context.currentTime
         band.start(now + LEAD)
         mixer.fadeIn(now)
-        band.scheduleUntil(now + AHEAD)
-        if (timer == null) timer = window.setInterval({ band.scheduleUntil(context.currentTime + AHEAD) }, TIMER_MILLIS)
+        band.scheduleUntil(now + AHEAD, now)
+        if (timer == null) timer = window.setInterval({ plan() }, TIMER_MILLIS)
     }
 
     override fun off() {
@@ -390,6 +395,12 @@ internal class WebAudioSpeaker(private val context: AudioContext, seed: Int, hou
 
     override fun chime() {
         if (playing) mixer.chime(context.currentTime)
+    }
+
+    /** Plans the bars a little ahead of the sound's clock, leaving out any note already due. */
+    private fun plan() {
+        val now = context.currentTime
+        band.scheduleUntil(now + AHEAD, now)
     }
 
     /** Asks the browser to play, and calls [whenPlaying] if it does. A refusal leaves the context held. */

@@ -15,14 +15,22 @@ import org.khronos.webgl.get
 class SynthTest {
     private val rate = 44_100.0
 
-    /** [seconds] of the tune in [mood], faded in from the start, with whatever [more] adds, rendered to a buffer. */
-    private fun render(seconds: Double, mood: Mood, more: (Mixer) -> Unit = {}): Promise<AudioBuffer> {
+    /**
+     * [seconds] of the tune in [mood], faded in from the start, with whatever [more] adds, rendered to a buffer.
+     * Notes due before [late] are left out, as after a stall.
+     */
+    private fun render(
+        seconds: Double,
+        mood: Mood,
+        late: Double = Double.NEGATIVE_INFINITY,
+        more: (Mixer) -> Unit = {},
+    ): Promise<AudioBuffer> {
         val context = OfflineAudioContext(2, (rate * seconds).toInt(), rate)
         val mixer = Mixer(context)
         mixer.fadeIn(0.0)
         val band = Band(mixer, VillageTune.THEME_SEED) { mood }
         band.start(0.05)
-        band.scheduleUntil(seconds)
+        band.scheduleUntil(seconds, late)
         more(mixer)
         return context.startRendering()
     }
@@ -93,5 +101,14 @@ class SynthTest {
             val later = ratio(2.0 + Mixer.FADE_BACK + 0.05, 3.0)
             assertTrue(start < 0.4, "Back at once, not faded: $start of the level")
             assertTrue(later in 0.95..1.05, "Not back to the full level: $later")
+        }
+
+    @Test
+    fun `after a stall, notes already due are left out instead of all starting at once`(): Promise<Unit> =
+        render(4.0, Mood.DAY, late = 2.0).then { buffer ->
+            val (overdue, _) = levels(buffer, 0.0, 1.95)
+            val (played, _) = levels(buffer, 2.0, 4.0)
+            assertTrue(overdue < 1e-4, "Overdue notes were played: $overdue")
+            assertTrue(played > 0.02, "Nothing was played after the stall: $played")
         }
 }
