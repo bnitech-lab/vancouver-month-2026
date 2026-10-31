@@ -15,6 +15,7 @@ import vancouvermonth.text.endingLine
 import vancouvermonth.text.eventLine
 import vancouvermonth.text.guessLine
 import vancouvermonth.text.money
+import vancouvermonth.text.monthStartLines
 import vancouvermonth.text.parseAmount
 import vancouvermonth.text.passPrices
 import vancouvermonth.text.percent
@@ -95,9 +96,7 @@ class TerminalGame(
 
     private fun showMonthStart(month: Month) {
         line("9월 한 달이 시작돼요.")
-        line("  목표: 9월 30일까지 취업 제안 받기")
-        line("  매일 생활비 ${money(Month.DAILY_LIVING_COST)}이 나가고, 10월 1일에는 이 방의 총비용 ${money(month.room.totalMonthlyCost)}를 또 내야 해요.")
-        line("  면접은 두 번이에요. 1차 영어 면접은 영어 실력, 2차 기술 면접은 코딩 실력으로 붙어요.")
+        for (text in monthStartLines(month.room)) line("  $text")
         line()
     }
 

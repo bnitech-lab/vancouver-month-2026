@@ -22,6 +22,7 @@ import vancouvermonth.text.endingLine
 import vancouvermonth.text.eventLine
 import vancouvermonth.text.guessLine
 import vancouvermonth.text.money
+import vancouvermonth.text.monthStartLines
 import vancouvermonth.text.parseAmount
 import vancouvermonth.text.passPrices
 import vancouvermonth.text.percent
@@ -161,13 +162,7 @@ class PhoneGame(
         root.child("section", "card start") {
             child("h2", text = "9월 한 달이 시작돼요.")
             child("ul", "notes") {
-                child("li", text = "목표: 9월 30일까지 취업 제안 받기")
-                child(
-                    "li",
-                    text = "매일 생활비 ${money(Month.DAILY_LIVING_COST)}이 나가고, " +
-                        "10월 1일에는 이 방의 총비용 ${money(room.totalMonthlyCost)}를 또 내야 해요.",
-                )
-                child("li", text = "면접은 두 번이에요. 1차 영어 면접은 영어 실력, 2차 기술 면접은 코딩 실력으로 붙어요.")
+                for (text in monthStartLines(room)) child("li", text = text)
             }
             button("primary", text = "${date(Month.FIRST_DAY)} 시작하기") {
                 onclick = {

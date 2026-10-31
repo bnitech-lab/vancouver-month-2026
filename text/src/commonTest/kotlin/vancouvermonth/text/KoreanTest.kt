@@ -86,6 +86,18 @@ class KoreanTest {
     }
 
     @Test
+    fun `the month start names the last day, the living cost and October's total`() {
+        assertEquals(
+            listOf(
+                "목표: 9월 30일까지 취업 제안 받기",
+                "매일 생활비 \$40이 나가고, 10월 1일에는 이 방의 총비용 \$1,165를 또 내야 해요.",
+                "면접은 두 번이에요. 1차 영어 면접은 영어 실력, 2차 기술 면접은 코딩 실력으로 붙어요.",
+            ),
+            monthStartLines(room),
+        )
+    }
+
+    @Test
     fun `actions show their effect`() {
         val month = month()
         assertEquals("카페 알바", actionName(Action.WORK))
