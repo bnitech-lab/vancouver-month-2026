@@ -28,9 +28,8 @@ sealed interface Picked {
  * The camera behind and above the character, which the player turns by dragging and brings nearer or farther by
  * pinching. [yaw], [pitch] and [distance] are what the player asked for, already kept in their limits; the camera
  * moves toward them a little each frame, so it glides instead of jumping. It follows the character ([subject]) and
- * looks at [focus], which on the street is nudged toward the street's middle so both rows are in view. It never
- * looks at the character through anything: a wall, the SkyTrain deck or a canopy in the way pulls it in front, or
- * lifts it over when that would bring it too close.
+ * looks at it ([focus]). It never looks at the character through anything: a wall, the SkyTrain deck or a canopy in
+ * the way pulls it in front, or lifts it over when that would bring it too close.
  */
 class FollowCamera(subject: Point) {
     /** The turn around the character, in radians. 0 puts the camera south of it; -PI / 2 puts it west, looking east. */
@@ -53,19 +52,9 @@ class FollowCamera(subject: Point) {
     var subject: Point = subject
         private set
 
-    /**
-     * The point in the middle of the screen. From far back, on the street, it is nudged toward the street's middle
-     * to show both rows; the nearer the camera comes, the less, so close in the character stays in the picture.
-     */
+    /** The point in the middle of the screen: the character, as the camera has followed it. */
     val focus: Point
-        get() {
-            val nudged = Neighbourhood.cameraFocus(Spot(subject.x, subject.z))
-            // How far the camera really is, after any wall pulled it in.
-            val reach = length(eye - subject)
-            val share = ((reach - NEAR) / (FULL_NUDGE_DISTANCE - NEAR)).coerceIn(0.0, 1.0)
-            val x = subject.x + (nudged.x - subject.x) * share
-            return Point(x, subject.y, subject.z + (nudged.z - subject.z) * share)
-        }
+        get() = subject
 
     var eye: Point = eyeFor()
         private set
@@ -193,12 +182,13 @@ class FollowCamera(subject: Point) {
      * way pulls the camera in front of it, and when that would bring it too close, it rises over the wall instead.
      */
     private fun eyeFor(): Point {
+        val near = wallsNear(subject, shownDistance)
         var tilt = shownPitch
         while (true) {
             val out = Point(cos(tilt) * sin(shownYaw), sin(tilt), cos(tilt) * cos(shownYaw))
             var reach = shownDistance
-            for (wall in Neighbourhood.walls) {
-                val hit = distanceToBox(subject, out, wall.box) ?: continue
+            for (box in near) {
+                val hit = distanceToBox(subject, out, box) ?: continue
                 reach = min(reach, max(0.0, hit - WALL_GAP))
             }
             if (reach >= CLOSEST || tilt >= HIGHEST_TILT) return subject + out * reach
@@ -207,17 +197,25 @@ class FollowCamera(subject: Point) {
     }
 
     companion object {
-        /** The first view: from the street's west end, high and far enough to see four buildings and their names. */
-        val START_YAW = -0.5 * PI
-        const val START_PITCH = 0.7
+        /**
+         * The first view: from the south-west of 내 방, looking north-east over the West End to downtown, low and far
+         * enough to see four buildings and their names.
+         */
+        val START_YAW = -0.32 * PI
+        const val START_PITCH = 0.45
         const val START_DISTANCE = 21.0
+
+        /** The walls within [reach] of [from] on the ground: the only ones a camera that far off can meet. */
+        fun wallsNear(from: Point, reach: Double): List<Block> = Neighbourhood.walls.mapNotNull { wall ->
+            val box = wall.box
+            val dx = max(0.0, max(box.x - from.x, from.x - box.x - box.width))
+            val dz = max(0.0, max(box.z - from.z, from.z - box.z - box.depth))
+            if (dx * dx + dz * dz <= reach * reach) box else null
+        }
         const val MIN_PITCH = 0.2
         const val MAX_PITCH = 1.3
         const val NEAR = 4.5
         const val FAR = 30.0
-
-        /** From this far back the focus is nudged all the way to the street's middle. */
-        const val FULL_NUDGE_DISTANCE = 15.0
 
         const val TURN_PER_PIXEL = 0.008
         const val TURN_MILLIS = 60.0

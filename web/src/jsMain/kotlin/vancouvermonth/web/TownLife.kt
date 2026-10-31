@@ -4,6 +4,7 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.floor
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -17,8 +18,9 @@ import vancouvermonth.text.Weather
 
 /**
  * The SkyTrain's round, every [PERIOD]: it stands at the station for [DWELL], pulls out east faster and faster until
- * it is far down the guideway, is away for a while, then comes in from the west, slowing all the way into the station.
- * Far down the line it fades into the haze, so it never pops out of sight or into it.
+ * it is far down the guideway, is away for a while, then comes in from the west, out of its tunnel, slowing all the
+ * way into the station. Far down the line it fades into the haze, so it never pops out of sight or into it. How far it
+ * has gone is counted along [Neighbourhood.guideway], which bends.
  */
 object SkyTrainRun {
     const val PERIOD = 32_000.0
@@ -64,18 +66,19 @@ object SkyTrainRun {
     /** The train's speed as it goes farthest and fastest, at the end of pulling out and the start of coming in. */
     const val TOP_SPEED = 2 * REACH / LEAVE * 1_000
 
-    /** How far [ear] is from the nearest part of the train at [millis]. */
+    /** How far [ear] is from the nearest part of the train at [millis], the train taken every half unit along it. */
     fun distanceTo(millis: Double, ear: Point): Double {
         val west = Neighbourhood.TRAIN_STOP + shiftAt(millis)
-        val east = west + Neighbourhood.TRAIN_LENGTH
-        val across = when {
-            ear.x < west -> west - ear.x
-            ear.x > east -> ear.x - east
-            else -> 0.0
-        }
         val up = ear.y - (Neighbourhood.DECK_HEIGHT + 0.9)
-        val side = ear.z - (Neighbourhood.DECK_NORTH + Neighbourhood.DECK_SOUTH) / 2
-        return sqrt(across * across + up * up + side * side)
+        var nearest = Double.MAX_VALUE
+        val steps = (Neighbourhood.TRAIN_LENGTH / 0.5).toInt()
+        for (step in 0..steps) {
+            val spot = Neighbourhood.guideway.spotAt(west + Neighbourhood.TRAIN_LENGTH * step / steps)
+            val across = ear.x - spot.x
+            val side = ear.z - spot.z
+            nearest = minOf(nearest, sqrt(across * across + up * up + side * side))
+        }
+        return nearest
     }
 
     /** How loud a rumble [distance] away sounds: 1.0 right by it, half as loud [RUMBLE_NEAR] away, little far off. */
@@ -122,34 +125,37 @@ object Campfire {
 }
 
 /**
- * Light glinting on the water: short pale streaks on the sea by the seawall and on the pond, each coming and going on
- * its own beat and drifting a little. They fade away in the night, when [night] is 1.0.
+ * Light glinting on the water: short pale streaks on the sea off the seawall near the five places, each coming and
+ * going on its own beat and drifting a little. They fade away in the night, when [night] is 1.0.
  */
 object Shimmer {
     private class Glint(val x: Double, val z: Double, val y: Double, val width: Double, val beat: Double, val phase: Double)
 
+    /** The water squares the glints may be on: off the shore, past the seawall, near the places' doors. */
+    val seaSquares: List<Cell> = RealVancouver.map.let { map ->
+        val doors = Neighbourhood.venues.map { it.door }
+        fun around(cell: Cell, reach: Int, terrain: Terrain): List<Boolean> =
+            (-reach..reach).flatMap { dx ->
+                (-reach..reach).map { dz -> map.terrainAt(Cell(cell.x + dx, cell.z + dz)) == terrain }
+            }
+        map.cellsOf(Terrain.WATER).filter { cell ->
+            doors.any { hypot(it.x - cell.x, it.z - cell.z) < NEAR_DOORS } &&
+                around(cell, 1, Terrain.WATER).all { it } && around(cell, SHORE_REACH, Terrain.SHORE).any { it }
+        }
+    }
+
     private val glints: List<Glint> = Random(11).let { random ->
-        val sea = List(SEA_GLINTS) {
+        List(SEA_GLINTS) {
+            val square = seaSquares[random.nextInt(seaSquares.size)]
             Glint(
-                x = SEA_WEST + random.nextDouble() * (SEA_EAST - SEA_WEST),
-                z = SEA_NORTH + random.nextDouble() * (SEA_SOUTH - SEA_NORTH),
+                x = square.x + random.nextDouble(),
+                z = square.z + random.nextDouble(),
                 y = SEA_TOP,
                 width = 0.6 + random.nextDouble() * 0.8,
                 beat = 1_800 + random.nextDouble() * 1_400,
                 phase = random.nextDouble() * 2 * PI,
             )
         }
-        val pond = List(POND_GLINTS) {
-            Glint(
-                x = 34.8 + random.nextDouble() * 2.4,
-                z = 25.2 + random.nextDouble() * 1.6,
-                y = POND_TOP,
-                width = 0.3 + random.nextDouble() * 0.3,
-                beat = 1_500 + random.nextDouble() * 1_000,
-                phase = random.nextDouble() * 2 * PI,
-            )
-        }
-        sea + pond
     }
 
     val count: Int
@@ -165,16 +171,14 @@ object Shimmer {
 
     const val MAX_WIDTH = 1.4
     private const val MIN_WIDTH = 0.001
-    private const val SEA_GLINTS = 28
-    private const val POND_GLINTS = 4
+    private const val SEA_GLINTS = 32
 
-    /** Where the sea is in view from the town: north of the seawall's edge, and its surface. */
-    const val SEA_WEST = -8.0
-    const val SEA_EAST = 56.0
-    const val SEA_NORTH = -22.0
-    const val SEA_SOUTH = -1.2
+    /** How near the shore and the places' doors the glints keep, so they are where the player looks. */
+    private const val SHORE_REACH = 6
+    private const val NEAR_DOORS = 40.0
+
+    /** The sea's surface. */
     const val SEA_TOP = -0.39
-    const val POND_TOP = 0.045
     private const val GLINT = 0xF4FBFF
 }
 
@@ -339,7 +343,7 @@ object Rain {
         val x = wrap(SPAN * scatter(index * 7.13 + round * 1.71), centreX - SPAN / 2)
         val z = wrap(SPAN * scatter(index * 3.31 + round * 2.93 + 0.5), centreZ - SPAN / 2)
         val size = if (through < SPLASH_SHOWS) SPLASH_SIZE * (0.4 + through / SPLASH_SHOWS) else MIN_SIZE
-        val y = if (z < SEA_EDGE) SEA_SPLASH_HEIGHT else SPLASH_HEIGHT
+        val y = if (isSea(x, z)) SEA_SPLASH_HEIGHT else SPLASH_HEIGHT
         return Block(x - size / 2, y, z - size / 2, size, 0.01, size, 0)
     }
 
@@ -419,26 +423,73 @@ object Rain {
         return value - floor(value)
     }
 
-    /**
-     * Puddles left on the street and the pavements on a rainy day, catching the grey sky: flat boxes just over the
-     * stone, which stay where they are.
-     */
-    val puddles: List<Block> = listOf(
-        Block(3.2, 0.052, 12.6, 1.6, 0.012, 0.8, PUDDLE),
-        Block(11.0, 0.052, 13.9, 1.1, 0.012, 0.7, PUDDLE),
-        Block(15.4, 0.062, 10.4, 1.3, 0.012, 0.6, PUDDLE),
-        Block(21.6, 0.052, 12.4, 1.8, 0.012, 0.9, PUDDLE),
-        Block(25.2, 0.062, 15.5, 1.2, 0.012, 0.7, PUDDLE),
-        Block(33.8, 0.052, 13.6, 1.5, 0.012, 0.8, PUDDLE),
-        Block(40.6, 0.062, 10.5, 1.0, 0.012, 0.6, PUDDLE),
-        Block(44.2, 0.052, 12.9, 1.4, 0.012, 0.9, PUDDLE),
-        Block(-4.5, 0.052, 13.2, 1.3, 0.012, 0.7, PUDDLE),
-        Block(8.6, 0.032, 0.6, 1.4, 0.012, 0.7, PUDDLE),
-        Block(30.5, 0.032, 1.1, 1.6, 0.012, 0.6, PUDDLE),
-    )
+    /** True where the map has sea under [x], [z]: a splash there flashes on the water. */
+    private fun isSea(x: Double, z: Double): Boolean =
+        RealVancouver.map.terrainAt(Cell(floor(x).toInt(), floor(z).toInt())) == Terrain.WATER
 
-    /** North of this the box of sky is over the sea, past the seawall's edge. */
-    private const val SEA_EDGE = -0.4
+    /**
+     * Puddles left on the street in front of each place on a rainy day, catching the grey sky: flat boxes just over
+     * the stone, which stay where they are. Two for each place, on the first open pairs of squares in front of its
+     * door.
+     */
+    val puddles: List<Block> = Neighbourhood.venues.flatMap { venue ->
+        val grid = Neighbourhood.grid
+        val out = if (venue.doorFacesSouth) 1 else -1
+        val door = grid.cellAt(venue.door)
+        val found = mutableListOf<Block>()
+        for (step in 1..PUDDLES_WITHIN) {
+            for (dx in listOf(-3, 2, -1, 3, -2, 1)) {
+                val x = door.x + dx
+                val z = door.z + out * step
+                val open = (0..1).map { Cell(x + it, z) }.all { cell ->
+                    grid.isFree(cell) && RealVancouver.map.terrainAt(cell) == Terrain.LAND
+                }
+                val apart = found.none { abs(it.x - x) < 3.0 && abs(it.z - z) < 2.0 }
+                if (open && apart && found.size < 2) {
+                    found.add(Block(x + 0.25, PUDDLE_HEIGHT, z + 0.15, 1.5, 0.012, 0.7, PUDDLE))
+                }
+            }
+        }
+        found
+    }
+
+    /** How many rows out from a door the puddles may lie. */
+    private const val PUDDLES_WITHIN = 4
+
+    /** How high a puddle lies: just over the street's stone. */
+    const val PUDDLE_HEIGHT = 0.032
     private const val MIN_SIZE = 0.001
     private const val PUDDLE = 0xA3AEB6
+}
+
+/**
+ * Where the boxes of the train's cars are drawn. Each car's boxes are long along x round the car's middle; a car is
+ * turned along the guideway where it bends, so its boxes are written as Three.js keeps a matrix, sixteen numbers each,
+ * column by column. It makes nothing new, since it runs on every beat of the town's life.
+ */
+object TrainCars {
+    /**
+     * Writes [boxes], car number [car]'s, turned by [turn] about the vertical and set down at [spot], into their
+     * slots of [into]: from car times the number of boxes on. A car [hidden] in the tunnel is shrunk to nothing.
+     */
+    fun write(boxes: List<Block>, car: Int, spot: Spot, turn: Double, hidden: Boolean, into: Float32Array) {
+        val across = cos(turn)
+        val toward = sin(turn)
+        for ((index, box) in boxes.withIndex()) {
+            val at = (car * boxes.size + index) * 16
+            for (offset in 0 until 15) into[at + offset] = 0f
+            into[at + 15] = 1f
+            if (hidden) continue
+            val middleX = box.x + box.width / 2
+            val middleZ = box.z + box.depth / 2
+            into[at] = (across * box.width).toFloat()
+            into[at + 2] = (-toward * box.width).toFloat()
+            into[at + 5] = box.height.toFloat()
+            into[at + 8] = (toward * box.depth).toFloat()
+            into[at + 10] = (across * box.depth).toFloat()
+            into[at + 12] = (spot.x + middleX * across + middleZ * toward).toFloat()
+            into[at + 13] = (box.y + box.height / 2).toFloat()
+            into[at + 14] = (spot.z - middleX * toward + middleZ * across).toFloat()
+        }
+    }
 }

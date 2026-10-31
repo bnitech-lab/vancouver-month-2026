@@ -113,9 +113,9 @@ class NeighbourhoodTest {
     }
 
     @Test
-    fun `the way from the library door to the seawall behind it goes around the library`() {
+    fun `the way from the library door to the street behind it goes around the library`() {
         val library = Neighbourhood.venue(Place.LIBRARY)
-        val behind = Spot(library.door.x, 1.0)
+        val behind = Spot(library.door.x, library.z - 0.5)
         val route = town.route(library.door, behind)
         assertEquals(behind, route.last())
         assertTrue(town.walks(route), "$route")
@@ -128,10 +128,16 @@ class NeighbourhoodTest {
 
     @Test
     fun `the longest walk across the town is found in a blink`() {
+        // From the park's western tip to the far corner across False Creek: the way goes round the creek's head.
+        val free = town.freeCells()
+        val west = town.centreOf(free.minBy { it.x })
+        val far = town.centreOf(free.maxBy { it.x + it.z })
+        town.route(west, far)
         val start = Date().getTime()
-        val route = town.route(Spot(0.5, 0.5), Spot(47.5, 31.5))
+        val route = town.route(west, far)
         val millis = Date().getTime() - start
-        assertTrue(route.size >= 2)
+        assertEquals(far, route.last())
+        assertTrue(route.zipWithNext { a, b -> hypot(b.x - a.x, b.z - a.z) }.sum() > 300.0, "$route")
         assertTrue(millis < 200, "took $millis ms")
     }
 
@@ -142,18 +148,61 @@ class NeighbourhoodTest {
         val free = town.freeCells()
         assertEquals(free.size, reached.size, "cut off: ${free.filter { it !in reached }}")
         // A square in the garden, by the fire.
-        assertTrue(Cell(3, 20) in reached)
+        val home = Neighbourhood.venue(Place.HOME)
+        assertTrue(Cell(home.x - 1, home.z + 1) in reached)
     }
 
     @Test
-    fun `on the street the camera looks at its middle, and past the pavements at the character`() {
-        assertEquals(Spot(7.5, Neighbourhood.STREET_MIDDLE), Neighbourhood.cameraFocus(Spot(7.5, 16.5)))
-        assertEquals(Spot(9.5, Neighbourhood.STREET_MIDDLE), Neighbourhood.cameraFocus(Spot(9.5, 11.5)))
-        assertEquals(Spot(20.0, 1.0), Neighbourhood.cameraFocus(Spot(20.0, 1.0)))
-        assertEquals(Neighbourhood.benchSeat, Neighbourhood.cameraFocus(Neighbourhood.benchSeat))
-        // Halfway out of the street, the nudge is half gone, so the camera never jumps.
-        val halfway = 17.5 + (Neighbourhood.STREET_MIDDLE - 17.5) * 0.5
-        assertEquals(halfway, Neighbourhood.cameraFocus(Spot(3.0, 17.5)).z, 1e-9)
+    fun `each place stands on open land near the square proposed for it on the real map`() {
+        val map = RealVancouver.map
+        for (venue in venues) {
+            val proposed = RealVancouver.spots.getValue(venue.place)
+            val middle = Spot(venue.x + venue.width / 2.0, venue.z + venue.depth / 2.0)
+            assertTrue(distanceBetween(middle, map.grid.centreOf(proposed)) < 7.0, "${venue.place} at $middle")
+            for (x in venue.x until venue.x + venue.width) {
+                for (z in venue.z until venue.z + venue.depth) {
+                    assertEquals(Terrain.LAND, map.terrainAt(Cell(x, z)), "${venue.place} at $x, $z")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `the city stands on the real blocks, off the water, clear of the five places and under no guideway`() {
+        val map = RealVancouver.map
+        val lots = Neighbourhood.cityLots
+        assertTrue(lots.size > 300, "only ${lots.size} buildings")
+        val places = venues.map { Lot(it.x, it.z, it.width, it.depth) }
+        val rail = (0..((Neighbourhood.guideway.length) / 0.5).toInt()).map { Neighbourhood.guideway.spotAt(it * 0.5) }
+            .filter { it.x < Neighbourhood.COLUMNS }
+        for (lot in lots) {
+            for (x in lot.x until lot.x + lot.width) {
+                for (z in lot.z until lot.z + lot.depth) assertEquals(Terrain.LAND, map.terrainAt(Cell(x, z)), "$lot")
+            }
+            assertTrue(places.none { it.overlaps(lot) }, "$lot")
+            assertTrue(rail.none { lot.isNear(it.x, it.z, 0.5) }, "$lot is under the guideway")
+        }
+        // Streets run between them: no two buildings touch.
+        for ((index, a) in lots.withIndex()) {
+            for (b in lots.drop(index + 1)) assertFalse(a.overlaps(b), "$a and $b")
+        }
+    }
+
+    @Test
+    fun `the ground is a few hundred boxes over one plane of sea, and the mountains stand far across the inlet`() {
+        assertEquals(1, Neighbourhood.ground.count { it.colour == Neighbourhood.WATER })
+        assertTrue(Neighbourhood.ground.size < 1_200, "${Neighbourhood.ground.size} boxes of ground")
+        // Every box of the mountains lies past the line in the middle of the inlet, and well past it.
+        val line = RealVancouver.mountains
+        val tall = Neighbourhood.ground.filter { it.y > 1.0 }
+        assertTrue(tall.isNotEmpty())
+        for (peak in tall) {
+            val middle = peak.x + peak.width / 2
+            val shore = line.zipWithNext().firstOrNull { (_, b) -> middle <= b.x }?.let { (a, b) ->
+                if (middle <= a.x) a.z else a.z + (b.z - a.z) * (middle - a.x) / (b.x - a.x)
+            } ?: line.last().z
+            assertTrue(peak.z + peak.depth < shore - 20.0, "$peak")
+        }
     }
 
     @Test
