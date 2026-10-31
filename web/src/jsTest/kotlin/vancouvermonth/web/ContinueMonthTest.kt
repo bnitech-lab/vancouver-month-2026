@@ -164,7 +164,7 @@ class ContinueMonthTest {
         assertTrue(skills in hud, hud)
         // The same sky as before the reload: the weather comes from the run and the day alone.
         assertEquals(sky, again.weather)
-        assertEquals("날씨 ${weatherWord(sky)}", text(".hud .weather"))
+        assertEquals(" 날씨 ${weatherWord(sky)}", text(".hud .weather"))
         assertTrue("${date(month.day - 1)}에 있었던 일" in text(".over-town .log"))
         assertNull(root.querySelector(".guide-card"), "The guide opened again")
         assertSame(root.querySelector(".over-town .log"), document.activeElement, "The focus is not on the log")

@@ -826,14 +826,17 @@ private fun HTMLElement.figure(label: String, value: String) {
     }
 }
 
-/** Today's date with its weather in a word after it, which a screen reader hears as "날씨 비" and so on. */
+/**
+ * Today's date with its weather in a word after it, which a screen reader hears as "9월 3일 날씨 비" and so on. The
+ * hidden label starts with a space, so the date and "날씨" are never read as one word.
+ */
 private fun HTMLElement.dayFigure(day: Int, weather: Weather) {
     child("div", "figure") {
         child("span", "figure-label", "오늘")
         child("span", "figure-value") {
             appendChild(document.createTextNode(date(day)))
             child("span", "weather weather-${weather.name.lowercase()}") {
-                child("span", "visually-hidden", "날씨 ")
+                child("span", "visually-hidden", " 날씨 ")
                 appendChild(document.createTextNode(weatherWord(weather)))
             }
         }

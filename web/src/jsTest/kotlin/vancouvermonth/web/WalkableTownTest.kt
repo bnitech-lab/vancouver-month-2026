@@ -821,7 +821,7 @@ class WalkableTownTest {
                 val word = root.querySelector(".hud .weather")?.textContent
                 if (day < rainyDay) {
                     assertFalse(town.isRaining, "rain on day $day")
-                    assertEquals("날씨 ${weatherWord(weatherOn(1011, day))}", word, "day $day")
+                    assertEquals(" 날씨 ${weatherWord(weatherOn(1011, day))}", word, "day $day")
                     talkTo(Place.HOME)
                     spendButton().click()
                     day++
@@ -831,7 +831,7 @@ class WalkableTownTest {
                 assertTrue(town.isRaining, "no rain on day $day")
                 assertTrue(town.isRainOnePassLast, "the rain is drawn twice, or before the passersby")
                 assertEquals(Weather.RAINY, town.weatherShown)
-                assertEquals("날씨 비", word)
+                assertEquals(" 날씨 비", word)
                 assertTrue("오늘9월 ${day}일" in screen, screen)
                 // The rain falls with the town's own time, every streak where the rain's rule puts it.
                 assertNotEquals(streakAt(1_000.0), streakAt(1_040.0))
@@ -858,12 +858,12 @@ class WalkableTownTest {
         return play(
             Step("spend a dry day", { town.isStill }) {
                 assertFalse(town.isRaining)
-                assertEquals("날씨 맑음", root.querySelector(".hud .weather")?.textContent)
+                assertEquals(" 날씨 맑음", root.querySelector(".hud .weather")?.textContent)
                 talkTo(Place.HOME)
                 spendButton().click()
                 assertTrue(town.isChangingDay)
                 // The top card already shows the new day, but the evening is still dry.
-                assertEquals("날씨 비", root.querySelector(".hud .weather")?.textContent)
+                assertEquals(" 날씨 비", root.querySelector(".hud .weather")?.textContent)
                 assertEquals(Weather.RAINY, town.weather)
                 assertEquals(Weather.SUNNY, town.weatherShown)
                 assertFalse(town.isRaining, "the rain came as the day was spent")

@@ -119,10 +119,10 @@ class PhoneGameTest {
         game.weatherOf = { day -> if (day == Month.FIRST_DAY) Weather.CLOUDY else Weather.RAINY }
         game.show()
         startMonth(room = 1, amount = "1200")
-        assertTrue("오늘9월 2일날씨 흐림" in screen, screen)
+        assertTrue("오늘9월 2일 날씨 흐림" in screen, screen)
         assertEquals("흐림", root.querySelector(".topbar .weather")?.lastChild?.textContent)
         tap("쉬기")
-        assertTrue("오늘9월 3일날씨 비" in screen, screen)
+        assertTrue("오늘9월 3일 날씨 비" in screen, screen)
     }
 
     @Test

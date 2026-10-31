@@ -155,7 +155,7 @@ class SoundInGameTest {
         startSeed1011(root)
         assertEquals(Weather.SUNNY, town.weather)
         assertEquals(false, speaker.rain)
-        assertTrue("오늘9월 2일날씨 맑음" in root.textContent.orEmpty(), root.textContent)
+        assertTrue("오늘9월 2일 날씨 맑음" in root.textContent.orEmpty(), root.textContent)
 
         // The town tells how loud the train and the fire are, and the sound hears it.
         town.onSounds(0.4, 0.2, 0.0)
@@ -166,10 +166,10 @@ class SoundInGameTest {
         (root.querySelector(".talk .spend") as HTMLButtonElement).click()
         assertEquals(Weather.RAINY, town.weather)
         assertEquals(true, speaker.rain)
-        assertTrue("오늘9월 3일날씨 비" in root.textContent.orEmpty(), root.textContent)
+        assertTrue("오늘9월 3일 날씨 비" in root.textContent.orEmpty(), root.textContent)
         val word = assertNotNull(root.querySelector(".hud .weather"))
-        assertEquals("날씨 비", word.textContent)
-        assertEquals("날씨 ", word.querySelector(".visually-hidden")?.textContent, "the word has no label for a screen reader")
+        assertEquals(" 날씨 비", word.textContent)
+        assertEquals(" 날씨 ", word.querySelector(".visually-hidden")?.textContent, "the word has no label for a screen reader")
 
         town.onPlace(Place.HOME)
         assertEquals("여기 비는 조용히 오지. 금방 익숙해져.", root.querySelector(".talk-line .visually-hidden")?.textContent)
