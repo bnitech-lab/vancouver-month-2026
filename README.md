@@ -218,7 +218,7 @@ when the passersby are out, and how each weather greys it), `Passersby` (their l
 crackle, the glints, petals, clouds and rain, all worked out from the time) and `FramePace` (which frames are drawn).
 The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`, and `Passersby.kt` for the passersby's),
 and so is each day's weather (`Weather.kt`). `WalkableTown` draws all of it, and `Three.kt` declares only the parts of
-Three.js in use. The page's script, Three.js included, is about 706 KB (about 189 KB gzipped).
+Three.js in use. The page's script, Three.js included, is about 716 KB (about 193 KB gzipped).
 
 ### Sound and the first-run guide
 
