@@ -89,7 +89,7 @@ The same game, drawn for a phone held upright, also works in a desktop browser. 
 open web/build/dist/js/productionExecutable/index.html   # add ?seed=1011 to replay a seed
 ```
 
-The first build downloads Node.js and the npm packages the Kotlin/JS build uses.
+The first build downloads Node.js and the npm packages the Kotlin/JS build uses, Three.js among them.
 
 ### Today's run
 
@@ -120,6 +120,32 @@ The date is each player's own, so near midnight two time zones can be on differe
 month and day but not the year, so the same date in two different years reads the same, although those are two
 different runs.
 
+### The 3D town
+
+On the phone screen, the days of September show a small town under the top bar, drawn in 3D with
+[Three.js](https://threejs.org) from boxes only, with no image files: 내 방, 카페, 도서관, 코워킹 and 회사 in a row
+along a road, a SkyTrain station on an elevated guideway with a train, trees, the water, and the North Shore
+mountains across it. The character starts at 내 방. Each tap sends it walking to the day's building, in under a
+second, while the day's log appears, and it stays there until the next day:
+
+| Tap | Building |
+|---|---|
+| 카페 알바 | 카페 |
+| 영어 공부 | 도서관 |
+| 코딩 연습 | 코워킹 |
+| 지원서 넣기, 면접 보기 | 회사 |
+| 쉬기 | 내 방 |
+
+The town is drawn only while something moves, so a screen left alone costs nothing, and at most two pixels per
+point however sharp the phone. The room screen and the ending have no town.
+
+Where the browser has no WebGL 2, which Three.js needs, or Three.js fails, the town is left out and the game
+plays exactly as before. A test forces that path.
+
+The layout, the building for each tap, the walk and the camera are plain Kotlin with tests (`TownMap`, `Walk` and
+`TownCamera` in `web`). `TownScene` draws them, and `Three.kt` declares only the parts of Three.js the town uses.
+Three.js makes the page's script about 570 KB instead of 70 KB (about 145 KB instead of 24 KB gzipped).
+
 ## How it is built
 
 | Part | What | Notes |
@@ -127,7 +153,7 @@ different runs.
 | `core` | The rules: rooms, the score, the month, interviews, endings, and the run number for a date | Kotlin Multiplatform, standard library only, so the same rules run on the JVM and in a browser. All luck goes through one `Dice` interface, so tests can control it |
 | `text` | The Korean lines both screens share (amounts, dates, actions, events, endings, today's result line) and how a typed amount is read | Kotlin Multiplatform, no layout |
 | `terminal` | The text screen | Kotlin on the JVM |
-| `web` | The phone screen in a browser | Kotlin/JS drawing the page with the DOM, plain CSS, no framework |
+| `web` | The phone screen in a browser, with the 3D town | Kotlin/JS drawing the page with the DOM, plain CSS, no framework. The town is drawn with Three.js |
 
 ```sh
 ./gradlew test                                  # rules, balance and screen tests, on the JVM and in headless Chrome
@@ -158,8 +184,12 @@ or wage.
 
 ## What comes next
 
-The town drawn as a small 3D map.
+Dawn plays the first version of the 3D town and decides what it shows next.
 
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
+
+The phone screen bundles [Three.js](https://github.com/mrdoob/three.js) 0.169.0, which is also under the MIT
+licence (Copyright © 2010-2024 three.js authors). The build keeps its licence notice next to the script, in
+`vancouver-month.js.LICENSE.txt`.
