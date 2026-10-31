@@ -43,6 +43,9 @@ private class SilentTown : WalkableTown {
     override val element = (document.createElement("div") as HTMLElement).also { it.className = "walk-town" }
     override var onPlace: (Place?) -> Unit = {}
     override var onPasserby: (Passer) -> Unit = {}
+    override var onShop: () -> Unit = {}
+    override var onRent: (Ride) -> Unit = {}
+    override var riding: Ride? = null
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
     override var isCovered = false
@@ -53,6 +56,14 @@ private class SilentTown : WalkableTown {
     override fun mark(place: Place?) {}
 
     override fun endChat() {}
+
+    override fun ride(ride: Ride) {
+        riding = ride
+    }
+
+    override fun getOff() {
+        riding = null
+    }
 
     override fun endDay(place: Place) = onMorning()
 
@@ -244,14 +255,14 @@ class WalkableTownTest {
     }
 
     @Test
-    fun `the town fills the screen, with the five names and the day's figures over it, and no day buttons`() {
+    fun `the town fills the screen, with the five names, the shop's, and the day's figures over it, and no day buttons`() {
         startInTown(phone = false)
         val town = root.querySelector(".walk-town") as HTMLElement
         val frame = town.getBoundingClientRect()
         assertEquals(window.innerWidth.toDouble(), frame.width)
         assertEquals(window.innerHeight.toDouble(), frame.height)
         val names = town.querySelectorAll(".place-name").asList().map { it.textContent }
-        assertEquals(listOf("내 방", "카페", "도서관", "코워킹", "회사"), names)
+        assertEquals(listOf("내 방", "카페", "도서관", "코워킹", "회사", "자전거 가게"), names)
         assertEquals("three.js r169", town.querySelector("canvas")?.getAttribute("data-engine"))
         assertTrue("오늘9월 2일" in screen && "잔고\$1,835" in screen && "10월 총비용\$1,165" in screen, screen)
         assertTrue("영어 1/10 · 코딩 3/10 · 체력 5/5" in screen, screen)

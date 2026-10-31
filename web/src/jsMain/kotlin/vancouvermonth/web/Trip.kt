@@ -7,7 +7,8 @@ import kotlin.math.hypot
 import kotlin.math.sin
 
 /**
- * The character's walk along a [route] at a steady [speed] in units a second: a walk, or a dash after a double tap.
+ * The character's walk along a [route] at a steady [speed] in units a second: a walk, or a dash after a double tap,
+ * or a ride on a bike or an e-scooter.
  * Everything is asked by the time since the trip began, in milliseconds.
  */
 class Trip(val route: List<Spot>, val speed: Double) {
@@ -22,7 +23,7 @@ class Trip(val route: List<Spot>, val speed: Double) {
     fun isOverAfter(elapsed: Double): Boolean = elapsed >= millis
 
     /** How far along the route the character is after [elapsed] milliseconds. */
-    private fun travelled(elapsed: Double): Double = (elapsed.coerceAtLeast(0.0) / 1_000 * speed).coerceAtMost(length)
+    fun travelled(elapsed: Double): Double = (elapsed.coerceAtLeast(0.0) / 1_000 * speed).coerceAtMost(length)
 
     fun spotAfter(elapsed: Double): Spot {
         var left = travelled(elapsed)

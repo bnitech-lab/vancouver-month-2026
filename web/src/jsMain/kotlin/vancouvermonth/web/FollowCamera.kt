@@ -22,6 +22,12 @@ sealed interface Picked {
 
     data class AtPasserby(val index: Int) : Picked
 
+    /** The bike shop's building or its keeper. */
+    data object AtShop : Picked
+
+    /** One of the shared bikes and e-scooters, by its place in the list of them a tap was given. */
+    data class AtVehicle(val index: Int) : Picked
+
     data class OnGround(val spot: Spot) : Picked
 }
 
@@ -140,11 +146,18 @@ class FollowCamera(subject: Point) {
 
     /**
      * What a tap at [left], [top] (0.0 to 1.0 across and down the screen) lands on: the nearest building or
-     * person of a place, or of [passersby] (each one's box where they are now), else the ground. A tap on another
-     * building walks to its foot. The city's buildings are as tall as [cutaway] draws them: a folded one is only its
-     * low plinth, so a tap meant for the ground behind it lands there. Null for the sky and the far distance.
+     * person of a place, the bike shop or its keeper, one of [passersby] (each one's box where they are now) or of
+     * [vehicles] (the shared bikes and e-scooters that can be rented), else the ground. A tap on another building walks
+     * to its foot. The city's buildings are as tall as [cutaway] draws them: a folded one is only its low plinth, so a
+     * tap meant for the ground behind it lands there. Null for the sky and the far distance.
      */
-    fun pick(left: Double, top: Double, passersby: List<Block> = emptyList(), cutaway: Cutaway? = null): Picked? {
+    fun pick(
+        left: Double,
+        top: Double,
+        passersby: List<Block> = emptyList(),
+        cutaway: Cutaway? = null,
+        vehicles: List<Block> = emptyList(),
+    ): Picked? {
         val ray = rayThrough(left, top)
         var nearest = Double.MAX_VALUE
         var wallHit: Wall? = null
@@ -180,10 +193,21 @@ class FollowCamera(subject: Point) {
                 passerby = index
             }
         }
+        var vehicle: Int? = null
+        for ((index, box) in vehicles.withIndex()) {
+            val hit = distanceToBox(eye, ray, box) ?: continue
+            if (hit < nearest) {
+                nearest = hit
+                vehicle = index
+                passerby = null
+            }
+        }
+        if (vehicle != null && nearest < ground) return Picked.AtVehicle(vehicle)
         if (passerby != null && nearest < ground) return Picked.AtPasserby(passerby)
         if ((wallHit != null || cityHit) && nearest < ground) {
             val place = wallHit?.place
             if (place != null) return Picked.AtPlace(place)
+            if (wallHit?.shop == true) return Picked.AtShop
             val foot = eye + ray * nearest
             return Picked.OnGround(Spot(foot.x, foot.z))
         }

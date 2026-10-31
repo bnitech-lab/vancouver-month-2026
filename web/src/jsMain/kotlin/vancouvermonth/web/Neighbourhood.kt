@@ -61,10 +61,55 @@ data class Venue(
 fun personAt(place: Place): Townsperson = Townsperson.entries.first { it.offers == actionAt(place) }
 
 /**
- * A box a tap stops at. [place] is set when it belongs to one of the five places. The camera stays out of it, unless it
- * [folds]: one of the city's buildings, which fold down out of the camera's way instead (see [Cutaway]).
+ * The bike shop: a small building whose door faces the street to the south, and its keeper by the door. It is not one
+ * of the five places, as no day is spent there, but it matters as they do: it never folds, the camera keeps out of it,
+ * and a tap on it or on its keeper talks to the keeper.
  */
-data class Wall(val box: Block, val place: Place?, val folds: Boolean = false)
+data class Storefront(
+    val x: Int,
+    val z: Int,
+    val width: Int,
+    val depth: Int,
+    val height: Double,
+    val wall: Int,
+    val roof: Int,
+    /** Where the keeper stands, by the door. */
+    val keeper: Spot,
+) {
+    /** Where the character stands at the door: on the pavement, half a square out. */
+    val door: Spot
+        get() = Spot(x + width / 2.0, z + depth + 0.5)
+
+    /** Where the character stands to talk: one square from the keeper, on the street side. */
+    val talkSpot: Spot
+        get() = Spot(keeper.x, keeper.z + 1.0)
+
+    /** The way the keeper faces, toward the street: south. */
+    val facing: Double
+        get() = 0.0
+
+    /** Where the name floats: above the roof, over the front. */
+    val labelAnchor: Point
+        get() = Point(x + width / 2.0, height + Neighbourhood.SHOP_ROOF + 0.5, z + depth - 0.5)
+
+    /** The whole building as one box, roof included, for taps and for keeping the camera out. */
+    val box: Block
+        get() {
+            val top = height + Neighbourhood.SHOP_ROOF
+            return Block(x.toDouble(), 0.0, z.toDouble(), width.toDouble(), top, depth.toDouble(), wall)
+        }
+
+    /** The room it takes from the city: its building and a square round it. */
+    val lot: Lot
+        get() = Lot(x - 1, z - 1, width + 2, depth + 2)
+}
+
+/**
+ * A box a tap stops at. [place] is set when it belongs to one of the five places, and [shop] when it is the bike shop
+ * or its keeper. The camera stays out of it, unless it [folds]: one of the city's buildings, which fold down out of the
+ * camera's way instead (see [Cutaway]).
+ */
+data class Wall(val box: Block, val place: Place?, val folds: Boolean = false, val shop: Boolean = false)
 
 /**
  * One of the city's buildings, or a low block past the grid's edge: none of the places the month is about, so it folds
@@ -135,10 +180,19 @@ object Neighbourhood {
 
     fun venue(place: Place): Venue = venues.first { it.place == place }
 
-    /** A box around each place's person, so a tap on them talks to them. */
+    /**
+     * The bike shop, on the West End's wide street toward downtown, on the way from 내 방 to the business district: a
+     * block of the city cleared for it, as for the five places. Not a real shop or address.
+     */
+    val shop = Storefront(142, 87, 5, 3, 3.4, 0xE9C46A, 0x7A5233, Spot(146.5, 90.5))
+
+    /** How much the shop's flat roof adds on top of its walls. */
+    const val SHOP_ROOF = 0.3
+
+    /** A box around each place's person, and around the shop's keeper, so a tap on them talks to them. */
     val people: List<Wall> = venues.map { venue ->
         Wall(Block(venue.person.x - 0.4, 0.0, venue.person.z - 0.4, 0.8, 1.8, 0.8, 0), venue.place)
-    }
+    } + Wall(Block(shop.keeper.x - 0.4, 0.0, shop.keeper.z - 0.4, 0.8, 1.8, 0.8, 0), null, shop = true)
 
     private val home = venue(Place.HOME)
 
@@ -193,6 +247,10 @@ object Neighbourhood {
         listOf(venue.door, venue.talkSpot).any { hypot(it.x - spot.x, it.z - spot.z) <= REACH }
     }?.place
 
+    /** True when [spot] is within [REACH] of the shop's door or of where to stand to talk to its keeper. */
+    fun isAtShop(spot: Spot): Boolean =
+        distanceBetween(spot, shop.door) <= REACH || distanceBetween(spot, shop.talkSpot) <= REACH
+
     /**
      * Every box to draw that stands still, the people aside. [ground] holds what is too flat or too far to cast a
      * shadow (the ground, the water and the mountains), [glowing] the windows and lamps, and [blocks] the rest.
@@ -244,6 +302,7 @@ object Neighbourhood {
         town.addGround()
         town.addMountains()
         for (venue in venues) town.addVenue(venue)
+        town.addShop()
         town.addHomeGarden()
         town.addSkyTrain()
         town.addCity()
@@ -257,10 +316,10 @@ object Neighbourhood {
         cityLots = town.cityLots
         footprints = town.footprints
         foldables = town.foldables
-        walls = venues.map { Wall(it.box, it.place) } + town.otherWalls.map { Wall(it, null) } +
-            foldables.map { Wall(it.box, null, folds = true) }
+        walls = venues.map { Wall(it.box, it.place) } + Wall(shop.box, null, shop = true) +
+            town.otherWalls.map { Wall(it, null) } + foldables.map { Wall(it.box, null, folds = true) }
         // Each person stands on one square, which the character walks around; the water is never walked on.
-        val people = venues.map { Cell(floor(it.person.x).toInt(), floor(it.person.z).toInt()) }
+        val people = (venues.map { it.person } + shop.keeper).map { Cell(floor(it.x).toInt(), floor(it.z).toInt()) }
         val water = RealVancouver.map.cellsOf(Terrain.WATER)
         val blocked = water + footprints.flatMap { cellsUnder(it) } + people
         // A pocket of ground walled in by buildings, trees and the water is no ground to walk on.
@@ -552,6 +611,34 @@ object Neighbourhood {
             }
         }
 
+        /**
+         * The bike shop: warm walls under a flat roof, a door with a lit shop window either side, and a sign over the
+         * door with a wheel on it.
+         */
+        fun addShop() {
+            val x = shop.x.toDouble()
+            val z = shop.z.toDouble()
+            val width = shop.width.toDouble()
+            val depth = shop.depth.toDouble()
+            add(x, 0.0, z, width, shop.height, depth, shop.wall)
+            footprints.add(shop.box)
+            add(x - 0.15, shop.height, z - 0.15, width + 0.3, SHOP_ROOF, depth + 0.3, shop.roof)
+            val doorX = x + width / 2
+            val front = z + depth
+            add(doorX - 0.45, 0.0, front, 0.9, 1.6, 0.06, DOOR)
+            add(doorX - 0.55, 1.6, front - 0.01, 1.1, 0.12, 0.08, WOOD_DARK)
+            glow(x + 0.3, 0.55, front, doorX - 0.75 - x - 0.3, 1.3, 0.05, WINDOW)
+            glow(doorX + 0.75, 0.55, front, x + width - 0.3 - doorX - 0.75, 1.3, 0.05, WINDOW)
+            add(x + 0.5, 2.25, front, width - 1.0, 0.6, 0.1, SHOP_SIGN)
+            add(doorX - 0.22, 2.33, front + 0.1, 0.44, 0.44, 0.04, TYRE)
+            add(doorX - 0.12, 2.43, front + 0.12, 0.24, 0.24, 0.04, SHOP_SIGN)
+            // Plain windows along its sides, as on the houses round it.
+            for (east in listOf(false, true)) {
+                val faceX = if (east) x + width else x - 0.05
+                glow(faceX, 1.2, z + 0.7, 0.05, 0.7, depth - 1.4, WINDOW)
+            }
+        }
+
         /** A roof that steps up to a ridge running east to west, as a voxel cottage has. */
         fun addPitchedRoof(x: Double, z: Double, width: Double, depth: Double, top: Double, colour: Int) {
             val layers = 5
@@ -682,7 +769,7 @@ object Neighbourhood {
          */
         fun addCity() {
             val start = guideway.points.first()
-            val kept = venues.map { lotFor(it) } +
+            val kept = venues.map { lotFor(it) } + shop.lot +
                 Lot(floor(start.x).toInt() - 5, floor(start.z).toInt() - 4, STATION_LENGTH.toInt() + 8, 10)
             var lots = lotsOf(VancouverMapData.BLOCKS)
             for (hole in kept) lots = lots.flatMap { it.minus(hole) }
@@ -922,6 +1009,8 @@ object Neighbourhood {
     private const val AWNING = 0x3E8E6A
     private const val AWNING_LIGHT = 0xF4EDE1
     private const val SIGN_GREEN = 0x2F6B5A
+    private const val SHOP_SIGN = 0xF4EDE1
+    private const val TYRE = 0x2B2B2B
     private const val FLAME = 0xF08A3C
     private const val FLAME_LIGHT = 0xFFD36B
     private const val ROOF_GREY = 0x8E959C

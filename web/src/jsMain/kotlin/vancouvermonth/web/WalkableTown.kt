@@ -10,10 +10,12 @@ import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
 import kotlinx.browser.document
 import kotlinx.browser.window
+import org.khronos.webgl.Float32Array
 import org.khronos.webgl.Uint8Array
 import org.khronos.webgl.get
 import org.khronos.webgl.set
@@ -26,6 +28,7 @@ import org.w3c.dom.events.KeyboardEvent
 import org.w3c.dom.events.WheelEvent
 import org.w3c.dom.pointerevents.PointerEvent
 import vancouvermonth.text.Passer
+import vancouvermonth.text.Shop
 import vancouvermonth.text.Weather
 
 /** What the phone screen needs from the town the player walks in. */
@@ -44,6 +47,31 @@ interface WalkableTown {
      * stands and faces the player until [endChat].
      */
     var onPasserby: (Passer) -> Unit
+
+    /** Called when the player turns to the bike shop's keeper: they tapped the shop, its name or the keeper. */
+    var onShop: () -> Unit
+
+    /**
+     * Called when the character reaches a shared bike or e-scooter the player tapped, with the ride it would be. The
+     * game pays the fare and calls [ride] with it, or says why it cannot.
+     */
+    var onRent: (Ride) -> Unit
+
+    /** What the character rides now, or null on foot. */
+    val riding: Ride?
+
+    /**
+     * Gets on [ride]: one of the player's own, or the shared one the character has just reached (asked for through
+     * [onRent]). From here the character goes at the ride's speed, along the same streets. Not by night, nor sitting by
+     * the fire, nor already riding.
+     */
+    fun ride(ride: Ride)
+
+    /**
+     * Gets off and goes on foot: a shared bike or e-scooter goes back where it was rented. A walk on its way goes on
+     * at walking pace. The game asks for this whenever a talk opens; the town does it itself when the day ends.
+     */
+    fun getOff()
 
     /** Called once if the town stops drawing, so the game can go on with buttons. */
     var onFail: () -> Unit
@@ -129,6 +157,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     override val element = document.createElement("div") as HTMLElement
     override var onPlace: (Place?) -> Unit = {}
     override var onPasserby: (Passer) -> Unit = {}
+    override var onShop: () -> Unit = {}
+    override var onRent: (Ride) -> Unit = {}
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
     override var onSounds: (Double, Double, Double) -> Unit = { _, _, _ -> }
@@ -196,6 +226,10 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     }
     private val greeterParts = Neighbourhood.venues.map { Figures.townsperson(personAt(it.place)) }
     private val greeterFigures = greeterParts.map { FigureBoxes(it) }
+
+    /** The bike shop's keeper, who looks about and greets the player as the five places' people do. */
+    private val keeper = Greeter(Neighbourhood.shop.keeper, Neighbourhood.shop.facing, phase = greeters.size * 1.3)
+    private val keeperFigure = FigureBoxes(Figures.keeper)
     private val passersby = Strolls.all()
     private val passerbyParts = passersby.map { Figures.passer(it.passer) }
     private val passerbyFigures = passerbyParts.map { FigureBoxes(it) }
@@ -268,8 +302,33 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     private val character = Group()
     private val limbs = mutableMapOf<Limb, Group>()
+    private lateinit var leftLeg: Group
+    private lateinit var rightLeg: Group
+    private lateinit var leftArm: Group
+    private lateinit var rightArm: Group
     private val marker = Group()
     private val labels = mutableMapOf<Place, HTMLButtonElement>()
+    private val shopLabel = document.createElement("button") as HTMLButtonElement
+
+    /**
+     * The bikes and e-scooters: those standing in the town in one draw, with each box's place kept so a rented one can
+     * be put back; and under the character the one it rides, one draw for each [Ride], only the ridden one shown.
+     */
+    private lateinit var parked: InstancedMesh
+    private lateinit var parkedMatrices: Float32Array
+    private val mount = Group()
+    private val rideMeshes = mutableListOf<InstancedMesh>()
+
+    /** What the character rides, and which of [Rides.shared] it was rented from (-1 for none, or its own). */
+    private var ride: Ride? = null
+    private var rentedFrom = -1
+
+    /**
+     * The shared one the character is on its way to, to rent on arrival; and the one it has reached, while the game is
+     * asked to pay for it. -1 for none.
+     */
+    private var rentAt = -1
+    private var renting = -1
 
     /** Where the camera was when the names were last laid out, and whether the town was resized since. */
     private var labelsEye: Point? = null
@@ -292,6 +351,9 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private var heading = home.facing
     private var trip: Trip? = null
     private var tripStarted = 0.0
+
+    /** True when the trip under way is a dash, after a double tap. */
+    private var tripDash = false
 
     /** True when the end of the walk should open the place there: a walk the player sent by tapping the ground. */
     private var opensOnArrival = false
@@ -399,6 +461,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         addLife()
         addWeather()
         addCharacter()
+        addRides()
         addPeople()
         addMarker()
         addLabels()
@@ -494,9 +557,31 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             character.add(group)
             limbs[limb] = group
         }
+        leftLeg = limbs.getValue(Limb.LEFT_LEG)
+        rightLeg = limbs.getValue(Limb.RIGHT_LEG)
+        leftArm = limbs.getValue(Limb.LEFT_ARM)
+        rightArm = limbs.getValue(Limb.RIGHT_ARM)
         character.scale.set(Figures.SCALE, Figures.SCALE, Figures.SCALE)
         scene.add(character)
         placeCharacter()
+    }
+
+    /**
+     * The shared bikes in their docks, the e-scooters on their corners and the bike on show at the shop, in one draw;
+     * and each ride, drawn under the character only while it rides it, turning with it.
+     */
+    private fun addRides() {
+        parked = boxes(Rides.boxes, material)
+        parkedMatrices = Float32Array(parked.instanceMatrix.array)
+        scene.add(parked)
+        for (each in Ride.entries) {
+            val mesh = boxes(Rides.model(each.vehicle, each.colour), material)
+            mesh.visible = false
+            mount.add(mesh)
+            rideMeshes.add(mesh)
+        }
+        mount.scale.set(Figures.SCALE, Figures.SCALE, Figures.SCALE)
+        scene.add(mount)
     }
 
     /**
@@ -504,7 +589,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
      * passersby in another, every box placed again each frame of the town's life.
      */
     private fun addPeople() {
-        townsfolk = figures(greeterParts, material)
+        townsfolk = figures(greeterParts + listOf(Figures.keeper), material)
         passerbyBoxes = figures(passerbyParts, passerbyMaterial)
         wetPasserbyBoxes = figures(wetPasserbyParts, passerbyMaterial)
         wetPasserbyBoxes.visible = false
@@ -596,6 +681,17 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             element.appendChild(label)
             labels[venue.place] = label
         }
+        shopLabel.type = "button"
+        shopLabel.className = "place-name shop-name"
+        shopLabel.textContent = Shop.NAME
+        shopLabel.style.position = "absolute"
+        shopLabel.style.left = "0"
+        shopLabel.style.top = "0"
+        shopLabel.onclick = {
+            touched()
+            if (nightFell == null) goToShop(dash = false)
+        }
+        element.appendChild(shopLabel)
     }
 
     /** One draw for boxes that move, placed again on every beat of the town's life, as the train's are. */
@@ -672,6 +768,9 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     override fun endDay(place: Place) {
         touched()
+        // The ride ends with the day: a shared one goes back, and the next morning starts on foot.
+        getOff()
+        rentAt = -1
         trip = null
         marker.visible = false
         pointers.clear()
@@ -693,6 +792,63 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         }
         nightFell = window.performance.now()
         askForFrame()
+    }
+
+    override val riding: Ride?
+        get() = ride
+
+    override fun ride(ride: Ride) {
+        if (sitting || nightFell != null || this.ride != null) return
+        if (ride.shared) {
+            // Only the shared one the character has just reached, and of its kind.
+            val at = renting
+            if (at < 0 || Rides.shared[at].vehicle != ride.vehicle) return
+            renting = -1
+            rentedFrom = at
+            showParked(at, false)
+            heading = Rides.shared[at].turn
+        }
+        this.ride = ride
+        for (index in rideMeshes.indices) rideMeshes[index].visible = index == ride.ordinal
+        goOnFromHere()
+        touched()
+        askForFrame()
+    }
+
+    override fun getOff() {
+        if (ride == null) return
+        ride = null
+        for (mesh in rideMeshes) mesh.visible = false
+        if (rentedFrom >= 0) showParked(rentedFrom, true)
+        rentedFrom = -1
+        goOnFromHere()
+        touched()
+        askForFrame()
+    }
+
+    /** A trip on its way goes on from where the character is, at the pace it now goes. */
+    private fun goOnFromHere() {
+        val current = trip ?: return
+        val route = Neighbourhood.grid.route(spot, current.route.last())
+        if (route.size < 2) return
+        trip = Trip(route, paceFor(tripDash))
+        tripStarted = window.performance.now()
+    }
+
+    /** How fast the character goes now, in units a second: on foot or on what it rides, a little faster on a [dash]. */
+    private fun paceFor(dash: Boolean): Double {
+        val vehicle = ride?.vehicle ?: return if (dash) Trip.DASH_SPEED else Trip.WALK_SPEED
+        return if (dash) vehicle.dashSpeed else vehicle.speed
+    }
+
+    /** Shows the shared one [index] where it stands, or hides it while it is ridden: only its own boxes are sent. */
+    private fun showParked(index: Int, shown: Boolean) {
+        val numbers = parked.instanceMatrix.array
+        val first = Rides.firstBoxOf(index) * 16
+        val count = Rides.boxCountOf(index) * 16
+        for (at in first until first + count) numbers[at] = if (shown) parkedMatrices[at] else 0f
+        parked.instanceMatrix.addUpdateRange(first, count)
+        parked.instanceMatrix.needsUpdate = true
     }
 
     override fun close() {
@@ -781,7 +937,22 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         get() = atan2(view.eye.x - view.focus.x, view.eye.z - view.focus.z)
 
     internal val isDashing: Boolean
-        get() = trip?.speed == Trip.DASH_SPEED
+        get() = trip != null && tripDash
+
+    /** How long the trip under way takes from where it started, in milliseconds, or null standing. For tests. */
+    internal val tripMillis: Double?
+        get() = trip?.millis
+
+    /** True when the shared one [index] stands in its dock or on its corner, drawn; false while it is ridden. */
+    internal fun isParkedShown(index: Int): Boolean =
+        parked.instanceMatrix.array[Rides.firstBoxOf(index) * 16 + 15] != 0f
+
+    /** True when the ride [each] is drawn under the character. For tests. */
+    internal fun isRideDrawn(each: Ride): Boolean = rideMeshes[each.ordinal].visible
+
+    /** The bike shop's name, floating over it. For tests. */
+    internal val shopName: HTMLButtonElement
+        get() = shopLabel
 
     internal val isMarkerShown: Boolean
         get() = marker.visible
@@ -945,11 +1116,22 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val dash = taps.isDouble(window.performance.now(), x, y)
         // The passersby can be tapped while they are out.
         val boxes = if (crowd.visible) passersby.map { Passerby.boxAround(it.spot) } else emptyList()
-        val picked = view.pick((x - frame.left) / frame.width, (y - frame.top) / frame.height, boxes, cutaway)
+        // The shared bikes and e-scooters can be tapped to rent one, on foot.
+        val vehicles = if (ride == null && !sitting) Rides.tapBoxes else emptyList()
+        val left = (x - frame.left) / frame.width
+        val picked = view.pick(left, (y - frame.top) / frame.height, boxes, cutaway, vehicles)
         // A tap that lands on something else turns the player away from the passerby; a tap on the sky does not.
         if (picked != null && picked !is Picked.AtPasserby) stopChatting()
         when (picked) {
             is Picked.AtPasserby -> stopFor(passersby[picked.index], dash)
+            is Picked.AtVehicle -> goRent(picked.index, dash)
+            Picked.AtShop -> {
+                if (dash) {
+                    walkTo(Neighbourhood.shop.talkSpot, dash = true, opensOnArrival = false)
+                } else {
+                    goToShop(dash = false)
+                }
+            }
             is Picked.AtPlace -> {
                 if (dash) {
                     walkTo(Neighbourhood.venue(picked.place).talkSpot, dash = true, opensOnArrival = false)
@@ -1004,11 +1186,44 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         onPlace(place)
     }
 
-    private fun walkTo(target: Spot, dash: Boolean, opensOnArrival: Boolean) {
-        if (sitting) return
+    /** Sends the character to the bike shop's keeper, and opens the talk with him at once. */
+    private fun goToShop(dash: Boolean) {
+        walkTo(Neighbourhood.shop.talkSpot, dash, opensOnArrival = false)
+        onShop()
+    }
+
+    /**
+     * Sends the character to the shared bike or e-scooter [index], to rent it on arrival, or rents it at once when the
+     * character stands by it. Like a tap on the ground, it turns the player away from a talk.
+     */
+    private fun goRent(index: Int, dash: Boolean) {
+        onPlace(null)
+        val there = Rides.shared[index].spot
+        if (distanceBetween(spot, there) <= Rides.RENT_REACH || !walkTo(there, dash, opensOnArrival = false)) {
+            trip = null
+            marker.visible = false
+            askToRent(index)
+            return
+        }
+        rentAt = index
+    }
+
+    /** At the shared one [index]: asks the game to pay its fare, which gets the character on it. */
+    private fun askToRent(index: Int) {
+        rentAt = -1
+        renting = index
+        onRent(Ride.shared(Rides.shared[index].vehicle))
+        renting = -1
+    }
+
+    /** Starts a trip to [target] at the pace the character goes now, unless it is there. True when it set off. */
+    private fun walkTo(target: Spot, dash: Boolean, opensOnArrival: Boolean): Boolean {
+        if (sitting) return false
+        rentAt = -1
         val route = Neighbourhood.grid.route(spot, target)
-        if (route.size < 2) return
-        trip = Trip(route, if (dash) Trip.DASH_SPEED else Trip.WALK_SPEED)
+        if (route.size < 2) return false
+        tripDash = dash
+        trip = Trip(route, paceFor(dash))
         tripStarted = window.performance.now()
         this.opensOnArrival = opensOnArrival
         cameraMovedOnWalk = false
@@ -1016,6 +1231,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         marker.position.set(end.x, 0.0, end.z)
         marker.visible = true
         askForFrame()
+        return true
     }
 
     private fun fit() {
@@ -1238,6 +1454,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             greeterFigures[index].write(pose, townsfolk.instanceMatrix.array, first)
             first += greeterFigures[index].count
         }
+        keeperFigure.write(keeper.step(now, millis, player), townsfolk.instanceMatrix.array, first)
         townsfolk.instanceMatrix.needsUpdate = true
         val out = if (nightFell == null) 1.0 else DayLight.outdoors(nightProgress)
         passerbyMaterial.opacity = out
@@ -1384,6 +1601,20 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
      * front along the street rather than down between the towers.
      */
     private fun arrive(end: Spot) {
+        if (rentAt >= 0) {
+            askToRent(rentAt)
+            return
+        }
+        if (Neighbourhood.isAtShop(end)) {
+            val shop = Neighbourhood.shop
+            if (distanceBetween(end, shop.talkSpot) <= Neighbourhood.REACH) {
+                heading = atan2(shop.keeper.x - end.x, shop.keeper.z - end.z)
+            }
+            // Its door faces south: the camera comes round to the south, looking at its front.
+            if (!cameraMovedOnWalk) view.aim(0.0, FollowCamera.ARRIVAL_TILT, view.distance)
+            if (opensOnArrival) onShop()
+            return
+        }
         val place = Neighbourhood.placeAt(end) ?: return
         val venue = Neighbourhood.venue(place)
         if (distanceBetween(end, venue.talkSpot) <= Neighbourhood.REACH) {
@@ -1461,29 +1692,52 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         rainMaterial.color.setHex(DayLight.mix(lit.sky, 0xFFFFFF, RAIN_PALE))
     }
 
-    /** Puts the character where it is: walking with its legs and arms swinging, or sitting on the bench. */
+    /**
+     * Puts the character where it is: walking with its legs and arms swinging, riding with its hands on the handlebar,
+     * or sitting on the bench. It makes nothing new, as it runs every frame.
+     */
     private fun placeCharacter() {
-        val legs = listOf(limbs.getValue(Limb.LEFT_LEG), limbs.getValue(Limb.RIGHT_LEG))
-        val arms = listOf(limbs.getValue(Limb.LEFT_ARM), limbs.getValue(Limb.RIGHT_ARM))
         if (sitting) {
             val seat = Neighbourhood.benchSeat
             // A little forward on the seat, toward the way the bench faces.
             character.position.set(seat.x, SITTING_LIFT, seat.z + 0.1 * cos(Neighbourhood.BENCH_FACING))
             character.rotation.y = Neighbourhood.BENCH_FACING
             // Legs straight out in front, hands in the lap.
-            for (leg in legs) leg.rotation.x = -PI / 2
-            for (arm in arms) arm.rotation.x = -0.5
+            leftLeg.rotation.x = -PI / 2
+            rightLeg.rotation.x = -PI / 2
+            leftArm.rotation.x = -0.5
+            rightArm.rotation.x = -0.5
             return
         }
         val current = trip
         val elapsed = window.performance.now() - tripStarted
+        val riding = ride
+        if (riding != null) {
+            val vehicle = riding.vehicle
+            // Up on the saddle or the deck, the ride under the character and turned with it.
+            character.position.set(spot.x, vehicle.lift * Figures.SCALE, spot.z)
+            character.rotation.y = heading
+            mount.position.set(spot.x, 0.0, spot.z)
+            mount.rotation.y = heading
+            // On a bike the feet go round with the pedals as it moves; on an e-scooter one foot stands ahead.
+            val step = if (vehicle == Vehicle.BIKE) {
+                if (current == null) 0.0 else sin(current.travelled(elapsed) / PEDAL_LENGTH * 2 * PI) * PEDAL_SWING
+            } else {
+                SCOOTER_STANCE
+            }
+            leftLeg.rotation.x = vehicle.legs - step
+            rightLeg.rotation.x = vehicle.legs + step
+            leftArm.rotation.x = vehicle.arms
+            rightArm.rotation.x = vehicle.arms
+            return
+        }
         val swing = current?.swingAfter(elapsed) ?: 0.0
         character.position.set(spot.x, current?.liftAfter(elapsed) ?: 0.0, spot.z)
         character.rotation.y = heading
-        legs[0].rotation.x = swing
-        legs[1].rotation.x = -swing
-        arms[0].rotation.x = -swing * 0.8
-        arms[1].rotation.x = swing * 0.8
+        leftLeg.rotation.x = swing
+        rightLeg.rotation.x = -swing
+        leftArm.rotation.x = -swing * 0.8
+        rightArm.rotation.x = swing * 0.8
     }
 
     private fun placeCamera() {
@@ -1515,20 +1769,36 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         // The names are all one line, so the first one tells how tall a name is.
         val tall = labels.values.first().offsetHeight.toDouble()
         for ((place, label) in labels) {
-            val point = view.screenPoint(Neighbourhood.venue(place).labelAnchor)
-            val shown = point != null && point.left in 0.0..1.0 && point.top in 0.0..1.0
-            label.classList.toggle("behind", !shown)
-            // A name that would reach up under the top card or the day's log is hidden there, and out of the finger's
-            // way; it stays for the keyboard and a screen reader, as its place's person is still there to talk to.
-            val under = covered > 0.0 && shown && point != null && point.top * height - tall < covered
-            label.classList.toggle("under", under)
-            label.tabIndex = if (shown) 0 else -1
-            if (shown) label.removeAttribute("aria-hidden") else label.setAttribute("aria-hidden", "true")
-            if (point != null) {
-                val left = point.left * width
-                val top = point.top * height
-                label.style.transform = "translate(${left}px, ${top}px) translate(-50%, -100%)"
-            }
+            placeLabel(label, Neighbourhood.venue(place).labelAnchor, width, height, tall, covered)
+        }
+        placeLabel(shopLabel, Neighbourhood.shop.labelAnchor, width, height, tall, covered)
+    }
+
+    /**
+     * Lays [label] over [anchor] on a town [width] by [height] pixels, a name [tall] pixels tall, with cards over the
+     * town's top [covered] pixels.
+     */
+    private fun placeLabel(
+        label: HTMLButtonElement,
+        anchor: Point,
+        width: Double,
+        height: Double,
+        tall: Double,
+        covered: Double,
+    ) {
+        val point = view.screenPoint(anchor)
+        val shown = point != null && point.left in 0.0..1.0 && point.top in 0.0..1.0
+        label.classList.toggle("behind", !shown)
+        // A name that would reach up under the top card or the day's log is hidden there, and out of the finger's
+        // way; it stays for the keyboard and a screen reader, as its person is still there to talk to.
+        val under = covered > 0.0 && shown && point != null && point.top * height - tall < covered
+        label.classList.toggle("under", under)
+        label.tabIndex = if (shown) 0 else -1
+        if (shown) label.removeAttribute("aria-hidden") else label.setAttribute("aria-hidden", "true")
+        if (point != null) {
+            val left = point.left * width
+            val top = point.top * height
+            label.style.transform = "translate(${left}px, ${top}px) translate(-50%, -100%)"
         }
     }
 
@@ -1595,6 +1865,13 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
         /** Within this distance of a passerby the character turns to them where it stands, instead of walking up. */
         const val CHAT_DISTANCE = 1.6
+
+        /** How far a bike goes for one turn of its pedals, and how far the legs swing with them, in radians. */
+        const val PEDAL_LENGTH = 1.8
+        const val PEDAL_SWING = 0.35
+
+        /** How far ahead the front foot stands on an e-scooter, and the back foot behind, in radians. */
+        const val SCOOTER_STANCE = 0.12
 
         /** The campfire's warm light at night, at full flicker, how far it reaches, and how high it hangs. */
         const val FIRE_COLOUR = 0xFFA040
