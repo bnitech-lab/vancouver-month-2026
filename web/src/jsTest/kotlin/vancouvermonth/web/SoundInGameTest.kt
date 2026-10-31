@@ -12,6 +12,7 @@ import org.w3c.dom.asList
 import org.w3c.dom.events.Event
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.text.Passer
+import vancouvermonth.text.Weather
 
 /** A town to walk in that draws nothing, whose nights pass at once. */
 internal class QuietTown : WalkableTown {
@@ -21,6 +22,8 @@ internal class QuietTown : WalkableTown {
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
     override var isCovered = false
+    override var weather = Weather.SUNNY
+    override var onSounds: (Double, Double, Double) -> Unit = { _, _, _ -> }
 
     override fun mark(place: Place?) {}
 

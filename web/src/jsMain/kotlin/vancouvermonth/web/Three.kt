@@ -155,7 +155,9 @@ external class MeshToonMaterial(parameters: Json) : Material {
 }
 
 /** A plain colour that no light changes, as rain is. With the option `transparent`, `opacity` lets the town show through. */
-external class MeshBasicMaterial(parameters: Json) : Material
+external class MeshBasicMaterial(parameters: Json) : Material {
+    val color: Color
+}
 
 external class Mesh(geometry: BoxGeometry, material: Material) : Object3D
 

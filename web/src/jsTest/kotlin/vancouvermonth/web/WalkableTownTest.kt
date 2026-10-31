@@ -28,6 +28,7 @@ import vancouvermonth.core.FirstMinute
 import vancouvermonth.text.actionName
 import vancouvermonth.text.money
 import vancouvermonth.text.Passer
+import vancouvermonth.text.Weather
 
 /** A town to walk in that draws nothing, so a test can make it fail on purpose. Its nights pass at once. */
 private class SilentTown : WalkableTown {
@@ -37,6 +38,8 @@ private class SilentTown : WalkableTown {
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
     override var isCovered = false
+    override var weather = Weather.SUNNY
+    override var onSounds: (Double, Double, Double) -> Unit = { _, _, _ -> }
 
     override fun mark(place: Place?) {}
 

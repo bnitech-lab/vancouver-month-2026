@@ -5,10 +5,12 @@ import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.exp
 import kotlin.math.hypot
+import kotlin.math.max
 import kotlin.math.min
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.khronos.webgl.Uint8Array
+import org.khronos.webgl.get
 import org.khronos.webgl.set
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLCanvasElement
@@ -18,6 +20,7 @@ import org.w3c.dom.events.Event
 import org.w3c.dom.events.WheelEvent
 import org.w3c.dom.pointerevents.PointerEvent
 import vancouvermonth.text.Passer
+import vancouvermonth.text.Weather
 
 /** What the phone screen needs from the town the player walks in. */
 interface WalkableTown {
@@ -50,6 +53,19 @@ interface WalkableTown {
      * to spare the battery.
      */
     var isCovered: Boolean
+
+    /**
+     * Today's weather: rain falls on a rainy day, and the sky greys on a cloudy or a rainy one. Set while the day
+     * changes, it comes in the dark of the night, so the morning wakes to it.
+     */
+    var weather: Weather
+
+    /**
+     * Called as the town's own life moves, with how loud its sounds are where the player is, each from 0.0 to 1.0:
+     * the passing [train] at the camera, how near the campfire the character is ([fire]), and how dark the town's own
+     * night is ([night]). What to play is the sound's to decide.
+     */
+    var onSounds: (train: Double, fire: Double, night: Double) -> Unit
 
     /** Marks the name of [place], as on an interview day, or no name when null. */
     fun mark(place: Place?)
@@ -101,6 +117,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     override var onPasserby: (Passer) -> Unit = {}
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
+    override var onSounds: (Double, Double, Double) -> Unit = { _, _, _ -> }
 
     private val renderer = WebGLRenderer(json("canvas" to canvas, "context" to context))
     private val scene = Scene()
@@ -130,10 +147,15 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private val passerbyParts = passersby.map { Figures.passer(it.passer) }
     private val passerbyFigures = passerbyParts.map { FigureBoxes(it) }
 
+    /** The passersby dressed for the rain, two with umbrellas open, drawn in their place on a rainy day. */
+    private val wetPasserbyParts = passersby.map { Figures.passer(it.passer, Weather.RAINY) }
+    private val wetPasserbyFigures = wetPasserbyParts.map { FigureBoxes(it) }
+
     /** The passersby fade out together in the evening and back in at dawn, so they share a material that can fade. */
     private val passerbyMaterial = MeshToonMaterial(json("gradientMap" to shades, "transparent" to true))
     private lateinit var townsfolk: InstancedMesh
     private lateinit var passerbyBoxes: InstancedMesh
+    private lateinit var wetPasserbyBoxes: InstancedMesh
 
     /** The passerby the player has stopped for a word, who stands and faces them for a while. */
     private var chatting: Passerby? = null
@@ -154,6 +176,23 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     /** How far the train is from its stop at the station, as last drawn. */
     private var trainShift = 0.0
+
+    /** The weather drawn now, and the one to come in the dark when it was set while the day changed. */
+    private var shownWeather = Weather.SUNNY
+    private var comingWeather: Weather? = null
+
+    /** The light as the time of day has it, before the weather greys it. */
+    private var lighting = DayLight.MORNING
+
+    /** The ground's boxes, among them the sea and the pond, which darken in the rain; and which of them are water. */
+    private lateinit var groundBoxes: InstancedMesh
+    private val waterBoxes = Neighbourhood.ground.indices.filter { Neighbourhood.ground[it].colour == Neighbourhood.WATER }
+
+    /** The rain's streaks and splashes in one draw, in a plain pale colour no light changes; the puddles in another. */
+    private val rainMaterial =
+        MeshBasicMaterial(json("color" to 0xFFFFFF, "transparent" to true, "opacity" to RAIN_OPACITY, "depthWrite" to false))
+    private lateinit var rain: InstancedMesh
+    private lateinit var puddles: InstancedMesh
 
     /** True when the page is not on screen. A test may set it. */
     internal var pageHidden: () -> Boolean = { document.asDynamic().hidden == true }
@@ -264,6 +303,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         addLightAndSky()
         addTown()
         addLife()
+        addWeather()
         addCharacter()
         addPeople()
         addMarker()
@@ -315,6 +355,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val ground = boxes(Neighbourhood.ground, material)
         ground.castShadow = false
         scene.add(ground)
+        groundBoxes = ground
         scene.add(boxes(Neighbourhood.blocks, material))
         scene.add(boxes(Neighbourhood.glowing, glowMaterial))
     }
@@ -340,6 +381,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private fun addPeople() {
         townsfolk = figures(greeterParts, material)
         passerbyBoxes = figures(passerbyParts, passerbyMaterial)
+        wetPasserbyBoxes = figures(wetPasserbyParts, passerbyMaterial)
+        wetPasserbyBoxes.visible = false
         stepLife()
     }
 
@@ -373,6 +416,22 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         drifting.frustumCulled = false
         drifting.instanceMatrix.setUsage(DynamicDrawUsage)
         scene.add(drifting)
+    }
+
+    /** The rain, falling only on a rainy day, and the puddles it leaves; neither casts a shadow. */
+    private fun addWeather() {
+        rain = InstancedMesh(cube, rainMaterial, Rain.DROPS + Rain.SPLASHES)
+        rain.castShadow = false
+        rain.receiveShadow = false
+        rain.frustumCulled = false
+        rain.instanceMatrix.setUsage(DynamicDrawUsage)
+        rain.visible = false
+        meshes.add(rain)
+        scene.add(rain)
+        puddles = boxes(Rain.puddles, material)
+        puddles.castShadow = false
+        puddles.visible = false
+        scene.add(puddles)
     }
 
     /** A small square on the ground where the character is walking to, shown only while it walks. */
@@ -444,6 +503,18 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         stopChatting()
     }
 
+    override var weather: Weather
+        get() = comingWeather ?: shownWeather
+        set(value) {
+            if (nightFell != null) {
+                // The new day's sky comes in the dark of the night.
+                comingWeather = value
+                return
+            }
+            comingWeather = null
+            if (value != shownWeather) showWeather(value)
+        }
+
     override fun mark(place: Place?) {
         for ((labelPlace, label) in labels) label.classList.toggle("here", labelPlace == place)
     }
@@ -476,6 +547,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     override fun close() {
         if (closed) return
         closed = true
+        // The town's sounds go quiet with it.
+        onSounds(0.0, 0.0, 0.0)
         resizeObserver.disconnect()
         canvas.removeEventListener("pointerdown", onPress)
         canvas.removeEventListener("pointermove", onMove)
@@ -496,6 +569,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         trainGlowMaterial.dispose()
         passerbyMaterial.dispose()
         flameMaterial.dispose()
+        rainMaterial.dispose()
         shades.dispose()
     }
 
@@ -539,7 +613,22 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     /** True while the passersby are out, by day; false at night. For tests. */
     internal val arePassersbyOut: Boolean
-        get() = passerbyBoxes.visible
+        get() = crowd.visible
+
+    /** The weather drawn now, and whether rain is falling, for tests. */
+    internal val weatherShown: Weather
+        get() = shownWeather
+
+    internal val isRaining: Boolean
+        get() = rain.visible
+
+    /** How high the first streak of rain was last drawn, for tests: it falls as the town's time goes on. */
+    internal val firstStreakHeight: Double
+        get() = rain.instanceMatrix.array[13].toDouble()
+
+    /** The passersby as drawn today: in their rain clothes on a rainy day. */
+    private val crowd: InstancedMesh
+        get() = if (shownWeather == Weather.RAINY) wetPasserbyBoxes else passerbyBoxes
 
     /** The camera's turn, tilt and distance as asked, for tests. */
     internal val cameraTurn: Double
@@ -621,7 +710,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         if (frame.width == 0.0 || frame.height == 0.0 || nightFell != null) return
         val dash = taps.isDouble(window.performance.now(), x, y)
         // The passersby can be tapped while they are out.
-        val boxes = if (passerbyBoxes.visible) passersby.map { Passerby.boxAround(it.spot) } else emptyList()
+        val boxes = if (crowd.visible) passersby.map { Passerby.boxAround(it.spot) } else emptyList()
         val picked = view.pick((x - frame.left) / frame.width, (y - frame.top) / frame.height, boxes)
         // A tap that lands on something else turns the player away from the passerby; a tap on the sky does not.
         if (picked != null && picked !is Picked.AtPasserby) stopChatting()
@@ -791,16 +880,10 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         townsfolk.instanceMatrix.needsUpdate = true
         val out = if (nightFell == null) 1.0 else DayLight.outdoors(nightProgress)
         passerbyMaterial.opacity = out
-        passerbyBoxes.visible = out > 0.0
+        crowd.visible = out > 0.0
         // A fading figure would leave a solid shadow, so the passersby cast none until they are all there.
-        passerbyBoxes.castShadow = out >= 1.0
-        first = 0
-        for (index in passersby.indices) {
-            val pose = passersby[index].step(millis, player)
-            passerbyFigures[index].write(pose, passerbyBoxes.instanceMatrix.array, first)
-            first += passerbyFigures[index].count
-        }
-        passerbyBoxes.instanceMatrix.needsUpdate = true
+        crowd.castShadow = out >= 1.0
+        placePassersby(millis, player)
         trainShift = SkyTrainRun.shiftAt(now)
         train.position.set(Neighbourhood.TRAIN_STOP + trainShift, 0.0, 0.0)
         val trainShows = SkyTrainRun.opacityAt(now)
@@ -812,7 +895,71 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         flames.scale.set(spread, flicker, spread)
         flameMaterial.emissiveIntensity = glowLevel * flicker
         fireLight.intensity = FIRE_LIGHT * glowLevel * flicker
-        placeBlocks(drifting, Shimmer.at(now, glowLevel) + Petals.at(now) + Clouds.at(now))
+        // Grey skies dull the glints on the water, as the night does.
+        val dull = max(glowLevel, DayLight.dullness(shownWeather))
+        placeBlocks(drifting, Shimmer.at(now, dull) + Petals.at(now) + Clouds.at(now))
+        if (rain.visible) placeRain(now)
+        // How loud the train and the fire are where the player is: the train at the camera, the fire at the character.
+        val night = if (nightFell == null) 0.0 else DayLight.at(nightProgress).glow
+        val fire = Campfire.nearness(distanceBetween(player, Neighbourhood.campfire))
+        onSounds(SkyTrainRun.rumbleAt(now, view.eye), fire, night)
+    }
+
+    /**
+     * Moves the passersby on by [millis] with the player at [player], and draws them as they are dressed today: the
+     * hand holding an umbrella raised a little to its shaft.
+     */
+    private fun placePassersby(millis: Double, player: Spot) {
+        val wet = shownWeather == Weather.RAINY
+        val mesh = crowd
+        val dressed = if (wet) wetPasserbyFigures else passerbyFigures
+        var first = 0
+        for (index in passersby.indices) {
+            val passerby = passersby[index]
+            val pose = passerby.step(millis, player)
+            val held = if (Figures.holdsUmbrella(passerby.passer, shownWeather)) pose.copy(wave = Figures.UMBRELLA_ARM) else pose
+            dressed[index].write(held, mesh.instanceMatrix.array, first)
+            first += dressed[index].count
+        }
+        mesh.instanceMatrix.needsUpdate = true
+    }
+
+    /** The rain at [millis], falling in a box of sky between where the camera looks and the camera itself. */
+    private fun placeRain(millis: Double) {
+        val eye = view.eye
+        val focus = view.focus
+        val x = focus.x + (eye.x - focus.x) * RAIN_TOWARD_EYE
+        val z = focus.z + (eye.z - focus.z) * RAIN_TOWARD_EYE
+        Rain.write(millis, x, z, rain.instanceMatrix.array)
+        rain.instanceMatrix.needsUpdate = true
+    }
+
+    /**
+     * Dresses the town for [weather]: rain and puddles or none, the sky, the light and the haze, the sea and the
+     * clouds, and the passersby, who change clothes where they stand.
+     */
+    private fun showWeather(weather: Weather) {
+        val out = crowd.visible
+        crowd.visible = false
+        shownWeather = weather
+        val rainy = weather == Weather.RAINY
+        rain.visible = rainy
+        puddles.visible = rainy
+        val (near, far) = DayLight.haze(weather)
+        haze.near = near
+        haze.far = far
+        val colour = Color(0)
+        for (index in waterBoxes) groundBoxes.setColorAt(index, colour.setHex(DayLight.sea(weather)))
+        groundBoxes.instanceColor?.needsUpdate = true
+        val clouds = Shimmer.count + Petals.count
+        for (index in clouds until clouds + Clouds.count) drifting.setColorAt(index, colour.setHex(Clouds.colour(weather)))
+        drifting.instanceColor?.needsUpdate = true
+        crowd.visible = out
+        placePassersby(0.0, if (sitting) Neighbourhood.benchSeat else spot)
+        if (rainy) placeRain(lifeNow)
+        light(lighting)
+        touched()
+        askForFrame()
     }
 
     /** Puts each box of a mesh that moves where [blocks] are now: stretched to size, with no turn. */
@@ -864,7 +1011,12 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val progress = ((now - start) / nightMillis).coerceIn(0.0, 1.0)
         nightProgress = progress
         light(DayLight.at(progress))
-        // In the dark the character goes home, unless it spends the night by the fire.
+        // In the dark the next day's weather comes, and the character goes home, unless it spends the night by the fire.
+        val coming = comingWeather
+        if (progress >= DayLight.HOME_AT && coming != null) {
+            comingWeather = null
+            showWeather(coming)
+        }
         if (progress >= DayLight.HOME_AT && !wentHome && !sitting) {
             wentHome = true
             goHome(jump = true)
@@ -892,22 +1044,30 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private fun morning() {
         if (sitting) goHome(jump = false)
         marker.visible = false
+        val coming = comingWeather
+        comingWeather = null
+        if (coming != null) showWeather(coming)
         light(DayLight.MORNING)
         viewBeforeRest?.let { (turn, tilt, distance) -> view.aim(turn, tilt, distance) }
         viewBeforeRest = null
         onMorning()
     }
 
+    /** Lights the town as [lighting] says for the time of day, greyed as today's weather asks. */
     private fun light(lighting: Lighting) {
-        sky.setHex(lighting.sky)
-        haze.color.setHex(lighting.sky)
-        ambient.intensity = lighting.ambient
-        ambient.color.setHex(lighting.ambientColour)
-        sun.intensity = lighting.sun
-        sun.color.setHex(lighting.sunColour)
-        glowMaterial.emissiveIntensity = lighting.glow
-        trainGlowMaterial.emissiveIntensity = lighting.glow
-        glowLevel = lighting.glow
+        this.lighting = lighting
+        val lit = DayLight.weathered(lighting, shownWeather)
+        sky.setHex(lit.sky)
+        haze.color.setHex(lit.sky)
+        ambient.intensity = lit.ambient
+        ambient.color.setHex(lit.ambientColour)
+        sun.intensity = lit.sun
+        sun.color.setHex(lit.sunColour)
+        glowMaterial.emissiveIntensity = lit.glow
+        trainGlowMaterial.emissiveIntensity = lit.glow
+        glowLevel = lit.glow
+        // The rain is a paler shade of the sky, so it shows against the town by day and does not glare at night.
+        rainMaterial.color.setHex(DayLight.mix(lit.sky, 0xFFFFFF, RAIN_PALE))
     }
 
     /** Puts the character where it is: walking with its legs and arms swinging, or sitting on the bench. */
@@ -1024,5 +1184,13 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         const val FIRE_LIGHT = 4.0
         const val FIRE_REACH = 7.0
         const val FIRE_LIGHT_HEIGHT = 0.8
+
+        /**
+         * The rain: how solid a streak is, how much paler than the sky, and how far toward the camera its box of sky
+         * sits from where the camera looks.
+         */
+        const val RAIN_OPACITY = 0.55
+        const val RAIN_PALE = 0.45
+        const val RAIN_TOWARD_EYE = 0.4
     }
 }
