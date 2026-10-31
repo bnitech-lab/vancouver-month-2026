@@ -53,8 +53,6 @@ enum class Situation {
  */
 fun situations(month: Month, firstMeeting: Boolean, yesterday: List<Event>): List<Situation> {
     val stageToday = if (month.hasInterviewToday) month.interview?.stage else null
-    // At today's pace, the living costs still to come leave less than October's total.
-    val moneyTight = month.balance - month.daysLeft * Month.DAILY_LIVING_COST < month.room.totalMonthlyCost
     val holds = mapOf(
         Situation.OFFER to (month.ending == Ending.OFFER),
         Situation.FIRST_MEETING to firstMeeting,
@@ -62,7 +60,7 @@ fun situations(month: Month, firstMeeting: Boolean, yesterday: List<Event>): Lis
         Situation.INTERVIEW_TODAY to (stageToday != null),
         Situation.FAILED_INTERVIEW to yesterday.any { it is Event.InterviewHeld && !it.passed },
         Situation.LOW_ENERGY to (month.energy <= 1),
-        Situation.MONEY_TIGHT to moneyTight,
+        Situation.MONEY_TIGHT to month.moneyTight,
         Situation.INTERVIEW_BOOKED to (month.interview != null),
         Situation.APPLIED to yesterday.any { it is Event.Applied },
         Situation.APPLICATIONS_CLOSED to !month.canStillApplyThisMonth,
