@@ -2,6 +2,7 @@ package vancouvermonth.web
 
 import kotlin.js.Date
 import kotlin.js.Promise
+import kotlin.math.abs
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,10 +26,13 @@ import org.w3c.dom.pointerevents.PointerEvent
 import org.w3c.dom.pointerevents.PointerEventInit
 import vancouvermonth.core.Action
 import vancouvermonth.core.FirstMinute
+import vancouvermonth.core.Month
 import vancouvermonth.text.actionName
 import vancouvermonth.text.money
 import vancouvermonth.text.Passer
 import vancouvermonth.text.Weather
+import vancouvermonth.text.weatherOn
+import vancouvermonth.text.weatherWord
 
 /** A town to walk in that draws nothing, so a test can make it fail on purpose. Its nights pass at once. */
 private class SilentTown : WalkableTown {
@@ -74,12 +78,14 @@ class WalkableTownTest {
      * With [phone], the town is 375 by 812 points, a phone's shape, whatever the test browser's window, so every
      * point a test projects lands where it would on a phone. The town's own life runs by [life], a clock the test
      * holds: by default it stays at 0, so the passersby, the train and the rest stand still where a test can find them.
+     * With [weather], each day's weather is the test's own instead of the seed's.
      */
     private fun startInTown(
         settle: Double = 0.0,
         night: Double = DayLight.MILLIS,
         phone: Boolean = true,
         life: () -> Double = { 0.0 },
+        weather: ((Int) -> Weather)? = null,
     ): NeighbourhoodScene {
         val game = PhoneGame(root, 1011, playAgain = {}, makeWalkableTown = {
             val opened = assertNotNull(openWalkableTown(lessMotion = false), "The test browser has no WebGL 2")
@@ -90,6 +96,7 @@ class WalkableTownTest {
             }
         })
         game.talkSettleMillis = settle
+        if (weather != null) game.weatherOf = weather
         game.show()
         startMonth()
         val started = assertNotNull(town)
@@ -789,4 +796,153 @@ class WalkableTownTest {
     /** The ending's own line and figures. */
     private fun endingText(): String =
         listOf(".ending-line", ".figures").joinToString(" | ") { root.querySelector(it)?.textContent.orEmpty() }
+
+    /** The day's figures in the top card and the day's log, without the weather word. */
+    private fun dayFigures(): String {
+        val hud = root.querySelector(".hud")?.textContent.orEmpty()
+        val weather = root.querySelector(".hud .weather")?.textContent.orEmpty()
+        return hud.replace(weather, "") + " | " + root.querySelector(".log")?.textContent.orEmpty()
+    }
+
+    /** How high the first streak of rain is drawn when the town's time is [millis]: its top less half a streak. */
+    private fun streakAt(millis: Double): Double = Rain.dropAt(0, millis, 0.0, 0.0).y - Rain.STREAK / 2
+
+    @Test
+    fun `on seed 1011's sunny days no rain falls, and on its first rainy day rain falls and the top card says 비`():
+        Promise<Unit> {
+        val days = Month.FIRST_DAY..Month.LAST_DAY
+        val rainyDay = days.first { weatherOn(1011, it) == Weather.RAINY }
+        assertEquals(Weather.SUNNY, weatherOn(1011, Month.FIRST_DAY))
+        var clock = 0.0
+        val town = startInTown(night = 120.0, life = { clock })
+        var day = Month.FIRST_DAY
+        return Promise { resolve, reject ->
+            fun nextDay() {
+                val word = root.querySelector(".hud .weather")?.textContent
+                if (day < rainyDay) {
+                    assertFalse(town.isRaining, "rain on day $day")
+                    assertEquals("날씨 ${weatherWord(weatherOn(1011, day))}", word, "day $day")
+                    talkTo(Place.HOME)
+                    spendButton().click()
+                    day++
+                    whenReady({ !town.isChangingDay }, reject) { nextDay() }
+                    return
+                }
+                assertTrue(town.isRaining, "no rain on day $day")
+                assertEquals(Weather.RAINY, town.weatherShown)
+                assertEquals("날씨 비", word)
+                assertTrue("오늘9월 ${day}일" in screen, screen)
+                // The rain falls with the town's own time, every streak where the rain's rule puts it.
+                assertNotEquals(streakAt(1_000.0), streakAt(1_040.0))
+                clock = 1_000.0
+                whenReady({ abs(town.firstStreakHeight - streakAt(1_000.0)) < 1e-4 }, reject) {
+                    clock = 1_040.0
+                    whenReady({ abs(town.firstStreakHeight - streakAt(1_040.0)) < 1e-4 }, reject) {
+                        assertTrue(town.arePassersbyOut, "the passersby stayed in")
+                        resolve(Unit)
+                    }
+                }
+            }
+            try {
+                nextDay()
+            } catch (error: Throwable) {
+                reject(error)
+            }
+        }
+    }
+
+    @Test
+    fun `a rainy morning's rain comes in the dark of the night, not as the day is spent`(): Promise<Unit> {
+        val town = startInTown(weather = { day -> if (day > Month.FIRST_DAY) Weather.RAINY else Weather.SUNNY })
+        return play(
+            Step("spend a dry day", { town.isStill }) {
+                assertFalse(town.isRaining)
+                assertEquals("날씨 맑음", root.querySelector(".hud .weather")?.textContent)
+                talkTo(Place.HOME)
+                spendButton().click()
+                assertTrue(town.isChangingDay)
+                // The top card already shows the new day, but the evening is still dry.
+                assertEquals("날씨 비", root.querySelector(".hud .weather")?.textContent)
+                assertEquals(Weather.RAINY, town.weather)
+                assertEquals(Weather.SUNNY, town.weatherShown)
+                assertFalse(town.isRaining, "the rain came as the day was spent")
+            },
+            Step("the rain comes", { town.weatherShown == Weather.RAINY }) {
+                assertTrue(town.isChangingDay, "the rain came only in the morning")
+                assertTrue(town.isRaining)
+            },
+            Step("in the morning", { !town.isChangingDay }) {
+                assertTrue(town.isRaining)
+                assertTrue(town.arePassersbyOut)
+            },
+        )
+    }
+
+    @Test
+    fun `the rain changes none of the day's figures: the same choices end each day the same on a sunny run`():
+        Promise<Unit> {
+        val cycle = listOf(Action.APPLY, Action.STUDY_ENGLISH, Action.PRACTISE_CODING, Action.WORK, Action.REST)
+        val days = 8
+
+        /** Plays [days] days in a town where every day is [weather], and gives each morning's figures. */
+        fun playIn(weather: Weather): Promise<List<String>> {
+            val town = startInTown(night = 120.0, weather = { weather })
+            val seen = mutableListOf(dayFigures())
+            return Promise { resolve, reject ->
+                fun nextDay() {
+                    assertEquals(weather == Weather.RAINY, town.isRaining)
+                    if (seen.size > days) {
+                        resolve(seen)
+                        return
+                    }
+                    if ("오늘은 면접 날이에요" in screen) {
+                        talkTo(Place.OFFICE)
+                    } else {
+                        talkTo(placeFor(cycle[(seen.size - 1) % cycle.size]))
+                        if (spendButton().disabled) talkTo(Place.HOME)
+                    }
+                    spendButton().click()
+                    whenReady({ !town.isChangingDay }, reject) {
+                        seen += dayFigures()
+                        nextDay()
+                    }
+                }
+                try {
+                    nextDay()
+                } catch (error: Throwable) {
+                    reject(error)
+                }
+            }
+        }
+
+        return playIn(Weather.RAINY).then { rainy ->
+            town?.close()
+            town = null
+            root.innerHTML = ""
+            for (left in document.querySelectorAll(".walk-town").asList()) (left as HTMLElement).remove()
+            playIn(Weather.SUNNY).then { sunny ->
+                assertEquals(days + 1, rainy.size)
+                assertEquals(sunny, rainy)
+            }
+        }.then { }
+    }
+
+    @Test
+    fun `with rain falling and only the town's own life moving, it still draws no more than thirty frames a second`():
+        Promise<Unit> {
+        var clock = 0.0
+        val town = startInTown(life = { clock }, weather = { Weather.RAINY })
+        var from = 0
+        return play(
+            Step("let the rain fall", { town.isStill }) {
+                assertTrue(town.isRaining)
+                clock = 1.0
+                from = town.framesDrawn
+            },
+            Step("one second later", after(1_000)) {
+                val drawn = town.framesDrawn - from
+                assertTrue(drawn in 1..FramePace.AMBIENT_FPS.toInt() + 1, "$drawn frames in a second")
+            },
+        )
+    }
 }
