@@ -4,6 +4,7 @@ import kotlin.js.Date
 import kotlin.js.Promise
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.sqrt
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -1099,6 +1100,129 @@ class WalkableTownTest {
             Step("one second later", after(1_000)) {
                 val drawn = town.framesDrawn - from
                 assertTrue(drawn in 1..FramePace.AMBIENT_FPS.toInt() + 1, "$drawn frames in a second")
+            },
+        )
+    }
+
+    /** The five places' own walls, by where they are among the town's still boxes. */
+    private fun placeBodies(): List<Pair<Venue, Int>> = Neighbourhood.venues.map { venue ->
+        venue to Neighbourhood.blocks.indexOfFirst {
+            it.x == venue.x.toDouble() && it.z == venue.z.toDouble() && it.height == venue.height && it.y == 0.0
+        }
+    }
+
+    /**
+     * From [spot], a turn of the camera at the first view's tilt and distance from which one of the city's buildings at
+     * least [tall] stands between the camera and the character, though none of them does at the first view's turn:
+     * the turn and that building's number. Worked out with the same camera and the same folding rule as the town.
+     */
+    private fun turnWithBuildingInTheWay(spot: Spot, tall: Double): Pair<Double, Int> {
+        val boxes = Neighbourhood.foldables.map { it.box }
+        fun inTheWay(yaw: Double): List<Int> {
+            val focus = Point(spot.x, 1.0, spot.z)
+            val camera = FollowCamera(focus)
+            camera.aspect = 375.0 / 812
+            camera.aim(yaw, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+            camera.jumpTo(focus)
+            val eye = camera.eye
+            val head = Point(spot.x, 1.6, spot.z)
+            val length = sqrt((head.x - eye.x) * (head.x - eye.x) + (head.y - eye.y) * (head.y - eye.y) +
+                (head.z - eye.z) * (head.z - eye.z))
+            val way = Point((head.x - eye.x) / length, (head.y - eye.y) / length, (head.z - eye.z) / length)
+            return boxes.indices.filter { index ->
+                val hit = distanceToBox(eye, way, boxes[index])
+                hit != null && hit < length && boxes[index].height >= tall
+            }
+        }
+        val cutaway = Cutaway(boxes)
+        val start = FollowCamera(Point(spot.x, 1.0, spot.z)).also { it.aspect = 375.0 / 812 }.eye
+        cutaway.aim(start.x, start.y, start.z, spot.x, 1.6, spot.z)
+        for (step in 0 until 48) {
+            val yaw = FollowCamera.START_YAW + step * 2 * PI / 48
+            val index = inTheWay(yaw).firstOrNull { !cutaway.isFolding(it) } ?: continue
+            return yaw to index
+        }
+        error("No turn from $spot puts a building $tall tall in the camera's way")
+    }
+
+    @Test
+    fun `a tall city building between the camera and the character folds down, and stands again once clear`():
+        Promise<Unit> {
+        val town = startInTown()
+        // Downtown, at 도서관's door, among the towers.
+        val door = Neighbourhood.venue(Place.LIBRARY).door
+        val (yaw, index) = turnWithBuildingInTheWay(door, tall = 8.0)
+        val building = Neighbourhood.foldables[index]
+        val full = Neighbourhood.blocks[building.body].height
+        val places = placeBodies()
+        fun placesStand() {
+            for ((venue, body) in places) assertEquals(venue.height, town.drawnHeight(body), 1e-4, "${venue.place}")
+        }
+        return play(
+            Step("stand at 도서관's door", { town.isStill }) {
+                town.standAt(door)
+                town.aimCamera(FollowCamera.START_YAW, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+            },
+            Step("at the first view's turn, the building stands", { town.isStill }) {
+                assertFalse(town.isFolded(index))
+                assertEquals(full, town.drawnHeight(building.body), 1e-4)
+                placesStand()
+                town.aimCamera(yaw, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+            },
+            Step("turned so it stands in the way, it folds", { town.isStill }) {
+                assertTrue(town.isFolded(index), "${building.box} did not fold")
+                assertEquals(Cutaway.PLINTH, town.drawnHeight(building.body), 1e-4)
+                // The camera keeps the whole distance the player asked for.
+                assertEquals(FollowCamera.START_DISTANCE, town.cameraReach, 1e-6)
+                placesStand()
+                town.aimCamera(FollowCamera.START_YAW, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+            },
+            Step("turned back, it stands again", { town.isStill }) {
+                assertFalse(town.isFolded(index))
+                assertEquals(full, town.drawnHeight(building.body), 1e-4)
+                placesStand()
+            },
+        )
+    }
+
+    @Test
+    fun `the five places never fold, even with the camera turned all the way round each`(): Promise<Unit> {
+        val town = startInTown()
+        val places = placeBodies()
+        assertTrue(places.all { it.second >= 0 }, "a place's walls are missing: $places")
+        val steps = mutableListOf<Step>()
+        for (venue in Neighbourhood.venues) {
+            steps += Step("stand at ${venue.place}'s door", { town.isStill }) { town.standAt(venue.door) }
+            for (turn in 0 until 4) {
+                steps += Step("${venue.place}, turn $turn", { town.isStill }) {
+                    for ((place, body) in places) {
+                        assertEquals(place.height, town.drawnHeight(body), 1e-4, "${place.place} at ${venue.place}")
+                    }
+                    town.aimCamera(turn * PI / 2, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+                }
+            }
+        }
+        steps += Step("last turn", { town.isStill }) {
+            for ((place, body) in places) assertEquals(place.height, town.drawnHeight(body), 1e-4, "${place.place}")
+        }
+        return play(*steps.toTypedArray())
+    }
+
+    @Test
+    fun `downtown, the camera at the first view's turn keeps its whole distance, the city folding out of its way`():
+        Promise<Unit> {
+        val town = startInTown()
+        val door = Neighbourhood.venue(Place.LIBRARY).door
+        return play(
+            Step("stand at 도서관's door at the first view's turn", { town.isStill }) {
+                town.standAt(door)
+                town.aimCamera(FollowCamera.START_YAW, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+            },
+            Step("settled", { town.isStill }) {
+                // Not pulled in, not lifted, not turned to look along a street: just where the player put it.
+                assertEquals(FollowCamera.START_DISTANCE, town.cameraReach, 1e-6)
+                assertEquals(FollowCamera.START_YAW, town.cameraEyeTurn, 1e-6)
+                assertTrue(Neighbourhood.foldables.indices.any { town.isFolded(it) }, "nothing folded downtown")
             },
         )
     }

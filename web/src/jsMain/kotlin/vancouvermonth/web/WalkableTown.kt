@@ -9,6 +9,7 @@ import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.khronos.webgl.Uint8Array
@@ -118,7 +119,7 @@ fun openWalkableTown(
  * The town lives on its own too: the townspeople look about and turn to the player, passersby stroll, the SkyTrain
  * comes and goes, the campfire flickers and the water glints. That life is drawn at most [FramePace.AMBIENT_FPS]
  * frames a second; a walk, the camera moving or the change of day are drawn at the screen's full rate; and nothing
- * is drawn while the page is hidden.
+ * is drawn while the page is hidden. The city's buildings in the camera's way fold down out of it ([Cutaway]).
  */
 internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context: RenderingContext) : WalkableTown {
     override val element = document.createElement("div") as HTMLElement
@@ -143,6 +144,24 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private val material = MeshToonMaterial(json("gradientMap" to shades))
     private val glowMaterial = MeshToonMaterial(json("gradientMap" to shades, "emissive" to GLOW))
     private val meshes = mutableListOf<InstancedMesh>()
+
+    /**
+     * The still boxes in their tiles, and for each of [Neighbourhood.blocks] which tile it is drawn in and where in it;
+     * the glowing windows and glass in one draw. A building that folds is put again where it is drawn, and nowhere
+     * else.
+     */
+    private val tiles = mutableListOf<InstancedMesh>()
+    private val tileOf = IntArray(Neighbourhood.blocks.size)
+    private val slotOf = IntArray(Neighbourhood.blocks.size)
+    private lateinit var glowing: InstancedMesh
+
+    /** The city's buildings that fold down out of the camera's way, and where the camera and character last were. */
+    private val cutaway = Cutaway(Neighbourhood.foldables.map { it.box })
+    private var aimedEyeX = Double.NaN
+    private var aimedEyeY = Double.NaN
+    private var aimedEyeZ = Double.NaN
+    private var aimedHeadX = Double.NaN
+    private var aimedHeadZ = Double.NaN
 
     // The town's own life. Everything in it moves by the town's own time, [lifeClock], which a test may set.
     internal var lifeClock: () -> Double = { window.performance.now() }
@@ -397,14 +416,29 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         scene.add(sea)
         scene.add(boxes(ground, material).also { it.castShadow = false })
         tiled(Neighbourhood.blocks, material)
-        scene.add(boxes(Neighbourhood.glowing, glowMaterial))
+        glowing = boxes(Neighbourhood.glowing, glowMaterial)
+        scene.add(glowing)
     }
 
-    /** One draw for each tile of [blocks], [TILE] units square by where each box's middle is. */
-    private fun tiled(blocks: List<Block>, material: Material): List<InstancedMesh> =
-        blocks.groupBy { block ->
-            floor((block.x + block.width / 2) / TILE).toInt() to floor((block.z + block.depth / 2) / TILE).toInt()
-        }.values.map { tile -> boxes(tile, material).also { scene.add(it) } }
+    /**
+     * One draw for each tile of [blocks], [TILE] units square by where each box's middle is, noting for each box which
+     * tile it is in and where.
+     */
+    private fun tiled(blocks: List<Block>, material: Material) {
+        val groups = LinkedHashMap<Pair<Int, Int>, MutableList<Int>>()
+        for ((index, block) in blocks.withIndex()) {
+            val column = floor((block.x + block.width / 2) / TILE).toInt()
+            val key = column to floor((block.z + block.depth / 2) / TILE).toInt()
+            groups.getOrPut(key) { mutableListOf() }.add(index)
+        }
+        for (members in groups.values) {
+            for ((slot, index) in members.withIndex()) {
+                tileOf[index] = tiles.size
+                slotOf[index] = slot
+            }
+            tiles.add(boxes(members.map { blocks[it] }, material).also { scene.add(it) })
+        }
+    }
 
     /** The player: a body that turns as one, with legs and arms that swing from the hip and the shoulder. */
     private fun addCharacter() {
@@ -677,6 +711,19 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         askForFrame()
     }
 
+    /** Puts the character at [spot] at once, the camera with it, for tests that start somewhere on purpose. */
+    internal fun standAt(spot: Spot) {
+        trip = null
+        marker.visible = false
+        this.spot = spot
+        view.jumpTo(Point(spot.x, FOCUS_HEIGHT, spot.z))
+        askForFrame()
+    }
+
+    /** The turn the camera's eye is really at round the point it looks at, as [FollowCamera.yaw] counts. For tests. */
+    internal val cameraEyeTurn: Double
+        get() = atan2(view.eye.x - view.focus.x, view.eye.z - view.focus.z)
+
     internal val isDashing: Boolean
         get() = trip?.speed == Trip.DASH_SPEED
 
@@ -687,11 +734,29 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         get() = nightFell != null
 
     /**
-     * True once the town has drawn and nothing of the player's moves: no walk, no change of day, the camera settled.
-     * The town's own life may still move. For tests.
+     * True once the town has drawn and nothing of the player's moves: no walk, no change of day, the camera settled
+     * and no building still folding or rising. The town's own life may still move. For tests.
      */
     internal val isStill: Boolean
-        get() = framesDrawn > 0 && !urgent && !gliding && trip == null && nightFell == null
+        get() = framesDrawn > 0 && !urgent && !gliding && trip == null && nightFell == null && !cutaway.isMoving
+
+    /** True when the [index]th of [Neighbourhood.foldables] is folded down out of the way, or folding. For tests. */
+    internal fun isFolded(index: Int): Boolean = cutaway.isFolding(index)
+
+    /** How tall box [index] of [Neighbourhood.blocks] is drawn now, read from where the drawing keeps it. For tests. */
+    internal fun drawnHeight(index: Int): Double =
+        tiles[tileOf[index]].instanceMatrix.array[slotOf[index] * 16 + 5].toDouble()
+
+    /** How far the camera's eye is from the point it looks at, for tests. */
+    internal val cameraReach: Double
+        get() {
+            val eye = view.eye
+            val focus = view.focus
+            val x = eye.x - focus.x
+            val y = eye.y - focus.y
+            val z = eye.z - focus.z
+            return sqrt(x * x + y * y + z * z)
+        }
 
     /** How far east of its stop at the station the train was last drawn, for tests. */
     internal val trainShiftDrawn: Double
@@ -817,7 +882,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val dash = taps.isDouble(window.performance.now(), x, y)
         // The passersby can be tapped while they are out.
         val boxes = if (crowd.visible) passersby.map { Passerby.boxAround(it.spot) } else emptyList()
-        val picked = view.pick((x - frame.left) / frame.width, (y - frame.top) / frame.height, boxes)
+        val picked = view.pick((x - frame.left) / frame.width, (y - frame.top) / frame.height, boxes, cutaway)
         // A tap that lands on something else turns the player away from the passerby; a tap on the sky does not.
         if (picked != null && picked !is Picked.AtPasserby) stopChatting()
         when (picked) {
@@ -928,7 +993,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private fun drawFrame(now: Double) {
         if (closed) return
         val hidden = pageHidden() || contextLost
-        val moving = urgent || trip != null || nightFell != null || gliding
+        val moving = urgent || trip != null || nightFell != null || gliding || cutaway.isMoving
         if (!pace.shouldDraw(now, moving, hidden)) {
             // Hidden or without WebGL, nothing more is asked for until that ends; otherwise the life waits its turn.
             if (!hidden) nextFrame()
@@ -943,6 +1008,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val still = lessMotion.matches
         var walking = false
         var night = false
+        var folding = false
         try {
             // Inside the try, so that if the walk, the change of day (which brings the new day's weather) or the life
             // ever failed, the town would hand over to the buttons, not freeze.
@@ -952,6 +1018,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             val subject = if (sitting) Neighbourhood.benchSeat else spot
             gliding = view.follow(Point(subject.x, FOCUS_HEIGHT, subject.z), millis)
             placeCamera()
+            folding = foldBuildings(subject, millis, still)
             if (!still && pace.stepsLife) stepLife()
             // A town whose life stands still has no train passing and no fire to hear.
             if (still) quietSounds()
@@ -971,7 +1038,71 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             labelsStale = false
         }
         framesDrawn += 1
-        if (walking || night || gliding || !still) nextFrame()
+        if (walking || night || gliding || folding || !still) nextFrame()
+    }
+
+    /**
+     * Folds down the city's buildings that stand between the camera and the character at [subject], or fill the view
+     * just in front of the camera, and raises those that no longer do, moving each on by [millis]; a phone that asks
+     * for less motion sees them fold at once. They are worked out again only when the camera or the character moved.
+     * True while any is still folding or rising.
+     */
+    private fun foldBuildings(subject: Spot, millis: Double, still: Boolean): Boolean {
+        val eye = view.eye
+        if (eye.x != aimedEyeX || eye.y != aimedEyeY || eye.z != aimedEyeZ || subject.x != aimedHeadX ||
+            subject.z != aimedHeadZ
+        ) {
+            aimedEyeX = eye.x
+            aimedEyeY = eye.y
+            aimedEyeZ = eye.z
+            aimedHeadX = subject.x
+            aimedHeadZ = subject.z
+            cutaway.aim(eye.x, eye.y, eye.z, subject.x, HEAD_HEIGHT, subject.z)
+        }
+        val moving = cutaway.step(if (still) Cutaway.FOLD_MILLIS else millis)
+        if (cutaway.changedCount > 0) placeFolds()
+        return moving
+    }
+
+    /**
+     * Draws each building whose fold changed as tall as it now stands: its walls down toward their plinth, the plant
+     * room on its roof sinking with them, and its glass shrinking to fit, each box's footprint and colour kept. Only
+     * those boxes are put again, in the draws that already hold them.
+     */
+    private fun placeFolds() {
+        val blocks = Neighbourhood.blocks
+        for (at in 0 until cutaway.changedCount) {
+            val index = cutaway.changed[at]
+            val building = Neighbourhood.foldables[index]
+            val fold = cutaway.foldOf(index)
+            val body = blocks[building.body]
+            val full = body.height
+            val height = if (full > Cutaway.PLINTH) full - (full - Cutaway.PLINTH) * fold else full
+            standBox(building.body, body.y, height)
+            if (building.roof >= 0) standBox(building.roof, body.y + height, blocks[building.roof].height * (1 - fold))
+            val shrink = height / full
+            if (building.glassNorth >= 0) shrinkPane(building.glassNorth, shrink)
+            if (building.glassSouth >= 0) shrinkPane(building.glassSouth, shrink)
+        }
+    }
+
+    /** Draws pane [index] of the glowing glass [shrink] times as tall and as high up, to fit its folding building. */
+    private fun shrinkPane(index: Int, shrink: Double) {
+        val box = Neighbourhood.glowing[index]
+        val numbers = glowing.instanceMatrix.array
+        numbers[index * 16 + 5] = (box.height * shrink).toFloat()
+        numbers[index * 16 + 13] = ((box.y + box.height / 2) * shrink).toFloat()
+        glowing.instanceMatrix.needsUpdate = true
+    }
+
+    /** Puts box [index] of the still boxes [height] tall from [bottom] up, its footprint as it was. */
+    private fun standBox(index: Int, bottom: Double, height: Double) {
+        val mesh = tiles[tileOf[index]]
+        val at = slotOf[index] * 16
+        val numbers = mesh.instanceMatrix.array
+        numbers[at + 5] = height.toFloat()
+        numbers[at + 13] = (bottom + height / 2).toFloat()
+        mesh.instanceMatrix.needsUpdate = true
     }
 
     /**
@@ -1300,6 +1431,9 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     private companion object {
         const val FOCUS_HEIGHT = 1.0
+
+        /** How high the character's head is: the end of the way the city's buildings fold out of. */
+        const val HEAD_HEIGHT = 1.6
 
         /** How far a finger may move and still count as a tap, in pixels. */
         const val TAP_SLOP = 10.0
