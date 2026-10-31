@@ -59,9 +59,9 @@ class GridTest {
     fun `the open squares come out lowest score first`() {
         val open = OpenSquares()
         val scores = listOf(5.0, 1.0, 4.0, 1.5, 9.0, 0.5, 3.0, 7.0, 2.0)
-        for ((index, score) in scores.withIndex()) open.push(Cell(index, 0), score)
+        for ((index, score) in scores.withIndex()) open.push(index, score)
         val order = mutableListOf<Double>()
-        while (open.isNotEmpty()) order.add(scores[open.pop().x])
+        while (open.isNotEmpty()) order.add(scores[open.pop()])
         assertEquals(scores.sorted(), order)
     }
 }
