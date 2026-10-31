@@ -658,8 +658,8 @@ class WalkableTownTest {
                 tap("영어 공부")
                 assertTrue(town.isChangingDay)
             },
-            Step("in the middle of the night", after(1_500)) {
-                assertFalse(town.arePassersbyOut, "still out at night")
+            Step("in the night", { !town.arePassersbyOut || !town.isChangingDay }) {
+                assertTrue(town.isChangingDay, "the passersby were never gone before morning")
             },
             Step("in the morning", { !town.isChangingDay }) {
                 assertTrue(town.arePassersbyOut, "not back in the morning")
@@ -675,8 +675,7 @@ class WalkableTownTest {
             Step("hide the page", { town.isStill }) {
                 town.pageHidden = { true }
                 document.dispatchEvent(Event("visibilitychange"))
-            },
-            Step("note the frames once any frame on its way is done", after(100)) {
+                // A frame already asked for checks first, so nothing more is drawn from here.
                 hiddenAt = town.framesDrawn
                 // A drag still turns the camera, but draws nothing while hidden.
                 drag(town)
@@ -686,9 +685,7 @@ class WalkableTownTest {
                 town.pageHidden = { false }
                 document.dispatchEvent(Event("visibilitychange"))
             },
-            Step("shown again", after(400)) {
-                assertTrue(town.framesDrawn > hiddenAt, "did not draw again")
-            },
+            Step("shown again", { town.framesDrawn > hiddenAt }) {},
         )
     }
 
