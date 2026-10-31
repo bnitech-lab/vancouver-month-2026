@@ -68,6 +68,8 @@ private class TownScene(private val canvas: HTMLCanvasElement, context: Renderin
 
     init {
         element.className = "town"
+        // The same shape as the camera's frame, so the names land on their buildings at any width.
+        element.style.setProperty("aspect-ratio", "${TownCamera.FRAME_WIDTH} / ${TownCamera.FRAME_HEIGHT}")
         // The day's log already says where the day went, so a screen reader skips the picture.
         element.setAttribute("aria-hidden", "true")
         element.appendChild(canvas)

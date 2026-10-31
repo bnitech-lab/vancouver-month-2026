@@ -343,10 +343,9 @@ a:focus-visible {
 
 /* The month */
 
-/* The 3D town. A fixed shape, so the picture and the names over it line up at any width. */
+/* The 3D town. Its shape (aspect-ratio) comes from TownCamera, so the picture and the names over it line up. */
 .town {
   position: relative;
-  aspect-ratio: 16 / 9;
   overflow: hidden;
   background: linear-gradient(var(--sky-top), var(--sky-bottom));
   border: 1px solid var(--line);

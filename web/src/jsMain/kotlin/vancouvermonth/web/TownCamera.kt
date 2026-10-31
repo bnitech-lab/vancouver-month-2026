@@ -13,8 +13,10 @@ data class FramePoint(val left: Double, val top: Double)
  * The same numbers place the camera in Three.js and the building names over the picture.
  */
 object TownCamera {
-    /** The frame's width over its height. style.css gives the town the same shape. */
-    const val ASPECT = 16.0 / 9.0
+    /** The frame's shape, width to height. The town on the page takes this shape from here, and only from here. */
+    const val FRAME_WIDTH = 16
+    const val FRAME_HEIGHT = 9
+    val ASPECT: Double = FRAME_WIDTH.toDouble() / FRAME_HEIGHT
 
     /** How far the camera is turned east of due south, and how far it looks down, in degrees. */
     const val TURN_DEGREES = 15.0
@@ -22,7 +24,7 @@ object TownCamera {
 
     /** Half the frame's width and height, in grid squares. */
     const val HALF_WIDTH = 9.0
-    const val HALF_HEIGHT = HALF_WIDTH / ASPECT
+    val HALF_HEIGHT: Double = HALF_WIDTH / ASPECT
 
     /** The point at the middle of the frame. */
     val target = Point(8.5, 1.8, 3.2)
