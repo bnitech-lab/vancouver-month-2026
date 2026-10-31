@@ -56,7 +56,7 @@ class PhoneGameTest {
 
     /** Plays [today]'s run with the cheapest room and an exact guess, then rests until September ends. */
     private fun restThrough(today: TodaysRun) {
-        PhoneGame(root, today.seed, playAgain = { playedAgain = true }, today = today).show()
+        PhoneGame(root, today, playAgain = { playedAgain = true }).show()
         val game = FirstMinute(today.seed)
         startMonth(room = game.cheapestRoomIndex + 1, amount = "${game.lowestTotal}")
         while ("다시 하기" !in screen) tap("쉬기")
@@ -188,7 +188,7 @@ class PhoneGameTest {
     @Test
     fun `today's run is named under the title`() {
         val today = TodaysRun(2026, 10, 30)
-        PhoneGame(root, today.seed, playAgain = {}, today = today).show()
+        PhoneGame(root, today, playAgain = {}).show()
         assertTrue("10월 30일 오늘의 판 · 판 번호 ${today.seed}" in screen)
     }
 

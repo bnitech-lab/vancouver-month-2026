@@ -20,7 +20,9 @@ fun main() {
     val fromQuery = seedFrom(query)
     val today = if (fromQuery == null) todayFrom(query, Date()) else null
     val seed = fromQuery ?: today?.seed ?: newSeed()
-    PhoneGame(root, seed, playAgain = { window.location.search = "?seed=${newSeed()}" }, today = today).show()
+    val playAgain = { window.location.search = "?seed=${newSeed()}" }
+    val game = if (today != null) PhoneGame(root, today, playAgain) else PhoneGame(root, seed, playAgain)
+    game.show()
     when {
         today != null -> window.history.replaceState(null, "", todayQuery(today))
         fromQuery == null -> window.history.replaceState(null, "", "?seed=$seed")

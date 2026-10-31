@@ -38,17 +38,19 @@ import vancouvermonth.text.whyNot
 /**
  * Draws one run in [root]: the room on September 1st, then one action a day, then the ending.
  * The rules are in core and the wording in text; this only shows the state and passes each tap on.
- * Every tap redraws the whole screen from that state. [today] is set when this is today's run.
+ * Every tap redraws the whole screen from that state. A run comes from a seed or from today's date, never both.
  */
-class PhoneGame(
+class PhoneGame private constructor(
     private val root: HTMLElement,
     seed: Int,
+    private val today: TodaysRun?,
     private val playAgain: () -> Unit,
-    private val today: TodaysRun? = null,
 ) {
-    init {
-        require(today == null || today.seed == seed) { "Today's run is seed ${today?.seed}, not $seed" }
-    }
+    /** A run from a seed, as in `?seed=1011`. */
+    constructor(root: HTMLElement, seed: Int, playAgain: () -> Unit) : this(root, seed, null, playAgain)
+
+    /** Today's run: its date picks the seed, and its ending shows the result line to copy. */
+    constructor(root: HTMLElement, today: TodaysRun, playAgain: () -> Unit) : this(root, today.seed, today, playAgain)
 
     private val game = FirstMinute(seed)
     private var picked: Int? = null
