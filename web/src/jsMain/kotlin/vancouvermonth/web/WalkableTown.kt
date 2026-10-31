@@ -257,6 +257,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         scene.add(ambient)
         renderer.shadowMap.enabled = true
         renderer.shadowMap.type = PCFSoftShadowMap
+        // The shadows are drawn again only when the frame pace asks, not on every frame.
+        renderer.shadowMap.autoUpdate = false
         sun.castShadow = true
         sun.shadow.mapSize.set(SHADOW_PIXELS, SHADOW_PIXELS)
         val shadowBox = sun.shadow.camera
@@ -678,10 +680,12 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val subject = if (sitting) Neighbourhood.benchSeat else spot
         gliding = view.follow(Point(subject.x, FOCUS_HEIGHT, subject.z), millis)
         placeCamera()
-        // A phone that asks for less motion keeps the town's own life still, and draws only for the player.
+        // A phone that asks for less motion keeps the town's own life still, and draws only for the player. The life
+        // moves on the beat only, even on frames drawn at the screen's full rate for the player.
         val still = lessMotion.matches
-        if (!still) stepLife()
+        if (!still && pace.stepsLife) stepLife()
         try {
+            renderer.shadowMap.needsUpdate = pace.drawsShadows
             renderer.render(scene, camera)
         } catch (error: Throwable) {
             fail(error)

@@ -101,10 +101,15 @@ external class WebGLRenderer(parameters: Json) {
     fun dispose()
 }
 
-/** Whether the renderer draws shadows, and how soft their edges are. */
+/**
+ * Whether the renderer draws shadows, and how soft their edges are. With [autoUpdate] off, the shadows are drawn again
+ * only on a frame that sets [needsUpdate].
+ */
 external interface ShadowMapSettings {
     var enabled: Boolean
     var type: Int
+    var autoUpdate: Boolean
+    var needsUpdate: Boolean
 }
 
 /** Shadows with soft edges. */

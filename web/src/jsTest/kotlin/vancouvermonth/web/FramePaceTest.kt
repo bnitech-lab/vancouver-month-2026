@@ -49,4 +49,38 @@ class FramePaceTest {
         pace.reset()
         assertTrue(pace.shouldDraw(41.0, moving = false, hidden = false))
     }
+
+    @Test
+    fun `while moving, every frame is drawn, but the town's life moves at most thirty times a second`() {
+        for (hertz in listOf(60.0, 120.0, 144.0, 165.0, 240.0)) {
+            val pace = FramePace()
+            var drawn = 0
+            var steps = 0
+            for (frame in 0 until hertz.toInt() * 10) {
+                if (pace.shouldDraw(1_000.0 + frame * 1_000.0 / hertz, moving = true, hidden = false)) drawn++
+                if (pace.stepsLife) steps++
+            }
+            assertEquals(hertz.toInt() * 10, drawn, "$hertz Hz")
+            assertTrue(steps in 240..300, "the life moved $steps times in ten seconds at $hertz Hz")
+        }
+    }
+
+    @Test
+    fun `the shadows are drawn again on every moving frame, and on every other frame of the town's own life`() {
+        val pace = FramePace()
+        for (frame in 0 until 30) {
+            assertTrue(pace.shouldDraw(1_000.0 + frame * 1_000.0 / 60, moving = true, hidden = false))
+            assertTrue(pace.drawsShadows, "moving frame $frame")
+        }
+        var drawn = 0
+        var withShadows = 0
+        for (frame in 30 until 150) {
+            if (pace.shouldDraw(1_000.0 + frame * 1_000.0 / 60, moving = false, hidden = false)) {
+                drawn++
+                if (pace.drawsShadows) withShadows++
+            }
+        }
+        assertTrue(drawn in 59..61, "$drawn quiet frames in two seconds")
+        assertEquals((drawn + 1) / 2, withShadows)
+    }
 }
