@@ -106,6 +106,7 @@ h2 {
 /* Title */
 
 .title {
+  position: relative;
   padding: 12px 0 0;
 }
 
@@ -709,6 +710,51 @@ html:has(.walk-town) {
   color: var(--muted);
 }
 
+/* The day's skills on the left, the sound switch and the "?" on the right. */
+.hud-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.hud-line .hud-stats {
+  margin-top: 0;
+}
+
+.hud-controls {
+  display: flex;
+  flex: none;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.hud .sound-switch,
+.guide-open {
+  position: relative;
+  min-height: 30px;
+  font-size: 12px;
+}
+
+/* Small to look at, easier to hit: each tap area reaches a little past the button. */
+.hud .sound-switch::after,
+.guide-open::after {
+  content: "";
+  position: absolute;
+  inset: -7px -2px;
+}
+
+.guide-open {
+  width: 30px;
+  padding: 0;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+}
+
 .over-town .log {
   padding: 8px 12px;
   background: color-mix(in srgb, var(--surface) 90%, transparent);
@@ -888,6 +934,114 @@ html:has(.walk-town) {
 .ending-word {
   font-weight: 600;
   color: var(--accent);
+}
+
+/* The sound switch: a small pill that says what a tap does, filled while the sound is on. */
+.sound-switch {
+  min-height: 36px;
+  padding: 2px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--accent);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+}
+
+.sound-switch.on {
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+.title .sound-switch,
+.topbar .sound-switch {
+  position: absolute;
+  top: 10px;
+  right: 16px;
+}
+
+.title .sound-switch {
+  right: 0;
+}
+
+/* The title keeps the switch's width free beside it, so the two never touch on a small phone or a wider font. */
+.title:has(.sound-switch) h1 {
+  padding-right: 84px;
+}
+
+/* The card on how to play, over the town the first time it opens. The town waits under a soft shade. On a short
+   screen (a phone on its side, or large text) the card is never taller than the screen: it scrolls instead, and the
+   shade can scroll too, with "safe" centring so nothing is pushed off the top. */
+.guide {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  place-items: safe center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: rgba(28, 29, 31, 0.35);
+}
+
+.guide-card {
+  width: 100%;
+  max-width: 400px;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 18px 16px;
+  color: var(--talk-text);
+  background: var(--talk-bg);
+  border: 2px solid var(--talk-border);
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(59, 47, 37, 0.3);
+}
+
+.guide-title {
+  margin-bottom: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--talk-text);
+}
+
+.guide-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.guide-lines li {
+  position: relative;
+  padding-left: 1.1em;
+}
+
+.guide-lines li::before {
+  content: "";
+  position: absolute;
+  top: 0.65em;
+  left: 0.2em;
+  width: 6px;
+  height: 6px;
+  background: var(--talk-border);
+  border-radius: 50%;
+}
+
+.guide-goal {
+  margin: 12px 0 14px;
+  padding: 8px 12px;
+  font-weight: 700;
+  background: var(--keyword-bg);
+  border-radius: 12px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .guide-card {
+    animation: talk-up 180ms ease-out;
+  }
 }
 
 /* Read by a screen reader, not shown. */

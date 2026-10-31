@@ -43,9 +43,12 @@ fun cheapestLine(game: FirstMinute, reveal: Reveal): String =
 fun guessLine(reveal: Reveal): String =
     if (reveal.guessGap == 0) "짐작이 정확해요." else "내 짐작과 차이 ${money(reveal.guessGap)}"
 
+/** The month's goal, as the month's start and the town's first guide both say it. */
+fun goalLine(): String = "목표: ${date(Month.LAST_DAY)}까지 취업 제안 받기"
+
 /** What September asks of the player, shown once after the room is picked. */
 fun monthStartLines(room: Room): List<String> = listOf(
-    "목표: ${date(Month.LAST_DAY)}까지 취업 제안 받기",
+    goalLine(),
     "매일 생활비 ${money(Month.DAILY_LIVING_COST)}이 나가고, " +
         "${date(Month.LAST_DAY + 1)}에는 이 방의 총비용 ${money(room.totalMonthlyCost)}를 또 내야 해요.",
     "면접은 두 번이에요. 1차 영어 면접은 영어 실력, 2차 기술 면접은 코딩 실력으로 붙어요.",
