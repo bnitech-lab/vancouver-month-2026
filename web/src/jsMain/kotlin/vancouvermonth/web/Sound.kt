@@ -42,6 +42,9 @@ internal class Sound(
 
     private var speaker: Speaker? = null
     private val ticks = TickLimiter()
+
+    /** The switches on the page now, to show the sound off everywhere if it cannot be made. */
+    private val switches = mutableListOf<HTMLButtonElement>()
     private val onFirstTap: (Event) -> Unit = { event -> if (countsAsTap(event)) wake() }
     private val onVisibility: (Event) -> Unit = { shownOrHidden() }
 
@@ -65,9 +68,11 @@ internal class Sound(
         show(button)
         button.onclick = {
             toggle()
-            show(button)
+            switches.forEach(::show)
         }
         parent.appendChild(button)
+        switches.removeAll { !it.isConnected }
+        switches += button
     }
 
     private fun show(button: HTMLButtonElement) {
@@ -110,10 +115,22 @@ internal class Sound(
             stopWaiting()
             return
         }
-        val made = speaker ?: make() ?: return
-        speaker = made
-        waitForTap()
-        made.on { if (isOn) stopWaiting() }
+        try {
+            val made = speaker ?: checkNotNull(makeSpeaker).invoke().also { speaker = it }
+            waitForTap()
+            made.on { if (isOn) stopWaiting() }
+        } catch (error: Throwable) {
+            console.warn("The sound could not start:", error)
+            giveUp()
+        }
+    }
+
+    /** The sound cannot be made or started: the switch goes back to off, here and on the next visit. */
+    private fun giveUp() {
+        isOn = false
+        memory.write(KEY, OFF)
+        stopWaiting()
+        switches.forEach(::show)
     }
 
     /** Pauses while the page is hidden; once it is shown again, wakes the sound, waiting for a tap if the browser asks. */
@@ -125,13 +142,6 @@ internal class Sound(
             waitForTap()
             made.resume { if (isOn) stopWaiting() }
         }
-    }
-
-    private fun make(): Speaker? = try {
-        makeSpeaker?.invoke()
-    } catch (error: Throwable) {
-        console.warn("The sound could not start:", error)
-        null
     }
 
     private fun waitForTap() {

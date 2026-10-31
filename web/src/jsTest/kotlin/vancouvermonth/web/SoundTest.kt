@@ -9,6 +9,7 @@ import kotlin.test.assertTrue
 import kotlinx.browser.document
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
+import org.w3c.dom.asList
 import org.w3c.dom.events.Event
 import org.w3c.dom.events.KeyboardEvent
 import org.w3c.dom.events.KeyboardEventInit
@@ -266,6 +267,34 @@ class SoundTest {
             sound.tick()
         }
         assertEquals(listOf("on", "blip", "chime", "tick", "tick", "tick"), speaker.asked)
+    }
+
+    @Test
+    fun `a sound that cannot be made, or will not start, turns the switch back off and remembers off`() {
+        val store = FakeStore()
+        val broken = object : Speaker by speaker {
+            override fun on(whenPlaying: () -> Unit) = throw IllegalStateException("The sound would not start")
+        }
+        for (maker in listOf<() -> Speaker>({ throw IllegalStateException("No sound here") }, { broken })) {
+            root.innerHTML = ""
+            val sound = Sound(Memory { store }, maker).also { sounds += it }
+            sound.button(root)
+            switchIn().click()
+            assertEquals("소리 켜기", switchIn().textContent)
+            assertEquals(false, sound.isOn)
+            assertEquals("off", store.items["vancouver-month.sound"])
+        }
+
+        // Left on from a visit before, the first tap finds it cannot be made, and every switch shows it off.
+        store.setItem("vancouver-month.sound", "on")
+        root.innerHTML = ""
+        Sound(Memory { store }, { throw IllegalStateException("No sound here") }).also { sounds += it }.let {
+            it.button(root)
+            it.button(root)
+        }
+        press("pointerup")
+        assertEquals(listOf("소리 켜기", "소리 켜기"), root.querySelectorAll(".sound-switch").asList().map { it.textContent })
+        assertEquals("off", store.items["vancouver-month.sound"])
     }
 
     @Test
