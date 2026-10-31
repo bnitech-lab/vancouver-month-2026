@@ -23,6 +23,7 @@ import vancouvermonth.save.play
 import vancouvermonth.text.Continue
 import vancouvermonth.text.actionEffect
 import vancouvermonth.text.actionName
+import vancouvermonth.text.arrivalLines
 import vancouvermonth.text.breakdown
 import vancouvermonth.text.cheapestLine
 import vancouvermonth.text.continueFrom
@@ -33,6 +34,7 @@ import vancouvermonth.text.greeting
 import vancouvermonth.text.guessLine
 import vancouvermonth.text.keyword
 import vancouvermonth.text.money
+import vancouvermonth.text.monthCostLine
 import vancouvermonth.text.monthStartLines
 import vancouvermonth.text.replacesKept
 import vancouvermonth.text.parseAmount
@@ -51,6 +53,7 @@ import vancouvermonth.text.Weather
 import vancouvermonth.text.weatherOn
 import vancouvermonth.text.weatherWord
 import vancouvermonth.text.whyNot
+import vancouvermonth.text.whyTotalLines
 
 /**
  * Draws one run in [root]: the room on September 1st, then one action a day, then the ending.
@@ -182,11 +185,19 @@ class PhoneGame private constructor(
 
     private fun showRooms() {
         showTitle()
+        // Who the player is and what the month is for, so the room has a reason before it is asked for.
+        root.child("section", "card story") {
+            val (arrived, goal, room) = arrivalLines(game.startingBalance)
+            child("p", text = arrived)
+            child("p", "goal", goal)
+            child("p", text = room)
+        }
         root.child("p", "balance", "잔고 ${money(game.startingBalance)} · 9월 1일")
         root.child("section", "card") {
             child("h2", text = "할 일")
             child("p", "lead", "한 달 총비용이 가장 싼 방을 고르세요.")
             child("p", "formula", "한 달 총비용 = 월세 + 공과금 + 교통 정기권")
+            for (text in whyTotalLines()) child("p", "why", text)
         }
         root.child("section", "card") {
             child("h2", text = "요금표")
@@ -277,6 +288,7 @@ class PhoneGame private constructor(
             }
             child("p", "score", "방 고르기 점수 ${reveal.score} / ${FirstMinute.MAX_SCORE}")
             child("p", "left", "첫 달을 내고 남은 잔고 ${money(reveal.balanceAfterFirstMonth)}")
+            child("p", "month-cost", monthCostLine(game, reveal))
         }
         root.child("section", "card start") {
             child("h2", text = "9월 한 달이 시작돼요.")
