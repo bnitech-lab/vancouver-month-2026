@@ -142,6 +142,8 @@ class TerminalGameTest {
         assertTrue(goalLine() in story)
         assertTrue(lines.indexOf("할 일: 한 달 총비용이 가장 싼 방을 고르세요.") in at.first()..at.last())
         assertTrue(at.last() < lines.indexOfFirst { it.startsWith("  1) ") })
+        // The story says the money and the date, so the first screen has no balance line of its own.
+        assertFalse(lines.any { it.startsWith("잔고") }, screen)
         // No room's total is handed over before the guess.
         for (room in FirstMinute(4821).rooms) assertFalse(money(room.totalMonthlyCost) in screen)
     }

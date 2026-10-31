@@ -89,7 +89,8 @@ class PhoneGameTest {
     fun `seed 1011 plays the first day the README shows`() {
         open(1011)
         assertTrue("판 번호 1011" in screen)
-        assertTrue("잔고 \$3,000 · 9월 1일" in screen)
+        assertTrue("9월 1일, 딱 \$3,000 들고 밴쿠버에 막 도착했어요." in screen)
+        assertFalse("잔고 \$3,000" in screen)
         assertTrue("1구역 \$105 · 2구역 \$145 · 3구역 \$195" in screen)
         assertTrue("별도면 한 달 \$120~\$190" in screen)
 

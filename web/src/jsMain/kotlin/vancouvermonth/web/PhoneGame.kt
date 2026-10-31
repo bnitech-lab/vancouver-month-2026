@@ -185,14 +185,14 @@ class PhoneGame private constructor(
 
     private fun showRooms() {
         showTitle()
-        // Who the player is and what the month is for, so the room has a reason before it is asked for.
+        // Who the player is and what the month is for, so the room has a reason before it is asked for. The story
+        // says the money and the date, so no balance line repeats them.
         root.child("section", "card story") {
             val (arrived, goal, room) = arrivalLines(game.startingBalance)
             child("p", text = arrived)
             child("p", "goal", goal)
             child("p", text = room)
         }
-        root.child("p", "balance", "잔고 ${money(game.startingBalance)} · 9월 1일")
         root.child("section", "card") {
             child("h2", text = "할 일")
             child("p", "lead", "한 달 총비용이 가장 싼 방을 고르세요.")

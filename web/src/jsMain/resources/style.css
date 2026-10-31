@@ -127,11 +127,6 @@ h2 {
   font-size: 14px;
 }
 
-.balance {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
 /* The arrival story, kept small so the rooms stay on a phone's first screen */
 
 .story {

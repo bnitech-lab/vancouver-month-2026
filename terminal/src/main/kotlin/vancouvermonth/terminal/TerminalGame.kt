@@ -78,9 +78,8 @@ class TerminalGame(
         line("밴쿠버 한 달 (가제)                판 번호 ${game.seed}")
         if (today != null) line(todaysRunName(today))
         line()
+        // The story says the money and the date, so no balance line repeats them.
         for (text in arrivalLines(game.startingBalance)) line(text)
-        line()
-        line("잔고 ${money(game.startingBalance)} · 9월 1일")
         line()
         // Hangul takes two columns in a terminal, so the indents below count "할 일: " as 7 and "공과금" as 6.
         line("할 일: 한 달 총비용이 가장 싼 방을 고르세요.")
