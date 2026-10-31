@@ -219,16 +219,19 @@ Money can be spent in the town without spending a day. On the West End's wide st
 내 방 to the business district, stands a bike shop (자전거 가게), kept by 벤, invented like everyone else, with a bike on
 show beside it. It is not one of the five places, as no day is spent there, but it matters as they do: its name floats
 over it, it never folds and the camera keeps out of it. His talk offers 자전거 사기 ($350), 퀵보드 사기 ($550), 이야기 and
-그만. Buying takes the price off the balance and nothing else: the date stays, a line on the top card says what was
-bought, and the button then shows it owned, or why it cannot be bought (잔고가 모자라요.). What is bought is the player's
-for the month. Then the top card offers 자전거 타기 or 퀵보드 타기, and while riding says what is ridden, with 내리기. A
+그만. Buying takes the price off the balance and nothing else: the date stays, the keeper says how to get on it, and the
+button then shows it owned, or why it cannot be bought: 잔고가 모자라요., or 이걸 사면 9월 생활비가 모자라요. when what would
+be left could not pay the living cost of every day left in September, so the balance never goes below zero in September
+(October's total is another matter). What is bought is the player's for the month. Then one row on the top card
+offers 자전거 타기 or 퀵보드 타기, and while riding says what is ridden (a shared one with its fare), with 내리기. A
 bike goes about 9 units a second and an e-scooter 11, against 3.6 on foot (a double tap is a little faster still), along
 the same streets, never over the water, the rider pedalling on the saddle or standing on the deck, and the camera keeps
 up. Shared bikes stand two to a dock near 내 방, 도서관, 카페 and the station, and shared e-scooters on four street
 corners, all in an invented purple. A tap on one walks up to it, pays its fare ($3 a bike ride, $4 an e-scooter ride)
 once, there, and rides off on it; it goes back to its dock or corner when the player taps 내리기 or a talk opens. Any
-talk gets the character off first, and the day's end too, so each morning starts on foot. The money spent during a day
-heads that day's log. Every price is invented, and no shop, brand or bike-share or scooter company is real. On the
+talk gets the character off first, and the day's end too, so each morning starts on foot; a fare is only ever paid for
+a ride that starts. The money spent during a day heads that day's log, in two lines at most ("그 밖에 5건 -$15" for the
+rest), and on a small phone the log gives up its last lines before a talk would leave the screen. Every price is invented, and no shop, brand or bike-share or scooter company is real. On the
 button screen there is no shop and no riding.
 
 The town lives on its own. Four more people, invented too (올리버, 미나, 프리야 and 테오), stroll slow loops along the English Bay
@@ -288,8 +291,8 @@ rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, al
 `FramePace` (which frames are drawn). The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`, and
 `Passersby.kt` for the passersby's), and so are each day's weather (`Weather.kt`) and the bike shop's and riding's
 words (`Shop.kt`). `WalkableTown` draws all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the map included, is about 828 KB
-(about 223 KB gzipped).
+`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the map included, is about 846 KB
+(about 229 KB gzipped).
 
 ### Sound and the first-run guide
 
