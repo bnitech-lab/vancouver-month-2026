@@ -412,7 +412,7 @@ class PhoneGame private constructor(
             showInterview(month)
         }
         // The same update news as by the title, at the foot, out of the way of the day's figures.
-        notes?.let { news -> root.child("footer", "foot") { news.button(this, root) } }
+        notes?.let { news -> root.child("footer", "patch-foot") { news.button(this, root) } }
     }
 
     private fun showStats(month: Month) {
@@ -499,7 +499,7 @@ class PhoneGame private constructor(
             }
             child("div", "title-name") {
                 child("h1", text = "밴쿠버 한 달 (가제)")
-                child("p", "version", PatchNotes.versionLabel(PatchNotes.CURRENT))
+                child("p", "patch-current", PatchNotes.versionLabel(PatchNotes.CURRENT))
             }
             child("p", "run", if (today == null) "판 번호 ${game.seed}" else "${todaysRunName(today)} · 판 번호 ${game.seed}")
         }

@@ -150,7 +150,7 @@ h2 {
   column-gap: 8px;
 }
 
-.version {
+.patch-current {
   font-size: 13px;
   font-weight: 600;
   color: var(--muted);
@@ -1159,7 +1159,7 @@ html:has(.walk-town) {
 }
 
 /* The update news: a pill by the sound switch, in its look, and at the button screen's foot. */
-.notes-open {
+.patch-open {
   position: relative;
   min-height: 36px;
   padding: 2px 12px;
@@ -1172,22 +1172,22 @@ html:has(.walk-town) {
   border-radius: 999px;
 }
 
-.foot {
+.patch-foot {
   display: flex;
   justify-content: center;
   padding-top: 4px;
 }
 
 /* At the guide's foot, a link next to the map's credit. */
-.guide-news {
+.patch-guide-foot {
   margin-top: 12px;
 }
 
-.guide-news + .guide-credit {
+.patch-guide-foot + .guide-credit {
   margin-top: 4px;
 }
 
-.guide-notes {
+.patch-link {
   position: relative;
   min-height: 32px;
   padding: 0 2px;
@@ -1202,8 +1202,8 @@ html:has(.walk-town) {
 }
 
 /* While there is news the player has not opened, a small dot on the button's corner. */
-.notes-open.news::after,
-.guide-notes.news::after {
+.patch-open.patch-news::after,
+.patch-link.patch-news::after {
   content: "";
   position: absolute;
   top: -3px;
@@ -1215,7 +1215,7 @@ html:has(.walk-town) {
   border-radius: 50%;
 }
 
-.guide-notes.news::after {
+.patch-link.patch-news::after {
   top: 4px;
   right: -12px;
   border-color: var(--talk-bg);
@@ -1223,7 +1223,7 @@ html:has(.walk-town) {
 
 /* The update news over the page, over the guide too when opened from its foot. The list of updates scrolls inside
    the card, so its title and 닫기 stay in sight on a short or turned phone. */
-.notes {
+.patch-cover {
   position: fixed;
   inset: 0;
   z-index: 3;
@@ -1238,7 +1238,7 @@ html:has(.walk-town) {
   background: rgba(28, 29, 31, 0.45);
 }
 
-.notes-card {
+.patch-card {
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -1253,11 +1253,11 @@ html:has(.walk-town) {
   box-shadow: 0 8px 24px rgba(59, 47, 37, 0.3);
 }
 
-.notes-card:focus {
+.patch-card:focus {
   outline: none;
 }
 
-.notes-title {
+.patch-title {
   flex: none;
   margin-bottom: 6px;
   font-size: 18px;
@@ -1265,7 +1265,7 @@ html:has(.walk-town) {
   color: var(--talk-text);
 }
 
-.notes-list {
+.patch-list {
   flex: 1 1 auto;
   min-height: 0;
   margin: 0 -6px;
@@ -1274,17 +1274,17 @@ html:has(.walk-town) {
   overscroll-behavior: contain;
 }
 
-.notes-entry {
+.patch-entry {
   padding: 4px 0 8px;
   border-top: 1px solid color-mix(in srgb, var(--talk-border) 50%, transparent);
 }
 
-.notes-entry:first-child {
+.patch-entry:first-child {
   border-top: none;
 }
 
 /* A version's line: its number and date, then its headline; a tap opens or folds what changed. */
-.notes-summary {
+.patch-summary {
   position: relative;
   display: flex;
   flex-wrap: wrap;
@@ -1296,11 +1296,11 @@ html:has(.walk-town) {
   border-radius: 8px;
 }
 
-.notes-summary::-webkit-details-marker {
+.patch-summary::-webkit-details-marker {
   display: none;
 }
 
-.notes-summary::after {
+.patch-summary::after {
   content: "";
   position: absolute;
   top: 50%;
@@ -1312,32 +1312,32 @@ html:has(.walk-town) {
   transform: translateY(-75%) rotate(45deg);
 }
 
-.notes-entry[open] > .notes-summary::after {
+.patch-entry[open] > .patch-summary::after {
   transform: translateY(-25%) rotate(-135deg);
 }
 
-.notes-summary:focus-visible {
+.patch-summary:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 0;
 }
 
-.notes-version {
+.patch-version {
   font-weight: 800;
   color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
 
-.notes-date {
+.patch-date {
   font-size: 13px;
   color: var(--talk-muted);
 }
 
-.notes-headline {
+.patch-headline {
   flex-basis: 100%;
   font-weight: 700;
 }
 
-.notes-section {
+.patch-section {
   display: inline-block;
   margin: 8px 0 4px;
   padding: 1px 10px;
@@ -1349,7 +1349,7 @@ html:has(.walk-town) {
   border-radius: 999px;
 }
 
-.notes-lines {
+.patch-lines {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1357,12 +1357,12 @@ html:has(.walk-town) {
   line-height: 1.45;
 }
 
-.notes-lines li {
+.patch-lines li {
   position: relative;
   padding-left: 1.1em;
 }
 
-.notes-lines li::before {
+.patch-lines li::before {
   content: "";
   position: absolute;
   top: 0.6em;
@@ -1373,13 +1373,13 @@ html:has(.walk-town) {
   border-radius: 50%;
 }
 
-.notes-close {
+.patch-close {
   flex: none;
   margin-top: 12px;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .notes-card {
+  .patch-card {
     animation: talk-up 180ms ease-out;
   }
 }

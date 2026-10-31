@@ -58,7 +58,7 @@ internal class FirstRunGuide(private val memory: Memory) {
         start.type = "button"
         start.onclick = { close() }
         // At the foot, next to the map's credit: the update news, which open over this card and come back to it.
-        notes()?.let { news -> news.button(card.add("p", "guide-news"), root, "guide-notes") }
+        notes()?.let { news -> news.button(card.add("p", "patch-guide-foot"), root, "patch-link") }
         // The town is traced from the City of Vancouver's open data, whose licence asks for this line where it shows,
         // with a link to the licence: its name links there, in a new tab, so the game stays where it is.
         val credit = card.add("p", "guide-credit")

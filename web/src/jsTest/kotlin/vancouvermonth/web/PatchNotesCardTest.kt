@@ -9,11 +9,15 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.browser.document
+import kotlinx.browser.window
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
+import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.asList
+import org.w3c.dom.events.Event
 import org.w3c.dom.events.KeyboardEvent
 import org.w3c.dom.events.KeyboardEventInit
+import vancouvermonth.core.FirstMinute
 import vancouvermonth.text.Guide
 import vancouvermonth.text.PatchNotes
 
@@ -59,10 +63,10 @@ class PatchNotesCardTest {
     }
 
     private fun notesButton(): HTMLButtonElement =
-        assertNotNull(root.querySelector(".notes-open") as? HTMLButtonElement, "No 업데이트 소식: ${root.innerHTML}")
+        assertNotNull(root.querySelector(".patch-open") as? HTMLButtonElement, "No 업데이트 소식: ${root.innerHTML}")
 
     private val card: HTMLElement?
-        get() = root.querySelector(".notes-card") as? HTMLElement
+        get() = root.querySelector(".patch-card") as? HTMLElement
 
     private fun press(key: String, shift: Boolean = false) {
         val target = document.activeElement ?: document.body!!
@@ -70,14 +74,14 @@ class PatchNotesCardTest {
         target.dispatchEvent(KeyboardEvent("keydown", init))
     }
 
-    private fun hasNews(button: HTMLElement) = button.classList.contains("news")
+    private fun hasNews(button: HTMLElement) = button.classList.contains("patch-news")
 
     @Test
     fun `the first screen shows the version by the title and 업데이트 소식 next to the sound switch`() {
         firstScreen()
         val title = assertNotNull(root.querySelector(".title"))
-        assertEquals(PatchNotes.versionLabel(PatchNotes.CURRENT), title.querySelector(".title-name .version")?.textContent)
-        assertEquals("v${PatchNotes.ALL.first().version}", title.querySelector(".version")?.textContent)
+        assertEquals(PatchNotes.versionLabel(PatchNotes.CURRENT), title.querySelector(".title-name .patch-current")?.textContent)
+        assertEquals("v${PatchNotes.ALL.first().version}", title.querySelector(".patch-current")?.textContent)
         val button = notesButton()
         val sound = assertNotNull(title.querySelector(".sound-switch"))
         assertSame(sound, button.nextElementSibling, "The button is not next to the sound switch")
@@ -86,6 +90,30 @@ class PatchNotesCardTest {
         assertEquals("dialog", button.getAttribute("aria-haspopup"))
         // The notes open only on a tap.
         assertNull(card)
+    }
+
+    @Test
+    fun `laid out as published, a finger on 시작하기 after the reveal hits it, and it starts the month`() {
+        usePageStyle()
+        firstScreen()
+        val game = FirstMinute(1011)
+        root.button("${game.cheapestRoomIndex + 1}번 방").click()
+        val input = root.querySelector("input") as HTMLInputElement
+        input.value = "${game.lowestTotal}"
+        input.dispatchEvent(Event("input"))
+        root.button("총비용 확인하기").click()
+        assertNotNull(root.querySelector(".title .patch-open"))
+        // The month-start card's own list stays in the page's flow, under nothing of the update news.
+        val list = assertNotNull(root.querySelector(".start .notes") as? HTMLElement)
+        assertEquals("static", window.getComputedStyle(list).position)
+        val start = root.button("시작하기")
+        start.asDynamic().scrollIntoView(js("({ block: 'center' })"))
+        val box = start.getBoundingClientRect()
+        val hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+        assertSame(start, hit, "A finger on 시작하기 hits ${(hit as? HTMLElement)?.className}")
+        (hit as HTMLElement).click()
+        assertNotNull(root.querySelector(".topbar"), "The month did not start")
+        window.scrollTo(0.0, 0.0)
     }
 
     @Test
@@ -99,7 +127,7 @@ class PatchNotesCardTest {
         assertEquals(PatchNotes.TITLE, document.getElementById(card.getAttribute("aria-labelledby")!!)?.textContent)
         assertTrue(card.contains(document.activeElement), "The focus did not go into the card")
 
-        val entries = card.querySelectorAll(".notes-entry").asList().map { it as HTMLElement }
+        val entries = card.querySelectorAll(".patch-entry").asList().map { it as HTMLElement }
         assertEquals(PatchNotes.ALL.size, entries.size)
         entries.forEachIndexed { index, entry ->
             val note = PatchNotes.ALL[index]
@@ -115,14 +143,14 @@ class PatchNotesCardTest {
             }
         }
         // What lies under the card is out of reach meanwhile.
-        val cover = assertNotNull(root.querySelector(".notes"))
+        val cover = assertNotNull(root.querySelector(".patch-cover"))
         for (under in root.children.asList()) {
             if (under !== cover) assertTrue(under.hasAttribute("inert"), "${under.className} is not inert")
         }
 
         root.button(PatchNotes.CLOSE).click()
         assertNull(this.card)
-        assertNull(root.querySelector(".notes"))
+        assertNull(root.querySelector(".patch-cover"))
         assertSame(button, document.activeElement)
         assertNull(root.querySelector("[inert]"))
     }
@@ -152,9 +180,9 @@ class PatchNotesCardTest {
         usePageStyle()
         firstScreen()
         notesButton().click()
-        val cover = assertNotNull(root.querySelector(".notes") as? HTMLElement)
+        val cover = assertNotNull(root.querySelector(".patch-cover") as? HTMLElement)
         val card = assertNotNull(card)
-        val list = assertNotNull(card.querySelector(".notes-list") as? HTMLElement)
+        val list = assertNotNull(card.querySelector(".patch-list") as? HTMLElement)
         val close = root.button(PatchNotes.CLOSE)
         for ((width, height) in listOf(375 to 812, 320 to 568, 812 to 375, 568 to 320)) {
             pin(cover, width, height)
@@ -220,11 +248,11 @@ class PatchNotesCardTest {
         game.show()
         startSeed1011(root)
         assertNotNull(root.querySelector(".topbar"))
-        val button = assertNotNull(root.querySelector(".foot .notes-open") as? HTMLButtonElement)
+        val button = assertNotNull(root.querySelector(".patch-foot .patch-open") as? HTMLButtonElement)
         assertSame(root.lastElementChild, button.parentElement)
         assertTrue(hasNews(button))
         button.click()
-        assertEquals(PatchNotes.ALL.size, card?.querySelectorAll(".notes-entry")?.length)
+        assertEquals(PatchNotes.ALL.size, card?.querySelectorAll(".patch-entry")?.length)
         root.button(PatchNotes.CLOSE).click()
         assertNull(card)
         assertSame(button, document.activeElement)
@@ -244,7 +272,7 @@ class PatchNotesCardTest {
     }
 
     private val guideLink: HTMLButtonElement?
-        get() = root.querySelector(".guide-card .guide-notes") as? HTMLButtonElement
+        get() = root.querySelector(".guide-card .patch-link") as? HTMLButtonElement
 
     private fun helpButton(): HTMLButtonElement =
         assertNotNull(root.querySelector(".hud .guide-open") as? HTMLButtonElement, "No ? in the top card")
@@ -263,8 +291,8 @@ class PatchNotesCardTest {
 
         link.click()
         val notes = assertNotNull(card, "The link opened nothing")
-        assertEquals(PatchNotes.ALL.size, notes.querySelectorAll(".notes-entry").length)
-        assertSame(root.lastElementChild, root.querySelector(".notes"), "The notes are not over the guide")
+        assertEquals(PatchNotes.ALL.size, notes.querySelectorAll(".patch-entry").length)
+        assertSame(root.lastElementChild, root.querySelector(".patch-cover"), "The notes are not over the guide")
         assertTrue(root.querySelector(".guide")!!.hasAttribute("inert"))
         assertTrue(town.isCovered)
 
@@ -310,7 +338,7 @@ class PatchNotesCardTest {
         helpButton().click()
         assertNotNull(guideLink, "No link in the morning")
         press("Escape")
-        assertNull(root.querySelector(".notes"))
+        assertNull(root.querySelector(".patch-cover"))
     }
 
     /** Lays the page out with its own style sheet, as it is published (web/karma.config.d/style.js hands it over). */

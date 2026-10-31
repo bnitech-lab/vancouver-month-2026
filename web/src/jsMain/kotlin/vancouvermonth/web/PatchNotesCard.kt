@@ -43,10 +43,10 @@ internal class PatchNotesCard(private val memory: Memory) {
     private val onKey: (Event) -> Unit = { event -> (event as? KeyboardEvent)?.let { key(it) } }
 
     /**
-     * Adds the 업데이트 소식 button to [parent], which opens the card over [root]. [className] is "notes-open" for the
+     * Adds the 업데이트 소식 button to [parent], which opens the card over [root]. [className] is "patch-open" for the
      * small pill by the sound switch, or another look for the same button.
      */
-    fun button(parent: HTMLElement, root: HTMLElement, className: String = "notes-open") {
+    fun button(parent: HTMLElement, root: HTMLElement, className: String = "patch-open") {
         val button = document.createElement("button") as HTMLButtonElement
         button.type = "button"
         button.className = className
@@ -61,7 +61,7 @@ internal class PatchNotesCard(private val memory: Memory) {
     /** The button's words, and the dot with a word for screen readers while there is news. */
     private fun showNews(button: HTMLButtonElement) {
         button.textContent = PatchNotes.TITLE
-        button.classList.toggle("news", hasNews)
+        button.classList.toggle("patch-news", hasNews)
         if (hasNews) {
             button.add("span", "visually-hidden", " ${PatchNotes.NEWS}")
         }
@@ -78,29 +78,29 @@ internal class PatchNotesCard(private val memory: Memory) {
         buttons.removeAll { !it.isConnected }
         buttons.forEach(::showNews)
 
-        val cover = element("div", "notes")
-        val card = cover.add("section", "notes-card")
+        val cover = element("div", "patch-cover")
+        val card = cover.add("section", "patch-card")
         card.setAttribute("role", "dialog")
         card.setAttribute("aria-modal", "true")
-        card.setAttribute("aria-labelledby", "notes-title")
+        card.setAttribute("aria-labelledby", "patch-title")
         card.setAttribute("tabindex", "-1")
-        card.add("h2", "notes-title", PatchNotes.TITLE).id = "notes-title"
-        val list = card.add("div", "notes-list")
+        card.add("h2", "patch-title", PatchNotes.TITLE).id = "patch-title"
+        val list = card.add("div", "patch-list")
         PatchNotes.ALL.forEachIndexed { index, note ->
-            val entry = list.add("details", "notes-entry")
+            val entry = list.add("details", "patch-entry")
             if (index == 0) entry.setAttribute("open", "")
-            entry.add("summary", "notes-summary").apply {
-                add("span", "notes-version", PatchNotes.versionLabel(note.version))
-                add("span", "notes-date", " ${PatchNotes.dateLabel(note.date)} ")
-                add("span", "notes-headline", note.headline)
+            entry.add("summary", "patch-summary").apply {
+                add("span", "patch-version", PatchNotes.versionLabel(note.version))
+                add("span", "patch-date", " ${PatchNotes.dateLabel(note.date)} ")
+                add("span", "patch-headline", note.headline)
             }
             for ((name, lines) in note.sections) {
-                entry.add("h3", "notes-section", name)
-                val items = entry.add("ul", "notes-lines")
+                entry.add("h3", "patch-section", name)
+                val items = entry.add("ul", "patch-lines")
                 for (line in lines) items.add("li", text = line)
             }
         }
-        val close = card.add("button", "primary notes-close", PatchNotes.CLOSE) as HTMLButtonElement
+        val close = card.add("button", "primary patch-close", PatchNotes.CLOSE) as HTMLButtonElement
         close.type = "button"
         close.onclick = { close() }
 
