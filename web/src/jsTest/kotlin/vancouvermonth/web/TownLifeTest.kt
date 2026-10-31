@@ -226,6 +226,30 @@ class TownLifeTest {
     }
 
     @Test
+    fun `no streak of rain is drawn right by the camera, and the others are drawn as they fall`() {
+        val eye = Point(20.0, 9.0, 25.0)
+        val numbers = Float32Array((Rain.DROPS + Rain.SPLASHES) * 16)
+        var left = 0
+        for (t in times(2_000.0, 100.0)) {
+            Rain.write(t, 20.0, 18.0, numbers, eye)
+            for (index in 0 until Rain.DROPS) {
+                val drop = Rain.dropAt(index, t, 20.0, 18.0)
+                val middle = Point(drop.x + Rain.SLANT * Rain.STREAK / 2, drop.y - Rain.STREAK / 2, drop.z)
+                val near = kotlin.math.hypot(kotlin.math.hypot(middle.x - eye.x, middle.y - eye.y), middle.z - eye.z)
+                val at = index * 16
+                if (near < Rain.CLEAR) {
+                    left += 1
+                    for (offset in 0 until 15) assertEquals(0f, numbers[at + offset], "streak $index by the camera")
+                } else {
+                    assertEquals(Rain.STREAK, numbers[at + 5].toDouble(), 1e-6, "streak $index")
+                    assertEquals(middle.y, numbers[at + 13].toDouble(), 1e-4, "streak $index")
+                }
+            }
+        }
+        assertTrue(left > 0, "the camera was never in the rain")
+    }
+
+    @Test
     fun `splashes flash on the ground or the sea for a moment, each time somewhere else`() {
         var shown = 0
         val spots = mutableSetOf<Pair<Int, Int>>()

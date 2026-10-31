@@ -341,15 +341,24 @@ object Rain {
 
     /**
      * Writes every streak and then every splash at [millis] into [into], sixteen numbers each, column by column as
-     * Three.js keeps a matrix, with the box of sky centred on [centreX], [centreZ]. It makes nothing new, since it runs
-     * on every beat of the town's life.
+     * Three.js keeps a matrix, with the box of sky centred on [centreX], [centreZ]. A streak within [CLEAR] of the
+     * camera at [eye] is left out (shrunk to nothing): so close, it would be a pale bar across the screen, and costly
+     * to draw. It makes nothing new, since it runs on every beat of the town's life.
      */
-    fun write(millis: Double, centreX: Double, centreZ: Double, into: Float32Array) {
+    fun write(millis: Double, centreX: Double, centreZ: Double, into: Float32Array, eye: Point? = null) {
         val west = centreX - SPAN / 2
         val north = centreZ - SPAN / 2
         for (index in 0 until DROPS) {
             val fall = fallen(index, millis)
             val at = index * 16
+            val x = wrap(dropX[index] + SLANT * TOP * fall, west) + SLANT * STREAK / 2
+            val y = TOP * (1 - fall) - STREAK / 2
+            val z = wrap(dropZ[index], north)
+            if (eye != null && isNear(x - eye.x, y - eye.y, z - eye.z)) {
+                for (offset in 0 until 15) into[at + offset] = 0f
+                into[at + 15] = 1f
+                continue
+            }
             // Stretched to a thin streak whose top leans west, as the wind blows it east on the way down.
             into[at] = THIN.toFloat()
             into[at + 1] = 0f
@@ -363,9 +372,9 @@ object Rain {
             into[at + 9] = 0f
             into[at + 10] = THIN.toFloat()
             into[at + 11] = 0f
-            into[at + 12] = (wrap(dropX[index] + SLANT * TOP * fall, west) + SLANT * STREAK / 2).toFloat()
-            into[at + 13] = (TOP * (1 - fall) - STREAK / 2).toFloat()
-            into[at + 14] = wrap(dropZ[index], north).toFloat()
+            into[at + 12] = x.toFloat()
+            into[at + 13] = y.toFloat()
+            into[at + 14] = z.toFloat()
             into[at + 15] = 1f
         }
         for (index in 0 until SPLASHES) {
@@ -381,6 +390,12 @@ object Rain {
             into[at + 15] = 1f
         }
     }
+
+    /** True when a streak's middle, [dx], [dy], [dz] from the camera, is within [CLEAR] of it. */
+    private fun isNear(dx: Double, dy: Double, dz: Double): Boolean = dx * dx + dy * dy + dz * dz < CLEAR * CLEAR
+
+    /** How far from the camera the nearest streak may be. */
+    const val CLEAR = 4.0
 
     /** A number from 0.0 to 1.0 that looks random but comes from [seed] alone. */
     private fun scatter(seed: Double): Double {

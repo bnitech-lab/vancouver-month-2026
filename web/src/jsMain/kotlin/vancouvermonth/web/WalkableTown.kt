@@ -930,7 +930,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val focus = view.focus
         val x = focus.x + (eye.x - focus.x) * RAIN_TOWARD_EYE
         val z = focus.z + (eye.z - focus.z) * RAIN_TOWARD_EYE
-        Rain.write(millis, x, z, rain.instanceMatrix.array)
+        Rain.write(millis, x, z, rain.instanceMatrix.array, eye)
         rain.instanceMatrix.needsUpdate = true
     }
 
