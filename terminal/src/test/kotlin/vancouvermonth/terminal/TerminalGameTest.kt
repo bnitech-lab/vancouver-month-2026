@@ -139,13 +139,14 @@ class TerminalGameTest {
         val at = (story + why).map { lines.indexOf(it) }
         assertTrue(at.all { it >= 0 }, "missing a line in: $screen")
         assertEquals(at.sorted(), at)
-        assertTrue(goalLine() in story)
+        assertTrue(goalLine() in lines, screen)
         assertTrue(lines.indexOf("할 일: 한 달 총비용이 가장 싼 방을 고르세요.") in at.first()..at.last())
         assertTrue(at.last() < lines.indexOfFirst { it.startsWith("  1) ") })
         // The story says the money and the date, so the first screen has no balance line of its own.
         assertFalse(lines.any { it.startsWith("잔고") }, screen)
-        // No room's total is handed over before the guess.
+        // No room's total, and no word that names the cheapest room, is handed over before the guess.
         for (room in FirstMinute(4821).rooms) assertFalse(money(room.totalMonthlyCost) in screen)
+        for (word in listOf("가장 싼 방은", "번이었어요", "가장 싼 방보다", "가장 싼 방이라")) assertFalse(word in screen, word)
     }
 
     @Test

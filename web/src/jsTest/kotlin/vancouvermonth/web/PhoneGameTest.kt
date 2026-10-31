@@ -133,8 +133,9 @@ class PhoneGameTest {
         assertTrue(at.all { it >= 0 }, "missing one of $order in: $screen")
         assertEquals(at.sorted(), at, "out of order: $screen")
         assertTrue(at.last() < firstRoom, "the why comes after the rooms: $screen")
-        // The guess and the score stay: no room's total, and so no cheapest room, is shown before the reveal.
+        // The guess and the score stay: no room's total, and no word that names the cheapest room, before the reveal.
         for (room in game.rooms) assertFalse(money(room.totalMonthlyCost) in screen, screen)
+        for (word in listOf("가장 싼 방은", "번이었어요", "가장 싼 방보다", "가장 싼 방이라")) assertFalse(word in screen, word)
     }
 
     @Test
