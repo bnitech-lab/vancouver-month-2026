@@ -562,8 +562,6 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     override fun close() {
         if (closed) return
         closed = true
-        // The town's sounds go quiet with it.
-        onSounds(0.0, 0.0, 0.0)
         resizeObserver.disconnect()
         canvas.removeEventListener("pointerdown", onPress)
         canvas.removeEventListener("pointermove", onMove)
@@ -587,6 +585,20 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         flameMaterial.dispose()
         rainMaterial.dispose()
         shades.dispose()
+        // The town's sounds go quiet with it, last, so nothing the sound does can stop the town letting go.
+        tellSounds(0.0, 0.0, 0.0)
+    }
+
+    /**
+     * Tells the sound how loud the train and the fire are, and how dark the night is. A sound that fails is the
+     * sound's trouble: it is noted and the town goes on, rather than handing a working town over to the buttons.
+     */
+    private fun tellSounds(train: Double, fire: Double, night: Double) {
+        try {
+            onSounds(train, fire, night)
+        } catch (error: Throwable) {
+            console.warn("The town's sounds failed:", error)
+        }
     }
 
     /** Where the character is now, for tests. */
@@ -851,17 +863,20 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         // After a rest with no frames, the first one counts as a short step, not the whole pause.
         val millis = (now - lastFrame).coerceIn(0.0, MAX_STEP_MILLIS)
         lastFrame = now
-        val walking = stepWalk(now)
-        val night = stepNight(now)
-        placeCharacter()
-        val subject = if (sitting) Neighbourhood.benchSeat else spot
-        gliding = view.follow(Point(subject.x, FOCUS_HEIGHT, subject.z), millis)
-        placeCamera()
         // A phone that asks for less motion keeps the town's own life still, and draws only for the player. The life
         // moves on the beat only, even on frames drawn at the screen's full rate for the player.
         val still = lessMotion.matches
+        var walking = false
+        var night = false
         try {
-            // Inside the try, so that if the life ever failed the town would hand over to the buttons, not freeze.
+            // Inside the try, so that if the walk, the change of day (which brings the new day's weather) or the life
+            // ever failed, the town would hand over to the buttons, not freeze.
+            walking = stepWalk(now)
+            night = stepNight(now)
+            placeCharacter()
+            val subject = if (sitting) Neighbourhood.benchSeat else spot
+            gliding = view.follow(Point(subject.x, FOCUS_HEIGHT, subject.z), millis)
+            placeCamera()
             if (!still && pace.stepsLife) stepLife()
             renderer.shadowMap.needsUpdate = pace.drawsShadows
             renderer.render(scene, camera)
@@ -922,7 +937,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         // How loud the train and the fire are where the player is: the train at the camera, the fire at the character.
         val night = if (nightFell == null) 0.0 else DayLight.at(nightProgress).glow
         val fire = Campfire.nearness(distanceBetween(player, Neighbourhood.campfire))
-        onSounds(SkyTrainRun.rumbleAt(now, view.eye), fire, night)
+        tellSounds(SkyTrainRun.rumbleAt(now, view.eye), fire, night)
     }
 
     /**

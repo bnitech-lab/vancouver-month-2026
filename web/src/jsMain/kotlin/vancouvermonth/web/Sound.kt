@@ -112,7 +112,12 @@ internal class Sound(
         val rain = weather == Weather.RAINY
         if (rain == rainy) return
         rainy = rain
-        speaker?.weather(rain)
+        // A sound that fails here is noted, and the game goes on.
+        try {
+            speaker?.weather(rain)
+        } catch (error: Throwable) {
+            console.warn("The rain could not be played:", error)
+        }
     }
 
     /**
@@ -121,7 +126,13 @@ internal class Sound(
      * back with the sound after the town has gone, with nothing left to quiet it.
      */
     fun nearby(train: Double, fire: Double, night: Double) {
-        if (isOn || (train == 0.0 && fire == 0.0)) speaker?.nearby(train, fire, night)
+        if (!isOn && (train != 0.0 || fire != 0.0)) return
+        // A sound that fails here is noted, and the town goes on.
+        try {
+            speaker?.nearby(train, fire, night)
+        } catch (error: Throwable) {
+            console.warn("The town's sounds could not be played:", error)
+        }
     }
 
     /** Stops waiting for a tap and watching whether the page is hidden, as a test does when it is over. */

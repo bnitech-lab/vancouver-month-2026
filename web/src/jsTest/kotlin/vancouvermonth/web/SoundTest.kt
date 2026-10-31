@@ -342,6 +342,26 @@ class SoundTest {
     }
 
     @Test
+    fun `a sound that fails on the rain or the town's sounds is noted, and nothing else stops`() {
+        var breaks = false
+        val failing = object : Speaker by speaker {
+            override fun weather(rain: Boolean) = if (breaks) throw IllegalStateException("No rain here") else Unit
+
+            override fun nearby(train: Double, fire: Double, night: Double) =
+                if (breaks) throw IllegalStateException("No train here") else Unit
+        }
+        val sound = Sound(Memory { FakeStore() }, { failing }, now = { clock }, hidden = { hidden }).also { sounds += it }
+        sound.button(root)
+        switchIn().click()
+        breaks = true
+        sound.weather(Weather.RAINY)
+        sound.nearby(0.5, 0.5, 1.0)
+        sound.nearby(0.0, 0.0, 0.0)
+        assertTrue(sound.isOn, "A failing rain or train switched the whole sound off")
+        assertEquals("소리 끄기", switchIn().textContent)
+    }
+
+    @Test
     fun `a silence reaches the sound even while it is off, so nothing rumbles on once the town has gone`() {
         val sound = sound()
         sound.button(root)

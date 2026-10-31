@@ -929,6 +929,44 @@ class WalkableTownTest {
     }
 
     @Test
+    fun `a sound that fails never fails the town, and the town still lets go when it closes`(): Promise<Unit> {
+        var clock = 0.0
+        val town = startInTown(life = { clock })
+        var failed = false
+        val handOver = town.onFail
+        town.onFail = {
+            failed = true
+            handOver()
+        }
+        town.onSounds = { _, _, _ -> throw IllegalStateException("No sound here") }
+        var from = 0
+        var closedAt = 0
+        return play(
+            Step("let the town's life run with a sound that throws", { town.isStill }) {
+                from = town.framesDrawn
+                clock = 1_000.0
+            },
+            Step("it goes on drawing", { town.framesDrawn > from + 2 }) {
+                clock = 2_000.0
+                assertFalse(failed, "the town handed over to the buttons")
+                assertNull(root.querySelector(".actions"), "the day's buttons came")
+                assertNotNull(root.querySelector(".walk-town"))
+            },
+            Step("it closes, the sound told last", { town.framesDrawn > from + 4 }) {
+                // The quiet sent on closing throws too; the town still lets go of everything.
+                town.close()
+                closedAt = town.framesDrawn
+                clock = 3_000.0
+                drag(town)
+            },
+            Step("and draws nothing after", after(300)) {
+                assertEquals(closedAt, town.framesDrawn, "it drew after closing")
+                assertFalse(failed)
+            },
+        )
+    }
+
+    @Test
     fun `with rain falling and only the town's own life moving, it still draws no more than thirty frames a second`():
         Promise<Unit> {
         var clock = 0.0
