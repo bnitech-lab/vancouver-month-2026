@@ -188,9 +188,10 @@ picture: a screen reader hears only which place the character is nearest, as in 
 The city's buildings never get in the way. One that stands between the camera and the character, or fills the view
 just in front of the camera, folds down in a quarter of a second to a low outline of its footprint in its own colour,
 and rises again once clear; a tap meant for the ground behind a folded one lands there. So downtown the camera keeps the
-distance and the turn the player gave it. Only the five places, the SkyTrain's deck and station, the café's awning and
-the office's canopy still pull it in front or lift it over; where one of them stands right behind the character, it
-first looks along the nearest street. As the character reaches a place the camera comes round to the street side of
+distance and the turn the player gave it. Only the five places, the SkyTrain's deck, its station and the station's
+roof, the tunnel's mouth, the café's awning and the office's canopy still pull it in front or lift it over; where one of
+them stands right behind the character, it first looks along the nearest street. A building the camera would come
+inside folds at once, and the near view widens with the view, so nothing out of sight folds. As the character reaches a place the camera comes round to the street side of
 the door, unless the player turned it on the way.
 A tap on the water walks to the near shore. A talk ignores taps for a moment after it opens, so the finger that opened
 it cannot also answer it. While a day changes into the next, the town takes no taps, drags, pinches or names, and no
@@ -258,7 +259,7 @@ stopping for the character), `Greeter` (the five turning and waving), `TownLife`
 rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, all worked out from the time) and
 `FramePace` (which frames are drawn). The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`, and
 `Passersby.kt` for the passersby's), and so is each day's weather (`Weather.kt`). `WalkableTown` draws all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the map included, is about 805 KB
+`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the map included, is about 806 KB
 (about 216 KB gzipped).
 
 ### Sound and the first-run guide

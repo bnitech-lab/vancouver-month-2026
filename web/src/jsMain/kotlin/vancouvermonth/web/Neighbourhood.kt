@@ -313,7 +313,7 @@ object Neighbourhood {
     private const val FLAT_ROOF = 0.3
 
     /** How tall the plant room on a tall tower's roof is. */
-    const val PLANT_ROOM = 0.5
+    private const val PLANT_ROOM = 0.5
 
     /** How far the guideway carries on past the grid's edge, and how deep a place's square is in front of it. */
     private const val PAST_THE_EDGE = 170.0
