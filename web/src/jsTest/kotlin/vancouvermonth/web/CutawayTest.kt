@@ -72,6 +72,20 @@ class CutawayTest {
     }
 
     @Test
+    fun `the near view widens as the view does, so what stands beside or behind the camera, out of sight, stands`() {
+        // 2.5 off the line, half a unit in front of the camera: beside it, out of the picture.
+        val beside = onLine(0.5 / 21.8)
+        // As far off the line behind the camera.
+        val cutaway = Cutaway(listOf(
+            Block(beside.x - 1.0, 0.0, beside.z + 2.5, 2.0, 12.0, 2.0, 0),
+            Block(eye.x - 3.0, 0.0, eye.z + 2.5, 2.0, 12.0, 2.0, 0),
+        ))
+        cutaway.aimAt(eye, head)
+        assertFalse(cutaway.isFolding(0), "the building beside the camera folds")
+        assertFalse(cutaway.isFolding(1), "the building behind the camera folds")
+    }
+
+    @Test
     fun `brought in close, the camera has no wider near view to fold what stands round the character`() {
         val close = Point(head.x - 4.0, head.y + 2.5, head.z)
         // Beside the camera, 2.0 off the line: inside a near view, outside the ray.
@@ -214,13 +228,25 @@ class CutawayTest {
     }
 
     @Test
-    fun `the ray is widest in the near view, then as thick as asked, and narrows to the head`() {
-        assertEquals(Cutaway.NEAR_RADIUS, Cutaway.radiusAt(0.0, 21.0))
+    fun `the ray widens over the near view, then is as thick as asked, and narrows to the head`() {
+        // At the eye as thick as the ray, widening with the view to the near view's widest.
+        assertEquals(Cutaway.RAY_RADIUS, Cutaway.radiusAt(0.0, 21.0))
+        assertEquals(2.0 * Cutaway.NEAR_SPREAD, Cutaway.radiusAt(2.0, 21.0), 1e-9)
         assertEquals(Cutaway.NEAR_RADIUS, Cutaway.radiusAt(Cutaway.NEAR_LENGTH, 21.0))
         assertEquals(Cutaway.RAY_RADIUS, Cutaway.radiusAt(Cutaway.NEAR_LENGTH + 0.5, 21.0))
         assertEquals(Cutaway.RAY_RADIUS, Cutaway.radiusAt(21.0 - Cutaway.HEAD_TAPER, 21.0), 1e-9)
         assertEquals(Cutaway.HEAD_RADIUS, Cutaway.radiusAt(21.0, 21.0))
         // Close in, no near view at all.
         assertEquals(Cutaway.RAY_RADIUS, Cutaway.radiusAt(0.0, 4.5))
+        // A camera about five and a half units off, following the character a little behind, never folds and raises
+        // what stands just beside it as the distance wavers: the near view starts from the ray's own thickness.
+        val besideEye = Block(-0.5, 0.0, 2.0, 1.0, 12.0, 1.0, 0)
+        var length = 5.0
+        while (length < 6.5) {
+            val cutaway = Cutaway(listOf(besideEye))
+            cutaway.aim(0.0, 3.0, 0.0, length, 3.0, 0.0)
+            assertFalse(cutaway.isFolding(0), "at $length the building beside the camera folds")
+            length += 0.01
+        }
     }
 }

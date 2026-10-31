@@ -11,9 +11,10 @@ import kotlin.math.sqrt
  * fills the near view just in front of the camera; it folds over [FOLD_MILLIS] down to a plinth [PLINTH] tall, keeping
  * its footprint and colour, and rises back the same way once clear. The ray is [RAY_RADIUS] thick from the eye and
  * narrows to [HEAD_RADIUS] over the last [HEAD_TAPER] before the head, so the buildings level with the character and
- * behind it stand; it is [NEAR_RADIUS] thick over the first [NEAR_LENGTH] in front of the camera. A building already
- * folded stays folded until it is [SLACK] farther out than that, so one at the edge does not flicker. [buildings] are
- * the boxes, each from the ground up, in the order the drawing knows them by.
+ * behind it stand. Over the first [NEAR_LENGTH] in front of the camera it widens as the view does, up to
+ * [NEAR_RADIUS], so what fills the near view folds but what stands beside or behind the camera, out of sight, does not.
+ * A building already folded stays folded until it is [SLACK] farther out than that, so one at the edge does not
+ * flicker. [buildings] are the boxes, each from the ground up, in the order the drawing knows them by.
  *
  * Nothing new is made while the camera moves: the buildings are kept in buckets of [BUCKET] units on the ground, and
  * [aim] looks only at those near the ray.
@@ -213,9 +214,13 @@ class Cutaway(buildings: List<Block>) {
         /** Over how much of the way before the head the ray narrows, so what stands beside the character stays. */
         const val HEAD_TAPER = 2.5
 
-        /** The near view: how far in front of the camera, and how thick around its line. */
+        /**
+         * The near view: how far in front of the camera, how thick around its line at most, and how fast it widens
+         * from the eye: 0.9 a unit, about the 42 degrees a tall phone sees above and below the middle of the screen.
+         */
         const val NEAR_LENGTH = 6.0
         const val NEAR_RADIUS = 3.0
+        const val NEAR_SPREAD = 0.9
 
         /** How much farther out a folded building must be before it rises again. */
         const val SLACK = 0.6
@@ -225,14 +230,17 @@ class Cutaway(buildings: List<Block>) {
         const val BUCKET = 8.0
 
         /**
-         * How thick the ray is [along] units from the eye, on a way [length] units long to the head: [NEAR_RADIUS] in
-         * the near view, [RAY_RADIUS] on the way, narrowing to [HEAD_RADIUS] at the head. The near view never reaches
-         * into the part that narrows, so a camera brought in close does not fold what stands round the character.
+         * How thick the ray is [along] units from the eye, on a way [length] units long to the head: in the near view,
+         * widening from [RAY_RADIUS] at [NEAR_SPREAD] a unit up to [NEAR_RADIUS]; [RAY_RADIUS] on the way; narrowing to
+         * [HEAD_RADIUS] at the head. The near view never reaches into the part that narrows, so a camera brought in
+         * close does not fold what stands round the character; and as it starts from the ray's own thickness at the
+         * eye, a camera coming in or going out never folds or raises anything all at once.
          */
         fun radiusAt(along: Double, length: Double): Double {
             val toHead = length - along
             if (toHead < HEAD_TAPER) return HEAD_RADIUS + (RAY_RADIUS - HEAD_RADIUS) * max(0.0, toHead) / HEAD_TAPER
-            return if (along <= NEAR_LENGTH && toHead >= HEAD_TAPER + NEAR_RADIUS) NEAR_RADIUS else RAY_RADIUS
+            if (along > NEAR_LENGTH || toHead < HEAD_TAPER + NEAR_RADIUS) return RAY_RADIUS
+            return max(RAY_RADIUS, min(NEAR_RADIUS, along * NEAR_SPREAD))
         }
     }
 }
