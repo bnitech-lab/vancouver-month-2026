@@ -11,15 +11,33 @@ class WeatherTest {
     private val seeds = 1..2_000
     private val days = Month.FIRST_DAY..Month.LAST_DAY
 
+    /** A run's September 2nd to 30th, one letter a day: S sunny, C cloudy, R rainy. */
+    private fun september(seed: Int): String = days.joinToString("") { weatherOn(seed, it).name.take(1) }
+
     @Test
-    fun `the same run on the same day always has the same weather, and runs differ`() {
-        for (seed in listOf(1, 1011, 9_999)) {
-            for (day in days) assertEquals(weatherOn(seed, day), weatherOn(seed, day), "$seed, $day")
-        }
-        // Today's run is a run number like any other, so its weather is everyone's.
-        val today = TodaysRun(2026, 10, 31).seed
-        assertEquals(days.map { weatherOn(today, it) }, days.map { weatherOn(TodaysRun(2026, 10, 31).seed, it) })
-        assertNotEquals(days.map { weatherOn(1011, it) }, days.map { weatherOn(1012, it) })
+    fun `each run's September has the skies written down here, on the JVM and in a browser alike`() {
+        // Written down once from this rule. The test runs on the JVM and in a browser, so the two must agree, and a
+        // change to the rule's numbers, which would move everyone's weather, has to change these lines on purpose.
+        val skies = mapOf(
+            1011 to "SSSRRRSSSSRRSSSCSSSSSRCSSSRRS",
+            1012 to "SRRRRSRSCRSSSRRSRRRRCCRSSSRSS",
+            4242 to "SCSSCCSSRRCSSSSSSRCSSSSSCCCCC",
+            -1 to "SSCSSSCSSSSSCRRRRRRCCSSCCSSRR",
+            Int.MIN_VALUE to "SCCCRSSSSSRRRRRRCRSSRSCCSCSCS",
+            Int.MAX_VALUE to "SSSCSSSSSSSSRSRRSSSRRCRRSRSRR",
+        )
+        for ((seed, sky) in skies) assertEquals(sky, september(seed), "the weather changed: run $seed")
+        assertNotEquals(september(1011), september(1012))
+        // Every day of runs 1 to 500, counted by sky: a change too small to move the runs above still moves these.
+        val counts = (1..500).flatMap { september(it).toList() }.groupingBy { it }.eachCount()
+        assertEquals(mapOf('S' to 7_410, 'C' to 2_863, 'R' to 4_227), counts, "the weather changed: runs 1 to 500")
+    }
+
+    @Test
+    fun `today's run has the skies of its run number, so everyone playing it on that date gets the same weather`() {
+        val today = TodaysRun(2026, 10, 31)
+        assertEquals(7546, today.seed)
+        assertEquals("CSRRSSRRRRSRRSCSCCSSSSSSSSSSS", september(today.seed), "the weather changed: today's run 2026-10-31")
     }
 
     @Test
