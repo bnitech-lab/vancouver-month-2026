@@ -10,6 +10,7 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.browser.document
 import org.w3c.dom.HTMLButtonElement
+import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.asList
@@ -309,5 +310,30 @@ class PhoneGameTest {
         startMonth(room = 3, amount = "1165")
         while ("다시 하기" !in screen) tap("쉬기")
         assertNull(root.querySelector(".town"))
+    }
+
+    @Test
+    fun `without WebGL there is no town, and the month plays as it did before`() {
+        val canvas = document.createElement("canvas") as HTMLCanvasElement
+        // A browser without WebGL: asking the canvas for a context gives nothing.
+        canvas.asDynamic().getContext = { _: String, _: Any? -> null }
+        val town = openTown(canvas)
+        assertNull(town)
+
+        PhoneGame(root, 1011, playAgain = {}, town = town).show()
+        startMonth(room = 3, amount = "1165")
+        assertNull(root.querySelector(".town"))
+        assertSame(root.querySelector(".stats"), root.querySelector(".topbar")?.nextElementSibling)
+        tap("카페 알바")
+        assertNull(root.querySelector(".town"))
+        assertSame(root.querySelector(".log"), root.querySelector(".topbar")?.nextElementSibling)
+        assertTrue("카페에서 일했어요. +\$110" in screen)
+    }
+
+    @Test
+    fun `a canvas that fails while handing out WebGL gives no town either`() {
+        val canvas = document.createElement("canvas") as HTMLCanvasElement
+        canvas.asDynamic().getContext = { _: String, _: Any? -> throw IllegalStateException("No GPU") }
+        assertNull(openTown(canvas))
     }
 }
