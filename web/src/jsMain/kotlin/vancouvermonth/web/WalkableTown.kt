@@ -42,6 +42,12 @@ interface WalkableTown {
      */
     var onMorning: () -> Unit
 
+    /**
+     * True while a card covers most of the town, as a talk does. The town's own life then moves at a slower beat,
+     * to spare the battery.
+     */
+    var isCovered: Boolean
+
     /** Marks the name of [place], as on an interview day, or no name when null. */
     fun mark(place: Place?)
 
@@ -141,7 +147,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     /** True when the page is not on screen. A test may set it. */
     internal var pageHidden: () -> Boolean = { document.asDynamic().hidden == true }
     private val lessMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
-    private val pace = FramePace()
+    private val pace = FramePace(openedAt = window.performance.now())
 
     private val character = Group()
     private val limbs = mutableMapOf<Limb, Group>()
@@ -367,7 +373,10 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             label.style.position = "absolute"
             label.style.left = "0"
             label.style.top = "0"
-            label.onclick = { if (nightFell == null) goTalk(venue.place, dash = false) }
+            label.onclick = {
+                touched()
+                if (nightFell == null) goTalk(venue.place, dash = false)
+            }
             element.appendChild(label)
             labels[venue.place] = label
         }
@@ -392,11 +401,20 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         return mesh
     }
 
+    override var isCovered: Boolean
+        get() = pace.isCovered
+        set(value) {
+            if (value == pace.isCovered) return
+            pace.isCovered = value
+            touched()
+        }
+
     override fun mark(place: Place?) {
         for ((labelPlace, label) in labels) label.classList.toggle("here", labelPlace == place)
     }
 
     override fun endDay(place: Place) {
+        touched()
         trip = null
         marker.visible = false
         pointers.clear()
@@ -495,6 +513,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         get() = view.distance
 
     private fun press(event: PointerEvent) {
+        touched()
         if (event.button.toInt() != 0 || nightFell != null) return
         // The first finger of a new touch: any finger still on record lost its lift somewhere, so it is forgotten.
         if (event.isPrimary) pointers.clear()
@@ -542,6 +561,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     private fun wheel(event: WheelEvent) {
         event.preventDefault()
+        touched()
         if (nightFell != null) return
         view.zoom(exp(event.deltaY * WHEEL_ZOOM))
         askForFrame()
@@ -643,6 +663,11 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         camera.fov = view.fov
         camera.updateProjectionMatrix()
         askForFrame()
+    }
+
+    /** Notes that the player touched the town, or the game turned to it: the town's life goes back to its quicker beat. */
+    private fun touched() {
+        pace.noteInput(window.performance.now())
     }
 
     /** Draws the next frame at the screen's full rate: the player did something, or the picture must change. */

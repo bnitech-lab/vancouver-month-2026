@@ -430,6 +430,7 @@ class PhoneGame private constructor(
         }
         root.querySelector(".over-town")?.remove()
         town.mark(if (month.hasInterviewToday) INTERVIEW_PLACE else null)
+        town.isCovered = talkingAt != null || chattingWith != null
         root.child("div", "over-town") {
             child("header", "hud") {
                 setAttribute("tabindex", "-1")

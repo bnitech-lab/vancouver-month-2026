@@ -36,6 +36,7 @@ private class SilentTown : WalkableTown {
     override var onPasserby: (Passer) -> Unit = {}
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
+    override var isCovered = false
 
     override fun mark(place: Place?) {}
 
