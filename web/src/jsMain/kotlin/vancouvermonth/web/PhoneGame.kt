@@ -8,11 +8,13 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLFormElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.HTMLLabelElement
+import org.w3c.dom.Range
 import vancouvermonth.core.Action
 import vancouvermonth.core.Event
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.Month
 import vancouvermonth.core.Reveal
+import vancouvermonth.core.TodaysRun
 import vancouvermonth.text.actionEffect
 import vancouvermonth.text.actionName
 import vancouvermonth.text.breakdown
@@ -27,6 +29,8 @@ import vancouvermonth.text.parseAmount
 import vancouvermonth.text.passPrices
 import vancouvermonth.text.percent
 import vancouvermonth.text.stageName
+import vancouvermonth.text.todaysRunName
+import vancouvermonth.text.todaysRunResult
 import vancouvermonth.text.utilitiesLabel
 import vancouvermonth.text.utilitiesPrices
 import vancouvermonth.text.whyNot
@@ -34,13 +38,20 @@ import vancouvermonth.text.whyNot
 /**
  * Draws one run in [root]: the room on September 1st, then one action a day, then the ending.
  * The rules are in core and the wording in text; this only shows the state and passes each tap on.
- * Every tap redraws the whole screen from that state.
+ * Every tap redraws the whole screen from that state. A run comes from a seed or from today's date, never both.
  */
-class PhoneGame(
+class PhoneGame private constructor(
     private val root: HTMLElement,
     seed: Int,
+    private val today: TodaysRun?,
     private val playAgain: () -> Unit,
 ) {
+    /** A run from a seed, as in `?seed=1011`. */
+    constructor(root: HTMLElement, seed: Int, playAgain: () -> Unit) : this(root, seed, null, playAgain)
+
+    /** Today's run: its date picks the seed, and its ending shows the result line to copy. */
+    constructor(root: HTMLElement, today: TodaysRun, playAgain: () -> Unit) : this(root, today.seed, today, playAgain)
+
     private val game = FirstMinute(seed)
     private var picked: Int? = null
     private var guess = ""
@@ -230,8 +241,13 @@ class PhoneGame(
                 figure("영어", "${month.english}/${Month.MAX_SKILL}")
                 figure("코딩", "${month.coding}/${Month.MAX_SKILL}")
             }
-            button("primary", text = "다시 하기") {
-                onclick = { playAgain() }
+            if (today != null) result(todaysRunResult(today, reveal.score, ending, month.day))
+            child("div", "ending-buttons") {
+                button("primary", text = "다시 하기") {
+                    onclick = { playAgain() }
+                }
+                // A link, since it only opens the page again; the page then reads the browser's date.
+                child("a", "secondary", "오늘의 판").setAttribute("href", "?today")
             }
         }
     }
@@ -240,7 +256,7 @@ class PhoneGame(
         root.child("header", "title") {
             child("p", "brand", "BNI Tech")
             child("h1", text = "밴쿠버 한 달 (가제)")
-            child("p", "run", "판 번호 ${game.seed}")
+            child("p", "run", if (today == null) "판 번호 ${game.seed}" else "${todaysRunName(today)} · 판 번호 ${game.seed}")
         }
     }
 
@@ -306,6 +322,58 @@ private fun HTMLElement.meter(label: String, kind: String, value: Int, max: Int)
         child("span", "meter-value", "$value/$max")
     }
 }
+
+/**
+ * Today's result as one line, with a button that copies it. Where the browser refuses to copy,
+ * the line is selected instead, ready for the phone's own copy.
+ */
+private fun HTMLElement.result(line: String) {
+    child("div", "result") {
+        child("h2", text = "결과 한 줄")
+        val text = child("p", "result-line", line)
+        val copy = button("secondary", text = "결과 복사")
+        val status = child("p", "result-status") { setAttribute("aria-live", "polite") }
+
+        fun selectInstead() {
+            status.textContent = if (selectAll(text)) {
+                "복사하지 못했어요. 선택된 줄을 직접 복사해 주세요."
+            } else {
+                "복사하지 못했어요. 줄을 눌러 선택한 뒤 복사해 주세요."
+            }
+        }
+
+        copy.onclick = {
+            // The copy has to start inside the tap, or the browser refuses it.
+            try {
+                window.navigator.clipboard.writeText(line)
+                    .then { status.textContent = "복사했어요." }
+                    .catch { selectInstead() }
+            } catch (error: Throwable) {
+                // A page that is not on https, localhost or a file has no clipboard at all.
+                selectInstead()
+            }
+        }
+    }
+}
+
+/** Selects all of [element]'s text, as a long press would. False when the page has no selection to use. */
+internal fun selectAll(element: HTMLElement): Boolean {
+    val selection = getSelection() ?: return false
+    val range = document.createRange()
+    range.selectNodeContents(element)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    return true
+}
+
+/** The page's text selection. Kotlin's DOM declarations leave it out, so these are the parts this page uses. */
+internal external interface Selection {
+    fun removeAllRanges()
+    fun addRange(range: Range)
+}
+
+/** The browser's own getSelection(), the same function as window.getSelection(). */
+internal external fun getSelection(): Selection?
 
 private fun HTMLElement.point(line: String, points: Int) {
     child("li") {

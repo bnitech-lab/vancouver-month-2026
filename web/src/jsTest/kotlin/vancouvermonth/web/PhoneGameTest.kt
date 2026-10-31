@@ -1,10 +1,12 @@
 package vancouvermonth.web
 
+import kotlin.js.Date
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.browser.document
 import org.w3c.dom.HTMLButtonElement
@@ -12,6 +14,8 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.asList
 import org.w3c.dom.events.Event
+import vancouvermonth.core.FirstMinute
+import vancouvermonth.core.TodaysRun
 
 /** Plays the page in the test browser by tapping its buttons, the way a player would. */
 class PhoneGameTest {
@@ -48,6 +52,14 @@ class PhoneGameTest {
         type(amount)
         tap("총비용 확인하기")
         tap("시작하기")
+    }
+
+    /** Plays [today]'s run with the cheapest room and an exact guess, then rests until September ends. */
+    private fun restThrough(today: TodaysRun) {
+        PhoneGame(root, today, playAgain = { playedAgain = true }).show()
+        val game = FirstMinute(today.seed)
+        startMonth(room = game.cheapestRoomIndex + 1, amount = "${game.lowestTotal}")
+        while ("다시 하기" !in screen) tap("쉬기")
     }
 
     @Test
@@ -150,6 +162,94 @@ class PhoneGameTest {
         assertEquals(42, seedFrom("?lang=ko&seed=42"))
         assertNull(seedFrom(""))
         assertNull(seedFrom("?seed=abc"))
+    }
+
+    @Test
+    fun `today's run comes from the query or the browser's date`() {
+        val now = Date(2026, 9, 30) // A JavaScript date counts months from 0, so this is October 30th.
+        assertEquals(TodaysRun(2026, 10, 30), todayFrom("?today", now))
+        assertEquals(TodaysRun(2026, 10, 29), todayFrom("?today=2026-10-29", now))
+        assertEquals(TodaysRun(2026, 10, 30), todayFrom("?today=soon", now))
+        assertEquals(TodaysRun(2026, 10, 30), todayFrom("?today=2026-13-01", now))
+        assertEquals(TodaysRun(2026, 10, 30), todayFrom("?today=2026-02-30", now))
+        assertEquals(TodaysRun(2026, 10, 30), todayFrom("?today=0999-01-01", now))
+        assertNull(todayFrom("?today", Date(2100, 0, 1)), "a clock past 2099 plays a new run instead")
+        assertNull(todayFrom("?seed=1011", now))
+        assertNull(todayFrom("", now))
+    }
+
+    @Test
+    fun `the address picks the run, and is rewritten to name it`() {
+        val now = Date(2026, 9, 30) // October 30th
+        val today = TodaysRun(2026, 10, 30)
+        val earlier = TodaysRun(2026, 10, 29)
+        assertEquals(Opening(1011, null, null), openingFor("?seed=1011", now, newSeed = 4242))
+        assertEquals(Opening(1011, null, null), openingFor("?seed=1011&today", now, newSeed = 4242))
+        assertEquals(Opening(4242, null, "?seed=4242"), openingFor("", now, newSeed = 4242))
+        assertEquals(Opening(4242, null, "?seed=4242"), openingFor("?seed=abc", now, newSeed = 4242))
+        val todays = Opening(today.seed, today, "?today=2026-10-30")
+        assertEquals(todays, openingFor("?today", now, newSeed = 4242))
+        assertEquals(todays, openingFor("?today=2026-02-30", now, newSeed = 4242))
+        val earliers = Opening(earlier.seed, earlier, "?today=2026-10-29")
+        assertEquals(earliers, openingFor("?today=2026-10-29", now, newSeed = 4242))
+        assertEquals(Opening(4242, null, "?seed=4242"), openingFor("?today", Date(2100, 0, 1), newSeed = 4242))
+    }
+
+    @Test
+    fun `the address names the date of today's run`() {
+        assertEquals("?today=2026-10-30", todayQuery(TodaysRun(2026, 10, 30)))
+        assertEquals("?today=2027-01-05", todayQuery(TodaysRun(2027, 1, 5)))
+        assertEquals(TodaysRun(2027, 1, 5), todayFrom(todayQuery(TodaysRun(2027, 1, 5)), Date()))
+    }
+
+    @Test
+    fun `today's run is named under the title`() {
+        val today = TodaysRun(2026, 10, 30)
+        PhoneGame(root, today, playAgain = {}).show()
+        assertTrue("10월 30일 오늘의 판 · 판 번호 ${today.seed}" in screen)
+    }
+
+    @Test
+    fun `today's run ends with its result line and a copy button`() {
+        restThrough(TodaysRun(2026, 10, 30))
+        assertEquals(
+            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 200/200 · 10월 총비용 모자람",
+            root.querySelector(".result-line")?.textContent,
+        )
+        assertFalse(button("결과 복사").disabled)
+        assertEquals("polite", root.querySelector(".result-status")?.getAttribute("aria-live"))
+        assertEquals("?today", root.querySelector(".ending a")?.getAttribute("href"))
+        tap("다시 하기")
+        assertTrue(playedAgain)
+    }
+
+    @Test
+    fun `every ending offers today's run after 다시 하기`() {
+        open(1011)
+        startMonth(room = 3, amount = "1165")
+        while ("다시 하기" !in screen) tap("쉬기")
+        val link = root.querySelector(".ending a") ?: error("No link on the ending: $screen")
+        assertEquals("오늘의 판", link.textContent)
+        assertEquals("?today", link.getAttribute("href"))
+        assertSame(button("다시 하기"), link.previousElementSibling)
+    }
+
+    @Test
+    fun `the copy fallback selects the whole line`() {
+        val line = document.createElement("p") as HTMLElement
+        line.textContent = "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 170/200 · 9월 17일 취업 제안"
+        root.appendChild(line)
+        assertTrue(selectAll(line))
+        assertEquals(line.textContent, getSelection().toString())
+    }
+
+    @Test
+    fun `a run from a seed ends without a result line`() {
+        open(1011)
+        startMonth(room = 3, amount = "1165")
+        while ("다시 하기" !in screen) tap("쉬기")
+        assertNull(root.querySelector(".result-line"))
+        assertTrue(buttons().none { "결과 복사" in it.textContent.orEmpty() })
     }
 
     @Test

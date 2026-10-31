@@ -163,7 +163,8 @@ button:disabled {
 }
 
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+a:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
@@ -266,6 +267,21 @@ input:focus-visible {
 .primary:disabled {
   background: var(--track);
   color: var(--muted);
+}
+
+/* An outlined button, and a link drawn like one. */
+.secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 52px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  text-decoration: none;
 }
 
 /* Reveal */
@@ -496,4 +512,40 @@ input:focus-visible {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
+}
+
+.ending-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* Today's result */
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.result h2 {
+  margin: 0;
+}
+
+.result-line {
+  padding: 10px 12px;
+  font-size: 15px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  /* One tap selects the whole line, for when the copy button is refused. */
+  -webkit-user-select: all;
+  user-select: all;
+}
+
+.result-status {
+  font-size: 14px;
+  color: var(--muted);
 }
