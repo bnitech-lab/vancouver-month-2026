@@ -8,13 +8,21 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.url.URLSearchParams
 import vancouvermonth.core.TodaysRun
 
-/** Plays the run the address asks for (see [openingFor]), then makes the address name that run. */
+/**
+ * Plays the run the address asks for (see [openingFor]), then makes the address name that run.
+ * The month is played in a 3D town where the browser can draw one.
+ */
 fun main() {
     val root = document.getElementById("app") as? HTMLElement ?: return
     val opening = openingFor(window.location.search, Date(), newSeed())
     val playAgain = { window.location.search = "?seed=${newSeed()}" }
     val today = opening.today
-    val game = if (today != null) PhoneGame(root, today, playAgain) else PhoneGame(root, opening.seed, playAgain)
+    val town = openTown()
+    val game = if (today != null) {
+        PhoneGame(root, today, playAgain, town)
+    } else {
+        PhoneGame(root, opening.seed, playAgain, town)
+    }
     game.show()
     // The game is drawn first, so the screen does not depend on the address changing.
     opening.address?.let { window.history.replaceState(null, "", it) }

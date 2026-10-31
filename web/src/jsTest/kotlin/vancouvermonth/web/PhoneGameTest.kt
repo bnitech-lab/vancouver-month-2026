@@ -17,6 +17,16 @@ import org.w3c.dom.events.Event
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.TodaysRun
 
+/** A town that only notes where the character was sent, so a test needs no WebGL. */
+private class NotingTown : Town {
+    override val element = (document.createElement("div") as HTMLElement).also { it.className = "town" }
+    val visits = mutableListOf<Place>()
+
+    override fun walkTo(place: Place) {
+        visits += place
+    }
+}
+
 /** Plays the page in the test browser by tapping its buttons, the way a player would. */
 class PhoneGameTest {
     private val root = (document.createElement("main") as HTMLElement).also { document.body!!.appendChild(it) }
@@ -262,5 +272,42 @@ class PhoneGameTest {
             tap("총비용 확인하기")
             assertTrue("내 짐작과 차이 \$45+55" in screen, typed)
         }
+    }
+
+    @Test
+    fun `the town sits under the top bar, and each action sends the character to its building`() {
+        val town = NotingTown()
+        PhoneGame(root, 1011, playAgain = {}, town = town).show()
+        assertNull(root.querySelector(".town"), "the room screen has no town")
+        startMonth(room = 3, amount = "1165")
+        assertSame(town.element, root.querySelector(".topbar")?.nextElementSibling)
+        for (action in listOf("카페 알바", "영어 공부", "코딩 연습", "지원서 넣기", "쉬기")) tap(action)
+        assertEquals(listOf(Place.CAFE, Place.LIBRARY, Place.COWORKING, Place.OFFICE, Place.HOME), town.visits)
+        // Every day redraws the screen around the same town, so the character stays where it was.
+        assertSame(town.element, root.querySelector(".topbar")?.nextElementSibling)
+        assertEquals(1, root.querySelectorAll(".town").length)
+    }
+
+    @Test
+    fun `on an interview day the character goes to the office`() {
+        val town = NotingTown()
+        PhoneGame(root, 1011, playAgain = {}, town = town).show()
+        startMonth(room = 3, amount = "1165")
+        while ("오늘은 면접 날이에요." !in screen) {
+            val apply = button("지원서 넣기")
+            if (apply.disabled) tap("쉬기") else apply.click()
+        }
+        assertSame(town.element, root.querySelector(".topbar")?.nextElementSibling)
+        town.visits.clear()
+        tap("면접 보기")
+        assertEquals(listOf(Place.OFFICE), town.visits)
+    }
+
+    @Test
+    fun `the ending has no town`() {
+        PhoneGame(root, 1011, playAgain = {}, town = NotingTown()).show()
+        startMonth(room = 3, amount = "1165")
+        while ("다시 하기" !in screen) tap("쉬기")
+        assertNull(root.querySelector(".town"))
     }
 }

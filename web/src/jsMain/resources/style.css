@@ -14,6 +14,8 @@
   --english: #2d6ab0;
   --coding: #7550a8;
   --energy: #b86f00;
+  --sky-top: #9fcdea;
+  --sky-bottom: #e2f1f8;
   --radius: 14px;
 }
 
@@ -32,6 +34,8 @@
     --english: #6aa7ee;
     --coding: #b18ef0;
     --energy: #f0ad45;
+    --sky-top: #5f8fb2;
+    --sky-bottom: #a9c6d6;
   }
 }
 
@@ -338,6 +342,42 @@ a:focus-visible {
 }
 
 /* The month */
+
+/* The 3D town. A fixed shape, so the picture and the names over it line up at any width. */
+.town {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: linear-gradient(var(--sky-top), var(--sky-bottom));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.town canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The names sit on the picture, which looks the same in both themes, so their colours stay fixed. */
+.town-label {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
+  color: #1c1d1f;
+  background: rgba(255, 255, 255, 0.88);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.town-label.here {
+  color: #ffffff;
+  background: #1d6b57;
+}
 
 .topbar {
   position: sticky;
