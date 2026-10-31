@@ -378,15 +378,15 @@ internal class Mixer(private val context: BaseAudioContext) {
 
         /** The town's own sounds at their loudest: the rain's bed, the train's rumble and the fire's crackle. */
         const val RAIN = 0.06
-        const val RUMBLE = 0.12
+        const val RUMBLE = 0.16
         const val CRACKLE = 0.18
         const val RAIN_GLIDE = 1.2
         const val NEARBY_GLIDE = 0.15
         const val RAIN_LOW = 500.0
         const val RAIN_HIGH = 5_000.0
         const val DROPS_A_SECOND = 22.0
-        const val RUMBLE_TONE = 380.0
-        const val RUMBLE_HUM = 92.0
+        const val RUMBLE_TONE = 600.0
+        const val RUMBLE_HUM = 110.0
         const val CRACKLE_LOW = 700.0
         const val POPS_A_SECOND = 7.0
         const val LOOP_SECONDS = 4.0
