@@ -127,6 +127,36 @@ h2 {
   font-size: 14px;
 }
 
+/* The brand's line, with the update news and the sound switch at its end; on a narrow screen they wrap under it. */
+.title-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-height: 36px;
+}
+
+.title-controls {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* The title, with the game's version small after it. */
+.title-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+}
+
+.version {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* The arrival story, kept small so the rooms stay on a phone's first screen */
 
 .story {
@@ -1035,20 +1065,10 @@ html:has(.walk-town) {
   background: var(--accent);
 }
 
-.title .sound-switch,
 .topbar .sound-switch {
   position: absolute;
   top: 10px;
   right: 16px;
-}
-
-.title .sound-switch {
-  right: 0;
-}
-
-/* The title keeps the switch's width free beside it, so the two never touch on a small phone or a wider font. */
-.title:has(.sound-switch) h1 {
-  padding-right: 84px;
 }
 
 /* The card on how to play, over the town the first time it opens. The town waits under a soft shade. On a short
@@ -1134,6 +1154,232 @@ html:has(.walk-town) {
 
 @media (prefers-reduced-motion: no-preference) {
   .guide-card {
+    animation: talk-up 180ms ease-out;
+  }
+}
+
+/* The update news: a pill by the sound switch, in its look, and at the button screen's foot. */
+.notes-open {
+  position: relative;
+  min-height: 36px;
+  padding: 2px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--accent);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+}
+
+.foot {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+/* At the guide's foot, a link next to the map's credit. */
+.guide-news {
+  margin-top: 12px;
+}
+
+.guide-news + .guide-credit {
+  margin-top: 4px;
+}
+
+.guide-notes {
+  position: relative;
+  min-height: 32px;
+  padding: 0 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--talk-text);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* While there is news the player has not opened, a small dot on the button's corner. */
+.notes-open.news::after,
+.guide-notes.news::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 10px;
+  height: 10px;
+  background: var(--warn);
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+}
+
+.guide-notes.news::after {
+  top: 4px;
+  right: -12px;
+  border-color: var(--talk-bg);
+}
+
+/* The update news over the page, over the guide too when opened from its foot. The list of updates scrolls inside
+   the card, so its title and 닫기 stay in sight on a short or turned phone. */
+.notes {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  justify-content: safe center;
+  overscroll-behavior: contain;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: rgba(28, 29, 31, 0.45);
+}
+
+.notes-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 440px;
+  max-height: 100%;
+  min-height: 0;
+  padding: 16px 16px 14px;
+  color: var(--talk-text);
+  background: var(--talk-bg);
+  border: 2px solid var(--talk-border);
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(59, 47, 37, 0.3);
+}
+
+.notes-card:focus {
+  outline: none;
+}
+
+.notes-title {
+  flex: none;
+  margin-bottom: 6px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--talk-text);
+}
+
+.notes-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0 -6px;
+  padding: 0 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.notes-entry {
+  padding: 4px 0 8px;
+  border-top: 1px solid color-mix(in srgb, var(--talk-border) 50%, transparent);
+}
+
+.notes-entry:first-child {
+  border-top: none;
+}
+
+/* A version's line: its number and date, then its headline; a tap opens or folds what changed. */
+.notes-summary {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  padding: 6px 28px 6px 0;
+  list-style: none;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.notes-summary::-webkit-details-marker {
+  display: none;
+}
+
+.notes-summary::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--talk-muted);
+  border-bottom: 2px solid var(--talk-muted);
+  transform: translateY(-75%) rotate(45deg);
+}
+
+.notes-entry[open] > .notes-summary::after {
+  transform: translateY(-25%) rotate(-135deg);
+}
+
+.notes-summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 0;
+}
+
+.notes-version {
+  font-weight: 800;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.notes-date {
+  font-size: 13px;
+  color: var(--talk-muted);
+}
+
+.notes-headline {
+  flex-basis: 100%;
+  font-weight: 700;
+}
+
+.notes-section {
+  display: inline-block;
+  margin: 8px 0 4px;
+  padding: 1px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--talk-text);
+  background: var(--keyword-bg);
+  border: 1px solid var(--talk-border);
+  border-radius: 999px;
+}
+
+.notes-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.notes-lines li {
+  position: relative;
+  padding-left: 1.1em;
+}
+
+.notes-lines li::before {
+  content: "";
+  position: absolute;
+  top: 0.6em;
+  left: 0.2em;
+  width: 5px;
+  height: 5px;
+  background: var(--talk-border);
+  border-radius: 50%;
+}
+
+.notes-close {
+  flex: none;
+  margin-top: 12px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .notes-card {
     animation: talk-up 180ms ease-out;
   }
 }
