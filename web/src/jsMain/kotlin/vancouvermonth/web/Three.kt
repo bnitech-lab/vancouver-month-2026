@@ -43,13 +43,20 @@ external class WebGLRenderer(parameters: Json) {
     fun setPixelRatio(value: Double)
     fun setSize(width: Int, height: Int, updateStyle: Boolean)
     fun render(scene: Scene, camera: OrthographicCamera)
+
+    /** Lets go of what the renderer holds on the graphics card. */
+    fun dispose()
 }
 
 /** The shape of a box. The town draws every box from one 1x1x1 box, stretched with `scale`. */
-external class BoxGeometry(width: Double, height: Double, depth: Double)
+external class BoxGeometry(width: Double, height: Double, depth: Double) {
+    fun dispose()
+}
 
 /** A colour that light falls on: sides turned away from the sun are darker. Takes the option `color`. */
-external class MeshLambertMaterial(parameters: Json)
+external class MeshLambertMaterial(parameters: Json) {
+    fun dispose()
+}
 
 external class Mesh(geometry: BoxGeometry, material: MeshLambertMaterial) : Object3D
 

@@ -18,13 +18,18 @@ import org.w3c.dom.events.Event
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.TodaysRun
 
-/** A town that only notes where the character was sent, so a test needs no WebGL. */
+/** A town that only notes where the character was sent and whether it was closed, so a test needs no WebGL. */
 private class NotingTown : Town {
     override val element = (document.createElement("div") as HTMLElement).also { it.className = "town" }
     val visits = mutableListOf<Place>()
+    var closed = false
 
     override fun walkTo(place: Place) {
         visits += place
+    }
+
+    override fun close() {
+        closed = true
     }
 }
 
@@ -278,7 +283,7 @@ class PhoneGameTest {
     @Test
     fun `the town sits under the top bar, and each action sends the character to its building`() {
         val town = NotingTown()
-        PhoneGame(root, 1011, playAgain = {}, town = town).show()
+        PhoneGame(root, 1011, playAgain = {}, makeTown = { town }).show()
         assertNull(root.querySelector(".town"), "the room screen has no town")
         startMonth(room = 3, amount = "1165")
         assertSame(town.element, root.querySelector(".topbar")?.nextElementSibling)
@@ -292,7 +297,7 @@ class PhoneGameTest {
     @Test
     fun `on an interview day the character goes to the office`() {
         val town = NotingTown()
-        PhoneGame(root, 1011, playAgain = {}, town = town).show()
+        PhoneGame(root, 1011, playAgain = {}, makeTown = { town }).show()
         startMonth(room = 3, amount = "1165")
         while ("오늘은 면접 날이에요." !in screen) {
             val apply = button("지원서 넣기")
@@ -305,10 +310,19 @@ class PhoneGameTest {
     }
 
     @Test
-    fun `the ending has no town`() {
-        PhoneGame(root, 1011, playAgain = {}, town = NotingTown()).show()
-        startMonth(room = 3, amount = "1165")
+    fun `the town is made on the first day of the month and closed at the ending`() {
+        val town = NotingTown()
+        var made = 0
+        PhoneGame(root, 1011, playAgain = {}, makeTown = { made++; town }).show()
+        tap("3번 방")
+        type("1165")
+        tap("총비용 확인하기")
+        assertEquals(0, made, "the room screen makes no town")
+        tap("시작하기")
+        assertEquals(1, made)
         while ("다시 하기" !in screen) tap("쉬기")
+        assertEquals(1, made)
+        assertTrue(town.closed)
         assertNull(root.querySelector(".town"))
     }
 
@@ -317,10 +331,9 @@ class PhoneGameTest {
         val canvas = document.createElement("canvas") as HTMLCanvasElement
         // A browser without WebGL: asking the canvas for a context gives nothing.
         canvas.asDynamic().getContext = { _: String, _: Any? -> null }
-        val town = openTown(canvas)
-        assertNull(town)
+        assertNull(openTown(canvas))
 
-        PhoneGame(root, 1011, playAgain = {}, town = town).show()
+        PhoneGame(root, 1011, playAgain = {}, makeTown = { openTown(canvas) }).show()
         startMonth(room = 3, amount = "1165")
         assertNull(root.querySelector(".town"))
         assertSame(root.querySelector(".stats"), root.querySelector(".topbar")?.nextElementSibling)

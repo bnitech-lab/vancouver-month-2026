@@ -39,28 +39,30 @@ import vancouvermonth.text.whyNot
  * Draws one run in [root]: the room on September 1st, then one action a day, then the ending.
  * The rules are in core and the wording in text; this only shows the state and passes each tap on.
  * Every tap redraws the whole screen from that state. A run comes from a seed or from today's date, never both.
- * The month's days show the [town] under the top bar, when there is one; without it the game plays the same.
+ * The month's days show a town under the top bar: [makeTown] makes it on the first day, and it is closed at the
+ * ending. When [makeTown] gives none, the game plays the same without it.
  */
 class PhoneGame private constructor(
     private val root: HTMLElement,
     seed: Int,
     private val today: TodaysRun?,
     private val playAgain: () -> Unit,
-    private val town: Town?,
+    private val makeTown: () -> Town?,
 ) {
     /** A run from a seed, as in `?seed=1011`. */
-    constructor(root: HTMLElement, seed: Int, playAgain: () -> Unit, town: Town? = null) :
-        this(root, seed, null, playAgain, town)
+    constructor(root: HTMLElement, seed: Int, playAgain: () -> Unit, makeTown: () -> Town? = { null }) :
+        this(root, seed, null, playAgain, makeTown)
 
     /** Today's run: its date picks the seed, and its ending shows the result line to copy. */
-    constructor(root: HTMLElement, today: TodaysRun, playAgain: () -> Unit, town: Town? = null) :
-        this(root, today.seed, today, playAgain, town)
+    constructor(root: HTMLElement, today: TodaysRun, playAgain: () -> Unit, makeTown: () -> Town? = { null }) :
+        this(root, today.seed, today, playAgain, makeTown)
 
     private val game = FirstMinute(seed)
     private var picked: Int? = null
     private var guess = ""
     private var reveal: Reveal? = null
     private var month: Month? = null
+    private var town: Town? = null
 
     /** The day the last action was spent on, and what happened, written when it happened. */
     private var lastDay = 0
@@ -182,6 +184,7 @@ class PhoneGame private constructor(
             button("primary", text = "${date(Month.FIRST_DAY)} 시작하기") {
                 onclick = {
                     month = game.startMonth(checkNotNull(picked))
+                    town = makeTown()
                     show()
                     window.scrollTo(0.0, 0.0)
                 }
@@ -282,9 +285,15 @@ class PhoneGame private constructor(
     private fun spend(month: Month, place: Place, today: Month.() -> List<Event>) {
         lastDay = month.day
         lastLines = month.today().map { eventLine(it, month) }
-        town?.walkTo(place)
+        if (month.isOver) closeTown() else town?.walkTo(place)
         show()
         window.scrollTo(0.0, 0.0)
+    }
+
+    /** The ending has no town, so the town lets go of its drawing. */
+    private fun closeTown() {
+        town?.close()
+        town = null
     }
 }
 

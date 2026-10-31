@@ -17,11 +17,12 @@ fun main() {
     val opening = openingFor(window.location.search, Date(), newSeed())
     val playAgain = { window.location.search = "?seed=${newSeed()}" }
     val today = opening.today
-    val town = openTown()
+    // The town is made when the month starts, not now, so the room screen does not wait for WebGL.
+    val makeTown = { openTown() }
     val game = if (today != null) {
-        PhoneGame(root, today, playAgain, town)
+        PhoneGame(root, today, playAgain, makeTown)
     } else {
-        PhoneGame(root, opening.seed, playAgain, town)
+        PhoneGame(root, opening.seed, playAgain, makeTown)
     }
     game.show()
     // The game is drawn first, so the screen does not depend on the address changing.

@@ -18,6 +18,7 @@ class TownSceneTest {
         val names = town.element.querySelectorAll(".town-label").asList().map { it.textContent }
         assertEquals(listOf("내 방", "카페", "도서관", "코워킹", "회사"), names)
         assertEquals("three.js r169", town.element.querySelector("canvas")?.getAttribute("data-engine"))
+        town.close()
     }
 
     @Test
@@ -29,6 +30,7 @@ class TownSceneTest {
         assertEquals(listOf("카페"), marked())
         town.walkTo(Place.HOME)
         assertEquals(listOf("내 방"), marked())
+        town.close()
     }
 
     @Test
@@ -49,6 +51,7 @@ class TownSceneTest {
                     reject(error)
                 } finally {
                     town.element.remove()
+                    town.close()
                 }
             }, 1_200)
         }

@@ -15,6 +15,9 @@ interface Town {
 
     /** Walks the character from where it is to [place]. */
     fun walkTo(place: Place)
+
+    /** Lets go of the drawing for good: the WebGL renderer, the box shape and the colours. */
+    fun close()
 }
 
 /**
@@ -48,12 +51,20 @@ private class TownScene(private val canvas: HTMLCanvasElement, context: Renderin
     private val character = Group()
     private val labels = mutableMapOf<Place, HTMLElement>()
 
+    // Every box shares one cube, stretched to size, and every colour one material.
+    private val cube = BoxGeometry(1.0, 1.0, 1.0)
+    private val materials = mutableMapOf<Int, MeshLambertMaterial>()
+
+    // The town is drawn again when it gets a size: when it first appears, and when the phone turns.
+    private val resizeObserver = ResizeObserver { fit() }
+
     private var place = Place.HOME
     private var walk: Walk? = null
     private var walkStarted = 0.0
     private var frameAsked = false
     private var width = 0
     private var height = 0
+    private var closed = false
 
     init {
         element.className = "town"
@@ -68,9 +79,6 @@ private class TownScene(private val canvas: HTMLCanvasElement, context: Renderin
         sun.position.set(-5.0, 12.0, 8.0)
         scene.add(sun)
 
-        // Every box shares one cube, stretched to size, and every colour one material.
-        val cube = BoxGeometry(1.0, 1.0, 1.0)
-        val materials = mutableMapOf<Int, MeshLambertMaterial>()
         fun box(block: Block): Mesh {
             val material = materials.getOrPut(block.colour) { MeshLambertMaterial(json("color" to block.colour)) }
             val mesh = Mesh(cube, material)
@@ -102,8 +110,7 @@ private class TownScene(private val canvas: HTMLCanvasElement, context: Renderin
         }
         highlight(place)
 
-        // The town is drawn again when it gets a size: when it first appears, and when the phone turns.
-        ResizeObserver { fit() }.observe(canvas)
+        resizeObserver.observe(canvas)
         // A phone may take WebGL back from a page in the background. The town hides until it is given back.
         canvas.addEventListener("webglcontextlost", { element.hidden = true })
         canvas.addEventListener("webglcontextrestored", {
@@ -125,6 +132,14 @@ private class TownScene(private val canvas: HTMLCanvasElement, context: Renderin
     /** Marks the name of the building where the day goes, and only that one. */
     private fun highlight(place: Place) {
         for ((labelPlace, label) in labels) label.classList.toggle("here", labelPlace == place)
+    }
+
+    override fun close() {
+        closed = true
+        resizeObserver.disconnect()
+        renderer.dispose()
+        cube.dispose()
+        for (material in materials.values) material.dispose()
     }
 
     private fun stand(place: Place) {
@@ -155,6 +170,7 @@ private class TownScene(private val canvas: HTMLCanvasElement, context: Renderin
     }
 
     private fun drawFrame(now: Double) {
+        if (closed) return
         val current = walk
         if (current != null) {
             val progress = current.progressAfter(now - walkStarted)
@@ -182,4 +198,5 @@ private class TownScene(private val canvas: HTMLCanvasElement, context: Renderin
 /** The browser's ResizeObserver, which Kotlin's DOM declarations leave out. */
 private external class ResizeObserver(callback: () -> Unit) {
     fun observe(target: Element)
+    fun disconnect()
 }
