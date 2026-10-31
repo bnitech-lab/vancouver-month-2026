@@ -13,6 +13,7 @@ import vancouvermonth.core.InterviewStage
 import vancouvermonth.core.Month
 import vancouvermonth.core.Room
 import vancouvermonth.core.Skill
+import vancouvermonth.core.TodaysRun
 import vancouvermonth.core.Zone
 
 /** Every roll succeeds, and things land as soon as they can. */
@@ -38,6 +39,25 @@ class KoreanTest {
             "9월이 끝났어요. 제안은 없었지만 10월 총비용 \$1,175는 낼 수 있어요 (잔고 \$1,300).",
             endingLine(Ending.SURVIVED, 30, 1_175, 1_300),
         )
+    }
+
+    @Test
+    fun `today's run result is one short line for each ending`() {
+        val run = TodaysRun(2026, 10, 30)
+        assertEquals("10월 30일 오늘의 판", todaysRunName(run))
+        assertEquals(
+            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 155/200 · 9월 19일 취업 제안",
+            todaysRunResult(run, 155, Ending.OFFER, 19),
+        )
+        assertEquals(
+            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 200/200 · 9월을 버팀",
+            todaysRunResult(run, 200, Ending.SURVIVED, 30),
+        )
+        assertEquals(
+            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 0/200 · 10월 월세 모자람",
+            todaysRunResult(run, 0, Ending.CANNOT_PAY_RENT, 30),
+        )
+        assertEquals("1월 5일 오늘의 판", todaysRunName(TodaysRun(2027, 1, 5)))
     }
 
     @Test

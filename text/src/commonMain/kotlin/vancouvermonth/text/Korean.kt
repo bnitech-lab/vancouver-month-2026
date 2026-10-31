@@ -13,6 +13,7 @@ import vancouvermonth.core.Reveal
 import vancouvermonth.core.Room
 import vancouvermonth.core.RoomDealer
 import vancouvermonth.core.Skill
+import vancouvermonth.core.TodaysRun
 import vancouvermonth.core.Zone
 
 /** "1구역 $105 · 2구역 $145 · 3구역 $195", from the zones themselves. */
@@ -110,6 +111,22 @@ fun endingLine(ending: Ending, day: Int, rent: Int, balance: Int): String = when
     Ending.CANNOT_PAY_RENT ->
         "9월이 끝났어요. 10월 총비용 ${money(rent)}를 내기엔 ${money(rent - balance)} 모자라요 (잔고 ${money(balance)})."
     Ending.SURVIVED -> "9월이 끝났어요. 제안은 없었지만 10월 총비용 ${money(rent)}는 낼 수 있어요 (잔고 ${money(balance)})."
+}
+
+/** "10월 30일 오늘의 판", the name of a date's run. */
+fun todaysRunName(run: TodaysRun): String = "${run.month}월 ${run.day}일 오늘의 판"
+
+/**
+ * Today's run as one line to paste anywhere, with no run number, no link and nothing about the player:
+ * "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 155/200 · 9월 19일 취업 제안". [day] is the day the month ended on.
+ */
+fun todaysRunResult(run: TodaysRun, score: Int, ending: Ending, day: Int): String {
+    val result = when (ending) {
+        Ending.OFFER -> "${date(day)} 취업 제안"
+        Ending.SURVIVED -> "9월을 버팀"
+        Ending.CANNOT_PAY_RENT -> "10월 월세 모자람"
+    }
+    return "밴쿠버 한 달 · ${todaysRunName(run)} · 방 고르기 $score/${FirstMinute.MAX_SCORE} · $result"
 }
 
 fun stageName(stage: InterviewStage): String = when (stage) {
