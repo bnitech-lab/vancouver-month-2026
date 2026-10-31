@@ -8,6 +8,7 @@ import kotlin.math.sin
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.browser.document
 import org.w3c.dom.CanvasRenderingContext2D
@@ -112,6 +113,22 @@ class MinimapTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `the north shore's forest on the map is where the town lays it`() {
+        // The town's flat band of dark forest across the inlet, in front of the mountains.
+        val band = Neighbourhood.ground.filter { it.y == -0.5 && it.height == 1.2 && it.colour == 0x4D7A5E }
+        assertTrue(band.size > 10, "${band.size} stretches")
+        for (box in band) {
+            val middle = box.x + box.width / 2
+            assertTrue(Neighbourhood.isNorthShore(middle, box.z + box.depth / 2), "$box")
+            assertTrue(Neighbourhood.isNorthShore(box.x + 0.01, box.z + 0.01), "$box")
+            assertFalse(Neighbourhood.isNorthShore(middle, box.z - 0.01), "north of $box")
+            assertFalse(Neighbourhood.isNorthShore(middle, box.z + box.depth + 0.01), "south of $box")
+        }
+        // Nothing on the grid itself, where the town walks.
+        assertFalse(RealVancouver.map.cellsOf(Terrain.LAND).any { Neighbourhood.isNorthShore(it.x + 0.5, it.z + 0.5) })
     }
 
     @Test
