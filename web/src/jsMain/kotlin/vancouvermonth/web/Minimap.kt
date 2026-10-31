@@ -366,7 +366,8 @@ internal class Minimap {
 
         /**
          * The area the map shows as a picture, north up, [GROUND_DETAIL] pixels a square: water, the city's ground, its
-         * blocks, the park and the seawall, and past the grid's edges the land or water the town lays there.
+         * blocks, the park and the seawall, and past the grid's edges what the town lays there: land, water, and the
+         * north shore's forest across the inlet.
          */
         private fun paintGround(): HTMLCanvasElement {
             val columns = Neighbourhood.COLUMNS
@@ -391,8 +392,10 @@ internal class Minimap {
                 val south = AREA_TOP + (j + 0.5) / GROUND_DETAIL
                 for (i in 0 until across) {
                     val east = AREA_LEFT + (i + 0.5) / GROUND_DETAIL
-                    val x = floor(MinimapProjection.gridX(east, south)).toInt()
-                    val z = floor(MinimapProjection.gridZ(east, south)).toInt()
+                    val gridX = MinimapProjection.gridX(east, south)
+                    val gridZ = MinimapProjection.gridZ(east, south)
+                    val x = floor(gridX).toInt()
+                    val z = floor(gridZ).toInt()
                     val colour = if (x in 0 until columns && z in 0 until rows) {
                         when (map.terrainAt(x, z)) {
                             Terrain.WATER -> WATER
@@ -400,6 +403,8 @@ internal class Minimap {
                             Terrain.SHORE -> SHORE
                             Terrain.LAND -> if (built[z * columns + x]) BLOCK else LAND
                         }
+                    } else if (Neighbourhood.isNorthShore(gridX, gridZ)) {
+                        FOREST
                     } else if (landBeyond(map, x, z)) {
                         LAND
                     } else {
@@ -438,6 +443,9 @@ internal class Minimap {
         private const val BLOCK = 0xD3CCBC
         private const val PARK = 0x8FC165
         private const val SHORE = 0xF6F0E0
+
+        /** The town's dark forest green, on the north shore across the inlet. */
+        private const val FOREST = 0x4D7A5E
         private const val PLACE = "#3b2f25"
         private const val HOME = "#c0584a"
         private const val MARKED = "#1d6b57"

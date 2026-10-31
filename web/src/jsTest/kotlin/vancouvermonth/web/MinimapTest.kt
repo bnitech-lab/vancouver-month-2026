@@ -209,7 +209,7 @@ class MinimapTest {
     }
 
     @Test
-    fun `the map is painted from the grid north up, with the character's arrow, the places and north marked`() {
+    fun `the map is painted north up, with the north shore, the character's arrow, the places and north marked`() {
         val minimap = Minimap()
         val element = minimap.element
         // One CSS pixel a square, so each square can be looked at.
@@ -242,6 +242,9 @@ class MinimapTest {
         assertEquals(0x6FB3D9, colourOf(40.5, 5.5))
         assertEquals(0x8FC165, colourOf(50.5, 60.5))
         assertEquals(0xEDE8DC, colourOf(130.5, Neighbourhood.ROWS + 5.5))
+        // The north shore's forest across the inlet, in the top right, as the town lays it.
+        assertTrue(Neighbourhood.isNorthShore(105.5, -33.4))
+        assertEquals(0x4D7A5E, colourOf(105.5, -33.4))
         // The character's arrow, in its own gold, where the character stands, pointing straight up.
         assertEquals(standLeft, minimap.dotLeft, 1e-9)
         assertEquals(standTop, minimap.dotTop, 1e-9)
