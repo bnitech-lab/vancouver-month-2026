@@ -4,6 +4,7 @@ import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** Every date of [year], from January 1st to December 31st. */
@@ -46,10 +47,44 @@ class TodaysRunTest {
     }
 
     @Test
-    fun `a month or day that cannot exist is refused`() {
+    fun `a date that is not on the calendar is refused`() {
         assertFailsWith<IllegalArgumentException> { TodaysRun(2026, 13, 1) }
         assertFailsWith<IllegalArgumentException> { TodaysRun(2026, 0, 1) }
         assertFailsWith<IllegalArgumentException> { TodaysRun(2026, 10, 0) }
         assertFailsWith<IllegalArgumentException> { TodaysRun(2026, 10, 32) }
+        assertFailsWith<IllegalArgumentException> { TodaysRun(2026, 2, 30) }
+        assertFailsWith<IllegalArgumentException> { TodaysRun(2026, 4, 31) }
+        assertFailsWith<IllegalArgumentException> { TodaysRun(2026, 2, 29) }
+        assertEquals(29, TodaysRun(2024, 2, 29).day)
+        assertEquals(29, TodaysRun(2000, 2, 29).day)
+    }
+
+    @Test
+    fun `only the years 2000 to 2099 have a run`() {
+        assertEquals(2000..2099, TodaysRun.YEARS)
+        assertFailsWith<IllegalArgumentException> { TodaysRun(1999, 12, 31) }
+        assertFailsWith<IllegalArgumentException> { TodaysRun(2100, 1, 1) }
+        assertEquals(2000, TodaysRun(2000, 1, 1).year)
+        assertEquals(2099, TodaysRun(2099, 12, 31).year)
+    }
+
+    @Test
+    fun `a date reads from text such as 2026-10-30`() {
+        assertEquals(TodaysRun(2026, 10, 30), TodaysRun.parse("2026-10-30"))
+        assertEquals(TodaysRun(2026, 1, 5), TodaysRun.parse(" 2026-1-5 "))
+        assertEquals(TodaysRun(2024, 2, 29), TodaysRun.parse("2024-02-29"))
+        for (bad in listOf("2026-02-30", "2026-02-29", "2026-13-01", "2026-00-10", "1999-12-31", "2100-01-01",
+            "0999-01-01", "999-01-01", "20261030", "2026/10/30", "2026-10-30x", "soon", "")) {
+            assertNull(TodaysRun.parse(bad), bad)
+        }
+    }
+
+    @Test
+    fun `every date writes as text that reads back as the same date`() {
+        assertEquals("2026-10-30", TodaysRun(2026, 10, 30).toString())
+        assertEquals("2027-01-05", TodaysRun(2027, 1, 5).toString())
+        for (run in TodaysRun.YEARS.flatMap { daysOf(it) }) {
+            assertEquals(run, TodaysRun.parse(run.toString()))
+        }
     }
 }
