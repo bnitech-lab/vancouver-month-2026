@@ -26,3 +26,10 @@ kotlin {
         }
     }
 }
+
+// The page bundles Three.js, so the distribution carries its MIT licence in full, next to the script.
+tasks.named<Sync>("jsBrowserDistribution") {
+    from(rootProject.layout.buildDirectory.file("js/node_modules/three/LICENSE")) {
+        rename { "three-LICENSE.txt" }
+    }
+}
