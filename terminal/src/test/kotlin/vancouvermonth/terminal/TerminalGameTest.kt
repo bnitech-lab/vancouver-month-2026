@@ -76,7 +76,7 @@ class TerminalGameTest {
         assertTrue("10월 30일 오늘의 판" in lines)
         val label = lines.indexOf("결과 한 줄 (복사해서 붙여 넣으세요)")
         assertTrue(label >= 0, "no result label in: $screen")
-        assertEquals("밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 200/200 · 10월 월세 모자람", lines[label + 1])
+        assertEquals("밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 200/200 · 10월 총비용 모자람", lines[label + 1])
     }
 
     @Test

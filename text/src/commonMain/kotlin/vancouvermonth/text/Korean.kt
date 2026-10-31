@@ -124,7 +124,7 @@ fun todaysRunResult(run: TodaysRun, score: Int, ending: Ending, day: Int): Strin
     val result = when (ending) {
         Ending.OFFER -> "${date(day)} 취업 제안"
         Ending.SURVIVED -> "9월을 버팀"
-        Ending.CANNOT_PAY_RENT -> "10월 월세 모자람"
+        Ending.CANNOT_PAY_RENT -> "10월 총비용 모자람"
     }
     return "밴쿠버 한 달 · ${todaysRunName(run)} · 방 고르기 $score/${FirstMinute.MAX_SCORE} · $result"
 }

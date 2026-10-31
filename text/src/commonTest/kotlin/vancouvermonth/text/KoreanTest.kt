@@ -54,7 +54,7 @@ class KoreanTest {
             todaysRunResult(run, 200, Ending.SURVIVED, 30),
         )
         assertEquals(
-            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 0/200 · 10월 월세 모자람",
+            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 0/200 · 10월 총비용 모자람",
             todaysRunResult(run, 0, Ending.CANNOT_PAY_RENT, 30),
         )
         assertEquals("1월 5일 오늘의 판", todaysRunName(TodaysRun(2027, 1, 5)))
