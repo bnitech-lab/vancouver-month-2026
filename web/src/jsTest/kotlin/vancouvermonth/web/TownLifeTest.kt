@@ -262,4 +262,69 @@ class TownLifeTest {
         assertTrue(DayLight.lightness(Clouds.colour(Weather.RAINY)) < DayLight.lightness(Clouds.colour(Weather.CLOUDY)))
         assertTrue(DayLight.lightness(Clouds.colour(Weather.CLOUDY)) < DayLight.lightness(Clouds.colour(Weather.SUNNY)))
     }
+
+    @Test
+    fun `the train's rumble is louder the nearer it is, and silent while it stands or is away`() {
+        // Loudness falls all the way with distance.
+        val far = (0..300).map { SkyTrainRun.loudnessAt(it.toDouble()) }
+        assertEquals(1.0, far.first())
+        assertTrue(far.zipWithNext().all { (a, b) -> b < a })
+        assertEquals(0.5, SkyTrainRun.loudnessAt(SkyTrainRun.RUMBLE_NEAR), 1e-9)
+        assertTrue(SkyTrainRun.loudnessAt(150.0) < 0.02)
+
+        // An ear above the station's plaza, where the camera often is.
+        val ear = Point(27.0, 12.0, 20.0)
+        for (t in times(SkyTrainRun.PERIOD, 50.0)) {
+            val level = SkyTrainRun.rumbleAt(t, ear)
+            assertTrue(level in 0.0..1.0, "at $t: $level")
+            if (SkyTrainRun.speedAt(t) == 0.0) assertEquals(0.0, level, "at $t it stands or is away, yet rumbles")
+            if (!SkyTrainRun.isShownAt(t)) assertEquals(0.0, level, "at $t it is away, yet rumbles")
+        }
+        // Once under way, coming in it grows louder as it comes nearer, and pulling out it fades as it goes.
+        val full = SkyTrainRun.TOP_SPEED * SkyTrainRun.UNDER_WAY
+        val coming = times(SkyTrainRun.PERIOD, 50.0).filter { t ->
+            SkyTrainRun.shiftAt(t) < 0 && SkyTrainRun.speedAt(t) >= full
+        }
+        val going = times(SkyTrainRun.PERIOD, 50.0).filter { t ->
+            SkyTrainRun.shiftAt(t) > 0 && SkyTrainRun.speedAt(t) >= full
+        }
+        assertTrue(coming.size > 20 && going.size > 20)
+        for ((a, b) in coming.zipWithNext()) {
+            assertTrue(SkyTrainRun.distanceTo(b, ear) < SkyTrainRun.distanceTo(a, ear))
+            assertTrue(SkyTrainRun.rumbleAt(b, ear) >= SkyTrainRun.rumbleAt(a, ear), "coming in at $b it got quieter")
+        }
+        for ((a, b) in going.zipWithNext()) {
+            assertTrue(SkyTrainRun.rumbleAt(b, ear) <= SkyTrainRun.rumbleAt(a, ear), "pulling out at $b it got louder")
+        }
+        // Loudest close by: well heard as it passes the plaza, hardly at all far down the line.
+        val loudest = times(SkyTrainRun.PERIOD, 50.0).maxOf { SkyTrainRun.rumbleAt(it, ear) }
+        assertTrue(loudest > 0.3, "loudest $loudest")
+        val distant = times(SkyTrainRun.PERIOD, 50.0).filter { SkyTrainRun.distanceTo(it, ear) > 120 }
+        assertTrue(distant.isNotEmpty() && distant.all { SkyTrainRun.rumbleAt(it, ear) < 0.02 })
+    }
+
+    @Test
+    fun `the train's speed matches how far it goes`() {
+        for (t in times(SkyTrainRun.PERIOD, 37.0)) {
+            val moved = abs(SkyTrainRun.shiftAt(t + 1) - SkyTrainRun.shiftAt(t - 1)) / 2 * 1_000
+            val boundary = listOf(SkyTrainRun.DWELL, SkyTrainRun.DWELL + SkyTrainRun.LEAVE).any { abs(t - it) < 2 }
+            if (!boundary) assertEquals(moved, SkyTrainRun.speedAt(t), 0.05, "at $t")
+            assertTrue(SkyTrainRun.speedAt(t) <= SkyTrainRun.TOP_SPEED + 1e-9)
+        }
+    }
+
+    @Test
+    fun `the fire crackles only after dark, and only near it`() {
+        assertEquals(1.0, Campfire.nearness(0.0))
+        assertEquals(0.0, Campfire.nearness(Campfire.HEARD_WITHIN))
+        assertEquals(0.0, Campfire.nearness(30.0))
+        val near = (0..100).map { Campfire.nearness(it / 10.0) }
+        assertTrue(near.zipWithNext().all { (a, b) -> b <= a })
+        // From the bench, at night, it is well heard; by day, or from the street, not at all.
+        val bench = distanceBetween(Neighbourhood.benchSeat, Neighbourhood.campfire)
+        assertTrue(Campfire.crackle(Campfire.nearness(bench), 1.0) > 0.5)
+        assertEquals(0.0, Campfire.crackle(Campfire.nearness(bench), 0.0))
+        val street = distanceBetween(Neighbourhood.venue(Place.CAFE).door, Neighbourhood.campfire)
+        assertEquals(0.0, Campfire.crackle(Campfire.nearness(street), 1.0))
+    }
 }

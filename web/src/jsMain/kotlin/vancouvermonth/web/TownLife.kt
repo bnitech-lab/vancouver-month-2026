@@ -6,6 +6,7 @@ import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.random.Random
 import org.khronos.webgl.Float32Array
 import org.khronos.webgl.set
@@ -49,6 +50,54 @@ object SkyTrainRun {
     /** False while the train is away, faded out far down the guideway, and need not be drawn. */
     fun isShownAt(millis: Double): Boolean = opacityAt(millis) > 0.0
 
+    /** How fast the train goes at [millis], in units a second, east or west: 0 while it stands or is away. */
+    fun speedAt(millis: Double): Double {
+        val t = ((millis % PERIOD) + PERIOD) % PERIOD
+        return when {
+            t < DWELL -> 0.0
+            t < DWELL + LEAVE -> 2 * REACH * (t - DWELL) / LEAVE / LEAVE * 1_000
+            t < DWELL + LEAVE + AWAY -> 0.0
+            else -> 2 * REACH * (1 - (t - DWELL - LEAVE - AWAY) / ARRIVE) / ARRIVE * 1_000
+        }
+    }
+
+    /** The train's speed as it goes farthest and fastest, at the end of pulling out and the start of coming in. */
+    const val TOP_SPEED = 2 * REACH / LEAVE * 1_000
+
+    /** How far [ear] is from the nearest part of the train at [millis]. */
+    fun distanceTo(millis: Double, ear: Point): Double {
+        val west = Neighbourhood.TRAIN_STOP + shiftAt(millis)
+        val east = west + Neighbourhood.TRAIN_LENGTH
+        val across = when {
+            ear.x < west -> west - ear.x
+            ear.x > east -> ear.x - east
+            else -> 0.0
+        }
+        val up = ear.y - (Neighbourhood.DECK_HEIGHT + 0.9)
+        val side = ear.z - (Neighbourhood.DECK_NORTH + Neighbourhood.DECK_SOUTH) / 2
+        return sqrt(across * across + up * up + side * side)
+    }
+
+    /** How loud a rumble [distance] away sounds, from 1.0 right by it: half as loud [RUMBLE_NEAR] away, little far off. */
+    fun loudnessAt(distance: Double): Double = 1 / (1 + square(distance / RUMBLE_NEAR))
+
+    /**
+     * How loud the train rumbles at [millis] to an ear at [ear], the camera, from 0.0 to 1.0: louder the nearer it is,
+     * and once it is under way, as loud as its distance lets it be. It is silent while it stands at the station and
+     * while it is away, and fades with it far down the line.
+     */
+    fun rumbleAt(millis: Double, ear: Point): Double {
+        val underWay = (speedAt(millis) / (TOP_SPEED * UNDER_WAY)).coerceIn(0.0, 1.0)
+        if (underWay == 0.0) return 0.0
+        return opacityAt(millis) * underWay * loudnessAt(distanceTo(millis, ear))
+    }
+
+    /** Half as loud this far from the train. */
+    const val RUMBLE_NEAR = 18.0
+
+    /** At this share of its top speed the train rumbles all it can; slower, less, down to nothing standing. */
+    const val UNDER_WAY = 0.35
+
     private fun square(value: Double) = value * value
 }
 
@@ -56,6 +105,17 @@ object SkyTrainRun {
 object Campfire {
     fun flicker(millis: Double): Double =
         1 + 0.12 * sin(millis / 97) + 0.07 * sin(millis / 41 + 1.3) + 0.04 * sin(millis / 23 + 0.4)
+
+    /** How much of the fire's crackle reaches someone [distance] from it: all of it beside it, none [HEARD_WITHIN] off. */
+    fun nearness(distance: Double): Double {
+        val near = (1 - distance / HEARD_WITHIN).coerceIn(0.0, 1.0)
+        return near * near
+    }
+
+    /** How loud the fire crackles, from 0.0 to 1.0, for someone [near] it as [nearness] says, when [night] is how dark it is. */
+    fun crackle(near: Double, night: Double): Double = near.coerceIn(0.0, 1.0) * night.coerceIn(0.0, 1.0)
+
+    const val HEARD_WITHIN = 10.0
 }
 
 /**
