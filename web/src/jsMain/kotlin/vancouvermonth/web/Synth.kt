@@ -249,8 +249,9 @@ internal class Mixer(private val context: BaseAudioContext) {
      * Starts the town's own sounds at [time], all from noise made here, each a loop of a few seconds whose end runs on
      * into its start: rain as a gentle hiss with soft drops in it; the train as a low, dull rumble with a hum under it;
      * the fire as soft pops and snaps over a faint breath. They are made once, and sound only as their volumes allow.
+     * The page makes them as the sound is switched on, so the work of making them never falls on a frame of the town.
      */
-    private fun makeTownSounds(time: Double) {
+    fun makeTownSounds(time: Double) {
         if (townSoundsMade) return
         townSoundsMade = true
         val random = Random(TOWN_SOUNDS_SEED)
@@ -519,6 +520,8 @@ internal class WebAudioSpeaker(private val context: AudioContext, seed: Int, pri
         wake(whenPlaying)
         val now = context.currentTime
         band.start(now + LEAD)
+        // Made now, inside the tap, rather than on the frame the train first moves or the rain first falls.
+        mixer.makeTownSounds(now)
         mixer.fadeIn(now)
         band.scheduleUntil(now + AHEAD, now)
         if (timer == null) timer = window.setInterval({ plan() }, TIMER_MILLIS)
