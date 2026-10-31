@@ -18,7 +18,7 @@ fun main() {
     // What the page remembers, the month in progress among it: an address with no run goes on with that month's run.
     val memory = pageMemory()
     val slot = SaveSlot(memory)
-    val opening = openingFor(window.location.search, Date(), newSeed(), slot.record())
+    val opening = openingFor(window.location.search, Date(), newSeed(), slot.continuable())
     val playAgain = { window.location.search = "?seed=${newSeed()}" }
     val today = opening.today
     // The towns are made when the month starts, not now, so the room screen does not wait for WebGL.

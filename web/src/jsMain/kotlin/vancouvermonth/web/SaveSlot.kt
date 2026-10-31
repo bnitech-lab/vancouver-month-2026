@@ -19,6 +19,9 @@ internal class SaveSlot(
     /** The record kept in the slot, or null when there is none or it is not one this version reads. */
     fun record(): MonthRecord? = MonthRecord.decode(memory.read(KEY))
 
+    /** The record kept in the slot if it replays, so a page whose address names no run can continue it. */
+    fun continuable(): MonthRecord? = record()?.takeIf { replayed(it) != null }
+
     fun keep(record: MonthRecord) = memory.write(KEY, record.encode())
 
     /** Empties the slot. The storage offers only get and set, so an empty line stands for no month. */

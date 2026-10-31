@@ -383,6 +383,19 @@ class ContinueMonthTest {
     }
 
     @Test
+    fun `only a kept month that replays decides the run of an address with no run`() {
+        val slot = SaveSlot(Memory { store })
+        store.items[SaveSlot.KEY] = "1|1011||2|1165|EWC"
+        assertEquals(1011, slot.continuable()?.seed)
+        for (line in listOf("1|1011||2|1165|I", "1|1011||2|1165|Z", "")) {
+            store.items[SaveSlot.KEY] = line
+            assertNull(slot.continuable(), "Continuable: $line")
+        }
+        store.items[SaveSlot.KEY] = "1|1011||2|1165|EWC"
+        assertNull(SaveSlot(Memory { store }) { error("A rule this line was not kept under") }.continuable())
+    }
+
+    @Test
     fun `an address with no run plays the kept month's run, so the card can offer it`() {
         val now = Date(2026, 9, 30) // October 30th
         val today = TodaysRun(2026, 10, 29)
