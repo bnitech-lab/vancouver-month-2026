@@ -105,17 +105,22 @@ data class MonthRecord(
             'I' to Choice.AttendInterview,
         )
 
-        /** The small letter of each kind of spend, followed in the line by its amount. */
-        private val SPEND_LETTERS = mapOf(
-            'b' to Spending.BIKE,
-            'k' to Spending.E_SCOOTER,
-            's' to Spending.SHARED_BIKE_RIDE,
-            'q' to Spending.SHARED_E_SCOOTER_RIDE,
-        )
+        /**
+         * The small letter of each kind of spend, followed in the line by its amount. A `when`, so a kind added
+         * without a letter does not compile, rather than throw after its money was spent.
+         */
+        private fun letterOf(kind: Spending): Char = when (kind) {
+            Spending.BIKE -> 'b'
+            Spending.E_SCOOTER -> 'k'
+            Spending.SHARED_BIKE_RIDE -> 's'
+            Spending.SHARED_E_SCOOTER_RIDE -> 'q'
+        }
+
+        private val SPEND_LETTERS = Spending.entries.associateBy { letterOf(it) }
 
         private fun textOf(move: Move): String = when (move) {
             is Choice -> LETTERS.entries.first { it.value == move }.key.toString()
-            is Spend -> SPEND_LETTERS.entries.first { it.value == move.kind }.key + move.amount.toString()
+            is Spend -> letterOf(move.kind) + move.amount.toString()
         }
 
         /** The moves [text] holds, or null when a part is not one: an unknown letter, or a spend with no amount. */
