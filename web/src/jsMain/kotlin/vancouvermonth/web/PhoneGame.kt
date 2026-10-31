@@ -247,6 +247,7 @@ class PhoneGame(
     private fun showLog() {
         if (lastLines.isEmpty()) return
         root.child("section", "card log") {
+            setAttribute("aria-live", "polite")
             child("h2", text = "${date(lastDay)}에 있었던 일")
             child("ul") { lastLines.forEach { child("li", text = it) } }
         }
