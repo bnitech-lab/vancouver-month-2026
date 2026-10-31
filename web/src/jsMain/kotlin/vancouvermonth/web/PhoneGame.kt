@@ -30,6 +30,7 @@ import vancouvermonth.text.continueFrom
 import vancouvermonth.text.date
 import vancouvermonth.text.endingLine
 import vancouvermonth.text.eventLine
+import vancouvermonth.text.goalLine
 import vancouvermonth.text.greeting
 import vancouvermonth.text.guessLine
 import vancouvermonth.text.keyword
@@ -188,10 +189,7 @@ class PhoneGame private constructor(
         // Who the player is and what the month is for, so the room has a reason before it is asked for. The story
         // says the money and the date, so no balance line repeats them.
         root.child("section", "card story") {
-            val (arrived, goal, room) = arrivalLines(game.startingBalance)
-            child("p", text = arrived)
-            child("p", "goal", goal)
-            child("p", text = room)
+            for (text in arrivalLines(game.startingBalance)) child("p", if (text == goalLine()) "goal" else null, text)
         }
         root.child("section", "card") {
             child("h2", text = "할 일")

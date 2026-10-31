@@ -125,7 +125,8 @@ class PhoneGameTest {
         val game = FirstMinute(1011)
         val story = root.querySelector(".story")?.textContent.orEmpty()
         assertEquals(arrivalLines(game.startingBalance).joinToString(""), story)
-        assertTrue(goalLine() in story)
+        assertEquals(goalLine(), root.querySelector(".story .goal")?.textContent)
+        assertEquals(1, root.querySelectorAll(".story .goal").length)
         val firstRoom = screen.indexOf("1번 방")
         val order = arrivalLines(game.startingBalance) + "할 일" + whyTotalLines()
         val at = order.map { screen.indexOf(it) }
