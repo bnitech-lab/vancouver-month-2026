@@ -637,10 +637,12 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     /**
      * Stops [passerby] for a word: they stand and face the player, the character walks up to them unless already
-     * near, and the talk opens at once. The second tap of a double tap only hurries the character there.
+     * near, and the talk opens at once. The second tap of a double tap only hurries the character there, unless the
+     * first tap missed them: then it opens the talk too.
      */
     private fun stopFor(passerby: Passerby, dash: Boolean) {
         if (sitting) return
+        val already = chatting === passerby
         chatting?.takeIf { it !== passerby }?.release()
         chatting = passerby
         passerby.hold()
@@ -657,7 +659,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             heading = atan2(there.x - spot.x, there.z - spot.z)
             askForFrame()
         }
-        if (!dash) onPasserby(passerby.passer)
+        if (!dash || !already) onPasserby(passerby.passer)
     }
 
     /** Lets the passerby the player stopped walk on, as when the player turns to something else. */
