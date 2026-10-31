@@ -18,6 +18,7 @@ kotlin {
     sourceSets {
         jsMain.dependencies {
             implementation(project(":text"))
+            implementation(project(":save"))
             // Draws the town in 3D. An exact version, so every build bundles the same code.
             implementation(npm("three", "0.169.0"))
         }
