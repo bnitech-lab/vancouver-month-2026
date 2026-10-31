@@ -70,6 +70,10 @@ class FirstRunGuideTest {
         val described = card.getAttribute("aria-describedby")!!.split(" ").map { document.getElementById(it)!!.textContent }
         assertEquals(listOf(Guide.LINES.joinToString(""), goalLine()), described)
         assertSame(root.button(Guide.START), document.activeElement)
+        // The map's credit, as its licence asks, at the card's foot, after its button.
+        val credit = assertNotNull(card.lastElementChild)
+        assertEquals(Guide.MAP_CREDIT, credit.textContent)
+        assertEquals("guide-credit", credit.className)
         // Over the town, its top card and its first-day hint.
         assertTrue(root.querySelector(".over-town") != null && root.querySelector(".guide") != null)
     }

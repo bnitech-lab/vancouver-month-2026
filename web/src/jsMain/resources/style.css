@@ -1104,6 +1104,14 @@ html:has(.walk-town) {
   border-radius: 12px;
 }
 
+/* The map's credit, small at the card's foot. */
+.guide-credit {
+  margin-top: 12px;
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.75;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .guide-card {
     animation: talk-up 180ms ease-out;

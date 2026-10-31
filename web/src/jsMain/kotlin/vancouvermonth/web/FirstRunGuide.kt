@@ -53,6 +53,8 @@ internal class FirstRunGuide(private val memory: Memory) {
         val start = card.add("button", "primary", Guide.START) as HTMLButtonElement
         start.type = "button"
         start.onclick = { close() }
+        // The town is traced from the City of Vancouver's open data, whose licence asks for this line where it shows.
+        card.add("p", "guide-credit", Guide.MAP_CREDIT)
         for (under in root.children.asList()) {
             if (under is HTMLElement && !under.hasAttribute("inert")) {
                 under.setAttribute("inert", "")
