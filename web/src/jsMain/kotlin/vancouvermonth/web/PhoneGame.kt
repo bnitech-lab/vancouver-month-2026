@@ -239,8 +239,12 @@ class PhoneGame(
                 figure("코딩", "${month.coding}/${Month.MAX_SKILL}")
             }
             if (today != null) result(todaysRunResult(today, reveal.score, ending, month.day))
-            button("primary", text = "다시 하기") {
-                onclick = { playAgain() }
+            child("div", "ending-buttons") {
+                button("primary", text = "다시 하기") {
+                    onclick = { playAgain() }
+                }
+                // A link, since it only opens the page again; the page then reads the browser's date.
+                child("a", "secondary", "오늘의 판").setAttribute("href", "?today")
             }
         }
     }
@@ -324,7 +328,7 @@ private fun HTMLElement.result(line: String) {
     child("div", "result") {
         child("h2", text = "결과 한 줄")
         val text = child("p", "result-line", line)
-        val copy = button("copy", text = "결과 복사")
+        val copy = button("secondary", text = "결과 복사")
         val status = child("p", "result-status") { setAttribute("aria-live", "polite") }
 
         fun selectInstead() {

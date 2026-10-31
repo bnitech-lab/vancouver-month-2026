@@ -110,10 +110,10 @@ The other two endings read `9월을 버팀` and `10월 총비용 모자람`.
 The terminal prints the line under `결과 한 줄 (복사해서 붙여 넣으세요)`. `--today` and `--seed` together are
 refused.
 
-On the phone screen, open the page with `?today`. The page reads the browser's date and writes it into the
-address (`?today=2026-10-30`), so a reload or a shared link replays that date's run, even on another day. The
-ending shows the line with a `결과 복사` button; where the browser does not allow copying, the line is selected
-for copying by hand. `?seed` wins over `?today`.
+On the phone screen, tap `오늘의 판` on any ending screen, or open the page with `?today`. The page reads the
+browser's date and writes it into the address (`?today=2026-10-30`), so a reload or a shared link replays that
+date's run, even on another day. The ending shows the line with a `결과 복사` button; where the browser does not
+allow copying, the line is selected for copying by hand. `?seed` wins over `?today`.
 
 The date is each player's own, so near midnight two time zones can be on different runs. The date in the line
 says which run it was.

@@ -6,6 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.browser.document
 import org.w3c.dom.HTMLButtonElement
@@ -197,8 +198,20 @@ class PhoneGameTest {
         )
         assertFalse(button("결과 복사").disabled)
         assertEquals("polite", root.querySelector(".result-status")?.getAttribute("aria-live"))
+        assertEquals("?today", root.querySelector(".ending a")?.getAttribute("href"))
         tap("다시 하기")
         assertTrue(playedAgain)
+    }
+
+    @Test
+    fun `every ending offers today's run after 다시 하기`() {
+        open(1011)
+        startMonth(room = 3, amount = "1165")
+        while ("다시 하기" !in screen) tap("쉬기")
+        val link = root.querySelector(".ending a") ?: error("No link on the ending: $screen")
+        assertEquals("오늘의 판", link.textContent)
+        assertEquals("?today", link.getAttribute("href"))
+        assertSame(button("다시 하기"), link.previousElementSibling)
     }
 
     @Test
