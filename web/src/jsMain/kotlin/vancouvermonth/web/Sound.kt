@@ -7,6 +7,7 @@ import org.w3c.dom.Element
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.events.Event
+import org.w3c.dom.events.KeyboardEvent
 import vancouvermonth.text.soundLabel
 
 /** Lets a tick through at most once every [gapMillis], so a line typed out clicks softly instead of buzzing. */
@@ -24,8 +25,10 @@ internal class TickLimiter(private val gapMillis: Double = 110.0) {
 /**
  * The sound switch, off until the player turns it on, and remembered for the next visit where the browser allows it.
  * The sound itself is made only on a tap, as browsers require: [makeSpeaker] is called then. When it was left on last
- * time, the switch shows it on and the first tap anywhere on the page brings the sound back. While the page is hidden
- * the sound pauses. Where the browser has no Web Audio, [makeSpeaker] is null and the page has no switch.
+ * time, the switch shows it on and the first tap anywhere on the page brings the sound back. Until the browser really
+ * plays it, every tap tries again, since a browser may not count a tap (the end of a scroll, the Escape key) as the
+ * player's own. While the page is hidden the sound pauses, and when it is shown again it waits for a tap in the same
+ * way. Where the browser has no Web Audio, [makeSpeaker] is null and the page has no switch.
  * A test hands in its own clock ([now], in milliseconds) and its own idea of whether the page is [hidden].
  */
 internal class Sound(
@@ -39,13 +42,13 @@ internal class Sound(
 
     private var speaker: Speaker? = null
     private val ticks = TickLimiter()
-    private val onFirstTap: (Event) -> Unit = { event -> if (!onSwitch(event)) wake() }
-    private val onVisibility: (Event) -> Unit = { speaker?.hold(hidden()) }
+    private val onFirstTap: (Event) -> Unit = { event -> if (countsAsTap(event)) wake() }
+    private val onVisibility: (Event) -> Unit = { shownOrHidden() }
 
     init {
         if (makeSpeaker != null) {
             document.addEventListener("visibilitychange", onVisibility)
-            if (isOn) for (type in FIRST_TAPS) document.addEventListener(type, onFirstTap, true)
+            if (isOn) waitForTap()
         }
     }
 
@@ -97,13 +100,27 @@ internal class Sound(
         document.removeEventListener("visibilitychange", onVisibility)
     }
 
-    /** Makes the sound on the first tap that asks for it, then plays it. */
+    /** Makes the sound on a tap that asks for it, and plays it. Taps are waited for until the browser plays it. */
     private fun wake() {
-        stopWaiting()
-        if (!isOn) return
+        if (!isOn) {
+            stopWaiting()
+            return
+        }
         val made = speaker ?: make() ?: return
         speaker = made
-        made.on()
+        waitForTap()
+        made.on { if (isOn) stopWaiting() }
+    }
+
+    /** Pauses while the page is hidden; once it is shown again, wakes the sound, waiting for a tap if the browser asks. */
+    private fun shownOrHidden() {
+        val made = speaker ?: return
+        if (hidden()) {
+            made.pause()
+        } else if (isOn) {
+            waitForTap()
+            made.resume { if (isOn) stopWaiting() }
+        }
     }
 
     private fun make(): Speaker? = try {
@@ -113,21 +130,33 @@ internal class Sound(
         null
     }
 
+    private fun waitForTap() {
+        for (type in FIRST_TAPS) document.addEventListener(type, onFirstTap, true)
+    }
+
     private fun stopWaiting() {
         for (type in FIRST_TAPS) document.removeEventListener(type, onFirstTap, true)
     }
 
-    /** True for a tap on a sound switch, which switches the sound itself. */
-    private fun onSwitch(event: Event): Boolean =
-        (event.target as? Element)?.closest(".sound-switch") != null
+    /**
+     * True for a tap or key that may wake the sound: not one on a sound switch, which switches the sound itself, and
+     * not the Escape key, which a browser never counts as the player's own.
+     */
+    private fun countsAsTap(event: Event): Boolean {
+        if ((event.target as? Element)?.closest(".sound-switch") != null) return false
+        return event.type != "keydown" || (event as? KeyboardEvent)?.key != "Escape"
+    }
 
     private companion object {
         const val KEY = "vancouver-month.sound"
         const val ON = "on"
         const val OFF = "off"
 
-        /** The events a browser counts as the player's own tap or key, after which a page may play sound. */
-        val FIRST_TAPS = listOf("pointerup", "touchend", "click", "keydown")
+        /**
+         * Events a browser may count as the player's own tap or key, after which a page may play sound. No touchend:
+         * the end of a scroll sends one but does not count, and pointerup already covers a finger's tap.
+         */
+        val FIRST_TAPS = listOf("pointerup", "click", "keydown")
     }
 }
 

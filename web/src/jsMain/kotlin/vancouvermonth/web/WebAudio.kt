@@ -11,6 +11,9 @@ import org.w3c.dom.events.EventTarget
 internal external open class BaseAudioContext : EventTarget {
     /** Seconds since the context started, the clock every sound is timed on. */
     val currentTime: Double
+
+    /** "running" while it plays; "suspended" (or "interrupted") while the browser holds it. */
+    val state: String
     val destination: AudioNode
     fun createGain(): GainNode
     fun createOscillator(): OscillatorNode

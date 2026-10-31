@@ -308,14 +308,20 @@ internal class Band(private val mixer: Mixer, private val seed: Int, private val
 
 /** What makes the sound once the player turns it on. A test hands in one that only notes what it is asked. */
 internal interface Speaker {
-    /** Fades the music in, waking the sound if it was paused. */
-    fun on()
+    /**
+     * Fades the music in, waking the sound if it was paused, and calls [whenPlaying] once the browser really plays it.
+     * A browser may refuse until the player's own tap; then [whenPlaying] is never called, and a later call tries again.
+     */
+    fun on(whenPlaying: () -> Unit)
 
     /** Fades the music out, then pauses the sound. */
     fun off()
 
-    /** Pauses the sound at once while the page is [hidden], and wakes it when the page is shown again, if it was on. */
-    fun hold(hidden: Boolean)
+    /** Pauses the sound at once, as when the page is hidden. */
+    fun pause()
+
+    /** Wakes the sound again if it was on, as when the page is shown, and calls [whenPlaying] once it really plays. */
+    fun resume(whenPlaying: () -> Unit)
 
     /** A soft blip, as a talk opens. */
     fun blip()
@@ -338,11 +344,11 @@ internal class WebAudioSpeaker(private val context: AudioContext, seed: Int, hou
     private var timer: Int? = null
     private var pausing: Int? = null
 
-    override fun on() {
+    override fun on(whenPlaying: () -> Unit) {
         playing = true
         pausing?.let { window.clearTimeout(it) }
         pausing = null
-        wake()
+        wake(whenPlaying)
         val now = context.currentTime
         band.start(now + LEAD)
         mixer.fadeIn(now)
@@ -362,8 +368,10 @@ internal class WebAudioSpeaker(private val context: AudioContext, seed: Int, hou
         }, ((Mixer.FADE_OUT + 0.1) * 1000).toInt())
     }
 
-    override fun hold(hidden: Boolean) {
-        if (hidden) sleep() else if (playing) wake()
+    override fun pause() = sleep()
+
+    override fun resume(whenPlaying: () -> Unit) {
+        if (playing) wake(whenPlaying)
     }
 
     override fun blip() {
@@ -378,8 +386,9 @@ internal class WebAudioSpeaker(private val context: AudioContext, seed: Int, hou
         if (playing) mixer.chime(context.currentTime)
     }
 
-    private fun wake() {
-        context.resume().catch { }
+    /** Asks the browser to play, and calls [whenPlaying] if it does. A refusal leaves the context held. */
+    private fun wake(whenPlaying: () -> Unit) {
+        context.resume().then { if (context.state == "running") whenPlaying() }.catch { }
     }
 
     private fun sleep() {

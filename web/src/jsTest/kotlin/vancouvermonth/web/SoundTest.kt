@@ -10,21 +10,33 @@ import kotlinx.browser.document
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.events.Event
+import org.w3c.dom.events.KeyboardEvent
+import org.w3c.dom.events.KeyboardEventInit
 
-/** A speaker that only notes what it was asked to do, so a test needs no sound at all. */
+/**
+ * A speaker that only notes what it was asked to do, so a test needs no sound at all. While [plays] is false it acts
+ * as a browser that refuses to play: it never says it is playing.
+ */
 internal class NotingSpeaker : Speaker {
     val asked = mutableListOf<String>()
+    var plays = true
 
-    override fun on() {
+    override fun on(whenPlaying: () -> Unit) {
         asked += "on"
+        if (plays) whenPlaying()
     }
 
     override fun off() {
         asked += "off"
     }
 
-    override fun hold(hidden: Boolean) {
-        asked += "hold $hidden"
+    override fun pause() {
+        asked += "pause"
+    }
+
+    override fun resume(whenPlaying: () -> Unit) {
+        asked += "resume"
+        if (plays) whenPlaying()
     }
 
     override fun blip() {
@@ -173,7 +185,67 @@ class SoundTest {
         document.dispatchEvent(Event("visibilitychange"))
         hidden = false
         document.dispatchEvent(Event("visibilitychange"))
-        assertEquals(listOf("on", "hold true", "hold false"), speaker.asked)
+        assertEquals(listOf("on", "pause", "resume"), speaker.asked)
+    }
+
+    /** Dispatches [type] on the page as a tap or key from the player would arrive, with [key] for a keydown. */
+    private fun press(type: String, key: String? = null) {
+        val event = if (key == null) {
+            Event(type, js("({ bubbles: true })"))
+        } else {
+            KeyboardEvent(type, KeyboardEventInit(key = key, bubbles = true))
+        }
+        document.body!!.dispatchEvent(event)
+    }
+
+    @Test
+    fun `a tap the browser does not count leaves the sound waiting, and the next tap tries again`() {
+        val store = FakeStore()
+        store.setItem("vancouver-month.sound", "on")
+        sound(store).button(root)
+        speaker.plays = false
+        press("pointerup")
+        assertEquals(1, made)
+        assertEquals(listOf("on"), speaker.asked)
+        press("click")
+        assertEquals(listOf("on", "on"), speaker.asked, "The next tap did not try again")
+        speaker.plays = true
+        press("keydown", key = "a")
+        assertEquals(listOf("on", "on", "on"), speaker.asked)
+        press("pointerup")
+        assertEquals(listOf("on", "on", "on"), speaker.asked, "Taps still wake a sound that plays")
+        assertEquals(1, made, "The sound was made more than once")
+    }
+
+    @Test
+    fun `neither the Escape key nor the end of a touch counts as the first tap`() {
+        val store = FakeStore()
+        store.setItem("vancouver-month.sound", "on")
+        sound(store).button(root)
+        press("keydown", key = "Escape")
+        press("touchend")
+        assertEquals(0, made)
+        press("keydown", key = "Enter")
+        assertEquals(1, made)
+        assertEquals(listOf("on"), speaker.asked)
+    }
+
+    @Test
+    fun `shown again, a sound the browser will not wake waits for the next tap`() {
+        sound().button(root)
+        switchIn().click()
+        hidden = true
+        document.dispatchEvent(Event("visibilitychange"))
+        speaker.plays = false
+        hidden = false
+        document.dispatchEvent(Event("visibilitychange"))
+        assertEquals(listOf("on", "pause", "resume"), speaker.asked)
+        press("pointerup")
+        assertEquals(listOf("on", "pause", "resume", "on"), speaker.asked, "The tap after showing did not try again")
+        speaker.plays = true
+        press("pointerup")
+        press("pointerup")
+        assertEquals(listOf("on", "pause", "resume", "on", "on"), speaker.asked)
     }
 
     @Test
