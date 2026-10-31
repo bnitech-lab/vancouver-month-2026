@@ -14,6 +14,7 @@ import vancouvermonth.core.Interview
 import vancouvermonth.core.InterviewStage
 import vancouvermonth.core.Month
 import vancouvermonth.core.Room
+import vancouvermonth.core.RoomDealer
 import vancouvermonth.core.Skill
 import vancouvermonth.core.TodaysRun
 import vancouvermonth.core.Zone
@@ -24,6 +25,15 @@ private object LuckyDice : Dice {
 
     override fun daysLater(range: IntRange): Int = range.first
 }
+
+/** Terminal columns: two for a Hangul syllable, one for anything else, as the terminal screen counts them. */
+private fun columns(line: String): Int = line.sumOf { if (it in '가'..'힣') 2 else 1 }
+
+/**
+ * The widest first-screen line today, the story's first: 47 columns, 296 of the 313 points a 375-point phone gives
+ * the story card at 15px. A longer line may take a second row.
+ */
+private const val MAX_COLUMNS = 47
 
 class KoreanTest {
     private val room = Room(rent = 1_020, zone = Zone.TWO, utilitiesIncluded = true, utilities = 0)
@@ -108,34 +118,54 @@ class KoreanTest {
     }
 
     @Test
-    fun `the first screen's story names the starting money and the goal, and asks for a room first`() {
+    fun `the first screen's story starts on the day of the pick with the starting money, the goal and a room first`() {
         val lines = arrivalLines(FirstMinute.STARTING_BALANCE)
         assertEquals(
             listOf(
-                "8월 31일, ${money(FirstMinute.STARTING_BALANCE)}만 들고 밴쿠버에 도착했어요.",
+                "${date(Month.FIRST_DAY - 1)}, 딱 ${money(FirstMinute.STARTING_BALANCE)} 들고 밴쿠버에 막 도착했어요.",
                 goalLine(),
                 "먼저 9월 한 달 지낼 방부터 구해야 해요.",
             ),
             lines,
         )
-        assertEquals("8월 31일, \$3,000만 들고 밴쿠버에 도착했어요.", lines[0])
-        assertEquals("8월 31일, \$500만 들고 밴쿠버에 도착했어요.", arrivalLines(500)[0])
-        for (line in lines) assertTrue(line.length <= 40, "Too long for a phone: $line")
+        assertEquals("9월 1일, 딱 \$3,000 들고 밴쿠버에 막 도착했어요.", lines[0])
+        assertEquals("9월 1일, 딱 \$500 들고 밴쿠버에 막 도착했어요.", arrivalLines(500)[0])
+        for (line in lines) assertTrue(columns(line) <= MAX_COLUMNS, "Wider than one row of a phone: $line")
     }
 
     @Test
-    fun `why the total matters is said with October's date and the living cost, and no room's total`() {
+    fun `why the total matters is said with October's date, and no room's total`() {
         val lines = whyTotalLines()
-        assertEquals(
-            listOf(
-                "총비용은 오늘 내고, ${date(Month.LAST_DAY + 1)}에 또 내요.",
-                "매일 생활비 ${money(Month.DAILY_LIVING_COST)}도 나가니, 쌀수록 9월이 넉넉해요.",
-            ),
-            lines,
-        )
+        assertEquals(listOf("총비용은 오늘 내고, ${date(Month.LAST_DAY + 1)}에 또 내요.", "방이 쌀수록 알바 대신 취업 준비할 날이 늘어요."), lines)
         assertEquals("총비용은 오늘 내고, 10월 1일에 또 내요.", lines[0])
-        assertEquals("매일 생활비 \$40도 나가니, 쌀수록 9월이 넉넉해요.", lines[1])
-        for (line in lines) assertTrue(line.length <= 40, "Too long for a phone: $line")
+        for (line in lines) assertTrue(columns(line) <= MAX_COLUMNS, "Wider than one row of a phone: $line")
+    }
+
+    @Test
+    fun `a cheaper room never needs more café shifts to pay October, as the why line says`() {
+        for (seed in 0 until 200) {
+            val shifts = RoomDealer.deal(seed).sortedBy { it.totalMonthlyCost }.map { shiftsToPayOctober(it) }
+            assertEquals(shifts.sorted(), shifts, "seed $seed")
+        }
+        // Seed 1011: the cheapest room ($1,165) needs 5 shifts, room 2 ($1,345) needs 8.
+        val rooms = FirstMinute(1011).rooms
+        assertEquals(5, shiftsToPayOctober(rooms[2]))
+        assertEquals(8, shiftsToPayOctober(rooms[1]))
+    }
+
+    /** The fewest café shifts that end a month with no applications able to pay October's total, by core's rules. */
+    private fun shiftsToPayOctober(room: Room): Int = (0..Month.LAST_DAY).first { shifts ->
+        val month = Month(room, FirstMinute.STARTING_BALANCE - room.totalMonthlyCost, LuckyDice)
+        var left = shifts
+        while (!month.isOver) {
+            if (left > 0 && month.canTake(Action.WORK)) {
+                month.take(Action.WORK)
+                left -= 1
+            } else {
+                month.take(Action.REST)
+            }
+        }
+        month.ending == Ending.SURVIVED
     }
 
     @Test

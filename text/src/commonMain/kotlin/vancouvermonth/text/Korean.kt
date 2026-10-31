@@ -46,17 +46,23 @@ fun guessLine(reveal: Reveal): String =
 /** The month's goal, as the first screen, the month's start and the town's first guide all say it. */
 fun goalLine(): String = "목표: ${date(Month.LAST_DAY)}까지 취업 제안 받기"
 
-/** Who the player is and why a room comes first, at the top of the first screen. [balance] is the starting money. */
+/**
+ * Who the player is and why a room comes first, at the top of the first screen. [balance] is the starting money.
+ * The story starts on the day the room is picked, the day before the month's first day, so "오늘" below means it.
+ */
 fun arrivalLines(balance: Int): List<String> = listOf(
-    "8월 31일, ${money(balance)}만 들고 밴쿠버에 도착했어요.",
+    "${date(Month.FIRST_DAY - 1)}, 딱 ${money(balance)} 들고 밴쿠버에 막 도착했어요.",
     goalLine(),
     "먼저 9월 한 달 지낼 방부터 구해야 해요.",
 )
 
-/** Why the cheapest total matters, under the formula, without naming any room's total. */
+/**
+ * Why the cheapest total matters, under the formula, without naming any room's total. The total is paid twice, so
+ * a cheaper room needs fewer café shifts to pay October and leaves more days for English, coding and applications.
+ */
 fun whyTotalLines(): List<String> = listOf(
     "총비용은 오늘 내고, ${date(Month.LAST_DAY + 1)}에 또 내요.",
-    "매일 생활비 ${money(Month.DAILY_LIVING_COST)}도 나가니, 쌀수록 9월이 넉넉해요.",
+    "방이 쌀수록 알바 대신 취업 준비할 날이 늘어요.",
 )
 
 /** After the reveal, what the pick means for the month: how much more than the cheapest room it costs, if any. */
