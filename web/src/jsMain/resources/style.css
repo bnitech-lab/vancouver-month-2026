@@ -1215,6 +1215,13 @@ html:has(.walk-town) {
   border-radius: 50%;
 }
 
+/* The link is small to look at; its tap area reaches past it, to 48 points tall. The dot keeps ::after. */
+.patch-link::before {
+  content: "";
+  position: absolute;
+  inset: -8px -6px;
+}
+
 .patch-link.patch-news::after {
   top: 4px;
   right: -12px;
