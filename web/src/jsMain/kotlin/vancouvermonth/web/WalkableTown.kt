@@ -1079,7 +1079,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val coming = comingWeather
         if (progress >= DayLight.HOME_AT && coming != null) {
             comingWeather = null
-            showWeather(coming)
+            // The same sky as today needs nothing redone.
+            if (coming != shownWeather) showWeather(coming)
         }
         if (progress >= DayLight.HOME_AT && !wentHome && !sitting) {
             wentHome = true
@@ -1110,7 +1111,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         marker.visible = false
         val coming = comingWeather
         comingWeather = null
-        if (coming != null) showWeather(coming)
+        if (coming != null && coming != shownWeather) showWeather(coming)
         light(DayLight.MORNING)
         viewBeforeRest?.let { (turn, tilt, distance) -> view.aim(turn, tilt, distance) }
         viewBeforeRest = null
