@@ -53,8 +53,9 @@ SMALLEST_LAKE = 4
 # How far a simplified line may stray from the real one, in game units.
 SIMPLIFY = 0.35
 
-# A city block is drawn this much smaller on every side than its real outline, so a street of at least one square
-# always runs between two blocks; a block wider or deeper than SPLIT_OVER squares is cut into pieces with lanes.
+# A city block is drawn this much smaller on every side than its real outline, and where two still meet side to side
+# the smaller gives up a row or column, so a street of at least one square runs between any two side by side; a
+# block wider or deeper than SPLIT_OVER squares is cut into pieces with lanes.
 BLOCK_INSET = 0.4
 SPLIT_OVER = 9
 
@@ -93,7 +94,7 @@ DATASETS = [
     ("rapid-transit-lines.geojson", "Rapid transit lines", "rapid-transit-lines"),
     ("city-boundary.geojson", "City boundary", "city-boundary"),
     ("local-area-boundary.geojson", "Local area boundary", "local-area-boundary"),
-    ("block-outlines-downtown.geojson", "Block outlines", "block-outlines"),
+    ("block-outlines.geojson", "Block outlines", "block-outlines"),
 ]
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -474,7 +475,7 @@ class Sources:
                  for f in load_features(raw, "local-area-boundary.geojson")}
         self.areas = areas
         self.blocks = [lonlat_list(f["geometry"]["coordinates"][0])
-                       for f in load_features(raw, "block-outlines-downtown.geojson")]
+                       for f in load_features(raw, "block-outlines.geojson")]
         self.turn = 90.0 - street_grid_angle(self.blocks, [areas["Downtown"], areas["West End"]])
 
     def extent(self):
@@ -592,7 +593,10 @@ class Map:
         for rect in sorted(built + greens, key=lambda r: (-r[2] * r[3], r)):
             if not any(overlaps(rect, other) for other in kept):
                 kept.append(rect)
-        return [r for r in built if r in kept], [r for r in greens if r in kept]
+        # Where two blocks still meet side to side, the smaller gives up the row or column along that side, so a street
+        # of at least one square runs between any two.
+        kept = keep_streets(kept)
+        return [kept[r] for r in built if r in kept], [kept[r] for r in greens if r in kept]
 
     def trim_to_land(self, x0, z0, x1, z1):
         """The rectangle of squares x0..x1, z0..z1 cut down from its edges until every square in it is plain land,
@@ -637,12 +641,75 @@ class Map:
         box = (-1.0, -1.0, self.columns + 1.0, self.rows + 1.0)
         shore = [f.game(*p) for p in self.sources.shoreline]
         shore_parts = [simplify(part, SIMPLIFY) for part in clip_polyline(shore, *box)]
-        shore_parts = [p for p in shore_parts if len(p) > 1]
+        # Keep the stretches that are lines on the map: two distinct points or more, not all on the clipping frame.
+        def on_frame(point):
+            return point[0] in (box[0], box[2]) or point[1] in (box[1], box[3])
+        shore_parts = [p for p in shore_parts if len(set(p)) > 1 and not all(on_frame(q) for q in p)]
         park = simplify([f.game(*p) for p in self.sources.park_rings[0]], SIMPLIFY)
         rail_parts = clip_polyline([f.game(*p) for p in self.sources.rail], 0.0, 0.0, self.columns, self.rows)
         rail = simplify(rail_parts[0], SIMPLIFY) if rail_parts else []
         mountains = [f.game(*p) for p in self.sources.inlet_line]
         return shore_parts, park, rail, mountains
+
+
+def keep_streets(rects):
+    """[rects] with every two that meet side to side pulled apart by a square: the smaller one loses its row or column
+    on that side (the larger, when the smaller is only one square across). Returns each rectangle mapped to what is
+    left of it, and leaves out one that has nothing left."""
+    now = {r: r for r in rects}
+    changed = True
+    while changed:
+        changed = False
+        live = sorted((r for r in now if now[r] is not None), key=lambda r: (-now[r][2] * now[r][3], r))
+        for i, big in enumerate(live):
+            for small in live[i + 1:]:
+                a, b = now[big], now[small]
+                if a is None or b is None:
+                    continue
+                side = meeting_side(a, b)
+                if side is None:
+                    continue
+                trimmed = trim(b, side)
+                if trimmed is None:
+                    opposite = {"west": "east", "east": "west", "north": "south", "south": "north"}[side]
+                    trimmed_big = trim(a, opposite)
+                    if trimmed_big is not None:
+                        now[big] = trimmed_big
+                    else:
+                        now[small] = None
+                else:
+                    now[small] = trimmed
+                changed = True
+    return {r: v for r, v in now.items() if v is not None}
+
+
+def meeting_side(a, b):
+    """The side of [b] that meets [a] edge to edge with a stretch in common, or None: "west" when a lies west of b."""
+    ax0, az0, ax1, az1 = a[0], a[1], a[0] + a[2], a[1] + a[3]
+    bx0, bz0, bx1, bz1 = b[0], b[1], b[0] + b[2], b[1] + b[3]
+    across = min(az1, bz1) - max(az0, bz0)
+    down = min(ax1, bx1) - max(ax0, bx0)
+    if across > 0 and ax1 == bx0:
+        return "west"
+    if across > 0 and bx1 == ax0:
+        return "east"
+    if down > 0 and az1 == bz0:
+        return "north"
+    if down > 0 and bz1 == az0:
+        return "south"
+    return None
+
+
+def trim(rect, side):
+    """[rect] less its row or column on [side], or None when that would leave nothing."""
+    x, z, w, d = rect
+    if side in ("west", "east"):
+        if w < 2:
+            return None
+        return (x + 1, z, w - 1, d) if side == "west" else (x, z, w - 1, d)
+    if d < 2:
+        return None
+    return (x, z + 1, w, d - 1) if side == "north" else (x, z, w, d - 1)
 
 
 def overlaps(a, b):
@@ -732,10 +799,12 @@ def write_kotlin(built, sources, fetched, hashes):
     out.append("//")
     out.append("// Contains information licensed under the Open Government Licence – Vancouver.")
     out.append("// https://opendata.vancouver.ca/pages/licence/")
+    out.append("// This data is licensed under the Open Government Licence – Vancouver 1.0, not under the MIT licence")
+    out.append("// of the code: see Map data in the README, and MAP-DATA-NOTICE.txt beside the page.")
     out.append("//")
     out.append(f"// Fetched {fetched} from https://opendata.vancouver.ca:")
     for name, title, dataset in DATASETS:
-        out.append(f"//   {title} ({dataset}), sha1 {hashes[name][:12]}")
+        out.append(f"//   {title} ({dataset}), sha1 {hashes[name]}")
     out.append("package vancouvermonth.web")
     out.append("")
     out.append("/**")
@@ -743,7 +812,9 @@ def write_kotlin(built, sources, fetched, hashes):
                "and a strip of its")
     out.append(" * south shore. Turned so the downtown street grid runs along x and z (real north points up "
                "and to the left),")
-    out.append(" * and shrunk so the farthest walk between two of the five places takes about 25 seconds.")
+    out.append(" * and shrunk so the farthest walk between two of the five places takes about 25 seconds on "
+               "bare ground (along")
+    out.append(" * the streets between the blocks, a little more).")
     out.append(" * Points are \"x,z\" pairs in grid units, with x east along the columns and z south down the rows.")
     out.append(" */")
     out.append("internal object VancouverMapData {")
@@ -797,7 +868,7 @@ def write_kotlin(built, sources, fetched, hashes):
     out.append("    /** The city blocks that are small parks, as [BLOCKS]: grass and a few trees. */")
     out.append("    const val GREENS = " + wrap_rects(greens, 8))
     out.append("")
-    out.append("    /** The square proposed for each of the five places. Stage 20b builds them here. */")
+    out.append("    /** The square proposed for each of the five places; each stands within a few squares of it. */")
     out.append("    val spots: Map<Place, Cell> = mapOf(")
     for name, _, _ in SPOTS:
         x, z = built.spots[name]

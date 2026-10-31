@@ -169,6 +169,23 @@ class VancouverMapTest {
     }
 
     @Test
+    fun `a street at least a square wide runs between any two city blocks side by side`() {
+        val lots = (VancouverMapData.BLOCKS + " " + VancouverMapData.GREENS).split(' ').filter { it.isNotEmpty() }.map {
+            val (x, z, width, depth) = it.split(',').map(String::toInt)
+            Lot(x, z, width, depth)
+        }
+        assertTrue(lots.size > 400)
+        for ((index, a) in lots.withIndex()) {
+            for (b in lots.drop(index + 1)) {
+                val apartX = maxOf(b.x - (a.x + a.width), a.x - (b.x + b.width))
+                val apartZ = maxOf(b.z - (a.z + a.depth), a.z - (b.z + b.depth))
+                // Apart on one axis by a square or more, or meeting at a corner only.
+                assertTrue(apartX >= 1 || apartZ >= 1 || (apartX == 0 && apartZ == 0), "$a and $b")
+            }
+        }
+    }
+
+    @Test
     fun `the traced lines lie on the map`() {
         val lines = RealVancouver.shoreLines + listOf(RealVancouver.park)
         assertTrue(RealVancouver.shoreLines.isNotEmpty() && RealVancouver.park.size > 20)

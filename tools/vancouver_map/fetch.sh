@@ -13,9 +13,9 @@ base=https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets
 for dataset in shoreline-2002 parks-polygon-representation rapid-transit-lines local-area-boundary city-boundary; do
     curl -sS --fail --max-time 120 "$base/$dataset/exports/geojson" -o "$out/$dataset.geojson"
 done
-# Only the blocks around downtown, for the angle of its street grid and the comparison picture.
+# The city blocks over the whole grid: the angle of the street grid, the buildings, and the comparison picture.
 curl -sS --fail --max-time 120 -G "$base/block-outlines/exports/geojson" \
     --data-urlencode "where=in_bbox(geo_point_2d, 49.250, -123.185, 49.325, -123.075)" \
-    -o "$out/block-outlines-downtown.geojson"
+    -o "$out/block-outlines.geojson"
 date -u +%Y-%m-%dT%H:%M:%SZ > "$out/fetched-at.txt"
 echo "Fetched into $out"
