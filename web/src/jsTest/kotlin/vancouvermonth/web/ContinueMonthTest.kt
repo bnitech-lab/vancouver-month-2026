@@ -29,6 +29,18 @@ import vancouvermonth.text.greeting
 import vancouvermonth.text.money
 import vancouvermonth.text.replacesKept
 
+/**
+ * A town whose evening does not end, as when the page is closed while the day changes. Everything else is
+ * [QuietTown]'s.
+ */
+private class EveningTown(private val quiet: QuietTown = QuietTown()) : WalkableTown by quiet {
+    var evening: Place? = null
+
+    override fun endDay(place: Place) {
+        evening = place
+    }
+}
+
 /** The month in progress survives a reload: kept after every day, offered on opening, and let go at the ending. */
 class ContinueMonthTest {
     private val root = (document.createElement("main") as HTMLElement).also { document.body!!.appendChild(it) }
@@ -217,6 +229,49 @@ class ContinueMonthTest {
         while ("다시 하기" !in other.textContent.orEmpty()) playDay(other)
         while ("다시 하기" !in root.textContent.orEmpty()) playDay(root)
         assertEquals(text(".ending", other), text(".ending"))
+    }
+
+    @Test
+    fun `today's run continued plays on to the same ending and the same result line`() {
+        val today = TodaysRun(2026, 10, 30)
+        open(storage = FakeStore(), today = today, into = other)
+        startRun(today.seed, other)
+        open(today = today)
+        startRun(today.seed)
+        repeat(4) {
+            playDay(other)
+            playDay(root)
+        }
+        open(today = today)
+        root.button(Continue.CONTINUE).click()
+        while ("다시 하기" !in other.textContent.orEmpty()) playDay(other)
+        while ("다시 하기" !in root.textContent.orEmpty()) playDay(root)
+        assertTrue("10월 30일 오늘의 판" in text(".result-line"))
+        assertEquals(text(".result-line", other), text(".result-line"))
+        assertEquals(text(".ending", other), text(".ending"))
+        assertNull(kept)
+    }
+
+    @Test
+    fun `a reload while the day is changing goes on with the next day and that day's log`() {
+        val town = EveningTown()
+        open(town = town)
+        startSeed1011(root)
+        root.button(Guide.START).click()
+        town.onPlace(Place.LIBRARY)
+        (root.querySelector(".talk .spend") as HTMLButtonElement).click()
+        assertEquals(Place.LIBRARY, town.evening, "The day did not start to change")
+
+        val again = QuietTown()
+        open(town = again)
+        val month = played(Action.STUDY_ENGLISH)
+        assertEquals(continueFrom(month.day, month.balance), text(".kept-from"))
+        root.button(Continue.CONTINUE).click()
+        assertTrue("${date(Month.FIRST_DAY)}에 있었던 일" in text(".over-town .log"))
+        assertTrue(date(month.day) in text(".hud"))
+        // The new town is in the morning: it takes a tap, and a talk opens.
+        again.onPlace(Place.CAFE)
+        assertNotNull(root.querySelector(".talk"), "The continued day still waited for a morning")
     }
 
     @Test
