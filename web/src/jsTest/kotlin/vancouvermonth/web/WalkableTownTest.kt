@@ -965,6 +965,31 @@ class WalkableTownTest {
     }
 
     @Test
+    fun `when the phone takes WebGL back, the passing train falls silent, and it rumbles again once WebGL returns`():
+        Promise<Unit> {
+        var clock = 0.0
+        val town = startInTown(life = { clock })
+        val heard = mutableListOf<Double>()
+        town.onSounds = { train, _, _ -> heard += train }
+        val lose: dynamic = canvasOf(town).getContext("webgl2")?.asDynamic()?.getExtension("WEBGL_lose_context")
+        assertNotNull(lose, "The test browser cannot lose WebGL on purpose")
+        return play(
+            Step("the train pulls out", { town.isStill }) {
+                // Four seconds after it leaves the station it is under way.
+                clock = SkyTrainRun.DWELL + 4_000.0
+            },
+            Step("it rumbles", { heard.lastOrNull()?.let { it > 0.0 } == true }) {
+                lose.loseContext()
+            },
+            Step("WebGL is gone: silence", { heard.last() == 0.0 }) {
+                clock = SkyTrainRun.DWELL + 4_500.0
+                lose.restoreContext()
+            },
+            Step("WebGL is back: it rumbles again", { heard.last() > 0.0 }) {},
+        )
+    }
+
+    @Test
     fun `a sound that fails never fails the town, and the town still lets go when it closes`(): Promise<Unit> {
         var clock = 0.0
         val town = startInTown(life = { clock })

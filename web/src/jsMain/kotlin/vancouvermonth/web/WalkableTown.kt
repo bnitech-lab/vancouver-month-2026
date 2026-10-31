@@ -283,7 +283,11 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private val onRelease: (Event) -> Unit = { release(it as PointerEvent, cancelled = false) }
     private val onCancel: (Event) -> Unit = { release(it as PointerEvent, cancelled = true) }
     private val onWheel: (Event) -> Unit = { wheel(it as WheelEvent) }
-    private val onLost: (Event) -> Unit = { contextLost = true }
+    private val onLost: (Event) -> Unit = {
+        contextLost = true
+        // Nothing moves until WebGL comes back, so nothing rumbles or crackles either.
+        quietSounds()
+    }
     private val onRestored: (Event) -> Unit = {
         contextLost = false
         askForFrame()
@@ -294,6 +298,9 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     /** True while the phone has taken WebGL back from the page: the town waits, drawing nothing, until it returns. */
     private var contextLost = false
+
+    /** True once the sound has been told all is quiet, so it is told only once while the town's life stands still. */
+    private var soundsQuiet = true
 
     /** Back on screen, the town draws again at once; while hidden, it asks for no frames at all. */
     private val onVisibility: (Event) -> Unit = {
@@ -608,11 +615,17 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
      * sound's trouble: it is noted and the town goes on, rather than handing a working town over to the buttons.
      */
     private fun tellSounds(train: Double, fire: Double, night: Double) {
+        soundsQuiet = train == 0.0 && fire == 0.0
         try {
             onSounds(train, fire, night)
         } catch (error: Throwable) {
             console.warn("The town's sounds failed:", error)
         }
+    }
+
+    /** Tells the sound that the train and the fire are silent, unless it already knows. */
+    private fun quietSounds() {
+        if (!soundsQuiet) tellSounds(0.0, 0.0, 0.0)
     }
 
     /** Where the character is now, for tests. */
@@ -892,6 +905,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             gliding = view.follow(Point(subject.x, FOCUS_HEIGHT, subject.z), millis)
             placeCamera()
             if (!still && pace.stepsLife) stepLife()
+            // A town whose life stands still has no train passing and no fire to hear.
+            if (still) quietSounds()
             renderer.shadowMap.needsUpdate = pace.drawsShadows
             renderer.render(scene, camera)
         } catch (error: Throwable) {
