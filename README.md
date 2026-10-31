@@ -186,7 +186,7 @@ when the passersby are out), `Passersby` (their loops, and stopping for the char
 waving), `TownLife` (the train's round, the fire's flicker, the glints, petals and clouds, all worked out from the time)
 and `FramePace` (which frames are drawn). The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`,
 and `Passersby.kt` for the passersby's). `WalkableTown` draws all of it, and `Three.kt` declares only the parts of
-Three.js in use. The page's script, Three.js included, is about 666 KB (about 176 KB gzipped).
+Three.js in use. The page's script, Three.js included, is about 692 KB (about 185 KB gzipped).
 
 ### Sound and the first-run guide
 
@@ -255,7 +255,7 @@ or wage.
 
 ## What comes next
 
-Dawn plays the town to walk in and decides what changes. The plan's next stage adds sound.
+Dawn plays the living town, listens to the village tune and decides what changes. Playing on a phone needs a public address, which waits for Dawn.
 
 ## Licence
 
