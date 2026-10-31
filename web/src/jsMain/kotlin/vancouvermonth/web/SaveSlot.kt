@@ -11,7 +11,11 @@ internal class KeptMonth(val record: MonthRecord, val replayed: ReplayedMonth)
  * The page's one slot for the month in progress, in [memory]: written when the month starts and after every day,
  * and emptied at its ending. Where the browser refuses its storage, nothing is kept and nothing is offered.
  */
-internal class SaveSlot(private val memory: Memory) {
+internal class SaveSlot(
+    private val memory: Memory,
+    /** How a kept record becomes a month again. A test may hand in one that throws. */
+    private val replay: (MonthRecord) -> ReplayedMonth? = { it.replay() },
+) {
     /** The record kept in the slot, or null when there is none or it is not one this version reads. */
     fun record(): MonthRecord? = MonthRecord.decode(memory.read(KEY))
 
@@ -23,7 +27,7 @@ internal class SaveSlot(private val memory: Memory) {
     /**
      * The month kept for the run of [seed] (and of [today], for today's run), replayed, or null. A month kept for
      * another run is left for that run, until a new month takes the slot. A kept line that is not a record, or a
-     * record of this run that does not replay, is dropped.
+     * record of this run that does not replay, is dropped, so a line that cannot be continued never blocks the page.
      */
     fun keptFor(seed: Int, today: TodaysRun?): KeptMonth? {
         val text = memory.read(KEY)
@@ -33,11 +37,21 @@ internal class SaveSlot(private val memory: Memory) {
             return null
         }
         if (record.seed != seed || record.today != today) return null
-        val replayed = record.replay() ?: run {
+        val replayed = replayed(record) ?: run {
             clear()
             return null
         }
         return KeptMonth(record, replayed)
+    }
+
+    /**
+     * [record] replayed, or null when it does not replay. A throw counts as not replaying: the rules check each day
+     * before playing it, but a rule added to core later that they do not know of must not leave the page blank.
+     */
+    private fun replayed(record: MonthRecord): ReplayedMonth? = try {
+        replay(record)
+    } catch (error: Throwable) {
+        null
     }
 
     companion object {

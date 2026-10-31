@@ -325,6 +325,21 @@ class ContinueMonthTest {
     }
 
     @Test
+    fun `a replay that throws counts as one that does not replay, and the page starts fresh`() {
+        open()
+        startSeed1011(root)
+        root.button("영어 공부").click()
+
+        root.innerHTML = ""
+        val game = PhoneGame(root, 1011, playAgain = {})
+        game.slot = SaveSlot(Memory { store }) { error("A rule this line was not kept under") }
+        game.show()
+        assertNull(card)
+        assertNotNull(root.querySelector(".rooms"))
+        assertEquals("", store.items[SaveSlot.KEY])
+    }
+
+    @Test
     fun `an address with no run plays the kept month's run, so the card can offer it`() {
         val now = Date(2026, 9, 30) // October 30th
         val today = TodaysRun(2026, 10, 29)
