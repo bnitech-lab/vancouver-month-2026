@@ -113,8 +113,10 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         Greeter(venue.person, venue.facing, phase = index * 1.3)
     }
     private val greeterParts = Neighbourhood.venues.map { Figures.townsperson(personAt(it.place)) }
+    private val greeterFigures = greeterParts.map { FigureBoxes(it) }
     private val passersby = Strolls.all
     private val passerbyParts = passersby.map { Figures.passer(it.passer) }
+    private val passerbyFigures = passerbyParts.map { FigureBoxes(it) }
 
     /** The passersby fade out together in the evening and back in at dawn, so they share a material that can fade. */
     private val passerbyMaterial = MeshToonMaterial(json("gradientMap" to shades, "transparent" to true))
@@ -305,7 +307,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         stepLife()
     }
 
-    /** One draw for the boxes of many figures, each box placed by [placeFigures]. */
+    /** One draw for the boxes of many figures, each box placed every frame by its [FigureBoxes]. */
     private fun figures(parts: List<List<Part>>, material: Material): InstancedMesh {
         val mesh = boxes(parts.flatten().map { it.block }, material)
         // The figures move about, so the bounds worked out from where they first stood would soon be wrong.
@@ -699,13 +701,25 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val millis = (now - lifeNow).coerceIn(0.0, MAX_LIFE_STEP_MILLIS)
         lifeNow = now
         val player = if (sitting) Neighbourhood.benchSeat else spot
-        placeFigures(townsfolk, greeterParts, greeters.map { it.step(now, millis, player) })
+        var first = 0
+        for (index in greeters.indices) {
+            val pose = greeters[index].step(now, millis, player)
+            greeterFigures[index].write(pose, townsfolk.instanceMatrix.array, first)
+            first += greeterFigures[index].count
+        }
+        townsfolk.instanceMatrix.needsUpdate = true
         val out = if (nightFell == null) 1.0 else DayLight.outdoors(nightProgress)
         passerbyMaterial.opacity = out
         passerbyBoxes.visible = out > 0.0
         // A fading figure would leave a solid shadow, so the passersby cast none until they are all there.
         passerbyBoxes.castShadow = out >= 1.0
-        placeFigures(passerbyBoxes, passerbyParts, passersby.map { it.step(now, millis, player) })
+        first = 0
+        for (index in passersby.indices) {
+            val pose = passersby[index].step(now, millis, player)
+            passerbyFigures[index].write(pose, passerbyBoxes.instanceMatrix.array, first)
+            first += passerbyFigures[index].count
+        }
+        passerbyBoxes.instanceMatrix.needsUpdate = true
         trainShift = SkyTrainRun.shiftAt(now)
         train.position.set(Neighbourhood.TRAIN_STOP + trainShift, 0.0, 0.0)
         train.visible = SkyTrainRun.isShownAt(now)
@@ -715,24 +729,6 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         flameMaterial.emissiveIntensity = glowLevel * flicker
         fireLight.intensity = FIRE_LIGHT * glowLevel * flicker
         placeBlocks(drifting, Shimmer.at(now, glowLevel) + Petals.at(now) + Clouds.at(now))
-    }
-
-    /** Puts every box of each figure of [parts] where [poses] say, in the order [figures] made them. */
-    private fun placeFigures(mesh: InstancedMesh, parts: List<List<Part>>, poses: List<Pose>) {
-        val numbers = mesh.instanceMatrix.array
-        var index = 0
-        for ((figure, pose) in parts.zip(poses)) {
-            for (matrix in Figures.place(figure, pose)) {
-                // Three.js keeps a matrix column by column; [Figures.place] gives it row by row.
-                val at = index * 16
-                for (column in 0..3) {
-                    for (row in 0..2) numbers[at + column * 4 + row] = matrix[row * 4 + column].toFloat()
-                    numbers[at + column * 4 + 3] = if (column == 3) 1f else 0f
-                }
-                index += 1
-            }
-        }
-        mesh.instanceMatrix.needsUpdate = true
     }
 
     /** Puts each box of a mesh that moves where [blocks] are now: stretched to size, with no turn. */

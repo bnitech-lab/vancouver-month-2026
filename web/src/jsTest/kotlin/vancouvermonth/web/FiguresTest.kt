@@ -5,6 +5,8 @@ import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import org.khronos.webgl.Float32Array
+import org.khronos.webgl.get
 import vancouvermonth.text.Passer
 import vancouvermonth.text.Townsperson
 
@@ -85,6 +87,37 @@ class FiguresTest {
         for (passer in Passer.entries) {
             for (matrix in Figures.place(Figures.passer(passer), Pose(Spot(0.0, 0.0), 0.0))) {
                 assertTrue(middle(matrix).y - matrix[5] / 2 >= -1e-9, "$passer")
+            }
+        }
+    }
+
+    @Test
+    fun `the town's fast placing gives the same numbers as the plain one, for any pose`() {
+        val figures = Townsperson.entries.map { Figures.townsperson(it) } + Passer.entries.map { Figures.passer(it) }
+        val poses = listOf(
+            Pose(Spot(0.0, 0.0), 0.0),
+            Pose(Spot(12.5, 30.25), 2.0, lift = 0.05, swing = 0.4),
+            Pose(Spot(44.0, 1.5), -2.7, swing = -0.45, wave = 2.3),
+            Pose(Spot(3.0, 17.0), PI / 2, lift = 0.02, wave = Greeter.WAVE_RAISE),
+        )
+        for (parts in figures) {
+            val fast = FigureBoxes(parts)
+            assertEquals(parts.size, fast.count)
+            // Two figures' room, written from the second, so the offset is checked too.
+            val numbers = Float32Array(fast.count * 2 * 16)
+            for (pose in poses) {
+                fast.write(pose, numbers, first = fast.count)
+                for ((box, matrix) in Figures.place(parts, pose).withIndex()) {
+                    val at = (fast.count + box) * 16
+                    for (row in 0..2) {
+                        for (column in 0..3) {
+                            val expected = matrix[row * 4 + column]
+                            assertEquals(expected, numbers[at + column * 4 + row].toDouble(), 1e-4, "$pose box $box")
+                        }
+                    }
+                    for (column in 0..2) assertEquals(0f, numbers[at + column * 4 + 3])
+                    assertEquals(1f, numbers[at + 15])
+                }
             }
         }
     }
