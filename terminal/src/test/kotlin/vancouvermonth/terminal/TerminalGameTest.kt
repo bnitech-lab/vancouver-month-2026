@@ -1,5 +1,6 @@
 package vancouvermonth.terminal
 
+import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -7,6 +8,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.Room
+import vancouvermonth.core.TodaysRun
 import vancouvermonth.core.Zone
 import vancouvermonth.text.date
 import vancouvermonth.text.money
@@ -55,6 +57,41 @@ class TerminalGameTest {
         assertTrue("[9월 30일] 남은 날 1일" in screen)
         assertTrue("9월이 끝났어요." in screen)
         assertTrue(again)
+    }
+
+    @Test
+    fun `today's run is named on the first screen and ends with a result line to copy`() {
+        val today = TodaysRun(2026, 10, 30)
+        val game = FirstMinute(today.seed)
+        // The cheapest room and an exact guess, then a month of rest, which never covers October.
+        val answers = (listOf("${game.cheapestRoomIndex + 1}", "${game.lowestTotal}") + List(29) { "5" } + "n").iterator()
+        val screen = StringBuilder()
+        val again = TerminalGame(
+            input = { if (answers.hasNext()) answers.next() else null },
+            output = { screen.append(it) },
+        ).play(today)
+        val lines = screen.lines()
+        assertFalse(again)
+        assertTrue("판 번호 ${today.seed}" in screen)
+        assertTrue("10월 30일 오늘의 판" in lines)
+        val label = lines.indexOf("결과 한 줄 (복사해서 붙여 넣으세요)")
+        assertTrue(label >= 0, "no result label in: $screen")
+        assertEquals("밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 200/200 · 10월 월세 모자람", lines[label + 1])
+    }
+
+    @Test
+    fun `a run from a seed has no result line`() {
+        val answers = arrayOf("3", "1165") + Array(29) { "5" } + arrayOf("n")
+        val (_, screen) = playWith(1011, *answers)
+        assertTrue("9월이 끝났어요." in screen)
+        assertFalse("오늘의 판" in screen)
+        assertFalse("결과 한 줄" in screen)
+    }
+
+    @Test
+    fun `today's run comes from this computer's date`() {
+        assertEquals(TodaysRun(2026, 10, 30), todaysRun(LocalDate.of(2026, 10, 30)))
+        assertEquals(TodaysRun(2027, 1, 1), todaysRun(LocalDate.of(2027, 1, 1)))
     }
 
     @Test

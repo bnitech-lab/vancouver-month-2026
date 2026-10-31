@@ -2,6 +2,7 @@
 # Builds the terminal game if needed and plays it in this terminal.
 # Usage: ./play            new rooms
 #        ./play --seed 4821   the same rooms again
+#        ./play --today       today's run: the same rooms for everyone on this date
 set -e
 cd "$(dirname "$0")"
 ./gradlew -q --console=plain :terminal:installDist

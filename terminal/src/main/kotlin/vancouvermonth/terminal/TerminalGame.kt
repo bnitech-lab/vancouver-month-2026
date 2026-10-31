@@ -6,6 +6,7 @@ import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.Month
 import vancouvermonth.core.Reveal
 import vancouvermonth.core.Room
+import vancouvermonth.core.TodaysRun
 import vancouvermonth.text.actionEffect
 import vancouvermonth.text.actionName
 import vancouvermonth.text.breakdown
@@ -20,6 +21,8 @@ import vancouvermonth.text.parseAmount
 import vancouvermonth.text.passPrices
 import vancouvermonth.text.percent
 import vancouvermonth.text.stageName
+import vancouvermonth.text.todaysRunName
+import vancouvermonth.text.todaysRunResult
 import vancouvermonth.text.utilitiesLabel
 import vancouvermonth.text.utilitiesPrices
 import vancouvermonth.text.whyNot
@@ -36,9 +39,15 @@ class TerminalGame(
     /** Plays one run and returns true when the player wants another. */
     fun play(seed: Int): Boolean = play(FirstMinute(seed))
 
-    /** Plays one run of a game that is already set up, which lets a test hand in tied rooms. */
-    fun play(game: FirstMinute): Boolean {
-        showRooms(game)
+    /** Plays today's run, which ends with its result as one line to copy. */
+    fun play(today: TodaysRun): Boolean = play(FirstMinute(today.seed), today)
+
+    /**
+     * Plays one run of a game that is already set up, which lets a test hand in tied rooms.
+     * [today] is set when this is today's run.
+     */
+    fun play(game: FirstMinute, today: TodaysRun? = null): Boolean {
+        showRooms(game, today)
         val roomIndex = askRoom(game.rooms.size) ?: return false
         val guess = askAmount() ?: return false
         val reveal = showReveal(game, roomIndex, guess)
@@ -55,15 +64,16 @@ class TerminalGame(
             }
             showEvents(month, events)
         }
-        showEnding(month, reveal)
+        showEnding(month, reveal, today)
         return askAgain()
     }
 
-    private fun showRooms(game: FirstMinute) {
+    private fun showRooms(game: FirstMinute, today: TodaysRun?) {
         line()
         line("BNI Tech")
         line()
         line("밴쿠버 한 달 (가제)                판 번호 ${game.seed}")
+        if (today != null) line(todaysRunName(today))
         line("잔고 ${money(game.startingBalance)} · 9월 1일")
         line()
         // Hangul takes two columns in a terminal, so the indents below count "할 일: " as 7 and "공과금" as 6.
@@ -118,11 +128,17 @@ class TerminalGame(
         line()
     }
 
-    private fun showEnding(month: Month, reveal: Reveal) {
+    private fun showEnding(month: Month, reveal: Reveal, today: TodaysRun?) {
         val ending = checkNotNull(month.ending) { "The month is not over" }
         line(endingLine(ending, month.day, month.room.totalMonthlyCost, month.balance))
         line("  방 고르기 점수 ${reveal.score}/${FirstMinute.MAX_SCORE} · 영어 ${month.english}/${Month.MAX_SKILL} · 코딩 ${month.coding}/${Month.MAX_SKILL}")
         line()
+        if (today != null) {
+            // Not indented, so selecting the whole line copies nothing but the result.
+            line("결과 한 줄 (복사해서 붙여 넣으세요)")
+            line(todaysRunResult(today, reveal.score, ending, month.day))
+            line()
+        }
     }
 
     private fun askRoom(roomCount: Int): Int? {
