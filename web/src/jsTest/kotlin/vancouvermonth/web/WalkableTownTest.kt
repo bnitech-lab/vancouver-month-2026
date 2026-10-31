@@ -31,6 +31,9 @@ import org.w3c.dom.pointerevents.PointerEventInit
 import vancouvermonth.core.Action
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.Month
+import vancouvermonth.save.Choice
+import vancouvermonth.save.MonthRecord
+import vancouvermonth.text.Continue
 import vancouvermonth.text.actionName
 import vancouvermonth.text.money
 import vancouvermonth.text.Passer
@@ -125,16 +128,49 @@ class WalkableTownTest {
         game.show()
         startMonth()
         val started = assertNotNull(town)
-        if (phone) {
-            val element = started.element
-            element.style.setProperty("inset", "auto")
-            element.style.left = "0px"
-            element.style.top = "0px"
-            element.style.width = "375px"
-            element.style.height = "812px"
-        }
+        if (phone) pinToPhone(started)
         return started
     }
+
+    /** Makes [town] 375 by 812 points, a phone's shape, whatever the test browser's window. */
+    private fun pinToPhone(town: NeighbourhoodScene) {
+        val element = town.element
+        element.style.setProperty("inset", "auto")
+        element.style.left = "0px"
+        element.style.top = "0px"
+        element.style.width = "375px"
+        element.style.height = "812px"
+    }
+
+    /**
+     * Opens seed 1011's page on [store], as a reload does, in a real town pinned to a phone once the month starts or
+     * goes on. Its life clock stands still and talks answer at once.
+     */
+    private fun openKept(store: FakeStore): PhoneGame {
+        root.innerHTML = ""
+        val game = PhoneGame(root, 1011, playAgain = {}, makeWalkableTown = {
+            val opened = assertNotNull(openWalkableTown(lessMotion = false), "The test browser has no WebGL 2")
+            (opened as NeighbourhoodScene).also {
+                it.lifeClock = { 0.0 }
+                pinToPhone(it)
+                town = it
+            }
+        })
+        game.slot = SaveSlot(Memory { store })
+        game.talkSettleMillis = 0.0
+        game.show()
+        return game
+    }
+
+    private fun hud(): String = root.querySelector(".hud")?.textContent.orEmpty()
+
+    /** The keeper's button that buys what [text] names. */
+    private fun buyButton(text: String): HTMLButtonElement = root.querySelectorAll(".talk .buy").asList()
+        .map { it as HTMLButtonElement }.firstOrNull { text in it.textContent.orEmpty() } ?: error("No $text: $screen")
+
+    /** Seed 1011's balance on its first day, in its cheapest room. */
+    private val firstBalance: Int
+        get() = FirstMinute(1011).let { it.startMonth(it.cheapestRoomIndex).balance }
 
     private fun startMonth() {
         val game = FirstMinute(1011)
@@ -1422,5 +1458,170 @@ class WalkableTownTest {
                 assertEquals("지도: 도서관 근처", town.minimapElement.getAttribute("aria-label"))
             },
         )
+    }
+
+    @Test
+    fun `the bike shop's keeper sells a bike, and buying it spends no day`(): Promise<Unit> {
+        val town = startInTown()
+        val shop = Neighbourhood.shop
+        return play(
+            Step("stand on the street in front of the shop, looking at it", { town.isStill }) {
+                town.standAt(Spot(shop.talkSpot.x - 1.5, shop.talkSpot.z + 1.5))
+                town.aimCamera(0.0, FollowCamera.START_PITCH, 12.0)
+            },
+            Step("tap its keeper", { town.isStill }) {
+                assertFalse(town.shopName.classList.contains("behind"), "the shop's name is not over it")
+                tapScreen(town, onScreen(town, Point(shop.keeper.x, 1.3, shop.keeper.z)))
+                val talk = root.querySelector(".talk")?.textContent.orEmpty()
+                assertTrue("벤" in talk && "자전거 사기\$350" in talk && "퀵보드 사기\$550" in talk, talk)
+                assertTrue("이야기" in talk && "그만" in talk, talk)
+                assertTrue(town.isCovered)
+            },
+            Step("walked up to him, buy a bike", { town.isStill }) {
+                assertTrue(distanceBetween(town.characterSpot, shop.talkSpot) < 0.01, "${town.characterSpot}")
+                buyButton("자전거 사기").click()
+                assertTrue("9월 2일" in hud() && money(firstBalance - 350) in hud(), hud())
+                assertTrue(buyButton("자전거 사기").disabled)
+                assertTrue("이미 있어요." in buyButton("자전거 사기").textContent.orEmpty())
+                button("자전거 타기")
+                assertFalse(town.isChangingDay)
+                assertNull(town.riding)
+            },
+        )
+    }
+
+    @Test
+    fun `on a bike the character rides the streets it walks, faster, and 내리기 gets off`(): Promise<Unit> {
+        val town = startInTown()
+        val home = town.characterSpot
+        // Beside 내 방, in front of the first view.
+        val target = Spot(home.x + 3.0, home.z + 1.0)
+        var walked = 0.0
+        fun backHome() {
+            town.standAt(home)
+            town.aimCamera(FollowCamera.START_YAW, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+        }
+        return play(
+            Step("buy a bike, from the shop's name", { town.isStill }) {
+                town.shopName.click()
+                buyButton("자전거 사기").click()
+                tap("그만")
+                backHome()
+            },
+            Step("walk beside 내 방", { town.isStill }) {
+                tapScreen(town, onScreen(town, Point(target.x, 0.0, target.z)))
+                walked = assertNotNull(town.tripMillis)
+            },
+            Step("arrived on foot; back at the door, get on the bike", { town.isStill }) {
+                assertTrue(distanceBetween(town.characterSpot, target) < 0.05, "${town.characterSpot}")
+                backHome()
+                tap("자전거 타기")
+                assertEquals(Ride.BIKE, town.riding)
+                assertTrue(town.isRideDrawn(Ride.BIKE))
+                assertTrue("자전거 타는 중" in hud(), hud())
+            },
+            Step("ride the same way", { town.isStill }) {
+                tapScreen(town, onScreen(town, Point(target.x, 0.0, target.z)))
+                val ridden = assertNotNull(town.tripMillis)
+                // The same streets, at 9 units a second instead of 3.6.
+                assertEquals(walked * Trip.WALK_SPEED / Vehicle.BIKE.speed, ridden, walked * 0.01)
+            },
+            Step("arrived on the bike; a double tap rides faster still", { town.isStill }) {
+                assertTrue(distanceBetween(town.characterSpot, target) < 0.05, "${town.characterSpot}")
+                assertEquals(Ride.BIKE, town.riding)
+                val point = onScreen(town, Point(target.x - 2.0, 0.0, target.z))
+                tapScreen(town, point)
+                val single = assertNotNull(town.tripMillis)
+                tapScreen(town, point)
+                assertTrue(town.isDashing)
+                assertEquals(single * Vehicle.BIKE.speed / Vehicle.BIKE.dashSpeed, assertNotNull(town.tripMillis), 1.0)
+            },
+            Step("내리기", { town.isStill }) {
+                tap("내리기")
+                assertNull(town.riding)
+                assertFalse(town.isRideDrawn(Ride.BIKE))
+                button("자전거 타기")
+            },
+        )
+    }
+
+    @Test
+    fun `a tap on a shared e-scooter walks up to it, pays its fare once there, and a talk puts it back`():
+        Promise<Unit> {
+        val town = startInTown()
+        val index = Rides.shared.indexOfFirst { it.vehicle == Vehicle.E_SCOOTER }
+        val scooter = Rides.shared[index]
+        return play(
+            Step("stand a few steps east of it, looking west at it", { town.isStill }) {
+                town.standAt(Spot(scooter.spot.x + 3.5, scooter.spot.z + 0.4))
+                town.aimCamera(PI / 2, 0.6, 10.0)
+            },
+            Step("tap it", { town.isStill }) {
+                assertTrue(town.isParkedShown(index))
+                tapScreen(town, onScreen(town, Point(scooter.spot.x, 0.5, scooter.spot.z)))
+                assertNotNull(town.markerSpot, "no walk to it")
+                assertNull(town.riding)
+                assertTrue(money(firstBalance) in hud(), hud())
+            },
+            Step("reached it", { town.riding != null }) {
+                assertEquals(Ride.SHARED_E_SCOOTER, town.riding)
+                assertTrue(distanceBetween(town.characterSpot, scooter.spot) < 0.05, "${town.characterSpot}")
+                assertFalse(town.isParkedShown(index), "the rented one still stands on its corner")
+                assertTrue(town.isRideDrawn(Ride.SHARED_E_SCOOTER))
+                assertTrue(money(firstBalance - 4) in hud(), hud())
+                assertEquals("공유 퀵보드를 빌렸어요. -\$4", root.querySelector(".hud-spent")?.textContent)
+                assertTrue("공유 퀵보드 타는 중" in hud(), hud())
+            },
+            Step("talk to the neighbour", { town.isStill }) {
+                talkTo(Place.HOME)
+                assertNull(town.riding)
+                assertTrue(town.isParkedShown(index), "it did not go back")
+                assertFalse(town.isRideDrawn(Ride.SHARED_E_SCOOTER))
+                assertTrue(money(firstBalance - 4) in hud(), "paid more than once: ${hud()}")
+                assertNotNull(root.querySelector(".talk"))
+            },
+        )
+    }
+
+    @Test
+    fun `a month continued after buying a bike keeps the bike, ready to ride`() {
+        val store = FakeStore()
+        openKept(store)
+        startMonth()
+        val first = assertNotNull(town)
+        first.shopName.click()
+        buyButton("자전거 사기").click()
+        assertTrue(store.items[SaveSlot.KEY].orEmpty().endsWith("|b350"), store.items[SaveSlot.KEY])
+        first.close()
+
+        openKept(store)
+        tap(Continue.CONTINUE)
+        val again = assertNotNull(town)
+        assertTrue(again !== first, "the same town")
+        assertTrue(money(firstBalance - 350) in hud(), hud())
+        tap("자전거 타기")
+        assertEquals(Ride.BIKE, again.riding)
+        again.shopName.click()
+        assertNull(again.riding, "the keeper's talk did not get off")
+        assertTrue(buyButton("자전거 사기").disabled)
+    }
+
+    @Test
+    fun `a short balance shows why at the shop`() {
+        val store = FakeStore()
+        val game = FirstMinute(1011)
+        // 28 days of rest to 9월 30일, with $715 left.
+        val rests = List(28) { Choice.Take(Action.REST) }
+        store.items[SaveSlot.KEY] = MonthRecord(1011, null, game.cheapestRoomIndex, game.lowestTotal, rests).encode()
+        openKept(store)
+        tap(Continue.CONTINUE)
+        val town = assertNotNull(town)
+        town.shopName.click()
+        assertTrue(money(firstBalance - 28 * Month.DAILY_LIVING_COST) in hud(), hud())
+        buyButton("퀵보드 사기").click()
+        val bike = buyButton("자전거 사기")
+        assertTrue(bike.disabled)
+        assertTrue("잔고가 모자라요." in bike.textContent.orEmpty(), bike.textContent)
+        assertTrue("9월 30일" in hud(), hud())
     }
 }
