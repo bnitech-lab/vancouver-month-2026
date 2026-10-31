@@ -19,7 +19,10 @@ the money runs out.
 
 ## Play
 
-Needs Java 21.
+In a browser, on a phone or a computer: **https://bnitech-lab.github.io/vancouver-month-2026/** (the phone
+screen with the 3D town; add `?seed=1011` to replay a run, or `?today` for today's run).
+
+In a terminal, which needs Java 21:
 
 ```sh
 ./play                # new rooms and a new month
@@ -81,7 +84,8 @@ A test plays this seed and checks that the screen still matches this sample.
 
 ### On a phone screen
 
-The same game, drawn for a phone held upright, also works in a desktop browser. Build it, then open
+The same game, drawn for a phone held upright, also works in a desktop browser. Every merge to `main` publishes it
+to the address above through GitHub Pages (`.github/workflows/web.yml`). To try a change locally, build it, then open
 `web/build/dist/js/productionExecutable/index.html` from disk or put that folder on any static host:
 
 ```sh
@@ -296,7 +300,7 @@ or wage.
 
 ## What comes next
 
-Dawn plays the living town, listens to the village tune and decides what changes. Playing on a phone needs a public address, which waits for Dawn.
+Dawn plays the month on a phone and decides what grows next.
 
 ## Licence
 
