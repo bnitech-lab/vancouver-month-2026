@@ -149,29 +149,30 @@ STRAIGHT_ON = 30.0
 LARGEST_BLOCK = 400
 
 # The zones a room can be in, as the room chooser's transit zones: 1 is downtown and the West End (the town's corner),
-# 2 is the Burnaby town centre round the big station, 3 is the outer edge in Burnaby: the quiet west side of the slope
-# that runs down to the Fraser, off the line. Each is an area from the cities' own data, cut to the grid: zone 1 the
-# City of Vancouver's local areas, zones 2 and 3 the City of Burnaby's community plan areas.
+# 2 is the Burnaby plan area round the big station, 3 the Burnaby plan area north-west of the big park, along the city
+# line at the grid's top edge. Zone 1 is two of the City of Vancouver's local areas, by name (that layer has no other
+# key); zones 2 and 3 are City of Burnaby community plan areas, by their OBJECTID in that layer. Each is cut to the grid.
 ZONE_AREAS = {
     1: [("vancouver", "Downtown"), ("vancouver", "West End")],
-    2: [("burnaby", "Metrotown")],
-    3: [("burnaby", "South Slope")],
+    2: [("burnaby", 8)],
+    3: [("burnaby", 15)],
 }
-# Zone 3 keeps only the strip of its plan area within this many squares (250 m) east of the plan area's west edge,
-# the city line: single-family streets down the slope, the side farthest from the last station.
-ZONE_STRIPS = {3: 10.0}
-# The proposed room in each zone: a rough point among residential streets, never an address. One square is 25 m, a
-# few lots. Zone 1's is the town's 내 방.
-ZONE_HOMES = {
-    # 2: apartment streets between the big Burnaby park and the town centre, south of the main road.
-    2: (-123.0090, 49.2238),
-    # 3: houses on the slope down to the river, a block in from the city line, far from every station.
-    3: (-123.0221, 49.2128),
-}
+# Each Burnaby plan area's size as fetched, in hectares: if a republished layer numbers its areas differently, the
+# build stops instead of drawing the wrong zone. It also stops unless zone 2's area holds two stations and zone 3's
+# area reaches the city line.
+PLAN_AREA_HECTARES = {8: 413.0, 15: 193.6}
+# Zone 3 keeps only the strip of its plan area within this many squares (375 m) east of the area's west edge, the
+# city line.
+ZONE_STRIPS = {3: 15.0}
+# The room in zones 2 and 3 is chosen by rule, never by hand: of the squares in the zone with a 5 x 5 block of plain
+# land round them, at least ROOM_INSET squares inside the grid's edges, 2 squares off every main street and 4 off the
+# guideway, whose middle lies on a road (outside every City of Burnaby legal block and City of Vancouver block
+# outline, so never on a lot), the one farthest from the last station inside the grid. Zone 1's room is the town's.
+ROOM_INSET = 5
 ZONE_NOTES = {
     1: "웨스트엔드 주택가 (지금 내 방)",
-    2: "버나비 큰 공원과 역세권 사이 아파트 골목",
-    3: "강으로 내려가는 비탈의 서쪽 주택가, 역에서 먼 곳",
+    2: "큰 역 구역의 북서쪽 끝 주택가, 시 경계 가까이",
+    3: "큰 공원 북서쪽, 시 경계를 따라 난 주택가",
 }
 
 
@@ -912,9 +913,10 @@ class WideSources:
         for f in load_pages(raw, "park-inventory"):
             self.parks.setdefault(("burnaby", f["properties"].get("NAME")), []).extend(polygons_of(f["geometry"]))
 
+        # The community plan areas, by their OBJECTID.
         self.plan_areas = {}
         for f in load_pages(raw, "community-plan-areas"):
-            self.plan_areas.setdefault(f["properties"]["NAME"], []).extend(polygons_of(f["geometry"]))
+            self.plan_areas.setdefault(f["properties"]["OBJECTID"], []).extend(polygons_of(f["geometry"]))
 
 
 def paint_polygon(mask, rings, columns, rows):
@@ -1245,17 +1247,58 @@ class WideMap:
         out.sort(key=lambda b: (round(b[1], 1), round(b[0], 1)))
         return out
 
+    def city_line(self):
+        """The line between the two cities in grid units: the straight edge that closes Vancouver's land ring, along
+        Boundary Road from the Fraser to the inlet."""
+        shore = self.town.sources.shoreline
+        return [self.frame.game(*shore[-1]), self.frame.game(*shore[0])]
+
+    def check_city_line(self):
+        """Stops if water lies along the city line inland. The two cities' outlines leave a seam there at most a
+        square wide, which the pond rule fills; a wider gap would leave a channel of water between the cities."""
+        line = self.city_line()
+        length = math.dist(*line)
+        wet = [(x, z) for z in range(self.rows) for x in range(self.columns) if self.squares[z][x] == WATER
+               and along_line(line, (x + 0.5, z + 0.5))[2] <= 1.5
+               and 3.0 < along_line(line, (x + 0.5, z + 0.5))[0] < length - 3.0]
+        if wet:
+            sys.exit(f"water along the city line at {wet[:5]}")
+
+    def check_zone_areas(self):
+        """Stops unless the Burnaby plan areas picked by OBJECTID are the ones meant: their sizes as recorded, zone 2's
+        holding two stations, and zone 3's reaching the city line."""
+        f = self.frame
+        for zone, areas in ZONE_AREAS.items():
+            for city, key in areas:
+                if city != "burnaby":
+                    continue
+                polygons = self.wide.plan_areas.get(key)
+                if not polygons:
+                    sys.exit(f"zone {zone}: no plan area {key} in the data")
+                hectares = sum(abs(polygon_area(polygon[0])) for polygon in polygons)
+                if abs(hectares - PLAN_AREA_HECTARES[key]) > 0.03 * PLAN_AREA_HECTARES[key]:
+                    sys.exit(f"zone {zone}: plan area {key} is {hectares:.1f} ha, not {PLAN_AREA_HECTARES[key]} ha")
+                rings = [[f.game(*p) for p in polygon[0]] for polygon in polygons]
+                if zone == 2:
+                    held = [s for s in self.stations() if any(point_in_ring(s[1][0], s[1][1], r) for r in rings)]
+                    if len(held) != 2:
+                        sys.exit(f"zone 2: plan area {key} holds {len(held)} stations, not 2")
+                if zone == 3:
+                    west = min(p for r in rings for p in r)
+                    if along_line(self.city_line(), west)[2] > 2.0:
+                        sys.exit(f"zone 3: plan area {key} does not reach the city line")
+
     def zones(self):
         """Each zone's areas as polygons in grid units, cut to the grid and simplified."""
         f = self.frame
         out = {}
         for zone, areas in ZONE_AREAS.items():
             shapes = []
-            for city, name in areas:
+            for city, key in areas:
                 if city == "vancouver":
-                    polygons = [[self.town.sources.areas[name]]]
+                    polygons = [[self.town.sources.areas[key]]]
                 else:
-                    polygons = self.wide.plan_areas[name]
+                    polygons = self.wide.plan_areas[key]
                 for polygon in polygons:
                     points = clip_polygon([f.game(*p) for p in polygon[0]], *self.box())
                     if zone in ZONE_STRIPS and points:
@@ -1285,25 +1328,46 @@ class WideMap:
         return out
 
     def homes(self):
-        """The proposed room in each zone: zone 1 is the town's 내 방, the others the ZONE_HOMES squares, each checked
-        to stand on plain land with a 5 x 5 block of it around, inside its zone, off the main streets (a residential
-        street) and away from the guideway."""
-        out = {1: self.town.spots["HOME"]}
+        """The room in each zone: zone 1's is the town's 내 방; in zones 2 and 3 it is chosen by the rule written at
+        ROOM_INSET. Worked out once."""
+        if getattr(self, "_homes", None):
+            return self._homes
+        f = self.frame
+        lots = LotIndex([[f.game(*p) for p in polygon[0]] for polygon in self.wide.burnaby_blocks]
+                        + [[f.game(*p) for p in ring] for ring in self.town.sources.blocks])
+        last = self.stations()[-1][1]
+        rail = self.rail()
+        streets = self.streets()
         zones = self.zones()
-        for zone, (lon, lat) in ZONE_HOMES.items():
-            gx, gz = self.frame.game(lon, lat)
-            x, z = math.floor(gx), math.floor(gz)
-            room = [self.squares[z + dz][x + dx] for dx in range(-2, 3) for dz in range(-2, 3)
-                    if 0 <= x + dx < self.columns and 0 <= z + dz < self.rows]
-            if len(room) != 25 or any(kind != LAND for kind in room):
-                sys.exit(f"zone {zone}: no room for a home at {(x, z)}")
-            if not any(point_in_ring(x + 0.5, z + 0.5, shape) for shape in zones[zone]):
-                sys.exit(f"zone {zone}: the home at {(x, z)} is outside its zone")
-            if any(along_line(street, (x + 0.5, z + 0.5))[2] < 2.0 for street in self.streets()):
-                sys.exit(f"zone {zone}: the home at {(x, z)} is on a main street")
-            if along_line(self.rail(), (x + 0.5, z + 0.5))[2] < 4.0:
-                sys.exit(f"zone {zone}: the home at {(x, z)} is under the guideway")
-            out[zone] = (x, z)
+        out = {1: self.town.spots["HOME"]}
+        for zone in (2, 3):
+            shapes = zones[zone]
+            xs = [p[0] for shape in shapes for p in shape]
+            zs = [p[1] for shape in shapes for p in shape]
+            best = None
+            for z in range(max(ROOM_INSET, math.floor(min(zs))), min(self.rows - ROOM_INSET, math.ceil(max(zs)))):
+                for x in range(max(ROOM_INSET, math.floor(min(xs))), min(self.columns - ROOM_INSET, math.ceil(max(xs)))):
+                    middle = (x + 0.5, z + 0.5)
+                    far = math.dist(middle, last)
+                    if best is not None and far <= best[0]:
+                        continue
+                    if not any(point_in_ring(middle[0], middle[1], shape) for shape in shapes):
+                        continue
+                    if any(self.squares[z + dz][x + dx] != LAND for dx in range(-2, 3) for dz in range(-2, 3)):
+                        continue
+                    if lots.holds(middle) or along_line(rail, middle)[2] < 4.0:
+                        continue
+                    if any(along_line(street, middle)[2] < 2.0 for street in streets):
+                        continue
+                    best = (far, (x, z))
+            if best is None:
+                sys.exit(f"zone {zone}: no square meets the rule for a room")
+            out[zone] = best[1]
+        # The rule's road test, said again as a check: no room's middle on a lot.
+        for zone, (x, z) in out.items():
+            if zone != 1 and lots.holds((x + 0.5, z + 0.5)):
+                sys.exit(f"zone {zone}: the room at {(x, z)} is on a lot")
+        self._homes = out
         return out
 
     def walks(self):
@@ -1326,6 +1390,24 @@ class WideMap:
         for a, b in pairs:
             out[(a, b)] = walker.route_length(free_near(self.squares, ends[a]), free_near(self.squares, ends[b]))
         return out
+
+
+class LotIndex:
+    """City blocks (lots between roads) in buckets of 10 x 10 squares, to ask quickly whether a point lies on one."""
+
+    def __init__(self, rings):
+        self.rings = rings
+        self.buckets = {}
+        for index, ring in enumerate(rings):
+            xs = [p[0] for p in ring]
+            zs = [p[1] for p in ring]
+            for bx in range(math.floor(min(xs)) // 10, math.floor(max(xs)) // 10 + 1):
+                for bz in range(math.floor(min(zs)) // 10, math.floor(max(zs)) // 10 + 1):
+                    self.buckets.setdefault((bx, bz), []).append(index)
+
+    def holds(self, point):
+        bucket = (math.floor(point[0]) // 10, math.floor(point[1]) // 10)
+        return any(point_in_ring(point[0], point[1], self.rings[i]) for i in self.buckets.get(bucket, []))
 
 
 def join_parts(parts):
@@ -1513,20 +1595,32 @@ def wrap_list(items, indent, width=112):
 
 
 def with_stops(line, stops):
-    """[line] with each of [stops] (points on it) put in as a point of its own, where it lies along the line."""
+    """[line] with each of [stops] (points on it) as a point of its own, and where each stop now is: a stop within a
+    fifth of a square of a point of the line takes that point, so no leg is left a hair long; any other goes in where
+    it lies along the line. Returns the line and, for each stop in order, its point and how far along the line it is."""
     out = list(line)
-    for stop in sorted(stops, key=lambda p: -along_line(line, p)[0]):
+    placed = []
+    for stop in stops:
+        closest = min(range(len(out)), key=lambda i: math.dist(out[i], stop))
+        if math.dist(out[closest], stop) <= 0.2:
+            placed.append(out[closest])
+            continue
         index = min(range(len(out) - 1), key=lambda i: along_line(out[i:i + 2], stop)[2])
-        if stop not in (out[index], out[index + 1]):
-            out.insert(index + 1, stop)
-    return out
+        out.insert(index + 1, stop)
+        placed.append(stop)
+    lengths = [0.0]
+    for a, b in zip(out, out[1:]):
+        lengths.append(lengths[-1] + math.dist(a, b))
+    return out, [(p, lengths[out.index(p)]) for p in placed]
 
 
 def write_wide_kotlin(wide, fetched, van_hashes, bby_hashes):
     f = wide.frame
     stations = wide.stations()
-    # Each station is a point of the line itself, so it stands exactly on the rail.
-    rail = with_stops(wide.rail(), [(round(p[0], 1), round(p[1], 1)) for _, p, _ in stations])
+    # Each station is a point of the line itself, so it stands exactly on the rail. The points are rounded as they
+    # are written, so the line and the stations agree to the digit.
+    rounded = [(round(x, 1), round(z, 1)) for x, z in wide.rail()]
+    rail, stops = with_stops(rounded, [(round(p[0], 1), round(p[1], 1)) for _, p, _ in stations])
     streets = wide.streets()
     blocks = wide.blocks()
     zones = wide.zones()
@@ -1599,7 +1693,7 @@ def write_wide_kotlin(wide, fetched, van_hashes, bby_hashes):
     out.append("     * The real stations on [RAIL], in order from the tunnel's mouth: \"x,z,along\", the point on the line and how")
     out.append("     * far along it that is, in squares. The game gives them made-up names.")
     out.append("     */")
-    items = [f"{fmt(p[0])},{fmt(p[1])},{fmt(along)}" for _, p, along in stations]
+    items = [f"{fmt(p[0])},{fmt(p[1])},{fmt(along)}" for p, along in stops]
     out.append("    const val STATIONS =")
     out.append("        " + " +\n        ".join(f'"{line} "' for line in wrap_list(items, 8))[:-2] + '"')
     out.append("")
@@ -1623,9 +1717,9 @@ def write_wide_kotlin(wide, fetched, van_hashes, bby_hashes):
     out.append("")
     out.append("    /**")
     out.append("     * Where each transit zone a room can be in lies: 1 downtown and the West End (the town's corner), 2 the")
-    out.append("     * Burnaby town centre round the big station, 3 the outer edge in Burnaby, the quiet west side of the slope")
-    out.append("     * down to the river, off the line. Each zone is one or more areas, each a string of points round its")
-    out.append("     * edge, cut to the grid.")
+    out.append("     * Burnaby plan area round the big station, 3 a strip of the Burnaby plan area north-west of the big park,")
+    out.append("     * along the city line at the grid's top edge. Each zone is one or more areas, each a string of points")
+    out.append("     * round its edge, cut to the grid.")
     out.append("     */")
     out.append("    val zones: Map<Int, List<String>> = mapOf(")
     for zone, shapes in zones.items():
@@ -1635,7 +1729,10 @@ def write_wide_kotlin(wide, fetched, van_hashes, bby_hashes):
         out.append("        ),")
     out.append("    )")
     out.append("")
-    out.append("    /** The proposed square of 내 방 in each zone: zone 1's is the town's own. Rough points, never an address. */")
+    out.append("    /**")
+    out.append("     * The square of 내 방 in each zone: zone 1's is the town's own; in zones 2 and 3, the square the build's")
+    out.append("     * written rule picks, on a road between blocks (never on a lot), off the main streets.")
+    out.append("     */")
     out.append("    val homes: Map<Int, Cell> = mapOf(")
     for zone, (x, z) in homes.items():
         out.append(f"        {zone} to Cell({x}, {z}),")
@@ -2155,7 +2252,8 @@ def write_wide_previews(wide, walks, out_dir, png):
     van_blocks = [[f.game(*p) for p in ring] for ring in wide.town.sources.blocks]
     bby_blocks = [[f.game(*p) for p in polygon[0]] for polygon in wide.wide.burnaby_blocks]
     areas = [(name, [f.game(*p) for p in ring]) for name, ring in wide.town.sources.areas.items()]
-    areas += [(name, [f.game(*p) for p in polygon[0]]) for name, polygons in wide.wide.plan_areas.items()
+    # Burnaby's plan areas by their number in the data (OBJECTID): the build reads no names for them.
+    areas += [(f"plan area {key}", [f.game(*p) for p in polygon[0]]) for key, polygons in wide.wide.plan_areas.items()
               for polygon in polygons]
     burnaby_edge = [[f.game(*p) for p in polygon[0]] for polygon in wide.wide.burnaby]
     shore_raw = [f.game(*p) for p in wide.town.sources.shoreline]
@@ -2254,8 +2352,8 @@ def main():
     parser.add_argument("--preview", help="also draw the maps as SVG pictures into this directory")
     parser.add_argument("--png", action="store_true", help="turn the pictures into PNG files with a local Chrome")
     parser.add_argument("--town", action="store_true",
-                        help="also write the town's map, VancouverMapData.kt (its blocks follow the order of the "
-                             "block file, so a fetch with a wider area reorders them: the town uses that order)")
+                        help="also rewrite the town's map, VancouverMapData.kt, from the same files (on the data "
+                             "fetched for 24a only its header changes; every run checks its rows anyway)")
     args = parser.parse_args()
     raw = os.path.abspath(args.raw)
 
@@ -2288,6 +2386,8 @@ def main():
     if wide.differences:
         sys.exit(f"the wide map's corner differs from the town's map in {len(wide.differences)} squares: "
                  f"{wide.differences[:10]}")
+    wide.check_city_line()
+    wide.check_zone_areas()
     text = write_wide_kotlin(wide, fetched, hashes, burnaby_hashes)
     counts = {k: sum(row.count(k) for row in wide.squares) for k in (WATER, LAND, PARK, SHORE)}
     print(f"wide grid: {wide.columns} x {wide.rows} = {wide.columns * wide.rows} squares; "
