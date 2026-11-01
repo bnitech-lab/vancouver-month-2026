@@ -218,7 +218,7 @@ internal object WideMapData {
      * through East Vancouver into Burnaby, to where it leaves the grid past the last station. Each of
      * [STATIONS] is one of its points.
      */
-    const val RAIL =
+    val RAIL =
         "196.5,62.8 206.9,62.0 213.6,57.6 217.1,57.0 221.1,58.6 229.2,65.4 231.2,65.9 234.6,64.3 243.9,60.1 " +
         "270.5,44.7 282.4,38.6 285.5,37.6 288.3,37.4 299.9,39.8 303.6,39.3 329.0,31.1 331.8,32.6 332.1,32.8 " +
         "349.8,50.8 354.1,54.3 356.5,55.6 360.2,56.5 374.9,57.3 404.3,50.9 437.5,43.5 484.7,33.1 552.0,21.4 " +
@@ -228,7 +228,7 @@ internal object WideMapData {
      * The real stations on [RAIL], in order from the tunnel's mouth: "x,z,along", the point on the line and how
      * far along it that is, in squares. The game gives them made-up names.
      */
-    const val STATIONS =
+    val STATIONS =
         "196.5,62.8,0.0 234.6,64.3,42.7 331.8,32.6,148.5 404.3,50.9,231.0 437.5,43.5,265.0 484.7,33.1,313.4 " +
         "552.0,21.4,381.7 581.9,15.6,412.2 631.4,2.0,463.9"
 

@@ -217,26 +217,26 @@ internal object VancouverMapData {
     )
 
     /** The big park's outline, simplified, packed as [unpackPoints] reads it. */
-    const val PARK =
+    val PARK =
         "w6BqpBKHA8BPLFqFnDqFA+MbOFaJTZJ1EPJJhBIxBHVKRTxBKfTCrB1CjBRT7BaDQVPdD/BuBxBfAVNPLDJONRRWtBF1B6B1DQ7B" +
         "lBxBDjBnBnBOMnBRZdQIbLPdSNHGjDQjBJZKNxB/B5BrB7B+BsBlDnFhInCtCqBnCNzBKnCVnBfbXKflBiB9BPrBEhCoBrCkBlBK" +
         "pBapBDhBqBhB+BnDcXYhCyB5BkCO2BfLM2BDkDcuCD4BiBkCEkBgBwDUgBsB0BaiFXsCIeYyBQiDM2Db2BlBOzBUP8FSuG9B+ChC" +
         "IxBNlBAlBSnBaH2BY2C8DOiCvCmCdsBlBWRoBOiBboBtBMtBiBvBmCRqBCsBiB6BhBkChCOzBFnCbnBKAsDjBWtC6CS4CSWUG"
 
     /** The rail on its guideway: from where it leaves its tunnel, east along False Creek. */
-    const val RAIL = "196.5,62.8 206.9,62.0 213.6,57.6 217.1,57.0 221.1,58.6 229.2,65.4 231.2,65.9 246.0,58.9"
+    val RAIL = "196.5,62.8 206.9,62.0 213.6,57.6 217.1,57.0 221.1,58.6 229.2,65.4 231.2,65.9 246.0,58.9"
 
     /**
      * A line out along the middle of Burrard Inlet (the city's boundary there): the north shore and its mountains
      * stand past it, to the north.
      */
-    const val MOUNTAINS = "16.0,13.0 157.3,-23.7 328.0,-161.2"
+    val MOUNTAINS = "16.0,13.0 157.3,-23.7 328.0,-161.2"
 
     /**
      * The real city blocks, simplified to rectangles of plain land with a street between any two: "x,z,width,depth"
      * in squares, west and north sides first. Buildings stand on these.
      */
-    const val BLOCKS = "225,33,8,6 135,64,4,1 125,69,2,1 166,64,3,6 197,136,3,6 194,85,3,5 158,92,3,5 184,92,1,5 190,64,2,6 " +
+    val BLOCKS = "225,33,8,6 135,64,4,1 125,69,2,1 166,64,3,6 197,136,3,6 194,85,3,5 158,92,3,5 184,92,1,5 190,64,2,6 " +
         "129,74,4,3 124,79,3,2 141,67,7,3 141,87,7,3 141,83,7,3 135,87,4,3 129,87,4,3 129,83,4,3 150,92,6,3 " +
         "166,98,3,5 158,105,3,5 150,105,6,3 170,98,3,5 170,92,3,5 162,118,3,4 158,118,3,4 178,98,3,5 " +
         "174,105,3,5 162,105,3,5 178,111,3,5 158,54,3,2 174,85,3,5 162,65,3,5 158,65,3,5 174,54,3,2 " +
@@ -288,7 +288,7 @@ internal object VancouverMapData {
         "151,146,3,6 190,85,2,5 182,92,1,5 194,64,6,5"
 
     /** The city blocks that are small parks, as [BLOCKS]: grass and a few trees. */
-    const val GREENS = "186,54,2,2 210,52,5,6 202,55,5,5 216,20,4,3 245,106,1,3 127,137,9,9 127,147,9,8 137,137,8,9 " +
+    val GREENS = "186,54,2,2 210,52,5,6 202,55,5,5 216,20,4,3 245,106,1,3 127,137,9,9 127,147,9,8 137,137,8,9 " +
         "137,147,8,8 95,66,9,3 186,112,5,1 192,112,5,1 240,20,4,3 109,110,2,3 124,83,3,3 174,98,3,5 " +
         "242,42,4,6 131,120,9,3 141,120,8,3 188,105,7,5"
 
