@@ -1489,8 +1489,10 @@ def packed(items):
     change from the same number of the item before (the first item's from 0), as a base-64 VLQ."""
     out, before = [], None
     for item in items:
-        before = before or [0] * len(item)
-        out.extend(vlq(v - b) for v, b in zip(item, before))
+        if before is None:
+            before = [0] * len(item)
+        # strict: an item of another length stops the build instead of being packed short.
+        out.extend(vlq(v - b) for v, b in zip(item, before, strict=True))
         before = item
     text = "".join(out)
     # Every packing is read back as the game reads it, so a slip in the packing stops the build, not the page.
