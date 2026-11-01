@@ -96,6 +96,7 @@ class PatchNotesCardTest {
     fun `laid out as published, a finger on 시작하기 after the reveal hits it, and it starts the month`() {
         usePageStyle()
         firstScreen()
+        passIntro(root)
         val game = FirstMinute(1011)
         root.button("${game.cheapestRoomIndex + 1}번 방").click()
         val input = root.querySelector("input") as HTMLInputElement
@@ -264,7 +265,7 @@ class PatchNotesCardTest {
         root.innerHTML = ""
         val game = PhoneGame(root, 1011, playAgain = {}, makeWalkableTown = { town })
         val memory = Memory { store }
-        game.guide = FirstRunGuide(memory).also { guides += it }
+        game.guide = FirstRunGuide().also { guides += it }
         game.notes = PatchNotesCard(memory).also { cards += it }
         game.talkSettleMillis = 0.0
         game.show()
@@ -281,6 +282,7 @@ class PatchNotesCardTest {
     fun `the ? card's foot opens the same notes over it, and Escape goes back to the card`() {
         val town = QuietTown()
         startInTown(town)
+        helpButton().click()
         val guide = assertNotNull(root.querySelector(".guide-card"), "No guide over the town")
         val link = assertNotNull(guideLink, "No 업데이트 소식 at the guide's foot")
         assertTrue(link.textContent.orEmpty().startsWith(PatchNotes.TITLE))
@@ -314,7 +316,8 @@ class PatchNotesCardTest {
     fun `the ? card has no link to the notes over a talk or while the day changes`() {
         val town = NightLongTown()
         startInTown(town)
-        assertNotNull(guideLink, "No link on the first card")
+        helpButton().click()
+        assertNotNull(guideLink, "No link on the card")
         root.button(Guide.START).click()
 
         town.onPlace(Place.LIBRARY)

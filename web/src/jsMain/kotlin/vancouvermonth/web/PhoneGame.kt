@@ -25,6 +25,8 @@ import vancouvermonth.save.MonthRecord
 import vancouvermonth.save.Spend
 import vancouvermonth.save.play
 import vancouvermonth.text.Continue
+import vancouvermonth.text.Guide
+import vancouvermonth.text.Intro
 import vancouvermonth.text.actionEffect
 import vancouvermonth.text.actionName
 import vancouvermonth.text.arrivalLines
@@ -36,6 +38,7 @@ import vancouvermonth.text.dayLog
 import vancouvermonth.text.endingLine
 import vancouvermonth.text.goalLine
 import vancouvermonth.text.greeting
+import vancouvermonth.text.guessExamplesLine
 import vancouvermonth.text.guessLine
 import vancouvermonth.text.guessMoneyLabel
 import vancouvermonth.text.guessMoneyWhy
@@ -72,7 +75,7 @@ import vancouvermonth.text.whyNotSpend
 import vancouvermonth.text.whyTotalLines
 
 /**
- * Draws one run in [root]: the room on September 1st, then one action a day, then the ending.
+ * Draws one run in [root]: the intro, the room and the guess on September 1st, then one action a day, then the ending.
  * The rules are in core and the wording in text; this only shows the state and passes each tap on.
  * Every tap redraws the whole screen from that state. A run comes from a seed or from today's date, never both.
  * The month is played in a town the player walks in, which [makeWalkableTown] makes on the first day: each day is
@@ -205,6 +208,13 @@ class PhoneGame private constructor(
     /** The day another run's kept month goes on from, read with [kept]: starting this run replaces that month. */
     private var replacing: Int? = null
 
+    /**
+     * True once the intro is left for the rooms, by 시작하기 or by 새로 시작 over a kept month. The page sets it from the
+     * start when its address asks to go straight to the rooms, as 다시 하기 and a new run from 새로 시작 do. A month kept
+     * for this run is still offered on the intro first.
+     */
+    internal var introPassed = false
+
     fun show() {
         stopTyping()
         val current = month
@@ -218,20 +228,76 @@ class PhoneGame private constructor(
         root.clear()
         val offered = if (current == null) keptMonth() else null
         when {
-            offered != null -> showKept(offered)
+            current == null && (offered != null || !introPassed) -> showIntro(offered)
             current == null -> showRooms()
             current.isOver -> showEnding(current)
             else -> showDay(current)
         }
     }
 
+    /**
+     * The page's first screen: the title with the update news and the sound switch, the arrival story, how to play, how
+     * the guess pays, and the map's credit; at its foot, kept in sight however long the rest, 시작하기 to the rooms. Over
+     * a month kept from an earlier visit for this run, the intro opens with that month's day and balance, and the foot
+     * offers 이어하기, which goes on with it, and 새로 시작, which drops it.
+     */
+    private fun showIntro(offer: KeptMonth?) {
+        showTitle()
+        root.child("div", "intro") {
+            offer?.let { kept ->
+                val month = kept.replayed.month
+                child("section", "card kept") {
+                    setAttribute("aria-labelledby", "kept-title")
+                    child("h2", text = Continue.TITLE).id = "kept-title"
+                    child("p", "kept-from", continueFrom(month.day, month.balance)).id = "kept-from"
+                    child("p", "kept-note", Continue.NOTE).id = "kept-note"
+                }
+            }
+            // Who the player is and what the month is for. The story says the money and the date, so no balance line
+            // repeats them.
+            child("section", "card story") {
+                for (text in arrivalLines(game.startingBalance)) {
+                    child("p", if (text == goalLine()) "goal" else null, text)
+                }
+            }
+            child("section", "card how-to") {
+                child("h2", text = Guide.TITLE)
+                child("ul", "how-to-lines") { for (line in Guide.LINES) child("li", text = line) }
+            }
+            child("section", "card guess-pays") {
+                child("h2", text = Intro.GUESS)
+                child("p", text = Intro.GUESS_WHAT)
+                child("p", "guess-rule-line", guessRuleLine())
+                child("p", "guess-examples", guessExamplesLine())
+            }
+            child("div", if (offer == null) "intro-start" else "intro-start kept-buttons") {
+                if (offer == null) {
+                    button("primary", text = Intro.START) { onclick = { toRooms() } }
+                } else {
+                    button("primary", text = Continue.CONTINUE) {
+                        setAttribute("aria-describedby", "kept-from")
+                        onclick = { goOn(offer) }
+                    }
+                    button("secondary", text = Continue.NEW) {
+                        setAttribute("aria-describedby", "kept-note")
+                        onclick = { startOver() }
+                    }
+                }
+            }
+            // The town is traced from the City's open data, whose licence asks for its statement where the data shows.
+            mapCredit(this, "intro-credit")
+        }
+    }
+
+    /** Leaves the intro for the rooms, from the top of the page. */
+    private fun toRooms() {
+        introPassed = true
+        show()
+        window.scrollTo(0.0, 0.0)
+    }
+
     private fun showRooms() {
         showTitle()
-        // Who the player is and what the month is for, so the room has a reason before it is asked for. The story
-        // says the money and the date, so no balance line repeats them.
-        root.child("section", "card story") {
-            for (text in arrivalLines(game.startingBalance)) child("p", if (text == goalLine()) "goal" else null, text)
-        }
         root.child("section", "card") {
             child("h2", text = "할 일")
             child("p", "lead", "한 달 총비용이 가장 싼 방을 고르세요.")
@@ -366,7 +432,6 @@ class PhoneGame private constructor(
         guide?.notes = { notes.takeIf { talkingAt == null && chattingWith == null && !dayChanging } }
         show()
         window.scrollTo(0.0, 0.0)
-        if (walkable != null) guide?.openFirstTime(root)
     }
 
     /** The month kept from an earlier visit for this run, read once, when the page first shows. */
@@ -379,28 +444,6 @@ class PhoneGame private constructor(
         return kept
     }
 
-    /** Before the rooms, a card that offers the kept month: 이어하기 goes on with it, 새로 시작 drops it. */
-    private fun showKept(offer: KeptMonth) {
-        showTitle()
-        val month = offer.replayed.month
-        root.child("section", "card kept") {
-            setAttribute("aria-labelledby", "kept-title")
-            child("h2", text = Continue.TITLE).id = "kept-title"
-            child("p", "kept-from", continueFrom(month.day, month.balance)).id = "kept-from"
-            child("p", "kept-note", Continue.NOTE).id = "kept-note"
-            child("div", "kept-buttons") {
-                button("primary", text = Continue.CONTINUE) {
-                    setAttribute("aria-describedby", "kept-from")
-                    onclick = { goOn(offer) }
-                }
-                button("secondary", text = Continue.NEW) {
-                    setAttribute("aria-describedby", "kept-note")
-                    onclick = { startOver() }
-                }
-            }
-        }
-    }
-
     /** Drops the kept month and shows the run's rooms, or plays a new run when the address named none. */
     private fun startOver() {
         slot?.clear()
@@ -409,7 +452,7 @@ class PhoneGame private constructor(
             return
         }
         kept = null
-        show()
+        toRooms()
     }
 
     /** Goes on with [offer] on the day it reached, with that day's log, as if the page had never closed. */

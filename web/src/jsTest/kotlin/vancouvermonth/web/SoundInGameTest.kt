@@ -12,6 +12,7 @@ import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.asList
 import org.w3c.dom.events.Event
 import vancouvermonth.core.FirstMinute
+import vancouvermonth.text.Intro
 import vancouvermonth.text.Passer
 import vancouvermonth.text.Transport
 import vancouvermonth.text.Weather
@@ -87,8 +88,14 @@ internal class QuietTown : WalkableTown {
     override fun close() {}
 }
 
-/** Starts seed 1011's September in [root]: the cheapest room, an exact guess, and 시작하기. */
+/** Leaves the intro for the rooms with its 시작하기, when the page shows an intro with nothing kept to continue. */
+internal fun passIntro(root: HTMLElement) {
+    if (root.querySelector(".intro") != null) root.button(Intro.START).click()
+}
+
+/** Starts seed 1011's September in [root]: past the intro, the cheapest room, an exact guess, and 시작하기. */
 internal fun startSeed1011(root: HTMLElement) {
+    passIntro(root)
     val game = FirstMinute(1011)
     root.button("${game.cheapestRoomIndex + 1}번 방").click()
     val input = root.querySelector("input") as HTMLInputElement
@@ -119,7 +126,7 @@ class SoundInGameTest {
         assertNotNull(parent.querySelector(".sound-switch") as? HTMLButtonElement, "No sound switch: ${parent.innerHTML}")
 
     @Test
-    fun `the switch is on the room screen and the day's buttons, and a day changes with a chime`() {
+    fun `the switch is on the intro and the day's buttons, and a day changes with a chime`() {
         val game = PhoneGame(root, 1011, playAgain = {})
         game.sound = sound
         game.show()
@@ -185,9 +192,11 @@ class SoundInGameTest {
             game.sound = remembered
             game.show()
             assertEquals(emptyList(), speaker.asked)
-            root.button("1번 방").click()
-            // The tap woke the sound and still picked the room.
+            root.button(Intro.START).click()
+            // The tap woke the sound and still left the intro for the rooms.
             assertEquals(listOf("on"), speaker.asked)
+            assertNotNull(root.querySelector(".rooms"))
+            root.button("1번 방").click()
             assertEquals("true", root.button("1번 방").getAttribute("aria-pressed"))
         } finally {
             remembered.close()

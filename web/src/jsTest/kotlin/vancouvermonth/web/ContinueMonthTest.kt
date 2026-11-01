@@ -22,7 +22,6 @@ import vancouvermonth.core.TodaysRun
 import vancouvermonth.save.Choice
 import vancouvermonth.save.MonthRecord
 import vancouvermonth.text.Continue
-import vancouvermonth.text.Guide
 import vancouvermonth.text.continueFrom
 import vancouvermonth.text.date
 import vancouvermonth.text.greeting
@@ -77,14 +76,15 @@ class ContinueMonthTest {
             PhoneGame(into, today, playAgain = { playedAgain = true }, makeWalkableTown = { town })
         }
         game.slot = SaveSlot(Memory { storage })
-        game.guide = FirstRunGuide(Memory { storage }).also { guides += it }
+        game.guide = FirstRunGuide().also { guides += it }
         game.talkSettleMillis = 0.0
         game.show()
         return game
     }
 
-    /** Picks [seed]'s cheapest room in [into] and reveals it with an exact guess, up to the start card. */
+    /** Past the intro, picks [seed]'s cheapest room in [into] and reveals it with an exact guess, up to the start card. */
     private fun revealRun(seed: Int, into: HTMLElement = root) {
+        passIntro(into)
         val game = FirstMinute(seed)
         into.button("${game.cheapestRoomIndex + 1}번 방").click()
         val input = into.querySelector("input") as HTMLInputElement
@@ -131,7 +131,6 @@ class ContinueMonthTest {
         val town = QuietTown()
         open(town = town)
         startSeed1011(root)
-        root.button(Guide.START).click()
         for (place in listOf(Place.LIBRARY, Place.CAFE, Place.COWORKING)) {
             town.onPlace(place)
             (root.querySelector(".talk .spend") as HTMLButtonElement).click()
@@ -174,7 +173,6 @@ class ContinueMonthTest {
     fun `continued on the first day, the town has its hint and the focus is on its top card`() {
         open(town = QuietTown())
         startSeed1011(root)
-        root.button(Guide.START).click()
 
         open(town = QuietTown())
         assertEquals(continueFrom(Month.FIRST_DAY, played().balance), text(".kept-from"))
@@ -189,7 +187,6 @@ class ContinueMonthTest {
         val town = QuietTown()
         open(town = town)
         startSeed1011(root)
-        root.button(Guide.START).click()
         town.onPlace(Place.LIBRARY)
         (root.querySelector(".talk .spend") as HTMLButtonElement).click()
 
@@ -265,7 +262,6 @@ class ContinueMonthTest {
         val town = EveningTown()
         open(town = town)
         startSeed1011(root)
-        root.button(Guide.START).click()
         town.onPlace(Place.LIBRARY)
         (root.querySelector(".talk .spend") as HTMLButtonElement).click()
         assertEquals(Place.LIBRARY, town.evening, "The day did not start to change")
@@ -355,7 +351,8 @@ class ContinueMonthTest {
 
         open()
         assertNull(card)
-        assertNotNull(root.querySelector(".rooms"))
+        assertNotNull(root.querySelector(".intro"))
+        assertNull(root.querySelector(".rooms"))
     }
 
     @Test
@@ -374,7 +371,7 @@ class ContinueMonthTest {
             again.slot = SaveSlot(Memory { storage })
             again.show()
             assertNull(card)
-            assertNotNull(root.querySelector(".rooms"))
+            assertNotNull(root.querySelector(".intro"))
         }
     }
 
@@ -451,7 +448,7 @@ class ContinueMonthTest {
             store.items[SaveSlot.KEY] = line
             open()
             assertNull(card, "Offered: $line")
-            assertNotNull(root.querySelector(".rooms"))
+            assertNotNull(root.querySelector(".intro"))
             assertEquals("", store.items[SaveSlot.KEY], "Not dropped: $line")
         }
     }
@@ -467,7 +464,7 @@ class ContinueMonthTest {
         game.slot = SaveSlot(Memory { store }) { error("A rule this line was not kept under") }
         game.show()
         assertNull(card)
-        assertNotNull(root.querySelector(".rooms"))
+        assertNotNull(root.querySelector(".intro"))
         assertEquals("", store.items[SaveSlot.KEY])
     }
 

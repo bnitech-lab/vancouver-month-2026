@@ -51,7 +51,14 @@ class PhoneGameTest {
         root.remove()
     }
 
-    private fun open(seed: Int) = PhoneGame(root, seed, playAgain = { playedAgain = true }).show()
+    /** Opens [seed]'s page on its intro. */
+    private fun openIntro(seed: Int) = PhoneGame(root, seed, playAgain = { playedAgain = true }).show()
+
+    /** Opens [seed]'s page and leaves the intro for the rooms. */
+    private fun open(seed: Int) {
+        openIntro(seed)
+        passIntro(root)
+    }
 
     private val screen: String
         get() = root.textContent.orEmpty()
@@ -73,8 +80,9 @@ class PhoneGameTest {
         input.dispatchEvent(Event("input"))
     }
 
-    /** Picks [room] (from 1), guesses [amount] and starts September. */
+    /** Leaves the intro, picks [room] (from 1), guesses [amount] and starts September. */
     private fun startMonth(room: Int, amount: String) {
+        passIntro(root)
         tap("${room}번 방")
         type(amount)
         tap("총비용 확인하기")
@@ -91,10 +99,12 @@ class PhoneGameTest {
 
     @Test
     fun `seed 1011 plays the first day the README shows`() {
-        open(1011)
+        openIntro(1011)
         assertTrue("판 번호 1011" in screen)
         assertTrue("9월 1일, 딱 \$3,000 들고 밴쿠버에 막 도착했어요." in screen)
         assertFalse("잔고 \$3,000" in screen)
+        passIntro(root)
+        assertTrue("판 번호 1011" in screen)
         assertTrue("1구역 \$105 · 2구역 \$145 · 3구역 \$195" in screen)
         assertTrue("별도면 한 달 \$120~\$190" in screen)
 
@@ -127,22 +137,28 @@ class PhoneGameTest {
     }
 
     @Test
-    fun `the first screen tells the story, the goal and why the room matters before the rooms`() {
-        open(1011)
+    fun `the intro tells the story, and the rooms say why the room matters before the rooms, without the story`() {
+        openIntro(1011)
         val game = FirstMinute(1011)
-        val story = root.querySelector(".story")?.textContent.orEmpty()
+        val story = root.querySelector(".intro .story")?.textContent.orEmpty()
         assertEquals(arrivalLines(game.startingBalance).joinToString(""), story)
         assertEquals(goalLine(), root.querySelector(".story .goal")?.textContent)
         assertEquals(1, root.querySelectorAll(".story .goal").length)
+        val introScreen = screen
+        passIntro(root)
+        assertNull(root.querySelector(".story"), "The story is told again on the rooms")
+        for (line in arrivalLines(game.startingBalance)) assertFalse(line in screen, line)
         val firstRoom = screen.indexOf("1번 방")
-        val order = arrivalLines(game.startingBalance) + "할 일" + whyTotalLines()
+        val order = listOf("할 일") + whyTotalLines()
         val at = order.map { screen.indexOf(it) }
         assertTrue(at.all { it >= 0 }, "missing one of $order in: $screen")
         assertEquals(at.sorted(), at, "out of order: $screen")
         assertTrue(at.last() < firstRoom, "the why comes after the rooms: $screen")
-        // The guess and the score stay: no room's total, and no word that names the cheapest room, before the reveal.
-        for (room in game.rooms) assertFalse(money(room.totalMonthlyCost) in screen, screen)
-        for (word in listOf("가장 싼 방은", "번이었어요", "가장 싼 방보다", "가장 싼 방이라")) assertFalse(word in screen, word)
+        // No room's total, and no word that names the cheapest room, before the reveal, on the intro or the rooms.
+        for (page in listOf(introScreen, screen)) {
+            for (room in game.rooms) assertFalse(money(room.totalMonthlyCost) in page, page)
+            for (word in listOf("가장 싼 방은", "번이었어요", "가장 싼 방보다", "가장 싼 방이라")) assertFalse(word in page, word)
+        }
     }
 
     @Test
@@ -437,6 +453,7 @@ class PhoneGameTest {
         val town = NotingTown()
         var made = 0
         PhoneGame(root, 1011, playAgain = {}, makeTown = { made++; town }).show()
+        passIntro(root)
         tap("3번 방")
         type("1165")
         tap("총비용 확인하기")

@@ -11,12 +11,12 @@ import vancouvermonth.text.Guide
 import vancouvermonth.text.goalLine
 
 /**
- * One card on how to play, over the town the first time it opens and again from the "?" in the town's top card.
- * It is a dialog: it takes the focus, 시작 or Escape closes it, and the focus goes back to the "?". While it is open the
- * town and its top card under it are inert, out of reach of taps, keys and screen readers. Closing it is
- * remembered in [memory], so it does not open by itself again; where the browser remembers nothing, it opens each time.
+ * One card on how to play, over the town, from the "?" in the town's top card. It never opens by itself: the intro says
+ * the same before the month starts. It is a dialog: it takes the focus, 시작 or Escape closes it, and the focus goes
+ * back to the "?". While it is open the town and its top card under it are inert, out of reach of taps, keys and screen
+ * readers.
  */
-internal class FirstRunGuide(private val memory: Memory) {
+internal class FirstRunGuide {
     private var shown: HTMLElement? = null
 
     /** What was made inert under the card, to give back when it closes. */
@@ -33,11 +33,6 @@ internal class FirstRunGuide(private val memory: Memory) {
 
     // A page or an extension may send a plain Event named "keydown"; only a real key press is read.
     private val onKey: (Event) -> Unit = { event -> (event as? KeyboardEvent)?.let { key(it) } }
-
-    /** Opens the card over [root], unless it was closed on an earlier visit. */
-    fun openFirstTime(root: HTMLElement) {
-        if (memory.read(KEY) != SEEN) open(root)
-    }
 
     /** Opens the card over [root] and moves the focus to its button. */
     fun open(root: HTMLElement) {
@@ -59,16 +54,8 @@ internal class FirstRunGuide(private val memory: Memory) {
         start.onclick = { close() }
         // At the foot, next to the map's credit: the update news, which open over this card and come back to it.
         notes()?.let { news -> news.button(card.add("p", "patch-guide-foot"), root, "patch-link") }
-        // The town is traced from the City of Vancouver's open data, whose licence asks for this line where it shows,
-        // with a link to the licence: its name links there, in a new tab, so the game stays where it is.
-        val credit = card.add("p", "guide-credit")
-        val name = Guide.MAP_CREDIT.indexOf(Guide.MAP_LICENCE)
-        credit.appendChild(document.createTextNode(Guide.MAP_CREDIT.substring(0, name)))
-        val link = credit.add("a", text = Guide.MAP_LICENCE) as HTMLAnchorElement
-        link.href = Guide.MAP_LICENCE_URL
-        link.target = "_blank"
-        link.rel = "noopener"
-        credit.appendChild(document.createTextNode(Guide.MAP_CREDIT.substring(name + Guide.MAP_LICENCE.length)))
+        // The town is traced from the City of Vancouver's open data, whose licence asks for this line where it shows.
+        mapCredit(card, "guide-credit")
         for (under in root.children.asList()) {
             if (under is HTMLElement && !under.hasAttribute("inert")) {
                 under.setAttribute("inert", "")
@@ -84,7 +71,7 @@ internal class FirstRunGuide(private val memory: Memory) {
         card.scrollTop = 0.0
     }
 
-    /** Closes the card, remembers that it was seen, and gives the focus back to the "?". */
+    /** Closes the card and gives the focus back to the "?". */
     fun close() {
         val cover = shown ?: return
         shown = null
@@ -93,10 +80,9 @@ internal class FirstRunGuide(private val memory: Memory) {
         // Before the focus can go back, what is under the card must take it again.
         stilled.forEach { it.removeAttribute("inert") }
         stilled.clear()
-        // A card taken off the page with the town was never closed by the player, so it is not counted as seen.
+        // A card taken off the page with the town has no "?" to go back to.
         if (!cover.isConnected) return
         cover.remove()
-        memory.write(KEY, SEEN)
         (document.querySelector(".guide-open") as? HTMLElement)?.focus()
     }
 
@@ -149,9 +135,24 @@ internal class FirstRunGuide(private val memory: Memory) {
 
     private fun HTMLElement.add(tag: String, className: String = "", text: String? = null): HTMLElement =
         element(tag, className, text).also { appendChild(it) }
+}
 
-    private companion object {
-        const val KEY = "vancouver-month.guide"
-        const val SEEN = "seen"
-    }
+/**
+ * The map's credit, as the City of Vancouver's open data licence asks wherever its data shows, at the end of [parent]:
+ * the statement, with the licence's name a link to the licence that opens in a new tab, so the game stays where it is.
+ */
+internal fun mapCredit(parent: HTMLElement, className: String): HTMLElement {
+    val credit = document.createElement("p") as HTMLElement
+    credit.className = className
+    val name = Guide.MAP_CREDIT.indexOf(Guide.MAP_LICENCE)
+    credit.appendChild(document.createTextNode(Guide.MAP_CREDIT.substring(0, name)))
+    val link = document.createElement("a") as HTMLAnchorElement
+    link.textContent = Guide.MAP_LICENCE
+    link.href = Guide.MAP_LICENCE_URL
+    link.target = "_blank"
+    link.rel = "noopener"
+    credit.appendChild(link)
+    credit.appendChild(document.createTextNode(Guide.MAP_CREDIT.substring(name + Guide.MAP_LICENCE.length)))
+    parent.appendChild(credit)
+    return credit
 }

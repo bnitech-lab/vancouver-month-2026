@@ -209,6 +209,7 @@ class WalkableTownTest {
         get() = FirstMinute(1011).let { it.startMonth(it.cheapestRoomIndex, it.lowestTotal).balance }
 
     private fun startMonth() {
+        passIntro(root)
         val game = FirstMinute(1011)
         tap("${game.cheapestRoomIndex + 1}번 방")
         val input = root.querySelector("input") as HTMLInputElement

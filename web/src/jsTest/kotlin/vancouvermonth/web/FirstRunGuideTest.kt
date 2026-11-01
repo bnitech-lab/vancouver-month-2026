@@ -19,7 +19,7 @@ import org.w3c.dom.events.KeyboardEventInit
 import vancouvermonth.text.Guide
 import vancouvermonth.text.goalLine
 
-/** The card on how to play: the first time the town opens, from the "?" after that, and never on the button screen. */
+/** The card on how to play: from the "?" in the town's top card only, never by itself, and never on the button screen. */
 class FirstRunGuideTest {
     private val root = (document.createElement("main") as HTMLElement).also { document.body!!.appendChild(it) }
 
@@ -35,11 +35,11 @@ class FirstRunGuideTest {
 
     private val town = QuietTown()
 
-    /** Opens seed 1011 with [store] as the page's storage, and starts September in a town or with buttons. */
-    private fun startMonth(store: KeyValueStore, inTown: Boolean = true) {
+    /** Opens seed 1011 and starts September in a town or with buttons. */
+    private fun startMonth(inTown: Boolean = true) {
         root.innerHTML = ""
         val game = PhoneGame(root, 1011, playAgain = {}, makeWalkableTown = { if (inTown) town else null })
-        game.guide = FirstRunGuide(Memory { store }).also { guides += it }
+        game.guide = FirstRunGuide().also { guides += it }
         game.talkSettleMillis = 0.0
         game.show()
         startSeed1011(root)
@@ -58,8 +58,11 @@ class FirstRunGuideTest {
         assertNotNull(root.querySelector(".hud .guide-open") as? HTMLButtonElement, "No ? in the top card")
 
     @Test
-    fun `the guide shows the first time the town opens, as a dialog with the focus on its button`() {
-        startMonth(FakeStore())
+    fun `the guide does not open by itself, and the ? opens it as a dialog with the focus on its button`() {
+        startMonth()
+        assertNull(card, "The guide opened by itself")
+        assertNotNull(root.querySelector(".town-hint"), "The first day's hint is not there")
+        helpButton().click()
         val card = assertNotNull(card, "No guide over the town")
         assertEquals("dialog", card.getAttribute("role"))
         assertEquals("true", card.getAttribute("aria-modal"))
@@ -88,7 +91,9 @@ class FirstRunGuideTest {
 
     @Test
     fun `while the card is open the town and its top card are inert, and after it they are not`() {
-        startMonth(FakeStore())
+        startMonth()
+        assertNull(root.querySelector("[inert]"))
+        helpButton().click()
         val under = listOf(".walk-town", ".over-town").map { assertNotNull(root.querySelector(it), it) }
         for (element in under) assertTrue(element.hasAttribute("inert"), "${element.className} is not inert")
         assertTrue(!card!!.hasAttribute("inert"))
@@ -102,7 +107,9 @@ class FirstRunGuideTest {
 
     @Test
     fun `the town counts as covered while the card is open, so its own life slows down`() {
-        startMonth(FakeStore())
+        startMonth()
+        assertTrue(!town.isCovered, "The town is covered before the card opens")
+        helpButton().click()
         assertTrue(town.isCovered, "The town was not told the card covers it")
         root.button(Guide.START).click()
         assertTrue(!town.isCovered, "The town stayed covered after the card closed")
@@ -113,21 +120,22 @@ class FirstRunGuideTest {
     }
 
     @Test
-    fun `시작 closes it, the focus goes back to the ?, and the next visit has no guide`() {
-        val store = FakeStore()
-        startMonth(store)
+    fun `시작 closes it, the focus goes back to the ?, and it opens by itself on no later visit either`() {
+        startMonth()
+        helpButton().click()
         root.button(Guide.START).click()
         assertNull(card)
         assertSame(helpButton(), document.activeElement)
 
-        startMonth(store)
-        assertNull(card, "The guide opened again on the second visit")
+        startMonth()
+        assertNull(card, "The guide opened by itself on the second visit")
         assertNotNull(root.querySelector(".hud"))
     }
 
     @Test
     fun `Escape closes it, and the ? opens it again with the focus going there and back`() {
-        startMonth(FakeStore())
+        startMonth()
+        helpButton().click()
         press("Escape")
         assertNull(card)
         assertSame(helpButton(), document.activeElement)
@@ -152,27 +160,16 @@ class FirstRunGuideTest {
     }
 
     @Test
-    fun `where storage throws, the guide shows on every visit and still closes`() {
-        repeat(2) {
-            startMonth(RefusingStore())
-            assertNotNull(card, "No guide on visit ${it + 1}")
-            root.button(Guide.START).click()
-            assertNull(card)
-        }
-    }
-
-    @Test
     fun `the button screen has no guide and no ?`() {
-        startMonth(FakeStore(), inTown = false)
+        startMonth(inTown = false)
         assertNotNull(root.querySelector(".topbar"))
         assertNull(card)
         assertNull(root.querySelector(".guide-open"))
     }
 
     @Test
-    fun `the ? stays in the top card through a talk and a day, and the guide does not open again by itself`() {
-        startMonth(FakeStore())
-        root.button(Guide.START).click()
+    fun `the ? stays in the top card through a talk and a day, and the guide does not open by itself`() {
+        startMonth()
         town.onPlace(Place.LIBRARY)
         assertNotNull(root.querySelector(".talk"))
         assertNotNull(helpButton())
@@ -184,7 +181,8 @@ class FirstRunGuideTest {
 
     @Test
     fun `a plain event named keydown leaves the card open and breaks nothing`() {
-        startMonth(FakeStore())
+        startMonth()
+        helpButton().click()
         // An error in a listener does not reach the one who sent the event; the page reports it to the window.
         val errors = mutableListOf<String>()
         val onError: (Event) -> Unit = { errors += it.asDynamic().message.toString() }

@@ -428,7 +428,64 @@ a:focus-visible {
   font-size: 15px;
 }
 
-/* The card that offers the month kept from an earlier visit */
+/* The intro, the page's first screen. Its way in (시작하기, or 이어하기 and 새로 시작) stays in sight at the foot of the
+   screen however long the rest is, on a small phone and on one turned on its side. */
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.how-to-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.how-to-lines li {
+  position: relative;
+  padding-left: 1.1em;
+}
+
+.how-to-lines li::before {
+  content: "";
+  position: absolute;
+  top: 0.65em;
+  left: 0.2em;
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.guess-pays {
+  font-size: 14px;
+}
+
+.guess-rule-line {
+  margin: 4px 0 2px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.guess-examples {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.intro-start {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin: 0 -16px;
+  padding: 10px 16px max(10px, env(safe-area-inset-bottom));
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+
+/* The card that offers the month kept from an earlier visit, at the top of the intro */
 .kept-from {
   font-size: 20px;
   font-weight: 700;
@@ -1250,7 +1307,7 @@ html:has(.walk-town) {
   right: 16px;
 }
 
-/* The card on how to play, over the town the first time it opens. The town waits under a soft shade. On a short
+/* The card on how to play, over the town from its "?". The town waits under a soft shade. On a short
    screen (a phone on its side, or large text) the card is never taller than the screen: it scrolls instead, and the
    shade can scroll too, with "safe" centring so nothing is pushed off the top. */
 .guide {
@@ -1318,15 +1375,22 @@ html:has(.walk-town) {
   border-radius: 12px;
 }
 
-/* The map's credit, small at the card's foot, its licence's name a link. */
-.guide-credit {
+/* The map's credit, small at the card's foot and at the intro's, its licence's name a link. */
+.guide-credit,
+.intro-credit {
   margin-top: 12px;
   font-size: 11px;
   line-height: 1.4;
   opacity: 0.75;
 }
 
-.guide-credit a {
+.intro-credit {
+  margin-top: 0;
+  color: var(--muted);
+}
+
+.guide-credit a,
+.intro-credit a {
   color: inherit;
   text-decoration: underline;
 }
