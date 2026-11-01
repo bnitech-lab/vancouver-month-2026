@@ -103,6 +103,24 @@ class HouseDetailTest {
     }
 
     @Test
+    fun `a block drawn one by one stays so a little past reach, so one at the edge does not flicker`() {
+        val yards = listOf(yardAt(500.0, 50.0, count = 1))
+        val house = yards[0].houses[0]
+        val spot = Spot(house.shape.x, house.shape.z)
+        val edge = HouseDetail.REACH + yards[0].reach + HouseDetail.HOLD / 2
+        val detail = HouseDetail(yards, numbers)
+        // Coming from near, it is still drawn just past reach; coming from far, not yet.
+        detail.fillFor(Point(house.shape.x + 30.0, 8.0, house.shape.z), spot)
+        assertTrue(detail.shown[0])
+        detail.fillFor(Point(house.shape.x + edge, 8.0, house.shape.z), spot)
+        assertTrue(detail.shown[0], "dropped at the edge")
+        detail.fillFor(Point(house.shape.x + edge + HouseDetail.HOLD, 8.0, house.shape.z), spot)
+        assertFalse(detail.shown[0])
+        detail.fillFor(Point(house.shape.x + edge, 8.0, house.shape.z), spot)
+        assertFalse(detail.shown[0], "drawn again at the edge")
+    }
+
+    @Test
     fun `a folded house has no roof, and its walls stand at the plinth`() {
         val yards = listOf(yardAt(500.0, 50.0, count = 2, foldable = 10))
         val detail = HouseDetail(yards, numbers)

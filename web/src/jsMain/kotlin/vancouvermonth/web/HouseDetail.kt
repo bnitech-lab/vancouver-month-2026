@@ -74,11 +74,13 @@ internal class HouseDetail(private val yards: List<Yard>, private val numbers: F
         val acrossSlant = sqrt(1 + tanAcross * tanAcross)
         val upSlant = sqrt(1 + tanUp * tanUp)
         for (index in yards.indices) {
-            val onGround = hypot(middleX[index] - eyeX, middleZ[index] - eyeZ) - reach[index]
+            // A block drawn one by one stays so until it is [HOLD] farther out, so one at the edge does not flicker.
+            val hold = if (shown[index]) HOLD else 0.0
+            val onGround = hypot(middleX[index] - eyeX, middleZ[index] - eyeZ) - reach[index] - hold
             away[index] = -1.0
             if (onGround > LAWN_REACH) continue
             // A ball round the block and its houses, tried against the four sides of the camera's view.
-            val ball = hypot(reach[index], BALL_HEIGHT) + VIEW_SLACK
+            val ball = hypot(reach[index], BALL_HEIGHT) + VIEW_SLACK + hold
             val dx = middleX[index] - eyeX
             val dy = BALL_HEIGHT - eyeY
             val dz = middleZ[index] - eyeZ
@@ -209,6 +211,9 @@ internal class HouseDetail(private val yards: List<Yard>, private val numbers: F
         /** Roofs, doors and trees are drawn this far from the camera, grown on over the last [GROW] of it. */
         const val REACH = 75.0
         const val GROW = 12.0
+
+        /** A block drawn one by one is held so until it is this much farther off, or this far out of the view. */
+        const val HOLD = 2.0
 
         /** The lawns reach this far, past the roofs, so the green does not come in where the eye is on it. */
         const val LAWN_REACH = 100.0
