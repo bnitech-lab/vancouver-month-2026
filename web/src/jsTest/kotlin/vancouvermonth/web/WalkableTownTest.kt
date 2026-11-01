@@ -248,9 +248,11 @@ class WalkableTownTest {
 
     /**
      * Opens 내 방's talk with the character at its door, where a night's sleep can start, as a walk home leaves it: the
-     * way home from downtown is too long for a test to walk every night.
+     * way home from downtown is too long for a test to walk every night. A talk already open is closed first, so 내 방's
+     * opens again with the character at the door, even when it was 내 방's, opened from afar.
      */
     private fun talkAtHome(town: NeighbourhoodScene) {
+        if (root.querySelector(".talk") != null) tap("그만")
         town.standAt(Neighbourhood.venue(Place.HOME).door)
         talkTo(Place.HOME)
     }
@@ -819,13 +821,18 @@ class WalkableTownTest {
                     return
                 }
                 val action = cycle[step % cycle.size]
-                if ("오늘은 면접 날이에요" in screen) {
-                    talkTo(Place.OFFICE)
-                } else {
-                    talkTo(placeFor(action))
-                    if (spendButton().disabled) talkAtHome(town)
+                // Sleep straight at the door: how far the character has walked meanwhile goes by the clock, so 내 방's
+                // talk opened from afar may not yet offer 자기.
+                when {
+                    "오늘은 면접 날이에요" in screen -> talkTo(Place.OFFICE)
+                    action == Action.REST -> talkAtHome(town)
+                    else -> {
+                        talkTo(placeFor(action))
+                        if (spendButton().disabled) talkAtHome(town)
+                    }
                 }
                 val sleep = "자기" in spendButton().textContent.orEmpty()
+                if (sleep) assertFalse(spendButton().disabled, "step $step: 자기 not offered at the door")
                 view = Triple(town.cameraTurn, town.cameraTilt, town.cameraDistance)
                 spendButton().click()
                 step++
