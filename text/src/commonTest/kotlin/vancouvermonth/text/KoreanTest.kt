@@ -246,6 +246,17 @@ class KoreanTest {
     }
 
     @Test
+    fun `the guess's money reads with its sign, as a reward or a penalty, with the balance it leaves`() {
+        val month = month()
+        assertEquals("짐작 보상 +\$100, 잔고 \$1,800", eventLine(Event.Guessed(0, 100), month))
+        assertEquals("짐작 보상 +\$55, 잔고 \$1,800", eventLine(Event.Guessed(45, 55), month))
+        assertEquals("짐작 보상 \$0, 잔고 \$1,800", eventLine(Event.Guessed(100, 0), month))
+        assertEquals("짐작 패널티 -\$150, 잔고 \$1,800", eventLine(Event.Guessed(250, -150), month))
+        assertEquals("짐작 패널티 -\$300, 잔고 \$1,800", eventLine(Event.Guessed(900, -300), month))
+        assertEquals(listOf("+\$80", "\$0", "-\$1,234"), listOf(signedMoney(80), signedMoney(0), signedMoney(-1_234)))
+    }
+
+    @Test
     fun `money spent in the town reads as what it bought or rented, and its price`() {
         val month = month()
         val lines = Spending.entries.map { eventLine(Event.Spent(it, it.price), month) }

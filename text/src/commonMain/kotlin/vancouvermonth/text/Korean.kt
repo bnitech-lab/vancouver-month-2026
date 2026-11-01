@@ -118,7 +118,14 @@ fun eventLine(event: Event, month: Month): String = when (event) {
     is Event.InterviewHeld -> interviewResult(event, month.canStillApplyThisMonth)
     is Event.LivingCost -> "생활비 -${money(event.amount)}, 잔고 ${money(month.balance)}"
     is Event.Spent -> spentLine(event)
+    is Event.Guessed -> "${guessMoneyLabel(event.amount)} ${signedMoney(event.amount)}, 잔고 ${money(month.balance)}"
 }
+
+/** What the guess's money is called: 짐작 보상 when it wins or breaks even, 짐작 패널티 when it loses. */
+fun guessMoneyLabel(amount: Int): String = if (amount < 0) "짐작 패널티" else "짐작 보상"
+
+/** "+$55", "-$150" or "$0": an amount with its sign, for money won or lost. */
+fun signedMoney(amount: Int): String = if (amount > 0) "+${money(amount)}" else money(amount)
 
 /** Money spent in the town: "자전거를 샀어요. -$350", "공유 퀵보드를 빌렸어요. -$4", "택시를 탔어요. -$12". */
 fun spentLine(event: Event.Spent): String {

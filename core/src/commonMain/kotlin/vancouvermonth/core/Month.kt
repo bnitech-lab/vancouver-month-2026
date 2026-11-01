@@ -105,24 +105,36 @@ sealed interface Event {
 
     /** Money spent in the town on [kind], during the day: no day goes by for it. */
     data class Spent(val kind: Spending, val amount: Int) : Event
+
+    /**
+     * As the month started: the guess at the room's total, [gap] dollars off, won [amount] (or lost it, when it is
+     * below zero, or neither at zero). See [FirstMinute.guessMoney].
+     */
+    data class Guessed(val gap: Int, val amount: Int) : Event
 }
 
 /**
  * September in Vancouver, one action a day, after the room was picked on September 1st.
  * The goal is a job offer by September 30th. On October 1st the room's total monthly cost is due again.
- * Every day, the offer day included, costs living money; what is left after the first room always covers it, and
- * money spent in the town never leaves less than the living cost of the days left, so the balance never goes below
- * zero in September and the money pressure is October's total. All numbers are invented.
+ * Every day, the offer day included, costs living money; what is left after the first room, even after the most a
+ * guess can lose, always covers it, and money spent in the town never leaves less than the living cost of the days
+ * left, so the balance never goes below zero in September and the money pressure is October's total. All numbers are
+ * invented.
  */
 class Month(
     val room: Room,
     startingBalance: Int,
     private val dice: Dice,
+    /** The guess's money, added to [startingBalance] once as the month starts; null for a month with no guess. */
+    guessed: Event.Guessed? = null,
 ) {
     var day: Int = FIRST_DAY
         private set
-    var balance: Int = startingBalance
+    var balance: Int = startingBalance + (guessed?.amount ?: 0)
         private set
+
+    /** What happened as the month started, before its first day: the guess's money, when there was a guess. */
+    val opening: List<Event> = listOfNotNull(guessed)
     var english: Int = START_ENGLISH
         private set
     var coding: Int = START_CODING
