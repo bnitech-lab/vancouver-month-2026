@@ -32,10 +32,32 @@ class PatchNote(
  */
 object PatchNotes {
     /** The newest version, shown by the title; it is [ALL]'s first entry. */
-    const val CURRENT = "0.13"
+    const val CURRENT = "0.14"
 
     /** Every update, newest first. */
     val ALL: List<PatchNote> = listOf(
+        PatchNote(
+            version = "0.14",
+            date = "2026-10-31",
+            headline = "인트로와 방값 짐작 보상",
+            added = listOf(
+                "첫 화면이 인트로가 됐어요. 이야기와 하는 법을 읽고 '시작하기'를 눌러요.",
+                "방의 한 달 총비용을 맞힐수록 최대 $100을 더 받고 9월을 시작해요.",
+                "틀린 만큼 잃어요. 잃는 돈은 $300까지예요.",
+                "딱 맞히면 +$100, $100 틀리면 $0, $250 틀리면 -$150이에요.",
+                "총비용을 확인하면 받거나 잃은 돈과 9월을 시작하는 잔고가 나와요.",
+            ),
+            improved = listOf(
+                "점수는 없어졌어요. 결과와 오늘의 판 한 줄에 받거나 잃은 돈이 나와요.",
+                "하던 한 달이 있으면 인트로에서 바로 '이어하기'를 누르면 돼요.",
+                "마을의 안내 카드는 저절로 뜨지 않아요. '?'를 누르면 열려요.",
+                "안내 카드에 스카이트레인, 버스, 수상버스, 택시, 미니맵 설명이 생겼어요.",
+                "'다시 하기'를 누르면 인트로 없이 새 판의 방 고르기로 가요.",
+            ),
+            known = listOf(
+                "이번 업데이트 전에 하던 한 달은 이어할 수 없어요. 새로 시작해 주세요.",
+            ),
+        ),
         PatchNote(
             version = "0.13",
             date = "2026-10-31",
