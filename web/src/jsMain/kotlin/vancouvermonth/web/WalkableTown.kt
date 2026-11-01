@@ -89,7 +89,8 @@ interface WalkableTown {
     /**
      * Gets on [ride], the shared one the character has just reached, and rides it to [to] along the way its fare was
      * worked out for ([taxiDistance]). There the character gets off, the shared one goes back, and [onTravelled] is
-     * called; on the way the town takes no taps, and [getOff] gets off where it is.
+     * called; at one of the places or the bike shop the talk there then opens, as at the end of a walk there. On the way
+     * the town takes no taps, and [getOff] gets off where it is.
      */
     fun rideTo(ride: Ride, to: Spot) = ride(ride)
 
@@ -1567,6 +1568,10 @@ internal class NeighbourhoodScene(
     internal val characterSpot: Spot
         get() = spot
 
+    /** Which way the character faces, as [Trip] counts it (0 faces south). For tests. */
+    internal val characterHeading: Double
+        get() = heading
+
     /** Where the walk is going, while the marker shows it, for tests. */
     internal val markerSpot: Spot?
         get() = trip?.route?.last()
@@ -2389,17 +2394,17 @@ internal class NeighbourhoodScene(
      * front along the street rather than down between the towers.
      */
     private fun arrive(end: Spot) {
-        if (rideTo != null) {
-            // At the place the shared ride was paid for: off it, and the game is told.
+        val rode = rideTo != null
+        if (rode) {
+            // At the place the shared ride was paid for: off it, and the game is told. At one of the places or the
+            // shop the character then turns to its person and the talk opens, as at the end of a walk there.
             getOff()
             onTravelled()
-            return
-        }
-        if (rentAt >= 0 && ride == null) {
+            opensOnArrival = true
+        } else if (rentAt >= 0 && ride == null) {
             askToRent(rentAt)
             return
-        }
-        if (stopAt >= 0) {
+        } else if (stopAt >= 0) {
             val stop = TransitLines.tapStops[stopAt]
             stopAt = -1
             onStop(stop)
@@ -2407,7 +2412,7 @@ internal class NeighbourhoodScene(
         }
         if (Neighbourhood.isAtShop(end)) {
             val shop = Neighbourhood.shop
-            if (distanceBetween(end, shop.talkSpot) <= Neighbourhood.REACH) {
+            if (rode || distanceBetween(end, shop.talkSpot) <= Neighbourhood.REACH) {
                 heading = atan2(shop.keeper.x - end.x, shop.keeper.z - end.z)
             }
             // Its door faces south: the camera comes round to the south, looking at its front.
@@ -2417,7 +2422,7 @@ internal class NeighbourhoodScene(
         }
         val place = site.placeAt(end) ?: return
         val venue = site.venue(place)
-        if (distanceBetween(end, venue.talkSpot) <= Neighbourhood.REACH) {
+        if (rode || distanceBetween(end, venue.talkSpot) <= Neighbourhood.REACH) {
             heading = atan2(venue.person.x - end.x, venue.person.z - end.z)
         }
         val streetSide = if (venue.doorFacesSouth) 0.0 else PI

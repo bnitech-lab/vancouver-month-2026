@@ -1702,8 +1702,12 @@ class WalkableTownTest {
                 assertEquals(shop, town.markerSpot)
                 assertEquals(Ride.SHARED_E_SCOOTER, town.riding)
             },
-            Step("there: off it, and it is back on its corner", { town.riding == null && town.isStill }) {
+            Step("there: off it, back on its corner, and the keeper's talk open", { town.riding == null && town.isStill }) {
                 assertEquals(shop, town.characterSpot)
+                // As at the end of a walk to the shop: turned to the keeper, and his talk open.
+                assertNotNull(root.querySelector(".shop-talk"), "no talk with the keeper: $screen")
+                val keeper = Neighbourhood.shop.keeper
+                assertEquals(kotlin.math.atan2(keeper.x - shop.x, keeper.z - shop.z), town.characterHeading, 1e-9)
                 assertTrue(town.isParkedShown(index), "it did not go back")
                 assertFalse(town.isRideDrawn(Ride.SHARED_E_SCOOTER))
                 assertTrue(money(firstBalance - fare) in hud(), "paid more than once: ${hud()}")
@@ -1740,6 +1744,7 @@ class WalkableTownTest {
                 left = town.characterSpot
                 assertNull(town.riding)
                 assertNull(town.markerSpot, "it rode on")
+                assertNull(root.querySelector(".talk"), "a talk opened on the way")
                 assertTrue(town.isParkedShown(index))
                 assertTrue(money(firstBalance - fare) in hud(), hud())
             },
@@ -1747,6 +1752,35 @@ class WalkableTownTest {
                 assertEquals(left, town.characterSpot)
                 assertTrue(distanceBetween(town.characterSpot, cafe) > 4.0)
                 assertTrue(money(firstBalance - fare) in hud(), "paid again: ${hud()}")
+            },
+        )
+    }
+
+    @Test
+    fun `a shared bike to 내 방 arrives as a walk there does: turned to the neighbour, the talk open`(): Promise<Unit> {
+        val town = startInTown()
+        val bike = Rides.shared.first { it.vehicle == Vehicle.BIKE }
+        val home = TransitLines.taxiStopsFor(1).first { it.first == Place.HOME.label }.second
+        val venue = Neighbourhood.venue(Place.HOME)
+        return play(
+            Step("stand by the dock near 내 방", { town.isStill }) {
+                town.standAt(Spot(bike.spot.x, bike.spot.z - 3.0))
+                // From the north, looking south past the character at the dock.
+                town.aimCamera(PI, 0.6, 10.0)
+            },
+            Step("tap the bike", { town.isStill }) {
+                tapScreen(town, onScreen(town, Point(bike.spot.x, 0.5, bike.spot.z)))
+            },
+            Step("reached it: ride to 내 방", { root.querySelector(".chooser") != null }) {
+                goButton(Place.HOME.label).click()
+                assertEquals(Ride.SHARED_BIKE, town.riding)
+            },
+            Step("there: the neighbour's talk", { town.riding == null && town.isStill }) {
+                assertEquals(home, town.characterSpot)
+                val talk = assertNotNull(root.querySelector(".talk"), "no talk: $screen")
+                assertFalse(talk.classList.contains("chooser"), talk.textContent)
+                val toPerson = kotlin.math.atan2(venue.person.x - home.x, venue.person.z - home.z)
+                assertEquals(toPerson, town.characterHeading, 1e-9)
             },
         )
     }
