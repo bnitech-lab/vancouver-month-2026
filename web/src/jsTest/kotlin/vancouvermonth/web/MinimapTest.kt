@@ -264,6 +264,27 @@ class MinimapTest {
     }
 
     @Test
+    fun `the small window stays on the ground's picture wherever the character stands`() {
+        // The picture reaches GROUND_PAD squares past the area on each side; the window is centred on the character.
+        val pictureLeft = MinimapProjection.AREA_LEFT - Minimap.GROUND_PAD
+        val pictureTop = MinimapProjection.AREA_TOP - Minimap.GROUND_PAD
+        val pictureRight = MinimapProjection.AREA_LEFT + MinimapProjection.AREA_WIDTH + Minimap.GROUND_PAD
+        val pictureBottom = MinimapProjection.AREA_TOP + MinimapProjection.AREA_HEIGHT + Minimap.GROUND_PAD
+        val halfAcross = Minimap.WINDOW_ACROSS / 2
+        val halfDown = Minimap.WINDOW_DOWN / 2
+        val map = Neighbourhood.map
+        for (z in 0 until map.rows) {
+            for (x in 0 until map.columns) {
+                if (map.terrainAt(x, z) == Terrain.WATER) continue
+                val across = MinimapProjection.turnedAcross(x + 0.5, z + 0.5)
+                val down = MinimapProjection.turnedDown(x + 0.5, z + 0.5)
+                assertTrue(across - halfAcross >= pictureLeft && across + halfAcross <= pictureRight, "at $x, $z")
+                assertTrue(down - halfDown >= pictureTop && down + halfDown <= pictureBottom, "at $x, $z")
+            }
+        }
+    }
+
+    @Test
     fun `a screen reader hears the place the character is nearest`() {
         for (venue in Neighbourhood.venues) {
             assertEquals(venue.place, Minimap.nearestPlace(venue.door.x, venue.door.z))

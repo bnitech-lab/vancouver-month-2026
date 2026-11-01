@@ -440,15 +440,18 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
     /** The painted ground, the part of it on the map only, so a window of the wide map costs no more than the whole. */
     private fun drawGround(map: MinimapProjection) {
         val detail = GROUND_DETAIL.toDouble()
+        // The picture's top left corner on the map: the area's, [GROUND_PAD] squares further out.
+        val pictureLeft = map.areaLeft - GROUND_PAD * map.scale
+        val pictureTop = map.areaTop - GROUND_PAD * map.scale
         // The window's corners in the picture's pixels, kept inside the picture.
-        val fromX = max(0.0, (0.0 - map.areaLeft) / map.scale * detail)
-        val fromY = max(0.0, (0.0 - map.areaTop) / map.scale * detail)
-        val toX = min(ground.width.toDouble(), (map.width - map.areaLeft) / map.scale * detail)
-        val toY = min(ground.height.toDouble(), (map.height - map.areaTop) / map.scale * detail)
+        val fromX = max(0.0, (0.0 - pictureLeft) / map.scale * detail)
+        val fromY = max(0.0, (0.0 - pictureTop) / map.scale * detail)
+        val toX = min(ground.width.toDouble(), (map.width - pictureLeft) / map.scale * detail)
+        val toY = min(ground.height.toDouble(), (map.height - pictureTop) / map.scale * detail)
         if (toX <= fromX || toY <= fromY) return
         context.drawImage(
             ground, fromX, fromY, toX - fromX, toY - fromY,
-            map.areaLeft + fromX / detail * map.scale, map.areaTop + fromY / detail * map.scale,
+            pictureLeft + fromX / detail * map.scale, pictureTop + fromY / detail * map.scale,
             (toX - fromX) / detail * map.scale, (toY - fromY) / detail * map.scale,
         )
     }
@@ -561,7 +564,8 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
             HomeSite.of(1).venues.minBy { hypot(it.door.x - x, it.door.z - z) }.place
 
         /**
-         * The area the map shows as a picture, north up, [GROUND_DETAIL] pixels a square: water, the city's ground, its
+         * The area the map shows, and [GROUND_PAD] squares more on each side, as a picture, north up, [GROUND_DETAIL]
+         * pixels a square: water, the city's ground, its
          * blocks, the park and the seawall, and past the grid's edges what the town lays there: land, water, and the
          * north shore's forest across the inlet.
          */
@@ -571,8 +575,8 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         private fun paintGround(): HTMLCanvasElement {
             val columns = Neighbourhood.COLUMNS
             val rows = Neighbourhood.ROWS
-            val across = AREA_WIDTH * GROUND_DETAIL
-            val down = AREA_HEIGHT * GROUND_DETAIL
+            val across = (AREA_WIDTH + 2 * GROUND_PAD) * GROUND_DETAIL
+            val down = (AREA_HEIGHT + 2 * GROUND_PAD) * GROUND_DETAIL
             val canvas = document.createElement("canvas") as HTMLCanvasElement
             canvas.width = across
             canvas.height = down
@@ -583,9 +587,9 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
             val map = Neighbourhood.map
             val built = Neighbourhood.built
             for (j in 0 until down) {
-                val south = AREA_TOP + (j + 0.5) / GROUND_DETAIL
+                val south = AREA_TOP - GROUND_PAD + (j + 0.5) / GROUND_DETAIL
                 for (i in 0 until across) {
-                    val east = AREA_LEFT + (i + 0.5) / GROUND_DETAIL
+                    val east = AREA_LEFT - GROUND_PAD + (i + 0.5) / GROUND_DETAIL
                     val gridX = MinimapProjection.gridX(east, south)
                     val gridZ = MinimapProjection.gridZ(east, south)
                     val x = floor(gridX).toInt()
@@ -680,6 +684,16 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
          */
         const val WINDOW_ACROSS = 100.0
         private const val WINDOW_SHAPE = "239 / 267"
+
+        /** How many squares the small map's window shows from top to bottom, from its shape. */
+        const val WINDOW_DOWN = WINDOW_ACROSS * 267 / 239
+
+        /**
+         * How many squares the ground's picture reaches past the whole map's area on each side: half the small window's
+         * height, rounded up, so the window, centred on the character wherever it stands, never runs off the picture
+         * into a bare sea where the town draws land.
+         */
+        const val GROUND_PAD = 56
 
         /** How tall a name on the larger map is, and the room kept between two names, in pixels. */
         private const val NAME_HEIGHT = 14.0
