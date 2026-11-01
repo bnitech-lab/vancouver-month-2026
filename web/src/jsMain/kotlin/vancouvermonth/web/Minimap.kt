@@ -596,9 +596,9 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
          * north shore's forest across the inlet.
          */
         /** The ground's picture, painted once for every map the page makes. */
-        private val groundPicture: HTMLCanvasElement by lazy { paintGround() }
+        private val groundPicture: HTMLCanvasElement by lazy { makeGroundPicture() }
 
-        private fun paintGround(): HTMLCanvasElement {
+        private fun makeGroundPicture(): HTMLCanvasElement {
             val columns = Neighbourhood.COLUMNS
             val rows = Neighbourhood.ROWS
             val across = (AREA_WIDTH + 2 * GROUND_PAD) * GROUND_DETAIL
