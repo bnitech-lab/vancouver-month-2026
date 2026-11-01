@@ -63,6 +63,23 @@ class VancouverMapTest {
         assertFailsWith<IllegalArgumentException> { unpackNumbers("Cg", 1) }
     }
 
+    /**
+     * Each packed number is the change from the one before, so the last point of a line stands for every character
+     * before it. The numbers are the ones `tools/vancouver_map/build_map.py` prints ("packed town shoreline", "packed
+     * town park"); they change only when the map is made again.
+     */
+    @Test
+    fun `the packed shoreline and park read back to the numbers the map script printed`() {
+        val shore = RealVancouver.shoreLines
+        assertEquals(listOf(2, 2, 420), shore.map { it.size })
+        assertEquals(Spot(205.8, -1.0), shore.first().first())
+        assertEquals(Spot(113.5, 156.0), shore.last().last())
+        val park = RealVancouver.park
+        assertEquals(133, park.size)
+        assertEquals(Spot(93.6, 66.1), park.first())
+        assertEquals(Spot(93.6, 66.1), park.last())
+    }
+
     @Test
     fun `water lies north, west and south of the peninsula`() {
         // The inlet, north of the office towers and the old brick streets.

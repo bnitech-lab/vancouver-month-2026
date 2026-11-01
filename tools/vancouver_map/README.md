@@ -109,6 +109,12 @@ numbers. `unpackNumbers` and `unpackPoints` in `VancouverMap.kt` read them back 
 gave (the 1,703 blocks take 13,991 characters instead of 37,780). The short lines (the rails, the stations, the
 mountains line, the zones) and the town's blocks stay as plain "x,z" numbers.
 
+The script reads every packed string back before writing it and stops if it does not give the same numbers. It then
+prints what the game will read from them ("packed town shoreline", "packed town park", "packed wide streets", "packed
+wide blocks": how many, and the first and last item). `VancouverMapTest` and `WideMapTest` pin those numbers, and as
+each packed number is the change from the one before, the last item stands for the whole string; when the map is made
+again, copy the printed numbers into those two tests.
+
 ## Data and licence
 
 Every input is from the [City of Vancouver Open Data Portal](https://opendata.vancouver.ca), under the

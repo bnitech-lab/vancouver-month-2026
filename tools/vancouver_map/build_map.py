@@ -1491,7 +1491,32 @@ def packed(items):
         before = before or [0] * len(item)
         out.extend(vlq(v - b) for v, b in zip(item, before))
         before = item
-    return "".join(out)
+    text = "".join(out)
+    # Every packing is read back as the game reads it, so a slip in the packing stops the build, not the page.
+    if items and unpack_numbers(text, len(items[0])) != [tuple(item) for item in items]:
+        sys.exit("packed numbers do not read back to the numbers packed")
+    return text
+
+
+def unpack_numbers(text, fields):
+    """Numbers packed by [packed] read back, as the game's unpackNumbers reads them: the items, each a tuple."""
+    numbers, value, shift = [], 0, 0
+    for char in text:
+        digit = VLQ_DIGITS.index(char)
+        value += (digit & 31) << shift
+        if digit & 32:
+            shift += 5
+        else:
+            numbers.append(-(value >> 1) if value & 1 else value >> 1)
+            value, shift = 0, 0
+    if shift or len(numbers) % fields:
+        sys.exit(f"{len(numbers)} packed numbers do not make items of {fields}")
+    sums, items = [0] * fields, []
+    for start in range(0, len(numbers), fields):
+        for k in range(fields):
+            sums[k] += numbers[start + k]
+        items.append(tuple(sums))
+    return items
 
 
 def tenths(v):
@@ -1502,6 +1527,30 @@ def tenths(v):
 def packed_points(points):
     """A line's points packed, x and z in tenths of a square, as the game's unpackPoints reads them."""
     return packed([(tenths(x), tenths(z)) for x, z in points])
+
+
+def block_items(blocks):
+    """The wide map's blocks as the five whole numbers each that are packed: x, z, width and depth in tenths of a
+    square, and the turn in degrees in the sense of the game's Block.turn."""
+    return [(tenths(cx), tenths(cz), tenths(w), tenths(d), round(-turn)) for cx, cz, w, d, turn in blocks]
+
+
+def packed_summary(name, texts, fields=2):
+    """What the game reads from packed [texts]: how many, and the first and last item, in squares (a block's turn in
+    degrees), to copy into the tests that pin them when the map is made again."""
+    lines = [unpack_numbers(text, fields) for text in texts]
+    items = [item for line in lines for item in line]
+
+    def shown(item):
+        return ",".join([fmt(v / 10) for v in item[:4]] + [str(v) for v in item[4:]])
+
+    if fields != 2:
+        count = f"{len(items)} items"
+    else:
+        count = f"{len(lines)} {'line' if len(lines) == 1 else 'lines'}, {len(items)} points"
+        if 1 < len(lines) <= 5:
+            count += f" ({', '.join(str(len(line)) for line in lines)})"
+    return f"packed {name}: {count}, first {shown(items[0])}, last {shown(items[-1])}"
 
 
 def wrap_packed(text, indent, width=112):
@@ -1783,7 +1832,7 @@ def write_wide_kotlin(wide, fetched, van_hashes, bby_hashes):
     out.append("     * in the same sense as [Block.turn]. Blocks on parks or water, and the few over 25 ha (yards, works, a")
     out.append("     * cemetery), are left out. Rows of them, north to south.")
     out.append("     */")
-    items = [(tenths(cx), tenths(cz), tenths(w), tenths(d), round(-turn)) for cx, cz, w, d, turn in blocks]
+    items = block_items(blocks)
     out.append("    val blocks =")
     out.append("        " + wrap_packed(packed(items), 8))
     out.append("")
@@ -2478,6 +2527,12 @@ def main():
     streets = wide.streets()
     print(f"main streets: {len(streets)} lines, {sum(len(s) for s in streets)} points")
     print(f"blocks right of the town: {len(wide.blocks())}")
+    # What the game reads from the packed lines and blocks; WideMapTest and VancouverMapTest pin these numbers.
+    shore_parts, park, _, _ = built.lines()
+    print(packed_summary("town shoreline", [packed_points(part) for part in shore_parts]))
+    print(packed_summary("town park", [packed_points(park)]))
+    print(packed_summary("wide streets", [packed_points(street) for street in streets]))
+    print(packed_summary("wide blocks", [packed(block_items(wide.blocks()))], fields=5))
     print("zones:", {zone: len(shapes) for zone, shapes in wide.zones().items()})
     print("homes:", wide.homes())
     wide_walks = wide.walks()
