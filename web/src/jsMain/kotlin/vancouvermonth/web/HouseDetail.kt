@@ -46,6 +46,12 @@ internal class HouseDetail(private val yards: List<Yard>, casterNumbers: Float32
     /** True for each block within [SHADOW_NEAR] of the character. */
     private val byCharacter = BooleanArray(yards.size)
 
+    /** How many boxes each block takes at most, and the blocks to draw in the order they are drawn. */
+    private val needs = IntArray(yards.size) {
+        (if (yards[it].lawn != null) 1 else 0) + yards[it].trees.size + 3 * yards[it].houses.size
+    }
+    private val order = IntArray(yards.size)
+
     /** True for each block whose houses the last [fill] drew one by one, in place of its rows' low boxes. */
     val shown = BooleanArray(yards.size)
 
@@ -115,9 +121,18 @@ internal class HouseDetail(private val yards: List<Yard>, casterNumbers: Float32
         others.count = 0
         changedCount = 0
         // The blocks round the character into the draw that casts shadows, or the other should it be full; then the
-        // nearest blocks first, so when there are too many boxes it is the farthest that go without.
+        // others within reach. Should there be more boxes than a draw holds, its blocks go nearest first, so it is the
+        // farthest that go without.
+        var listed = 0
+        var needed = 0
         for (index in yards.indices) {
             if (!byCharacter[index]) continue
+            order[listed++] = index
+            needed += needs[index]
+        }
+        if (needed > casters.capacity) nearestFirst(listed)
+        for (at in 0 until listed) {
+            val index = order[at]
             into = casters
             var drawn = addYard(yards[index], eyeX, eyeZ, foldOf)
             if (!drawn) {
@@ -127,19 +142,35 @@ internal class HouseDetail(private val yards: List<Yard>, casterNumbers: Float32
             show(index, drawn)
         }
         into = others
+        listed = 0
+        needed = others.count
         for (index in yards.indices) {
-            if (!byCharacter[index] && away[index] >= 0.0 && away[index] <= REACH / 2) {
-                show(index, addYard(yards[index], eyeX, eyeZ, foldOf))
+            if (byCharacter[index]) continue
+            if (away[index] < 0.0 || away[index] > REACH) {
+                show(index, false)
+                continue
             }
+            order[listed++] = index
+            needed += needs[index]
         }
-        for (index in yards.indices) {
-            val far = away[index]
-            if (byCharacter[index] || (far >= 0.0 && far <= REACH / 2)) continue
-            show(index, far > REACH / 2 && far <= REACH && addYard(yards[index], eyeX, eyeZ, foldOf))
-        }
+        if (needed > others.capacity) nearestFirst(listed)
+        for (at in 0 until listed) show(order[at], addYard(yards[order[at]], eyeX, eyeZ, foldOf))
         for (index in yards.indices) {
             val lawn = yards[index].lawn ?: continue
             if (away[index] > REACH && others.count < others.capacity) addBox(lawn, 1.0, lawn.colour)
+        }
+    }
+
+    /** Puts the first [listed] blocks of [order] nearest first, in place: they are few, so one by one will do. */
+    private fun nearestFirst(listed: Int) {
+        for (at in 1 until listed) {
+            val index = order[at]
+            var to = at
+            while (to > 0 && away[order[to - 1]] > away[index]) {
+                order[to] = order[to - 1]
+                to--
+            }
+            order[to] = index
         }
     }
 

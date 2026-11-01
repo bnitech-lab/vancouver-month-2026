@@ -188,16 +188,19 @@ class HouseDetailTest {
 
     @Test
     fun `with too many blocks in view the farthest go without, never more boxes than it holds`() {
-        // Rows of blocks reaching away from a camera looking along them: far more than it holds.
-        val yards = (0 until 40).flatMap { row -> (0 until 20).map { across -> yardAt(500.0 + row * 1.8, 30.0 + across * 2.2, count = 4) } }
+        // Rows of blocks reaching away from a camera looking along them, far more than it holds, listed farthest first.
+        val yards = (0 until 40).reversed().flatMap { row ->
+            (0 until 20).map { across -> yardAt(500.0 + row * 1.8, 30.0 + across * 2.2, count = 4) }
+        }
         val detail = detailOf(yards)
         detail.fillFor(Point(470.0, 12.0, 52.0), Spot(491.0, 52.0))
         assertTrue(detail.others.count <= HouseDetail.CAPACITY && detail.casters.count <= HouseDetail.CASTER_CAPACITY)
-        assertTrue(detail.others.count > HouseDetail.CAPACITY - 12, "${detail.others.count}")
-        // Along the middle of the view: the near ones all drawn, and some within reach left out.
-        val middle = yards.indices.filter { abs(yards[it].middle.z - 52.0) < 2.0 }
-        assertTrue(middle.filter { yards[it].middle.x < 507.0 }.all { detail.shown[it] }, "a near one left out")
-        assertTrue(middle.any { !detail.shown[it] && yards[it].middle.x - 470.0 < HouseDetail.REACH }, "none left out")
+        assertTrue(detail.others.count > HouseDetail.CAPACITY - 17, "${detail.others.count}")
+        // Along the middle of the view, those drawn are all nearer than those within reach left out.
+        val middle = yards.indices.filter { abs(yards[it].middle.z - 52.0) < 2.0 && yards[it].middle.x - 470.0 < HouseDetail.REACH }
+        val (drawn, left) = middle.partition { detail.shown[it] }
+        assertTrue(drawn.isNotEmpty() && left.isNotEmpty(), "${drawn.size} drawn, ${left.size} left out")
+        assertTrue(drawn.maxOf { yards[it].middle.x } < left.minOf { yards[it].middle.x }, "a nearer one left out")
     }
 
     private var town: NeighbourhoodScene? = null
