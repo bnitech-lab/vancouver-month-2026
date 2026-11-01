@@ -372,7 +372,7 @@ rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, al
 `Passersby.kt` for the passersby's), and so are each day's weather (`Weather.kt`) and the bike shop's and riding's
 words (`Shop.kt`), and the SkyTrain's, the bus's, the water bus's and the taxi's (`Transit.kt`). `WalkableTown` draws
 all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about 981 KB
+`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about 983 KB
 (about 277 KB gzipped). `TownBudgetTest` measures what a frame costs downtown (by day and at night), in East Vancouver, in Burnaby, on a walk
 and on the train, and keeps it within a phone's budget.
 
