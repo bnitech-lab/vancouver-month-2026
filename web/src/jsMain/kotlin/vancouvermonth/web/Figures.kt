@@ -113,6 +113,8 @@ object Figures {
         Passer.MINA -> Look(skin = 0xF6D6BD, hair = 0x2B1E1A, top = 0xF2D16B, bottom = 0x4A5568, shoes = 0x7A4E3A)
         Passer.PRIYA -> Look(skin = 0xC68E63, hair = 0x1F1712, top = 0xB65A7A, bottom = 0x3E3A5C, shoes = 0x5A3E2B)
         Passer.THEO -> Look(skin = 0xF1CFB0, hair = 0x6B4A2E, top = 0x8C9AA8, bottom = 0x3A3F4A, shoes = 0x2A2A2A)
+        Passer.JIHO -> Look(skin = 0xEFC9A4, hair = 0x1E1814, top = 0x5B7FC0, bottom = 0x2E3B4E, shoes = 0xE85D4A)
+        Passer.ELENA -> Look(skin = 0xDDB08C, hair = 0xB98A5A, top = 0x7FB069, bottom = 0x6B4E71, shoes = 0x4A3A2E)
     }
 
     /**
@@ -142,6 +144,10 @@ object Figures {
                 Part(Limb.RIGHT_ARM, Block(-0.07, -0.52, 0.02, 0.14, 0.16, 0.14, 0xF4EDE1)),
                 Part(Limb.RIGHT_ARM, Block(-0.075, -0.37, 0.015, 0.15, 0.03, 0.15, 0x6B4630)),
             )
+            // A school bag on the back.
+            Passer.JIHO -> listOf(Part(Limb.BODY, Block(-0.2, 0.42, -0.3, 0.4, 0.42, 0.14, 0xE0A43A)))
+            // A shopping bag in the right hand.
+            Passer.ELENA -> listOf(Part(Limb.RIGHT_ARM, Block(-0.12, -0.72, -0.06, 0.24, 0.26, 0.14, 0xEDE3CC)))
         }
         return body(look) + extra
     }

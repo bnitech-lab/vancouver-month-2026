@@ -138,6 +138,8 @@ private const val TURN_MILLIS = 120.0
  * - 미나 walks the West End street south-east of 내 방, along one side and back along the other.
  * - 프리야 walks the edge of the big park, between it and the West End, and back.
  * - 테오 walks the square in front of the station, round and round.
+ * - 지호 walks the big Burnaby park's edge by its station, and back.
+ * - 엘레나 walks a street of the Burnaby town centre, by its station, and back.
  * They start far apart and away from 내 방, where each day begins.
  */
 object Strolls {
@@ -157,5 +159,7 @@ object Strolls {
             speed = 1.05,
             start = 2.0,
         ),
+        Passerby(Passer.JIHO, Stroll(listOf(Spot(546.5, 28.0), Spot(556.5, 28.0))), speed = 1.3, start = 4.0),
+        Passerby(Passer.ELENA, Stroll(listOf(Spot(589.5, 19.0), Spot(589.5, 27.0))), speed = 0.95, start = 2.0),
     )
 }
