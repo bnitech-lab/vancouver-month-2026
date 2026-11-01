@@ -38,7 +38,7 @@ class ShopInGameTest {
     private val game1011 = FirstMinute(1011)
 
     /** Seed 1011's balance on its first day, in its cheapest room. */
-    private val startBalance = game1011.startMonth(game1011.cheapestRoomIndex).balance
+    private val startBalance = game1011.startMonth(game1011.cheapestRoomIndex, game1011.lowestTotal).balance
 
     @AfterTest
     fun removeScreen() {
@@ -163,16 +163,16 @@ class ShopInGameTest {
 
     @Test
     fun `a short balance says why at the shop, and why a shared one cannot be rented`() {
-        // 28 days of rest bring 9월 30일; a bike and 81 shared e-scooter rides leave $41, a day's living cost and $1.
+        // 28 days of rest bring 9월 30일; a bike and 106 shared e-scooter rides leave $41, a day's living cost and $1.
         val rest = Choice.Take(Action.REST)
         val bike = Spend(Spending.BIKE, 350)
         val ride = Spend(Spending.SHARED_E_SCOOTER_RIDE, 4)
-        val kept = record(*Array(28) { rest }, bike, *Array(81) { ride })
+        val kept = record(*Array(28) { rest }, bike, *Array(106) { ride })
         val month = assertNotNull(kept.replay()).month
         assertEquals(Month.LAST_DAY, month.day)
         assertEquals(41, month.balance)
         // One more ride would have left less than today's living cost, so the record could not hold it.
-        assertNull(record(*Array(28) { rest }, bike, *Array(82) { ride }).replay())
+        assertNull(record(*Array(28) { rest }, bike, *Array(107) { ride }).replay())
         val town = QuietTown()
         continued(kept, town)
         town.onShop()

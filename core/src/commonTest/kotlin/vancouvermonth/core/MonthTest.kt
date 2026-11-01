@@ -173,7 +173,7 @@ class MonthTest {
     fun `no interview is ever booked after the 30th`() {
         for (seed in 1..500) {
             val game = FirstMinute(seed)
-            val month = game.startMonth(0)
+            val month = game.startMonth(0, guess = 1_000)
             while (!month.isOver) {
                 if (month.hasInterviewToday) {
                     month.attendInterview()
@@ -229,13 +229,22 @@ class MonthTest {
     }
 
     @Test
-    fun `what is left after any first room covers the month's living cost`() {
+    fun `what is left after any first room and the most a guess can lose covers the month's living cost`() {
         val livingCost = Month.DAILY_LIVING_COST * (Month.LAST_DAY - Month.FIRST_DAY + 1)
         for (seed in 1..2_000) {
             for (room in RoomDealer.deal(seed)) {
-                assertTrue(FirstMinute.STARTING_BALANCE - room.totalMonthlyCost >= livingCost, "seed $seed: $room")
+                val left = FirstMinute.STARTING_BALANCE - room.totalMonthlyCost - FirstMinute.GUESS_PENALTY
+                assertTrue(left >= livingCost, "seed $seed: $room")
             }
         }
+        // The dearest room the dealer can deal, in zone 1 with the highest rent and utilities, leaves enough too.
+        val dearest = RoomDealer.BASE_RENT - RoomDealer.RENT_DROP_PER_ZONE + RoomDealer.RENT_SPREAD +
+            RoomDealer.UTILITIES_RANGE.last + Zone.ONE.monthlyPass
+        assertTrue(Zone.entries.all { zone ->
+            RoomDealer.BASE_RENT - zone.number * RoomDealer.RENT_DROP_PER_ZONE + RoomDealer.RENT_SPREAD +
+                RoomDealer.UTILITIES_RANGE.last + zone.monthlyPass <= dearest
+        })
+        assertTrue(FirstMinute.STARTING_BALANCE - dearest - FirstMinute.GUESS_PENALTY >= livingCost, "dearest $dearest")
     }
 
     @Test

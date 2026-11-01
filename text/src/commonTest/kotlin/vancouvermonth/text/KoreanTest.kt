@@ -60,16 +60,20 @@ class KoreanTest {
         val run = TodaysRun(2026, 10, 30)
         assertEquals("10월 30일 오늘의 판", todaysRunName(run))
         assertEquals(
-            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 155/200 · 9월 19일 취업 제안",
-            todaysRunResult(run, 155, Ending.OFFER, 19),
+            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 짐작 보상 +\$55 · 9월 19일 취업 제안",
+            todaysRunResult(run, 55, Ending.OFFER, 19),
         )
         assertEquals(
-            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 200/200 · 9월을 버팀",
-            todaysRunResult(run, 200, Ending.SURVIVED, 30),
+            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 짐작 보상 +\$100 · 9월을 버팀",
+            todaysRunResult(run, 100, Ending.SURVIVED, 30),
         )
         assertEquals(
-            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 0/200 · 10월 총비용 모자람",
-            todaysRunResult(run, 0, Ending.CANNOT_PAY_RENT, 30),
+            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 짐작 패널티 -\$300 · 10월 총비용 모자람",
+            todaysRunResult(run, -300, Ending.CANNOT_PAY_RENT, 30),
+        )
+        assertEquals(
+            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 짐작 보상 \$0 · 9월을 버팀",
+            todaysRunResult(run, 0, Ending.SURVIVED, 30),
         )
         assertEquals("1월 5일 오늘의 판", todaysRunName(TodaysRun(2027, 1, 5)))
     }
@@ -185,7 +189,7 @@ class KoreanTest {
         )
         assertEquals("가장 싼 방보다 한 달에 \$100 더 내요. 10월 1일에도 그만큼 더 나가요.", monthCostLine(game, game.reveal(1, 0)))
         // Rooms 1 and 3 tie for the lowest total: either is the cheapest.
-        val cheapest = "가장 싼 방이라 9월을 버틸 돈이 가장 많이 남아요."
+        val cheapest = "가장 싼 방이라 매달 나가는 돈이 가장 적어요."
         assertEquals(cheapest, monthCostLine(game, game.reveal(0, 1_245)))
         assertEquals(cheapest, monthCostLine(game, game.reveal(2, 0)))
     }
@@ -243,6 +247,43 @@ class KoreanTest {
             eventLine(Event.InterviewHeld(InterviewStage.PHONE_SCREEN, true, Interview(InterviewStage.TECHNICAL, 9)), month),
         )
         assertEquals("생활비 -\$40, 잔고 \$1,800", eventLine(Event.LivingCost(40), month))
+    }
+
+    @Test
+    fun `the guess's money reads with its sign, as a reward or a penalty, with the balance it leaves`() {
+        val month = month()
+        assertEquals("짐작 보상 +\$100, 잔고 \$1,800", eventLine(Event.Guessed(0, 100), month))
+        assertEquals("짐작 보상 +\$55, 잔고 \$1,800", eventLine(Event.Guessed(45, 55), month))
+        assertEquals("짐작 보상 \$0, 잔고 \$1,800", eventLine(Event.Guessed(100, 0), month))
+        assertEquals("짐작 패널티 -\$150, 잔고 \$1,800", eventLine(Event.Guessed(250, -150), month))
+        assertEquals("짐작 패널티 -\$300, 잔고 \$1,800", eventLine(Event.Guessed(900, -300), month))
+        assertEquals(listOf("+\$80", "\$0", "-\$1,234"), listOf(signedMoney(80), signedMoney(0), signedMoney(-1_234)))
+    }
+
+    @Test
+    fun `how the guess pays is said in one line, and worked out from core for three guesses`() {
+        assertEquals("맞힐수록 최대 \$100을 더 받고, \$100보다 더 틀리면 그만큼 잃어요(최대 \$300).", guessRuleLine())
+        assertEquals("딱 맞히면 +\$100, \$100 틀리면 \$0, \$250 틀리면 -\$150", guessExamplesLine())
+        assertEquals(Intro.GUESS_WHAT, "방을 고른 뒤 그 방의 한 달 총비용을 짐작해 적어요.")
+        for (line in listOf(guessRuleLine(), guessExamplesLine(), Intro.GUESS_WHAT, Intro.GUESS, Intro.START)) {
+            assertFalse('\u2014' in line, "Em dash in: $line")
+            assertTrue(columns(line) <= 2 * MAX_COLUMNS, "More than two rows of a phone: $line")
+        }
+    }
+
+    @Test
+    fun `the plain line under the guess's money says why, at every edge of the rule`() {
+        val lines = listOf(0, 1, 45, 99, 100, 101, 250, 399, 400, 10_000).associateWith { gap -> guessMoneyWhy(gap) }
+        assertEquals("딱 맞혀서 \$100을 다 받아요.", lines[0])
+        for (gap in listOf(1, 45, 99)) assertEquals("\$100에서 틀린 만큼 빼고 받아요.", lines[gap])
+        assertEquals("\$100만큼 틀려서 받지도 잃지도 않아요.", lines[100])
+        for (gap in listOf(101, 250, 399)) assertEquals("\$100보다 더 틀린 만큼 잃어요.", lines[gap])
+        for (gap in listOf(400, 10_000)) assertEquals("많이 틀렸지만 잃는 돈은 \$300까지예요.", lines[gap])
+        for (line in lines.values) assertFalse('\u2014' in line, line)
+        assertEquals("짐작 보상", guessMoneyLabel(0))
+        assertEquals("짐작 보상", guessMoneyLabel(55))
+        assertEquals("짐작 패널티", guessMoneyLabel(-1))
+        assertEquals("9월을 시작하는 잔고 \$1,710", startBalanceLine(1_710))
     }
 
     @Test

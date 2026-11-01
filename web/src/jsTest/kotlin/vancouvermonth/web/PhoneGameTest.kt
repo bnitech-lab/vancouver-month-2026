@@ -5,6 +5,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -50,7 +51,14 @@ class PhoneGameTest {
         root.remove()
     }
 
-    private fun open(seed: Int) = PhoneGame(root, seed, playAgain = { playedAgain = true }).show()
+    /** Opens [seed]'s page on its intro. */
+    private fun openIntro(seed: Int) = PhoneGame(root, seed, playAgain = { playedAgain = true }).show()
+
+    /** Opens [seed]'s page and leaves the intro for the rooms. */
+    private fun open(seed: Int) {
+        openIntro(seed)
+        passIntro(root)
+    }
 
     private val screen: String
         get() = root.textContent.orEmpty()
@@ -63,14 +71,18 @@ class PhoneGameTest {
 
     private fun tap(text: String) = button(text).click()
 
+    private fun text(selector: String): String =
+        assertNotNull(root.querySelector(selector), "No $selector in: $screen").textContent.orEmpty()
+
     private fun type(amount: String) {
         val input = root.querySelector("input") as HTMLInputElement
         input.value = amount
         input.dispatchEvent(Event("input"))
     }
 
-    /** Picks [room] (from 1), guesses [amount] and starts September. */
+    /** Leaves the intro, picks [room] (from 1), guesses [amount] and starts September. */
     private fun startMonth(room: Int, amount: String) {
+        passIntro(root)
         tap("${room}번 방")
         type(amount)
         tap("총비용 확인하기")
@@ -87,10 +99,12 @@ class PhoneGameTest {
 
     @Test
     fun `seed 1011 plays the first day the README shows`() {
-        open(1011)
+        openIntro(1011)
         assertTrue("판 번호 1011" in screen)
         assertTrue("9월 1일, 딱 \$3,000 들고 밴쿠버에 막 도착했어요." in screen)
         assertFalse("잔고 \$3,000" in screen)
+        passIntro(root)
+        assertTrue("판 번호 1011" in screen)
         assertTrue("1구역 \$105 · 2구역 \$145 · 3구역 \$195" in screen)
         assertTrue("별도면 한 달 \$120~\$190" in screen)
 
@@ -99,15 +113,18 @@ class PhoneGameTest {
         tap("총비용 확인하기")
         assertTrue("\$1,345" in screen)
         assertTrue("월세 \$970 + 공과금 \$180 + 교통 \$195" in screen)
-        assertTrue("총비용이 가장 싼 방은 3번이었어요 (\$1,165).+0" in screen)
-        assertTrue("내 짐작과 차이 \$45+55" in screen)
-        assertTrue("방 고르기 점수 55 / 200" in screen)
-        assertTrue("첫 달을 내고 남은 잔고 \$1,655" in screen)
+        assertEquals(
+            listOf("총비용이 가장 싼 방은 3번이었어요 (\$1,165).", "내 짐작과 차이 \$45"),
+            root.querySelectorAll(".reveal .points li").asList().map { it.textContent },
+        )
+        assertEquals("짐작 보상+\$55", root.querySelector(".reveal .guess-money")?.textContent)
+        assertTrue("9월을 시작하는 잔고 \$1,710" in screen)
+        assertFalse("점수" in screen, screen)
 
         tap("9월 2일 시작하기")
         assertTrue("오늘9월 2일" in screen)
         assertTrue("남은 날29일" in screen)
-        assertTrue("잔고\$1,655" in screen)
+        assertTrue("잔고\$1,710" in screen)
         assertTrue("10월 1일에 낼 총비용\$1,345" in screen)
         assertTrue("지원서 넣기면접이 잡힐 확률 27%, 체력 -1" in screen)
 
@@ -115,27 +132,33 @@ class PhoneGameTest {
         assertTrue("9월 2일에 있었던 일" in screen)
         assertEquals("polite", root.querySelector(".log")?.getAttribute("aria-live"))
         assertTrue("영어 실력이 올랐어요. 영어 2/10" in screen)
-        assertTrue("생활비 -\$40, 잔고 \$1,615" in screen)
+        assertTrue("생활비 -\$40, 잔고 \$1,670" in screen)
         assertTrue("오늘9월 3일" in screen)
     }
 
     @Test
-    fun `the first screen tells the story, the goal and why the room matters before the rooms`() {
-        open(1011)
+    fun `the intro tells the story, and the rooms say why the room matters before the rooms, without the story`() {
+        openIntro(1011)
         val game = FirstMinute(1011)
-        val story = root.querySelector(".story")?.textContent.orEmpty()
+        val story = root.querySelector(".intro .story")?.textContent.orEmpty()
         assertEquals(arrivalLines(game.startingBalance).joinToString(""), story)
         assertEquals(goalLine(), root.querySelector(".story .goal")?.textContent)
         assertEquals(1, root.querySelectorAll(".story .goal").length)
+        val introScreen = screen
+        passIntro(root)
+        assertNull(root.querySelector(".story"), "The story is told again on the rooms")
+        for (line in arrivalLines(game.startingBalance)) assertFalse(line in screen, line)
         val firstRoom = screen.indexOf("1번 방")
-        val order = arrivalLines(game.startingBalance) + "할 일" + whyTotalLines()
+        val order = listOf("할 일") + whyTotalLines()
         val at = order.map { screen.indexOf(it) }
         assertTrue(at.all { it >= 0 }, "missing one of $order in: $screen")
         assertEquals(at.sorted(), at, "out of order: $screen")
         assertTrue(at.last() < firstRoom, "the why comes after the rooms: $screen")
-        // The guess and the score stay: no room's total, and no word that names the cheapest room, before the reveal.
-        for (room in game.rooms) assertFalse(money(room.totalMonthlyCost) in screen, screen)
-        for (word in listOf("가장 싼 방은", "번이었어요", "가장 싼 방보다", "가장 싼 방이라")) assertFalse(word in screen, word)
+        // No room's total, and no word that names the cheapest room, before the reveal, on the intro or the rooms.
+        for (page in listOf(introScreen, screen)) {
+            for (room in game.rooms) assertFalse(money(room.totalMonthlyCost) in page, page)
+            for (word in listOf("가장 싼 방은", "번이었어요", "가장 싼 방보다", "가장 싼 방이라")) assertFalse(word in page, word)
+        }
     }
 
     @Test
@@ -155,7 +178,58 @@ class PhoneGameTest {
         type("${game.lowestTotal}")
         tap("총비용 확인하기")
         val cheap = root.querySelector(".reveal .month-cost")?.textContent
-        assertEquals("가장 싼 방이라 9월을 버틸 돈이 가장 많이 남아요.", cheap)
+        assertEquals("가장 싼 방이라 매달 나가는 돈이 가장 적어요.", cheap)
+    }
+
+    @Test
+    fun `a close guess shows its reward, why, and the balance it starts September with`() {
+        val game = FirstMinute(1011)
+        open(1011)
+        tap("1번 방")
+        val total = game.rooms[0].totalMonthlyCost
+        type("${total - 20}")
+        tap("총비용 확인하기")
+        val reward = assertNotNull(root.querySelector(".reveal .guess-money"))
+        assertTrue(reward.classList.contains("guess-money-reward") && !reward.classList.contains("guess-money-penalty"))
+        assertEquals("짐작 보상", text(".guess-money-label"))
+        assertEquals("+\$80", text(".guess-money-amount"))
+        assertEquals("\$100에서 틀린 만큼 빼고 받아요.", text(".reveal .guess-why"))
+        val start = FirstMinute.STARTING_BALANCE - total + 80
+        assertEquals("9월을 시작하는 잔고 ${money(start)}", text(".reveal .left"))
+        tap("시작하기")
+        assertTrue("잔고${money(start)}" in text(".topbar"), screen)
+    }
+
+    @Test
+    fun `a guess far off shows its penalty, why, and the balance it starts September with`() {
+        val game = FirstMinute(1011)
+        open(1011)
+        tap("3번 방")
+        type("${game.lowestTotal + 250}")
+        tap("총비용 확인하기")
+        val penalty = assertNotNull(root.querySelector(".reveal .guess-money"))
+        assertTrue(penalty.classList.contains("guess-money-penalty"))
+        assertEquals("짐작 패널티", text(".guess-money-label"))
+        assertEquals("-\$150", text(".guess-money-amount"))
+        assertEquals("\$100보다 더 틀린 만큼 잃어요.", text(".reveal .guess-why"))
+        val start = FirstMinute.STARTING_BALANCE - game.lowestTotal - 150
+        assertEquals("9월을 시작하는 잔고 ${money(start)}", text(".reveal .left"))
+        // The order the reveal reads in: the total, the gap, what the room costs the month, the money, why, the balance.
+        val order = listOf(".total", ".points", ".month-cost", ".guess-money", ".guess-why", ".left").map { selector ->
+            root.querySelector(".reveal")!!.children.asList().indexOfFirst { it.matches(selector) }
+        }
+        assertEquals(order.sorted(), order)
+        tap("시작하기")
+        assertTrue("잔고${money(start)}" in text(".topbar"), screen)
+        tap("쉬기")
+        assertTrue("생활비 -\$40, 잔고 ${money(start - 40)}" in screen, screen)
+    }
+
+    @Test
+    fun `the guess's form says how the guess pays, and the field is described by it`() {
+        open(1011)
+        assertEquals("맞힐수록 최대 \$100을 더 받고, \$100보다 더 틀리면 그만큼 잃어요(최대 \$300).", text(".guess .guess-rule"))
+        assertEquals("guess-rule", root.querySelector("#guess")?.getAttribute("aria-describedby"))
     }
 
     @Test
@@ -224,7 +298,8 @@ class PhoneGameTest {
         startMonth(room = 3, amount = "1165")
         while ("다시 하기" !in screen) tap("쉬기")
         assertTrue("9월이 끝났어요." in screen)
-        assertTrue("방 고르기 점수200/200" in screen)
+        assertTrue("짐작 보상+\$100" in text(".ending .figures"), screen)
+        assertFalse("점수" in screen, screen)
         assertTrue("판 번호 1011" in screen)
         assertFalse(playedAgain)
         tap("다시 하기")
@@ -288,7 +363,7 @@ class PhoneGameTest {
     fun `today's run ends with its result line and a copy button`() {
         restThrough(TodaysRun(2026, 10, 30))
         assertEquals(
-            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 200/200 · 10월 총비용 모자람",
+            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 짐작 보상 +\$100 · 10월 총비용 모자람",
             root.querySelector(".result-line")?.textContent,
         )
         assertFalse(button("결과 복사").disabled)
@@ -312,7 +387,7 @@ class PhoneGameTest {
     @Test
     fun `the copy fallback selects the whole line`() {
         val line = document.createElement("p") as HTMLElement
-        line.textContent = "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 170/200 · 9월 17일 취업 제안"
+        line.textContent = "밴쿠버 한 달 · 10월 30일 오늘의 판 · 짐작 보상 +\$70 · 9월 17일 취업 제안"
         root.appendChild(line)
         assertTrue(selectAll(line))
         assertEquals(line.textContent, getSelection().toString())
@@ -335,7 +410,8 @@ class PhoneGameTest {
             type(typed)
             assertFalse(button("총비용 확인하기").disabled, typed)
             tap("총비용 확인하기")
-            assertTrue("내 짐작과 차이 \$45+55" in screen, typed)
+            assertTrue("내 짐작과 차이 \$45" in screen, typed)
+            assertEquals("+\$55", text(".guess-money-amount"), typed)
         }
     }
 
@@ -377,6 +453,7 @@ class PhoneGameTest {
         val town = NotingTown()
         var made = 0
         PhoneGame(root, 1011, playAgain = {}, makeTown = { made++; town }).show()
+        passIntro(root)
         tap("3번 방")
         type("1165")
         tap("총비용 확인하기")

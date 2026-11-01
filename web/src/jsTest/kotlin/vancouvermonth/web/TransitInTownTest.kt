@@ -54,7 +54,7 @@ class TransitInTownTest {
 
     /** Seed 1011's balance on its first day, in its cheapest room. */
     private val firstBalance: Int
-        get() = FirstMinute(1011).let { it.startMonth(it.cheapestRoomIndex).balance }
+        get() = FirstMinute(1011).let { it.startMonth(it.cheapestRoomIndex, it.lowestTotal).balance }
 
     /** Makes [town] 375 by 812 points, a phone's shape, whatever the test browser's window. */
     private fun pinToPhone(town: NeighbourhoodScene) {
@@ -454,7 +454,7 @@ class TransitInTownTest {
         // Rest to the 30th, then a taxi or two down to $42: a $4 fare would leave less than the day's living cost.
         val game = FirstMinute(1011)
         val moves = mutableListOf<vancouvermonth.save.Move>()
-        val month = game.startMonth(game.cheapestRoomIndex)
+        val month = game.startMonth(game.cheapestRoomIndex, game.lowestTotal)
         while (month.day < Month.LAST_DAY) {
             month.play(Choice.Take(vancouvermonth.core.Action.REST))
             moves += Choice.Take(vancouvermonth.core.Action.REST)

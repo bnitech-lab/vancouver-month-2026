@@ -22,7 +22,6 @@ import vancouvermonth.core.TodaysRun
 import vancouvermonth.save.Choice
 import vancouvermonth.save.MonthRecord
 import vancouvermonth.text.Continue
-import vancouvermonth.text.Guide
 import vancouvermonth.text.continueFrom
 import vancouvermonth.text.date
 import vancouvermonth.text.greeting
@@ -77,14 +76,15 @@ class ContinueMonthTest {
             PhoneGame(into, today, playAgain = { playedAgain = true }, makeWalkableTown = { town })
         }
         game.slot = SaveSlot(Memory { storage })
-        game.guide = FirstRunGuide(Memory { storage }).also { guides += it }
+        game.guide = FirstRunGuide().also { guides += it }
         game.talkSettleMillis = 0.0
         game.show()
         return game
     }
 
-    /** Picks [seed]'s cheapest room in [into] and reveals it with an exact guess, up to the start card. */
+    /** Past the intro, picks [seed]'s cheapest room in [into] and reveals it with an exact guess, up to the start card. */
     private fun revealRun(seed: Int, into: HTMLElement = root) {
+        passIntro(into)
         val game = FirstMinute(seed)
         into.button("${game.cheapestRoomIndex + 1}번 방").click()
         val input = into.querySelector("input") as HTMLInputElement
@@ -102,7 +102,7 @@ class ContinueMonthTest {
     /** Seed 1011's September, after [actions], as core plays it. */
     private fun played(vararg actions: Action): Month {
         val game = FirstMinute(1011)
-        val month = game.startMonth(game.cheapestRoomIndex)
+        val month = game.startMonth(game.cheapestRoomIndex, game.lowestTotal)
         for (action in actions) month.take(action)
         return month
     }
@@ -131,7 +131,6 @@ class ContinueMonthTest {
         val town = QuietTown()
         open(town = town)
         startSeed1011(root)
-        root.button(Guide.START).click()
         for (place in listOf(Place.LIBRARY, Place.CAFE, Place.COWORKING)) {
             town.onPlace(place)
             (root.querySelector(".talk .spend") as HTMLButtonElement).click()
@@ -174,7 +173,6 @@ class ContinueMonthTest {
     fun `continued on the first day, the town has its hint and the focus is on its top card`() {
         open(town = QuietTown())
         startSeed1011(root)
-        root.button(Guide.START).click()
 
         open(town = QuietTown())
         assertEquals(continueFrom(Month.FIRST_DAY, played().balance), text(".kept-from"))
@@ -189,7 +187,6 @@ class ContinueMonthTest {
         val town = QuietTown()
         open(town = town)
         startSeed1011(root)
-        root.button(Guide.START).click()
         town.onPlace(Place.LIBRARY)
         (root.querySelector(".talk .spend") as HTMLButtonElement).click()
 
@@ -265,7 +262,6 @@ class ContinueMonthTest {
         val town = EveningTown()
         open(town = town)
         startSeed1011(root)
-        root.button(Guide.START).click()
         town.onPlace(Place.LIBRARY)
         (root.querySelector(".talk .spend") as HTMLButtonElement).click()
         assertEquals(Place.LIBRARY, town.evening, "The day did not start to change")
@@ -355,7 +351,8 @@ class ContinueMonthTest {
 
         open()
         assertNull(card)
-        assertNotNull(root.querySelector(".rooms"))
+        assertNotNull(root.querySelector(".intro"))
+        assertNull(root.querySelector(".rooms"))
     }
 
     @Test
@@ -374,7 +371,7 @@ class ContinueMonthTest {
             again.slot = SaveSlot(Memory { storage })
             again.show()
             assertNull(card)
-            assertNotNull(root.querySelector(".rooms"))
+            assertNotNull(root.querySelector(".intro"))
         }
     }
 
@@ -436,21 +433,22 @@ class ContinueMonthTest {
 
     @Test
     fun `a kept line that does not read or does not replay is dropped without a word`() {
-        // A bad letter, another version (the first one among them, from before money could be spent), an interview on
-        // a day without one, a room that is not there, and a bike bought twice.
+        // A bad letter, another version (the first, from before money could be spent, and the second, from before the
+        // guess moved money), an interview on a day without one, a room that is not there, and a bike bought twice.
         val lines = listOf(
-            "2|1011||2|1165|Z",
+            "3|1011||2|1165|Z",
             "9|1011||2|1165|",
             "1|1011||2|1165|EWC",
-            "2|1011||2|1165|I",
-            "2|1011||7|1165|",
-            "2|1011||2|1165|b350Eb350",
+            "2|1011||2|1165|EWC",
+            "3|1011||2|1165|I",
+            "3|1011||7|1165|",
+            "3|1011||2|1165|b350Eb350",
         )
         for (line in lines) {
             store.items[SaveSlot.KEY] = line
             open()
             assertNull(card, "Offered: $line")
-            assertNotNull(root.querySelector(".rooms"))
+            assertNotNull(root.querySelector(".intro"))
             assertEquals("", store.items[SaveSlot.KEY], "Not dropped: $line")
         }
     }
@@ -466,20 +464,21 @@ class ContinueMonthTest {
         game.slot = SaveSlot(Memory { store }) { error("A rule this line was not kept under") }
         game.show()
         assertNull(card)
-        assertNotNull(root.querySelector(".rooms"))
+        assertNotNull(root.querySelector(".intro"))
         assertEquals("", store.items[SaveSlot.KEY])
     }
 
     @Test
     fun `only a kept month that replays decides the run of an address with no run`() {
         val slot = SaveSlot(Memory { store })
-        store.items[SaveSlot.KEY] = "2|1011||2|1165|EWC"
+        store.items[SaveSlot.KEY] = "3|1011||2|1165|EWC"
         assertEquals(1011, slot.continuable()?.seed)
-        for (line in listOf("2|1011||2|1165|I", "2|1011||2|1165|Z", "1|1011||2|1165|EWC", "")) {
+        val notContinuable = listOf("3|1011||2|1165|I", "3|1011||2|1165|Z", "1|1011||2|1165|EWC", "2|1011||2|1165|EWC", "")
+        for (line in notContinuable) {
             store.items[SaveSlot.KEY] = line
             assertNull(slot.continuable(), "Continuable: $line")
         }
-        store.items[SaveSlot.KEY] = "2|1011||2|1165|EWC"
+        store.items[SaveSlot.KEY] = "3|1011||2|1165|EWC"
         assertNull(SaveSlot(Memory { store }) { error("A rule this line was not kept under") }.continuable())
     }
 

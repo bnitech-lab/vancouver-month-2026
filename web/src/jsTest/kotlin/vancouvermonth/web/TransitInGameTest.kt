@@ -22,7 +22,7 @@ import vancouvermonth.text.money
 class TransitInGameTest {
     private val root = (document.createElement("main") as HTMLElement).also { document.body!!.appendChild(it) }
     private val store = FakeStore()
-    private val start = FirstMinute(1011).let { it.startMonth(it.cheapestRoomIndex).balance }
+    private val start = FirstMinute(1011).let { it.startMonth(it.cheapestRoomIndex, it.lowestTotal).balance }
 
     @AfterTest
     fun removeScreen() {
