@@ -460,6 +460,12 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         fun marksOf(kind: Int): Int = MARK_KIND.count { it == kind }
 
         /**
+         * Paints the ground's picture now, with the city's layout it is painted from, if that is not done yet, so the
+         * first map drawn need not wait for it. Its width in pixels.
+         */
+        internal fun warmUp(): Int = groundPicture.width
+
+        /**
          * The water over the whole of [map], then the painted ground, the part of it on the map only, so a window of
          * the wide map costs no more than the whole.
          */

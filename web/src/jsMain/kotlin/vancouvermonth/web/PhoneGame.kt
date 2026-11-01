@@ -222,8 +222,16 @@ class PhoneGame private constructor(
      */
     internal var roomsOnMap = true
 
+    /** The map of the rooms on the screen, if it is; let go when the screen is drawn again. */
+    private var roomMap: RoomMap? = null
+
+    /** True once the map's picture has been set to be painted while the intro is read. */
+    private var mapWarming = false
+
     fun show() {
         stopTyping()
+        roomMap?.close()
+        roomMap = null
         val current = month
         // Rain is heard on a rainy day of the month, and nowhere else.
         sound?.weather(if (current != null && !current.isOver) weatherOf(current.day) else Weather.SUNNY)
@@ -295,6 +303,26 @@ class PhoneGame private constructor(
             mapCredit(this, "intro-credit")
             burnabyCredit(this, "intro-credit")
         }
+        warmUpMap()
+    }
+
+    /**
+     * Paints the whole map's ground, and lays out the city it is painted from, while the intro is read: once, after the
+     * intro shows, when the browser has nothing else to do. So the rooms open at once after 시작하기. A failure only
+     * leaves the work to the rooms.
+     */
+    private fun warmUpMap() {
+        if (mapWarming || !roomsOnMap) return
+        mapWarming = true
+        window.requestAnimationFrame {
+            whenIdle {
+                try {
+                    Minimap.warmUp()
+                } catch (error: Throwable) {
+                    // The rooms paint it themselves, or show the list.
+                }
+            }
+        }
     }
 
     /** Leaves the intro for the rooms, from the top of the page. */
@@ -315,6 +343,7 @@ class PhoneGame private constructor(
         // The rooms as pins on the whole map, where the browser draws one; as a list where it does not. The map comes
         // right after what to do, so a phone shows all of it on the first screen.
         val map = if (roomsOnMap) RoomMap(game.rooms, picked, reveal != null, ::pick).takeIf { it.canDraw } else null
+        roomMap = map
         root.child("section", "rooms") {
             child("h2", text = "어느 방?")
             if (map == null) {
@@ -341,8 +370,9 @@ class PhoneGame private constructor(
         }
         showGuess()
         reveal?.let { showReveal(it) }
-        // Drawn at the width it takes on the page, measured only once the whole screen is there: measured any earlier,
-        // the page would be shorter than where the player has scrolled to, and the browser would pull it back up.
+        // Placed at the width it takes on the page, measured only once the whole screen is there: measured any earlier,
+        // the page would be shorter than where the player has scrolled to, and the browser would pull it back up. The
+        // picture is painted just after the screen is first drawn, so the screen shows at once.
         map?.draw()
     }
 
@@ -1395,6 +1425,15 @@ private fun HTMLElement.result(line: String) {
                 selectInstead()
             }
         }
+    }
+}
+
+/** Runs [work] when the browser has nothing else to do, or straight after this task where it cannot tell when. */
+private fun whenIdle(work: () -> Unit) {
+    if (window.asDynamic().requestIdleCallback == undefined) {
+        window.setTimeout({ work() }, 0)
+    } else {
+        window.asDynamic().requestIdleCallback({ work() })
     }
 }
 

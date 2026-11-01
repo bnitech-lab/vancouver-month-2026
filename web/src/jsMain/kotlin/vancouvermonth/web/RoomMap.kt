@@ -46,8 +46,22 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
     val pinLeft = DoubleArray(rooms.size)
     val pinTop = DoubleArray(rooms.size)
 
-    /** Where each named place's name went at the last [draw]: its box's left, top, right and bottom, in CSS pixels. */
+    /** Where each named place's name went at the last [paint]: its box's left, top, right and bottom, in CSS pixels. */
     val names = mutableMapOf<Place, DoubleArray>()
+
+    /** True once the map has been painted ([paint]). For tests. */
+    var painted = false
+        private set
+
+    /** True once the screen it is on has gone ([close]): a paint still waiting does nothing. */
+    private var closed = false
+
+    /**
+     * When the map was put on the page ([draw]), on the clock of the page it is in, which a tap's time is told on. A tap
+     * made before then, queued while the page was busy (a second, impatient tap on 시작하기, landing where a pin now
+     * is), picks nothing: a pin answers only taps made once it was there.
+     */
+    private var shownAt = window.performance.now()
 
     init {
         element.className = "room-map"
@@ -78,28 +92,35 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
             pin.appendChild(span("room-pin-number", "${index + 1}번"))
             val heard = " 방, 월세 ${money(room.rent)}, 교통 ${room.zone.number}구역, ${utilitiesLabel(room)}"
             pin.appendChild(span("visually-hidden", heard))
-            pin.onclick = { onPick(index) }
+            pin.onclick = { event -> if (event.timeStamp.toDouble() >= shownAt) onPick(index) }
             element.appendChild(pin)
             pin
         }
     }
 
     /**
-     * Places the pins and paints the map at the size it has on the page. Before the page lays it out, the pins are
-     * placed for a map a 375-point phone's width, and nothing is painted.
+     * Places the pins now, at the size the map has on the page, and paints the map just after the screen is first drawn,
+     * so the screen answers at once and the picture follows ([paint]).
      */
     fun draw() {
-        val width = element.clientWidth.toDouble()
-        val height = element.clientHeight.toDouble()
-        val laidOut = width > 0.0 && height > 0.0
-        val map = if (laidOut) {
-            MinimapProjection(width, height)
-        } else {
-            MinimapProjection(NOMINAL_WIDTH, NOMINAL_WIDTH * AREA_HEIGHT / AREA_WIDTH)
-        }
+        shownAt = (element.ownerDocument?.defaultView ?: window).performance.now()
+        place(measured())
+        // In the frame the screen first shows, then straight after it is drawn.
+        window.requestAnimationFrame { window.setTimeout({ if (!closed) paint() }, 0) }
+    }
+
+    /**
+     * Paints the map, and places the pins again, at the size it has on the page now. Before the page lays it out,
+     * nothing is painted.
+     */
+    fun paint() {
+        val map = measured()
         place(map)
         val c = context ?: return
-        if (!laidOut) return
+        if (element.clientWidth == 0 || element.clientHeight == 0) return
+        painted = true
+        val width = map.width
+        val height = map.height
         val ratio = min(window.devicePixelRatio, 2.0)
         canvas.width = (width * ratio).roundToInt()
         canvas.height = (height * ratio).roundToInt()
@@ -145,6 +166,22 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
             if (spot > 0) Minimap.leader(c, dotLeft, dotTop, left, top)
             names[place] = nameBox(left, top, wide)
             Minimap.name(c, place.label, left, top)
+        }
+    }
+
+    /** Lets the map go with its screen: a paint still waiting does nothing. */
+    fun close() {
+        closed = true
+    }
+
+    /** The whole map at the size it has on the page; before the page lays it out, a 375-point phone's width. */
+    private fun measured(): MinimapProjection {
+        val width = element.clientWidth.toDouble()
+        val height = element.clientHeight.toDouble()
+        return if (width > 0.0 && height > 0.0) {
+            MinimapProjection(width, height)
+        } else {
+            MinimapProjection(NOMINAL_WIDTH, NOMINAL_WIDTH * AREA_HEIGHT / AREA_WIDTH)
         }
     }
 

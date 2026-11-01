@@ -21,6 +21,9 @@ import org.w3c.dom.HTMLIFrameElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.asList
 import org.w3c.dom.events.Event
+import org.w3c.dom.events.MouseEvent
+import org.w3c.dom.events.MouseEventInit
+import kotlin.js.Promise
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.save.MonthRecord
 import vancouvermonth.text.Continue
@@ -67,6 +70,14 @@ class RoomMapTest {
     private fun text(selector: String): String =
         assertNotNull(root.querySelector(selector), "No $selector in: ${root.textContent}").textContent.orEmpty()
 
+    /** Resolves after the browser has drawn [count] more frames. */
+    private fun frames(count: Int = 3): Promise<Unit> = Promise { resolve, _ ->
+        fun next(left: Int) {
+            if (left == 0) resolve(Unit) else window.requestAnimationFrame { next(left - 1) }
+        }
+        next(count)
+    }
+
     /** Guesses [amount] for the picked room, sees the real total and starts September. */
     private fun guessAndStart(amount: Int, into: HTMLElement = root) {
         val input = into.querySelector("#guess") as HTMLInputElement
@@ -77,7 +88,7 @@ class RoomMapTest {
     }
 
     @Test
-    fun `after 시작하기 the rooms are three pins on the whole map, each at its zone's 내 방 door`() {
+    fun `after 시작하기 the rooms are three pins on the whole map, each at its zone's 내 방 door`(): Promise<Unit> {
         open()
         passIntro(root)
         val rooms = FirstMinute(1011).rooms
@@ -100,22 +111,43 @@ class RoomMapTest {
         }
         // The three rooms are in three zones, so three places on the map.
         assertEquals(setOf(1, 2, 3), rooms.map { it.zone.number }.toSet())
-        // The map is painted: 내 방's red under each pin, at its door.
+        // The screen shows first: the picture is not painted yet, so the canvas still has a fresh canvas's size.
         val canvas = map.querySelector("canvas") as HTMLCanvasElement
         assertEquals("true", canvas.getAttribute("aria-hidden"))
-        val ratio = canvas.width / box.width
-        val paint = canvas.getContext("2d") as CanvasRenderingContext2D
-        for (room in rooms) {
-            val door = Neighbourhood.home(room.zone.number).door
-            val pixel = paint.getImageData(
-                (whole.left(door.x, door.z) * ratio).roundToInt().toDouble(),
-                (whole.top(door.x, door.z) * ratio).roundToInt().toDouble(),
-                1.0,
-                1.0,
-            ).data.asDynamic()
-            val colour = listOf(pixel[0] as Int, pixel[1] as Int, pixel[2] as Int)
-            assertEquals(listOf(0xC0, 0x58, 0x4A), colour, "No 내 방 at zone ${room.zone.number}")
+        assertEquals(300 to 150, canvas.width to canvas.height, "The map was painted before the screen showed")
+        // A frame later it is painted: 내 방's red under each pin, at its door.
+        return frames().then {
+            val ratio = canvas.width / box.width
+            assertTrue(ratio >= 1.0, "Not painted at the map's size: ${canvas.width} for ${box.width}")
+            val paint = canvas.getContext("2d") as CanvasRenderingContext2D
+            for (room in rooms) {
+                val door = Neighbourhood.home(room.zone.number).door
+                val pixel = paint.getImageData(
+                    (whole.left(door.x, door.z) * ratio).roundToInt().toDouble(),
+                    (whole.top(door.x, door.z) * ratio).roundToInt().toDouble(),
+                    1.0,
+                    1.0,
+                ).data.asDynamic()
+                val colour = listOf(pixel[0] as Int, pixel[1] as Int, pixel[2] as Int)
+                assertEquals(listOf(0xC0, 0x58, 0x4A), colour, "No 내 방 at zone ${room.zone.number}")
+            }
         }
+    }
+
+    @Test
+    fun `a tap made before the rooms were on the screen picks no pin, a tap after does`() {
+        open()
+        // A tap made while the page was busy opening the rooms: its event is from before the map was made.
+        val early = MouseEvent("click", MouseEventInit(bubbles = true, cancelable = true))
+        // Time moves on before 시작하기, past the clock's coarse steps.
+        val made = window.performance.now()
+        while (window.performance.now() - made < 5.0) continue
+        passIntro(root)
+        pins()[1].dispatchEvent(early)
+        assertTrue(pins().none { it.getAttribute("aria-pressed") == "true" }, "The early tap picked a room")
+        assertNull(root.querySelector(".room-card"))
+        pins()[1].click()
+        assertEquals("true", pins()[1].getAttribute("aria-pressed"))
     }
 
     @Test
@@ -125,7 +157,8 @@ class RoomMapTest {
             root.appendChild(holder)
             val map = RoomMap(FirstMinute(1011).rooms, null, false) {}
             holder.appendChild(map.element)
-            map.draw()
+            map.paint()
+            assertTrue(map.painted)
             assertEquals(RoomMap.NAMED.toSet(), map.names.keys, "Not both named at $width")
             for ((place, box) in map.names) {
                 for (at in map.pins.indices) {
@@ -146,7 +179,7 @@ class RoomMapTest {
         root.appendChild(holder)
         val map = RoomMap(FirstMinute(1011).rooms, null, false) {}
         holder.appendChild(map.element)
-        map.draw()
+        map.paint()
         val box = map.element.getBoundingClientRect()
         val whole = MinimapProjection(box.width, box.height)
         val doors = map.doors.map { whole.left(it.x, it.z) to whole.top(it.x, it.z) }
