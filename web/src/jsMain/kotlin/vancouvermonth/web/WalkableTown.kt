@@ -2449,18 +2449,17 @@ internal class NeighbourhoodScene(
     }
 
     /**
-     * Makes the underground's shaders and sends its sign's picture to the graphics card, in the background, so the
-     * platform's first frame does not wait for them. Where the browser cannot, they are made on that frame instead,
-     * and the town goes on either way.
+     * Makes the underground's shaders and sends its sign's picture to the graphics card while the town idles, so the
+     * graphics driver has linked them by the time the platform's first frame uses them. Not three's compileAsync: it
+     * goes on checking the shaders on a timer, which throws in the page once the town has let go of them. If anything
+     * fails here, they are made on that frame instead, and the town goes on either way.
      */
     private fun readyUnderground() {
         if (closed || undergroundReady) return
         try {
             underground.signPicture?.let { renderer.initTexture(it) }
-            renderer.compileAsync(underground.scene, camera).then(
-                { undergroundReady = true },
-                { error -> console.warn("The underground's shaders were not made ahead:", error) },
-            )
+            renderer.compile(underground.scene, camera)
+            undergroundReady = true
         } catch (error: Throwable) {
             console.warn("The underground's shaders were not made ahead:", error)
         }
