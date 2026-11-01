@@ -202,6 +202,20 @@ class ShopInGameTest {
     }
 
     @Test
+    fun `the fare on the top card is the one paid for the ride under way, and is gone once off it`() {
+        val town = QuietTown()
+        val game = open(town)
+        startSeed1011(root)
+        rideShared(town, Ride.SHARED_E_SCOOTER)
+        assertEquals(Riding.rented(Item.E_SCOOTER, 3), text(".hud-riding"))
+        root.button(Riding.GET_OFF).click()
+        // Were a shared one ever ridden without a fare paid for it, no fare is shown, not the last one nor the base.
+        town.ride(Ride.SHARED_BIKE)
+        game.show()
+        assertEquals(Riding.now(Item.BIKE, shared = true), text(".hud-riding"))
+    }
+
+    @Test
     fun `each place's fare goes with its way, from the base up to the most, and the fare shown is the fare paid`() {
         val town = QuietTown()
         val ways = mapOf("카페" to 10.0, "도서관" to 100.0, "코워킹" to 400.0, "회사" to 2_000.0)

@@ -1042,6 +1042,8 @@ class PhoneGame private constructor(
      */
     private fun HTMLElement.rides(month: Month, town: WalkableTown) {
         val riding = town.riding
+        // What a shared ride cost is forgotten once off it, however the ride ended.
+        if (riding == null) ridePaid = null
         val note = rideNote
         // A taxi is called from the open town: not over a talk, which keeps the top card short on a small phone.
         val offerTaxi = riding == null && !isTownCovered()
@@ -1067,11 +1069,11 @@ class PhoneGame private constructor(
             }
             note?.let { child("span", "hud-ride-note", it).setAttribute("aria-live", "polite") }
             if (riding != null) {
-                val fare = riding.fare
-                val now = if (fare == null) {
-                    Riding.now(riding.vehicle.item, shared = false)
+                val paid = ridePaid
+                val now = if (riding.fare != null && paid != null) {
+                    Riding.rented(riding.vehicle.item, paid)
                 } else {
-                    Riding.rented(riding.vehicle.item, ridePaid ?: fare.price)
+                    Riding.now(riding.vehicle.item, shared = riding.fare != null)
                 }
                 child("span", "hud-riding", now)
                 button("hud-ride-button", text = Riding.GET_OFF) {
