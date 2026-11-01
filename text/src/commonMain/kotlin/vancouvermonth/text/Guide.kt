@@ -26,7 +26,7 @@ object Guide {
         "사람이나 건물을 누르면 말을 걸어요. 일 하나를 고르면 하루가 끝나요.",
         "스카이트레인 역, 버스 정류장, 수상버스 선착장을 누르면 타요.",
         "자전거는 가게에서 사거나 길에서 빌리고, 택시는 위 카드로 불러요.",
-        "오른쪽 위 작은 지도는 내 둘레를, 누르면 지도 전체를 보여요.",
+        "오른쪽 위 작은 지도는 내 주변을, 누르면 지도 전체를 보여요.",
     )
 
     /** The card's button: it opens mid-month from the "?", so it closes the card rather than starts anything. */
