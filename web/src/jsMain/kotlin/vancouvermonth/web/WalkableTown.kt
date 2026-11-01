@@ -48,7 +48,7 @@ interface WalkableTown {
     var onPlace: (Place?) -> Unit
 
     /**
-     * Called with the passerby the player stops for a word: they tapped them. No day is spent on it. The passerby
+     * Called with the passerby the player stops for a word: they tapped them. It costs no stamina. The passerby
      * stands and faces the player until [endChat].
      */
     var onPasserby: (Passer) -> Unit
@@ -186,10 +186,10 @@ interface WalkableTown {
      * now, over [DayLight.PASS_MILLIS]: the sky, the sun, the lamps and the windows change little by little, and the
      * character stays where it is. A phone that asks for less motion sees the new time at once.
      */
-    fun passTime(share: Double) {}
+    fun passTime(share: Double)
 
     /** Shows the time of day [share] at once, as for a month taken up again at that time. */
-    fun showTime(share: Double) {}
+    fun showTime(share: Double)
 
     /** Lets go of the drawing for good: the renderer, the shapes and the colours. */
     fun close()

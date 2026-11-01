@@ -55,9 +55,9 @@ enum class Blocked {
 enum class Item { BIKE, E_SCOOTER }
 
 /**
- * What money can go on in the town without spending a day: something to keep ([buys]), or one ride's fare. Each costs
- * [price]; a taxi's fare depends on the trip, so it may cost anything from its [price] up to [most] ([TaxiFare]). All
- * of them are invented. A ride that is free with the month's pass (the SkyTrain, the bus) needs no spending at all.
+ * What money can go on in the town without spending stamina or time: something to keep ([buys]), or one ride's fare.
+ * Each costs [price]; a taxi's fare depends on the trip, so it may cost anything from its [price] up to [most]
+ * ([TaxiFare]). All of them are invented. A ride that is free with the month's pass (the SkyTrain, the bus) needs no spending at all.
  */
 enum class Spending(val price: Int, val buys: Item? = null, val most: Int = price) {
     BIKE(350, Item.BIKE),
@@ -127,7 +127,7 @@ sealed interface Event {
     data class InterviewHeld(val stage: InterviewStage, val passed: Boolean, val next: Interview?) : Event
     data class LivingCost(val amount: Int) : Event
 
-    /** Money spent in the town on [kind], during the day: no day goes by for it. */
+    /** Money spent in the town on [kind], between actions: it takes no stamina and no time. */
     data class Spent(val kind: Spending, val amount: Int) : Event
 
     /**

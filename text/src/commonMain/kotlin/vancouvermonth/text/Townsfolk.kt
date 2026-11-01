@@ -51,14 +51,14 @@ enum class Situation {
 
 /**
  * Everything that is true about the player now, most telling first, always ending with [Situation.ORDINARY].
- * [firstMeeting] is true when the player has not talked to this person yet, [yesterday] is what the player's last
+ * [firstMeeting] is true when the player has not talked to this person yet, [lastEvents] is what the player's last
  * action, interview or sleep brought, as the month told it, and [weather] is today's sky, which only changes what
  * people say. Night is when no stamina is left.
  */
 fun situations(
     month: Month,
     firstMeeting: Boolean,
-    yesterday: List<Event>,
+    lastEvents: List<Event>,
     weather: Weather = Weather.SUNNY,
 ): List<Situation> {
     val stageToday = if (month.hasInterviewToday) month.interview?.stage else null
@@ -69,11 +69,11 @@ fun situations(
         Situation.NIGHT to month.isNight,
         Situation.TECHNICAL_TODAY to (stageToday == InterviewStage.TECHNICAL),
         Situation.INTERVIEW_TODAY to (stageToday != null),
-        Situation.FAILED_INTERVIEW to yesterday.any { it is Event.InterviewHeld && !it.passed },
+        Situation.FAILED_INTERVIEW to lastEvents.any { it is Event.InterviewHeld && !it.passed },
         Situation.LOW_ENERGY to (month.energy <= 1),
         Situation.MONEY_TIGHT to month.moneyTight,
         Situation.INTERVIEW_BOOKED to (month.interview != null),
-        Situation.APPLIED to yesterday.any { it is Event.Applied },
+        Situation.APPLIED to lastEvents.any { it is Event.Applied },
         Situation.APPLICATIONS_CLOSED to !month.canStillApplyThisMonth,
         Situation.RAINY to (weather == Weather.RAINY),
         Situation.GOOD_ENGLISH to (month.english >= 5),
@@ -90,11 +90,11 @@ fun greeting(
     person: Townsperson,
     month: Month,
     firstMeeting: Boolean,
-    yesterday: List<Event>,
+    lastEvents: List<Event>,
     weather: Weather = Weather.SUNNY,
 ): String {
     val lines = greetings.getValue(person)
-    return situations(month, firstMeeting, yesterday, weather).firstNotNullOf { lines[it] }
+    return situations(month, firstMeeting, lastEvents, weather).firstNotNullOf { lines[it] }
 }
 
 /** A line of small talk, for the "이야기" button. [count] is how many times the player has asked today, from 0. */

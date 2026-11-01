@@ -37,6 +37,10 @@ internal class QuietTown : WalkableTown {
     override var onMorning: () -> Unit = {}
     override var onArrived: (Place) -> Unit = {}
     override val isHome = true
+
+    override fun passTime(share: Double) {}
+
+    override fun showTime(share: Double) {}
     override var isCovered = false
     override var weather = Weather.SUNNY
     override var onSounds: (Double, Double, Double) -> Unit = { _, _, _ -> }

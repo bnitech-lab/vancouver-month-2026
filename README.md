@@ -291,7 +291,7 @@ along the streets up to 160 squares and $0.70 for every ten past that, to the do
 the meter stops at $60); a taxi appears where the
 character stands and drives there fast, faster still on a long ride (up to 24 squares a second, so Burnaby to downtown
 takes about 20 seconds), and its 내리기 lets the character out on the way. A fare is paid through core
-when the ride sets off and only then, heads that day's log ("수상버스를 탔어요. -$4", "택시를 탔어요. -$12"), is kept
+when the ride sets off and only then, heads the next action's log ("수상버스를 탔어요. -$4", "택시를 탔어요. -$12"), is kept
 in the record (w and t, the record's version unchanged, so a month kept before still goes on), and is refused with the
 reason, as a purchase is, when what would be left could not pay September's living cost. While riding, the town takes no
 taps and no talk opens, so no day can end mid-ride; the camera follows the vehicle, the buildings in its way fold and

@@ -57,7 +57,7 @@ class TownsfolkTest {
         val month = month()
         assertEquals(
             listOf(Situation.FIRST_MEETING, Situation.LOW_CODING, Situation.FIRST_WEEK, Situation.ORDINARY),
-            situations(month, firstMeeting = true, yesterday = emptyList()),
+            situations(month, firstMeeting = true, lastEvents = emptyList()),
         )
         assertEquals("새로 왔구나? 오늘 손이 모자라. 오후까지만 도와줄래?", greeting(Townsperson.HANA, month, true, emptyList()))
         assertEquals("비 오는 날엔 손님이 두 배야. 우산 챙겨.", greeting(Townsperson.HANA, month, false, emptyList()))
@@ -136,7 +136,7 @@ class TownsfolkTest {
     }
 
     @Test
-    fun `a failed interview yesterday comforts at the library`() {
+    fun `a failed interview comforts at the library`() {
         val month = month(lucky = false)
         val failed = listOf(Event.InterviewHeld(InterviewStage.PHONE_SCREEN, passed = false, next = null))
         assertEquals("한 번 떨어진 건... 연습 한 번 한 거예요.", greeting(Townsperson.LEO, month, false, failed))

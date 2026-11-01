@@ -222,11 +222,11 @@ class ContinueMonthTest {
         root.button(Continue.CONTINUE).click()
         again.onPlace(Place.LIBRARY)
         val month = played(Action.STUDY_ENGLISH)
-        val yesterday = assertNotNull(kept?.replay()).lastEvents
+        val last = assertNotNull(kept?.replay()).lastEvents
         val leo = personAt(Place.LIBRARY)
         val sky = weatherOn(1011, month.day)
-        val expected = greeting(leo, month, firstMeeting = false, yesterday = yesterday, weather = sky)
-        assertTrue(expected != greeting(leo, month, firstMeeting = true, yesterday = yesterday, weather = sky))
+        val expected = greeting(leo, month, firstMeeting = false, lastEvents = last, weather = sky)
+        assertTrue(expected != greeting(leo, month, firstMeeting = true, lastEvents = last, weather = sky))
         assertEquals(expected, text(".talk .talk-line .visually-hidden"))
     }
 

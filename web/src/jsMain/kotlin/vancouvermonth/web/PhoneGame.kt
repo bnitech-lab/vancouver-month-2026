@@ -83,9 +83,10 @@ import vancouvermonth.text.whyTotalLines
  * The rules are in core and the wording in text; this only shows the state and passes each tap on.
  * Every tap redraws the whole screen from that state. A run comes from a seed or from today's date, never both.
  * The month is played in a town the player walks in, which [makeWalkableTown] makes on the first day for the room's
- * zone, where 내 방 stands: each day is spent by talking to a place's person. Where it gives none, the month is played with buttons, under a town that
+ * zone, where 내 방 stands: each action, and the night's sleep, is chosen by talking to a place's person. Where it gives
+ * none, the month is played with buttons, under a town that
  * is a picture when [makeTown] gives one. Either town is closed at the ending. Given a [slot], the month in
- * progress is kept after every day, and the page opened again for the same run offers to go on with it.
+ * progress is kept after every choice, and the page opened again for the same run offers to go on with it.
  */
 class PhoneGame private constructor(
     private val root: HTMLElement,
@@ -132,7 +133,7 @@ class PhoneGame private constructor(
     private var smallTalks = 0
     private val met = mutableSetOf<Townsperson>()
 
-    /** The passerby the player has stopped for a word, or null. No day is spent on them. */
+    /** The passerby the player has stopped for a word, or null. A word with them costs no stamina. */
     private var chattingWith: Passer? = null
 
     /** True while the player talks to the bike shop's keeper; whether they have met him; how much small talk so far. */
@@ -655,7 +656,7 @@ class PhoneGame private constructor(
             child("p", "ending-line", endingLine(ending, month.day, month.room.totalMonthlyCost, month.balance))
             // After a month in the town, the neighbour has a word on the day of an offer.
             if (playedInTown && ending == Ending.OFFER) {
-                val word = greeting(Townsperson.GRANDMA, month, firstMeeting = false, yesterday = lastEvents)
+                val word = greeting(Townsperson.GRANDMA, month, firstMeeting = false, lastEvents = lastEvents)
                 child("p", "ending-word", "${Townsperson.GRANDMA.title}: $word")
             }
             child("div", "figures") {
@@ -981,8 +982,9 @@ class PhoneGame private constructor(
     }
 
     /**
-     * The answer that spends the day: the place's action with what it does, or why it cannot be done today. On an
-     * interview day the office offers the interview instead.
+     * The answer that takes the place's action: what it does and costs, or why it cannot be done now. At 내 방 it is the
+     * night's sleep, which waits for the character to arrive. On an interview day the office offers the interview
+     * instead.
      */
     private fun HTMLElement.answer(month: Month, place: Place) {
         val interview = month.interview
@@ -1032,7 +1034,7 @@ class PhoneGame private constructor(
         show()
     }
 
-    /** The talk with a passerby: who they are, their line typed out, and 그만. No answer spends the day. */
+    /** The talk with a passerby: who they are, their line typed out, and 그만. Nothing there costs stamina. */
     private fun HTMLElement.chat(passer: Passer) {
         child("section", "talk") {
             setAttribute("role", "dialog")
@@ -1228,7 +1230,7 @@ class PhoneGame private constructor(
 
     /**
      * Rides [transport] from [from] to [to]: the fare [amount] paid first through the month's rules when it takes one,
-     * and only when the town can set off, so a fare is never paid for a ride not taken. No day goes by.
+     * and only when the town can set off, so a fare is never paid for a ride not taken. No stamina or time is spent.
      */
     private fun go(month: Month, town: WalkableTown, transport: Transport, from: Int, to: Int, amount: Int) {
         if (dayChanging || choosing != transport || !town.canTravel(transport, from, to)) return
@@ -1250,7 +1252,7 @@ class PhoneGame private constructor(
         chattingWith = null
     }
 
-    /** Opens the talk with the bike shop's keeper, on foot. No day is spent on it. */
+    /** Opens the talk with the bike shop's keeper, on foot. It costs no stamina. */
     private fun openShop() {
         val current = month ?: return
         closeTalks()
@@ -1353,8 +1355,8 @@ class PhoneGame private constructor(
     }
 
     /**
-     * Spends [amount] (by default [kind]'s price) on [kind] through the month's rules, without spending the day: kept for
-     * today's log and in the slot.
+     * Spends [amount] (by default [kind]'s price) on [kind] through the month's rules, without stamina or time: kept
+     * for the next action's log and in the slot.
      * False when the month does not allow it.
      */
     private fun pay(month: Month, kind: Spending, amount: Int = kind.price): Boolean {

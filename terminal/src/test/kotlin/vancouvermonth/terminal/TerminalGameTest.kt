@@ -150,8 +150,9 @@ class TerminalGameTest {
         assertEquals("9월 2일", date(2))
         assertEquals("10월 1일", date(31))
         assertEquals("27%", percent(0.27))
-        assertEquals("50%", percent(0.05 + 0.09 * 5))
-        assertEquals("29%", percent(0.05 + 0.08 * 3))
+        assertEquals("50%", percent(0.5))
+        assertEquals("12%", percent(0.12))
+        assertEquals("19%", percent(0.185))
         assertEquals("자기          ", padToColumns("자기", 14))
         assertEquals("지원서 넣기   ", padToColumns("지원서 넣기", 14))
     }
