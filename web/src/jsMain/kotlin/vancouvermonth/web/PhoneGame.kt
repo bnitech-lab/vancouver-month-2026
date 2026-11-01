@@ -152,17 +152,13 @@ class PhoneGame private constructor(
 
     /**
      * Where to go, open over the town: on [choosing] from stop [choosingFrom] (-1 for a taxi from where the character
-     * stands), with each taxi fare worked out as it opened (null where no taxi goes). Null when it is closed.
+     * stands), with the way to each place a taxi goes and its fare worked out as it opened (null where no taxi goes),
+     * the card listing them nearest first. Null when it is closed.
      */
     private var choosing: Transport? = null
     private var choosingFrom = -1
+    private var taxiWays: List<Double?> = emptyList()
     private var taxiFares: List<Int?> = emptyList()
-
-    /**
-     * The order a taxi's or a shared ride's places are listed in, nearest first by the way there, as the card opened, so
-     * the long list of places starts with those round the character.
-     */
-    private var listed: List<Int> = emptyList()
 
     /** What the ride under way cost, for the top card; null on the month's pass. */
     private var travelPaid: Int? = null
@@ -173,6 +169,7 @@ class PhoneGame private constructor(
      * and what the shared ride under way cost, for the top card.
      */
     private var renting: Ride? = null
+    private var rideWays: List<Double?> = emptyList()
     private var rideFares: List<Int?> = emptyList()
     private var ridePaid: Int? = null
 
@@ -1202,9 +1199,8 @@ class PhoneGame private constructor(
         choosing = transport
         choosingFrom = from
         taxiFares = if (transport == Transport.TAXI) {
-            val ways = TransitLines.taxiStopsFor(town.homeZone).map { (_, spot) -> town.taxiDistance(spot) }
-            listed = nearestFirst(ways)
-            ways.map { way -> way?.let { TaxiFare.forDistance(it) } }
+            taxiWays = TransitLines.taxiStopsFor(town.homeZone).map { (_, spot) -> town.taxiDistance(spot) }
+            taxiWays.map { way -> way?.let { TaxiFare.forDistance(it) } }
         } else {
             emptyList()
         }
@@ -1224,7 +1220,7 @@ class PhoneGame private constructor(
         val empty = if (transport == Transport.TAXI && taxiFares.all { it == null }) Transit.NOWHERE else null
         val stop = { choosing = null }
         // A taxi's places nearest first; a line's stops in the order its vehicle comes to them.
-        val order = if (transport == Transport.TAXI) listed else (0 until TransitLines.count(transport)).toList()
+        val order = if (transport == Transport.TAXI) nearestFirst(taxiWays) else (0 until TransitLines.count(transport))
         whereTo(Transit.title(transport, fromName), Transit.where(transport), empty, stop) {
             for (index in order) {
                 // A bus goes only along its own line.
@@ -1255,7 +1251,7 @@ class PhoneGame private constructor(
         val stop = { renting = null }
         val places = TransitLines.taxiStopsFor(town.homeZone)
         whereTo(Riding.shared(ride.vehicle.item), Riding.where(fare), empty, stop) {
-            for (index in listed) {
+            for (index in nearestFirst(rideWays)) {
                 val place = places[index]
                 val amount = rideFares.getOrNull(index) ?: continue
                 val blocked = month.spendBlockedBy(kind, amount)
@@ -1443,8 +1439,8 @@ class PhoneGame private constructor(
         closeTalks()
         rideNote = null
         renting = ride
+        rideWays = ways
         rideFares = fares
-        listed = nearestFirst(ways)
         talkOpened = window.performance.now()
         focusNext = ".talk"
         sound?.blip()
