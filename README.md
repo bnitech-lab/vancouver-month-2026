@@ -459,10 +459,25 @@ intro and the card on how to play show the statement with a link to the licence,
 script. The code that makes and reads the data is MIT. How to fetch the data again and rebuild the map is in
 [tools/vancouver_map/README.md](tools/vancouver_map/README.md).
 
+The same tool also makes the wide map, `WideMapData.kt`: the town's map carried on east through East Vancouver into
+south-west Burnaby, with the Expo Line and its stations, the main streets, the city blocks and the zones a room can
+be in. The town's map is its top-left corner, square for square. The town does not use it yet. Besides more of the
+City of Vancouver's open data (Rapid transit stations, Public streets), it uses the City of Burnaby's open datasets
+Burnaby Boundary, District Lot, Legal Block, Park Inventory, SkyTrain, SkyTrain Station, Street and Community Plan
+Area Boundaries, fetched on 2026-10-31 (Vancouver time) from [data.burnaby.ca](https://data.burnaby.ca), credit
+City of Burnaby, under the
+[Open Government Licence – Burnaby](https://data.burnaby.ca/pages/open-government-licence) (based on version 2.0 of
+the Open Government Licence – British Columbia). That licence's own attribution statement reads:
+
+Contains information licensed under the Open Government Licence – British Columbia.
+
+That part of the map data is licensed under the Open Government Licence – Burnaby, not MIT, with that statement,
+the credit and a link to the licence. No OpenStreetMap data is used.
+
 ## Licence
 
-MIT, except the map data: see [LICENSE](LICENSE), and Map data above for the map. The page carries both notices
-beside its script, `three-LICENSE.txt` and `MAP-DATA-NOTICE.txt`.
+MIT, except the map data: see [LICENSE](LICENSE), [NOTICE](NOTICE), and Map data above for the map. The page
+carries both notices beside its script, `three-LICENSE.txt` and `MAP-DATA-NOTICE.txt`.
 
 The phone screen bundles [Three.js](https://github.com/mrdoob/three.js) 0.169.0, which is also under the MIT
 licence (Copyright © 2010-2024 three.js authors). The build copies its full licence text next to the script, as

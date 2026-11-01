@@ -46,4 +46,22 @@ object Guide {
 
     /** Where the licence can be read, as the licence asks to be linked wherever its statement is shown. */
     const val MAP_LICENCE_URL = "https://opendata.vancouver.ca/pages/licence/"
+
+    /**
+     * The wide map's Burnaby part comes from the City of Burnaby's open data, which asks for this statement besides
+     * [MAP_CREDIT], word for word: the default statement of the Open Government Licence – Burnaby. It names British
+     * Columbia, as the provincial licence it is based on does; that is the licence's own wording, not a slip. The page
+     * shows it once the town stands on the wide map.
+     */
+    const val BURNABY_MAP_CREDIT =
+        "Contains information licensed under the Open Government Licence – British Columbia."
+
+    /** The source the Burnaby datasets credit. */
+    const val BURNABY_MAP_SOURCE = "City of Burnaby"
+
+    /** The City of Burnaby's name for its licence: on the page it links to [BURNABY_MAP_LICENCE_URL]. */
+    const val BURNABY_MAP_LICENCE = "Open Government Licence – Burnaby"
+
+    /** Where that licence can be read, as it asks to be linked where possible. */
+    const val BURNABY_MAP_LICENCE_URL = "https://data.burnaby.ca/pages/open-government-licence"
 }

@@ -6,13 +6,13 @@
 // This data is licensed under the Open Government Licence – Vancouver 1.0, not under the MIT licence
 // of the code: see Map data in the README, and MAP-DATA-NOTICE.txt beside the page.
 //
-// Fetched 2026-10-31T10:28:15Z from https://opendata.vancouver.ca:
+// Fetched 2026-11-01T01:15:28Z from https://opendata.vancouver.ca:
 //   Shoreline 2002 (shoreline-2002), sha1 cda26f7553662a813b82fac323f6f49b28237922
 //   Parks - polygon representation (parks-polygon-representation), sha1 a738a1e496839e1c1476105b26fc710b7da38fae
 //   Rapid transit lines (rapid-transit-lines), sha1 ec50c9d272a1182c520c84779038ccda678b9b90
 //   City boundary (city-boundary), sha1 9c293a8f7754e13d0e2d768a657ad0a3b8278698
 //   Local area boundary (local-area-boundary), sha1 e997743072293f241eaa1f2c8c6691f322fadd7e
-//   Block outlines (block-outlines), sha1 60e0ddc647f2cdb7cab926b07872f53ccaf3fa26
+//   Block outlines (block-outlines), sha1 0e4adfe2be4c204abc283812bbaee8935bb0ee6c
 package vancouvermonth.web
 
 /**
