@@ -72,4 +72,7 @@ object Guide {
      * links to [BURNABY_MAP_LICENCE_URL].
      */
     const val BURNABY_MAP_LINE = "$BURNABY_MAP_CREDIT ($BURNABY_MAP_SOURCE, $BURNABY_MAP_LICENCE)"
+
+    /** What a screen reader hears after a licence link's name: the link opens in a new tab, and the game stays. */
+    const val NEW_TAB = "(새 탭에서 열려요)"
 }
