@@ -19,23 +19,16 @@ import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.MIDDLE
 import vancouvermonth.text.Transit
 import vancouvermonth.text.Transport
-import vancouvermonth.web.UndergroundRide.CARS
-import vancouvermonth.web.UndergroundRide.CAR_GAP
-import vancouvermonth.web.UndergroundRide.CAR_LENGTH
-import vancouvermonth.web.UndergroundRide.CAR_SIDE
-import vancouvermonth.web.UndergroundRide.DECK
 import vancouvermonth.web.UndergroundRide.EDGE
 import vancouvermonth.web.UndergroundRide.FLOOR
 import vancouvermonth.web.UndergroundRide.HALL_EAST
 import vancouvermonth.web.UndergroundRide.HALL_SOUTH
-import vancouvermonth.web.UndergroundRide.HALL_TOP
 import vancouvermonth.web.UndergroundRide.HALL_WEST
 import vancouvermonth.web.UndergroundRide.LINE_Z
 import vancouvermonth.web.UndergroundRide.MOUTH
 import vancouvermonth.web.UndergroundRide.PLATFORM_X
 import vancouvermonth.web.UndergroundRide.TAIL
 import vancouvermonth.web.UndergroundRide.TRAIN_HALF
-import vancouvermonth.web.UndergroundRide.TUNNEL_HALF
 import vancouvermonth.web.UndergroundRide.TUNNEL_TOP
 
 /**
@@ -72,32 +65,15 @@ object UndergroundRide {
 
     /** Stepping out there: the doors open, the character steps out, they close, and it walks off along the platform. */
     const val ALIGHT_MILLIS = 1_900.0
-    private const val DOORS_SHUT = DOORS_MILLIS + STEP_MILLIS + DOORS_MILLIS
 
     /** How far back down the tunnel the train comes in from, to stop at the platform. */
     const val APPROACH = 22.0
 
-    /** How high the guideway runs, which the tunnel keeps, and the platform's floor above it. */
-    const val DECK = Neighbourhood.DECK_HEIGHT
+    /** The platform's floor, over the line's own height ([DECK]), which the tunnel keeps. */
     const val FLOOR = DECK + 0.55
 
-    /**
-     * The train under the ground, drawn larger than up on the line so the character fits through its doors: its cars,
-     * how far its two ends are from its middle, and its sides and roof from the line.
-     */
-    const val CARS = 3
-    const val CAR_LENGTH = 3.6
-    const val CAR_GAP = 0.15
+    /** How far the train's two ends are from its middle, as drawn under the ground ([CARS]). */
     const val TRAIN_HALF = (CARS * CAR_LENGTH + (CARS - 1) * CAR_GAP) / 2
-    const val CAR_SIDE = 0.95
-
-    /**
-     * Below this far along the line the whole train, as drawn under the ground, is in the tunnel: a ride into it from the
-     * line is shown there from then on, and a ride starting there is one from under downtown.
-     */
-    const val UNDER = -(TRAIN_HALF + 1.0)
-    const val CAR_BOTTOM = DECK + 0.35
-    const val CAR_TOP = DECK + 2.75
 
     /**
      * The station's hall, [HALL_HALF] each way from the platform's middle: the track along its north side, the platform
@@ -105,49 +81,25 @@ object UndergroundRide {
      * is [TUNNEL_HALF] wide each way from the line and [TUNNEL_TOP] high.
      */
     val PLATFORM_X: Double = xAt(PLATFORM)
-    const val HALL_HALF = 11.0
     val HALL_WEST: Double = PLATFORM_X - HALL_HALF
     val HALL_EAST: Double = PLATFORM_X + HALL_HALF
     const val EDGE = 1.05
     const val HALL_SOUTH = 5.0
-    const val HALL_TOP = DECK + 4.6
-    const val TUNNEL_HALF = 2.0
     const val TUNNEL_TOP = DECK + 3.6
 
     /** The tunnel's far end, past where the train comes in from. */
     val TAIL: Double = xAt(PLATFORM - APPROACH) - TRAIN_HALF - 4.0
 
-    /** Where the character waits on the platform, off the line, and where it goes through the doors. */
+    /** Where the character waits on the platform, off the line; it goes through the doors at [DOORWAY]. */
     const val WAIT = 2.0
-    const val DOORWAY = 1.0
-
-    /** How fast the character walks off along the platform after stepping out, in units a second. */
-    const val WALK_OFF = 2.4
 
     /**
-     * The camera: how far behind the train's middle it rides, how far ahead of itself it looks, and how fast it drifts
-     * on the platform while the train stands, in units a second; where it starts in the hall for getting on (behind
-     * where the train will stand), the farthest west and east it goes, and how softly it comes to the east end.
+     * The camera ([BEHIND] the train's middle): where it starts in the hall for getting on, behind where the train will
+     * stand, and the farthest west and east it goes.
      */
-    const val BEHIND = TRAIN_HALF + 3.8
-    const val LOOK = 7.0
-    const val DRIFT = 0.45
     val BOARD_EYE: Double = PLATFORM_X - BEHIND
     val EYE_WEST: Double = HALL_WEST + 0.5
     val EYE_EAST: Double = MOUTH.x - 0.3
-    private const val EASE_EAST = 2.0
-
-    /** How long the camera rides out in the tunnel, east of the hall, before a ride from under downtown cuts to the town. */
-    const val TUNNEL_MILLIS = 900.0
-
-    /** How high the camera is and how far off the line, and where it looks, in the hall and out in the tunnel. */
-    private const val HALL_EYE_Y = FLOOR + 2.2
-    private const val HALL_EYE_Z = 3.4
-    private const val HALL_LOOK_Y = FLOOR + 1.0
-    private const val HALL_LOOK_Z = 1.6
-    private const val TUNNEL_EYE_Y = CAR_TOP + 0.55
-    private const val TUNNEL_EYE_Z = 0.3
-    private const val TUNNEL_LOOK_Y = DECK + 1.6
 
     /** True when [going] is a SkyTrain ride from the station under downtown. */
     fun startsUnder(going: Journey): Boolean = going.transport == Transport.SKYTRAIN && going.railFrom < UNDER
@@ -192,8 +144,6 @@ object UndergroundRide {
         }
         return high
     }
-
-    private const val SEARCH_STEPS = 40
 
     /**
      * How far along the line the train's middle is: as [Journey.alongAt] says, but while the character waits to get on
@@ -454,22 +404,8 @@ internal class UndergroundScene(private val cube: BoxGeometry, shades: DataTextu
     }
 
     private companion object {
-        /** The dark of the tunnel, behind everything and in the haze, which closes in from near to far. */
-        const val DARK = 0x0D1014
-        const val HAZE_NEAR = 7.0
-        const val HAZE_FAR = 40.0
-
-        /** How far each door slides open, and which of a car's boxes the two doors are. */
-        const val DOOR_SLIDE = 0.55
-        const val LEFT_DOOR = 4
-        const val RIGHT_DOOR = 5
-
-        /** The station's sign: its size, and where it hangs over the platform. */
-        const val SIGN_WIDTH = 2.2
-        const val SIGN_HEIGHT = 0.55
+        /** Where the station's sign hangs over the platform, along it. */
         val SIGN_X = PLATFORM_X + 2.5
-        const val SIGN_Y = FLOOR + 3.0
-        const val SIGN_Z = 1.7
 
         /**
          * A box by its west, east, bottom, top, north and south sides; z is measured from the line, as the tunnel's
@@ -486,7 +422,7 @@ internal class UndergroundScene(private val cube: BoxGeometry, shades: DataTextu
             box(-1.8, 1.8, DECK + 0.35, DECK + 2.6, -CAR_SIDE, CAR_SIDE, TRAIN, onLine = false),
             box(-1.81, 1.81, DECK + 0.95, DECK + 1.15, -CAR_SIDE - 0.02, CAR_SIDE + 0.02, BLUE, onLine = false),
             box(-1.75, 1.75, DECK + 2.6, DECK + 2.75, -CAR_SIDE + 0.05, CAR_SIDE - 0.05, ROOF, onLine = false),
-            box(-0.62, 0.62, FLOOR, DECK + 2.45, CAR_SIDE, CAR_SIDE + 0.02, DOORWAY, onLine = false),
+            box(-0.62, 0.62, FLOOR, DECK + 2.45, CAR_SIDE, CAR_SIDE + 0.02, OPENING, onLine = false),
             box(-0.6, 0.0, FLOOR, DECK + 2.45, CAR_SIDE + 0.02, CAR_SIDE + 0.05, DOOR, onLine = false),
             box(0.0, 0.6, FLOOR, DECK + 2.45, CAR_SIDE + 0.02, CAR_SIDE + 0.05, DOOR, onLine = false),
             box(-1.4, -0.7, DECK + 0.2, DECK + 0.4, -0.6, 0.6, BOGIE, onLine = false),
@@ -530,7 +466,7 @@ internal class UndergroundScene(private val cube: BoxGeometry, shades: DataTextu
             add(box(west, east, DECK, HALL_TOP, HALL_SOUTH, HALL_SOUTH + 0.3, TILE))
             add(box(west, east, FLOOR + 1.7, FLOOR + 2.0, HALL_SOUTH - 0.02, HALL_SOUTH, BLUE))
             add(box(west, east, HALL_TOP, HALL_TOP + 0.3, -TUNNEL_HALF - 0.3, HALL_SOUTH + 0.3, CEILING))
-            add(box(west, east, DECK, FLOOR, EDGE, HALL_SOUTH, PLATFORM))
+            add(box(west, east, DECK, FLOOR, EDGE, HALL_SOUTH, PLATFORM_FLOOR))
             add(box(west, east, FLOOR, FLOOR + 0.02, EDGE, EDGE + 0.25, EDGE_LINE))
             for ((x0, x1) in listOf(west - 0.3 to west, east to east + 0.3)) {
                 add(box(x0, x1, DECK, HALL_TOP, TUNNEL_HALF, HALL_SOUTH + 0.3, TILE))
@@ -599,35 +535,111 @@ internal class UndergroundScene(private val cube: BoxGeometry, shades: DataTextu
             }
         }
 
-        /** How the sign's picture's colours are written: as a screen shows them, as the boxes' colours are given. */
-        const val SRGB = "srgb"
-
-        /** How far the daylight reaches in from the mouth, lighting the walls. */
-        const val LIT_REACH = 3.0
-        const val LAMP_GAP = 3.0
-
-        const val BED = 0x3B3835
-        const val RAIL = 0x8E959C
-        const val WALL = 0x55585C
-        const val WALL_LIT = 0x8A8D8E
-        const val TILE = 0xE6E0D2
-        const val CEILING = 0xC9C5BB
-        const val PLATFORM = 0xA8A39A
-        const val EDGE_LINE = 0xF2C94C
-        const val PILLAR = 0xD8D2C4
-        const val BENCH = 0x8B6A4B
-        const val FRAME = 0x2A2E33
-        const val BLUE = 0x3C6CB4
         val POSTERS = listOf(0xD9673F, 0x5BA37C, 0xE0B24A)
-        const val TRAIN = 0xF2F2EE
-        const val ROOF = 0xC9CCCF
-        const val DOORWAY = 0x2B3138
-        const val DOOR = 0xDADDDF
-        const val BOGIE = 0x2B2B2B
-        const val WINDOWS = 0xFFE7B0
-        const val HEADLIGHT = 0xFFFFFF
-        const val LIGHT = 0xFFF6DE
-        const val EXIT = 0x3DBB6E
-        const val LAMP = 0xFFD27A
     }
 }
+
+// The underground's measures and colours that only this file uses: as constants of the file rather than of its two
+// objects, they are written into the code where used, and the page carries no field for each.
+
+/** How high the guideway runs, which the tunnel keeps. */
+private const val DECK = Neighbourhood.DECK_HEIGHT
+
+/** The doors stay shut from the time they open, through the character's step, to the time they close again. */
+private const val DOORS_SHUT = UndergroundRide.DOORS_MILLIS + UndergroundRide.STEP_MILLIS + UndergroundRide.DOORS_MILLIS
+
+/**
+ * The train under the ground, drawn larger than up on the line so the character fits through its doors: its cars, and
+ * its sides, underside and roof from the line.
+ */
+private const val CARS = 3
+private const val CAR_LENGTH = 3.6
+private const val CAR_GAP = 0.15
+private const val CAR_SIDE = 0.95
+private const val CAR_BOTTOM = DECK + 0.35
+private const val CAR_TOP = DECK + 2.75
+
+/**
+ * Below this far along the line the whole train, as drawn under the ground, is in the tunnel: a ride into it from the
+ * line is shown there from then on, and a ride starting there is one from under downtown.
+ */
+private const val UNDER = -(UndergroundRide.TRAIN_HALF + 1.0)
+
+/** The hall, each way from the platform's middle, and its ceiling; the tunnel, each way from the line. */
+private const val HALL_HALF = 11.0
+private const val HALL_TOP = DECK + 4.6
+private const val TUNNEL_HALF = 2.0
+
+/** Where the character goes through the doors, off the line, and how fast it walks off after stepping out. */
+private const val DOORWAY = 1.0
+private const val WALK_OFF = 2.4
+
+/**
+ * The camera: how far behind the train's middle it rides, how far ahead of itself it looks, how fast it drifts on the
+ * platform while the train stands, in units a second, and how softly it comes to the east end.
+ */
+private const val BEHIND = UndergroundRide.TRAIN_HALF + 3.8
+private const val LOOK = 7.0
+private const val DRIFT = 0.45
+private const val EASE_EAST = 2.0
+
+/** How long the camera rides out in the tunnel, east of the hall, before a ride from under downtown cuts to the town. */
+private const val TUNNEL_MILLIS = 900.0
+
+/** How high the camera is and how far off the line, and where it looks, in the hall and out in the tunnel. */
+private const val HALL_EYE_Y = UndergroundRide.FLOOR + 2.2
+private const val HALL_EYE_Z = 3.4
+private const val HALL_LOOK_Y = UndergroundRide.FLOOR + 1.0
+private const val HALL_LOOK_Z = 1.6
+private const val TUNNEL_EYE_Y = CAR_TOP + 0.55
+private const val TUNNEL_EYE_Z = 0.3
+private const val TUNNEL_LOOK_Y = DECK + 1.6
+
+/** How many halvings find when a train gets somewhere. */
+private const val SEARCH_STEPS = 40
+
+/** The dark of the tunnel, behind everything and in the haze, which closes in from near to far. */
+private const val DARK = 0x0D1014
+private const val HAZE_NEAR = 7.0
+private const val HAZE_FAR = 40.0
+
+/** How far each door slides open, and which of a car's boxes the two doors are. */
+private const val DOOR_SLIDE = 0.55
+private const val LEFT_DOOR = 4
+private const val RIGHT_DOOR = 5
+
+/** The station's sign: its size, and how high and how far off the line it hangs. */
+private const val SIGN_WIDTH = 2.2
+private const val SIGN_HEIGHT = 0.55
+private const val SIGN_Y = UndergroundRide.FLOOR + 3.0
+private const val SIGN_Z = 1.7
+
+/** How the sign's picture's colours are written: as a screen shows them, as the boxes' colours are given. */
+private const val SRGB = "srgb"
+
+/** How far the daylight reaches in from the mouth, lighting the walls; how far apart the tunnel's lamps are. */
+private const val LIT_REACH = 3.0
+private const val LAMP_GAP = 3.0
+
+private const val BED = 0x3B3835
+private const val RAIL = 0x8E959C
+private const val WALL = 0x55585C
+private const val WALL_LIT = 0x8A8D8E
+private const val TILE = 0xE6E0D2
+private const val CEILING = 0xC9C5BB
+private const val PLATFORM_FLOOR = 0xA8A39A
+private const val EDGE_LINE = 0xF2C94C
+private const val PILLAR = 0xD8D2C4
+private const val BENCH = 0x8B6A4B
+private const val FRAME = 0x2A2E33
+private const val BLUE = 0x3C6CB4
+private const val TRAIN = 0xF2F2EE
+private const val ROOF = 0xC9CCCF
+private const val OPENING = 0x2B3138
+private const val DOOR = 0xDADDDF
+private const val BOGIE = 0x2B2B2B
+private const val WINDOWS = 0xFFE7B0
+private const val HEADLIGHT = 0xFFFFFF
+private const val LIGHT = 0xFFF6DE
+private const val EXIT = 0x3DBB6E
+private const val LAMP = 0xFFD27A
