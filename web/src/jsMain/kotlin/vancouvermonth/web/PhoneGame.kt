@@ -376,11 +376,13 @@ class PhoneGame private constructor(
         map?.draw()
     }
 
-    /** Picks room [index] and draws the screen again, the focus kept on its pin for a keyboard. */
+    /** Picks room [index] and draws the screen again, the focus kept on its pin, or its button in the list. */
     private fun pick(index: Int) {
         picked = index
         show()
-        (root.querySelector(".room-pin[data-room=\"$index\"]") as? HTMLElement)?.focus()
+        val again = root.querySelector(".room-pin[data-room=\"$index\"]")
+            ?: root.querySelectorAll("button.room").item(index)
+        (again as? HTMLElement)?.focus()
     }
 
     /** The rooms as a list of buttons, for a browser that cannot draw the map. */

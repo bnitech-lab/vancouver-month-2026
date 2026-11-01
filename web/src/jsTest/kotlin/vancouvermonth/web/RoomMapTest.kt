@@ -326,6 +326,8 @@ class RoomMapTest {
         val index = first.rooms.indexOfFirst { it.zone.number == 3 }
         root.button("${index + 1}번 방").click()
         assertEquals("true", root.button("${index + 1}번 방").getAttribute("aria-pressed"))
+        // The focus stays on the room picked, as on the map.
+        assertSame(root.button("${index + 1}번 방"), document.activeElement)
         guessAndStart(first.rooms[index].totalMonthlyCost)
         assertEquals(listOf(3), zones)
     }
