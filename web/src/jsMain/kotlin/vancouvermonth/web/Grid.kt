@@ -251,7 +251,28 @@ class Grid private constructor(val columns: Int, val rows: Int, private val clos
      * for each: the cheapest way to every square is worked out once, outward from [from], until each target's square is
      * reached. A target cut off from [from] gets an empty way.
      */
-    fun routes(from: Spot, targets: List<Spot>): List<List<Spot>> {
+    fun routes(from: Spot, targets: List<Spot>): List<List<Spot>> = cellRoutes(from, targets).mapIndexed { index, cells ->
+        if (cells.isEmpty()) return@mapIndexed emptyList()
+        val reached = cells.last()
+        val end = if (reached == cellAt(targets[index])) targets[index] else centreOf(reached)
+        straighten(listOf(from) + cells.drop(1).dropLast(1).map { centreOf(it) } + end)
+    }
+
+    /**
+     * The squares of the way from [from] to [to] as [route] searches them, before it is straightened; null when [to] is
+     * cut off. For tests: its cost is the cheapest a way can have.
+     */
+    internal fun cellRoute(from: Spot, to: Spot): List<Cell>? {
+        val start = nearestFree(cellAt(from)) ?: return null
+        val goal = nearestFree(cellAt(to)) ?: return null
+        return search(start, goal)
+    }
+
+    /**
+     * The squares of the way from [from] to each of [targets], as [routes] finds them in one search, before they are
+     * straightened; empty for a target cut off from [from].
+     */
+    internal fun cellRoutes(from: Spot, targets: List<Spot>): List<List<Cell>> {
         val start = nearestFree(cellAt(from)) ?: return targets.map { emptyList() }
         val goals = IntArray(targets.size) { index ->
             val goal = nearestFree(cellAt(targets[index]))
@@ -289,11 +310,7 @@ class Grid private constructor(val columns: Int, val rows: Int, private val clos
         }
         return targets.indices.map { index ->
             val goal = goals[index]
-            if (goal < 0 || !done[goal]) return@map emptyList()
-            val cells = wayBack(goal, cameFrom)
-            val reached = Cell(goal % columns, goal / columns)
-            val end = if (reached == cellAt(targets[index])) targets[index] else centreOf(reached)
-            straighten(listOf(from) + cells.drop(1).dropLast(1).map { centreOf(it) } + end)
+            if (goal < 0 || !done[goal]) emptyList() else wayBack(goal, cameFrom)
         }
     }
 
