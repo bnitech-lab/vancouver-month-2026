@@ -51,6 +51,9 @@ class GuideTest {
         assertEquals("City of Burnaby", Guide.BURNABY_MAP_SOURCE)
         assertEquals("Open Government Licence \u2013 Burnaby", Guide.BURNABY_MAP_LICENCE)
         assertEquals("https://data.burnaby.ca/pages/open-government-licence", Guide.BURNABY_MAP_LICENCE_URL)
+        // On the page: the statement, then the source and the licence's name, the name once, to link it.
+        assertEquals("$statement (City of Burnaby, Open Government Licence \u2013 Burnaby)", Guide.BURNABY_MAP_LINE)
+        assertEquals(1, Guide.BURNABY_MAP_LINE.split(Guide.BURNABY_MAP_LICENCE).size - 1)
     }
 
     @Test

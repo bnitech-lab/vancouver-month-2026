@@ -185,13 +185,17 @@ class CutawayTest {
     fun `only the city's buildings and the blocks past the edge fold, never the places, the train's or the garden`() {
         val foldables = Neighbourhood.foldables
         assertTrue(foldables.size > 300, "only ${foldables.size}")
-        // One for each building of the city, and the rest past the grid's edges.
+        // One for each building of the city, the wide map's turned ones among them, and the rest past the grid's edges.
         assertTrue(foldables.size >= Neighbourhood.cityLots.size)
         for (building in foldables) {
             val inside = building.box.x >= 0 && building.box.x < Neighbourhood.COLUMNS &&
                 building.box.z >= 0 && building.box.z < Neighbourhood.ROWS
             val corner = Spot(building.box.x + 0.2, building.box.z + 0.2)
-            if (inside) assertTrue(Neighbourhood.cityLots.any { it.isNear(corner.x, corner.z, 0.0) }, "${building.box}")
+            // The wide map's buildings stand east of the town's corner, turned as their blocks are; the corner keeps its own.
+            val wide = building.box.x + building.box.width / 2 > Neighbourhood.TOWN_COLUMNS
+            if (inside && !wide) {
+                assertTrue(Neighbourhood.cityLots.any { it.isNear(corner.x, corner.z, 0.0) }, "${building.box}")
+            }
         }
         // Nothing that matters is among them: none overlaps a wall the camera keeps out of, or a place's lot.
         val important = Neighbourhood.walls.filter { !it.folds }
@@ -206,11 +210,28 @@ class CutawayTest {
                 assertTrue(apart, "$box overlaps ${wall.place ?: other}")
             }
         }
-        // Each one's boxes are where it says, as tall as its walls.
+        // Each one's boxes are where it says, as tall as its walls: a turned one's box is the one round it, straight on
+        // the grid, with the same middle.
         for (building in foldables) {
             val body = Neighbourhood.blocks[building.body]
-            assertEquals(building.box.x, body.x)
-            assertEquals(building.box.z, body.z)
+            if (body.turn == 0.0) {
+                assertEquals(building.box.x, body.x)
+                assertEquals(building.box.z, body.z)
+            } else {
+                val middleX = body.x + body.width / 2
+                val middleZ = body.z + body.depth / 2
+                assertEquals(building.box.x + building.box.width / 2, middleX, 1e-9)
+                assertEquals(building.box.z + building.box.depth / 2, middleZ, 1e-9)
+                // Every corner of the turned building inside the box round it.
+                for ((along, across) in listOf(-1 to -1, -1 to 1, 1 to -1, 1 to 1)) {
+                    val lx = along * body.width / 2
+                    val lz = across * body.depth / 2
+                    val x = middleX + lx * cos(body.turn) + lz * sin(body.turn)
+                    val z = middleZ - lx * sin(body.turn) + lz * cos(body.turn)
+                    assertTrue(x >= building.box.x - 1e-9 && x <= building.box.x + building.box.width + 1e-9, "$body")
+                    assertTrue(z >= building.box.z - 1e-9 && z <= building.box.z + building.box.depth + 1e-9, "$body")
+                }
+            }
             val roof = if (building.roof < 0) 0.0 else Neighbourhood.blocks[building.roof].height
             assertEquals(building.box.height, body.height + roof, 1e-9)
             if (building.glassNorth < 0) continue

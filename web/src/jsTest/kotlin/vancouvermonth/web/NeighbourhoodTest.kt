@@ -157,9 +157,9 @@ class NeighbourhoodTest {
         // A square in the garden, by the fire.
         val home = Neighbourhood.venue(Place.HOME)
         assertTrue(Cell(home.x - 1, home.z + 1) in reached)
-        // Squares the character could never reach are blocked; there must be only a few, or the layout cut off a part
-        // of the town.
-        assertTrue(Neighbourhood.pockets < 20, "${Neighbourhood.pockets} squares were walled in")
+        // Squares the character could never reach are blocked; there must be only a few (the odd square between the wide
+        // map's turned blocks), or the layout cut off a part of the town.
+        assertTrue(Neighbourhood.pockets < free.size / 100, "${Neighbourhood.pockets} squares were walled in")
     }
 
     @Test

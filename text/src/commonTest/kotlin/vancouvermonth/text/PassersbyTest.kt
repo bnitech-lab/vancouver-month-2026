@@ -7,8 +7,8 @@ import kotlin.test.assertTrue
 
 class PassersbyTest {
     @Test
-    fun `the passersby are four people of their own, none of them one of the five at the places`() {
-        assertEquals(4, Passer.entries.size)
+    fun `the passersby are six people of their own, none of them one of the five at the places`() {
+        assertEquals(6, Passer.entries.size)
         val names = Passer.entries.map { it.title }
         assertEquals(names.size, names.toSet().size)
         for (name in names) assertTrue(name !in Townsperson.entries.map { it.title }, name)

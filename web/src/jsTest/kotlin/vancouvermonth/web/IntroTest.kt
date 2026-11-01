@@ -104,12 +104,20 @@ class IntroTest {
         }
         assertTrue(order.all { it >= 0 }, "$order")
         assertEquals(order.sorted(), order)
-        // The map is the City's open data, and its licence asks for its statement with a link wherever it shows.
+        // The map is the two cities' open data, and their licences ask for their statements with a link wherever it
+        // shows: Vancouver's line, then Burnaby's under it.
         val link = assertNotNull(root.querySelector(".intro-credit a") as? HTMLAnchorElement)
         assertEquals(Guide.MAP_CREDIT, text(".intro-credit"))
         assertEquals(Guide.MAP_LICENCE_URL, link.href)
         assertEquals("_blank", link.target)
         assertEquals("noopener", link.rel)
+        assertEquals(Guide.BURNABY_MAP_LINE, text(".intro-credit.burnaby-credit"))
+        val burnaby = assertNotNull(root.querySelector(".burnaby-credit a") as? HTMLAnchorElement)
+        assertEquals(Guide.BURNABY_MAP_LICENCE, burnaby.textContent)
+        assertEquals(Guide.BURNABY_MAP_LICENCE_URL, burnaby.href)
+        assertEquals("_blank", burnaby.target)
+        assertEquals("noopener", burnaby.rel)
+        assertEquals(root.querySelector(".intro-credit"), root.querySelector(".burnaby-credit")?.previousElementSibling)
     }
 
     @Test

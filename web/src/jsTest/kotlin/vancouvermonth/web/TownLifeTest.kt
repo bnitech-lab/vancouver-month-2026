@@ -163,10 +163,23 @@ class TownLifeTest {
             last = shows
             assertEquals(shows > 0.0, SkyTrainRun.isShownAt(t))
         }
-        // All there while any of it is over the town: it starts to fade only once it is past the grid's edge.
-        var edge = 0.0
-        while (Neighbourhood.guideway.spotAt(edge).x < Neighbourhood.COLUMNS) edge += 0.5
-        assertTrue(Neighbourhood.TRAIN_STOP + SkyTrainRun.FADE_FROM > edge, "it leaves the grid $edge along")
+        // All there while it is near its station: it starts to fade only past where the haze begins, at any station.
+        assertTrue(SkyTrainRun.FADE_FROM > Neighbourhood.HAZE_NEAR)
+    }
+
+    @Test
+    fun `the line's own train runs at the station up on the line nearest where the player looks`() {
+        // Downtown and in the West End, the station by the tunnel's mouth, as always.
+        val home = Neighbourhood.venue(Place.HOME).door
+        assertEquals(SkyTrainRun.STAND, SkyTrainRun.nearestStand(home.x, home.z))
+        val downtown = TransitLines.stations[0].door
+        assertEquals(SkyTrainRun.STAND, SkyTrainRun.nearestStand(downtown.x, downtown.z))
+        // Out on the line, the nearest station there; never the one under downtown.
+        for (station in TransitLines.stations.drop(1)) {
+            assertEquals(station.along, SkyTrainRun.nearestStand(station.door.x, station.door.z), 1e-9, "${station.door}")
+        }
+        val burnaby = Neighbourhood.home(2).door
+        assertTrue(SkyTrainRun.nearestStand(burnaby.x, burnaby.z) > TransitLines.stations[5].along)
     }
 
     @Test

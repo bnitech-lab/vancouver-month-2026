@@ -18,8 +18,11 @@ import vancouvermonth.web.MinimapProjection.Companion.AREA_HEIGHT
 import vancouvermonth.web.MinimapProjection.Companion.AREA_WIDTH
 
 class MinimapTest {
-    /** The small map on a 375-point-wide phone: a quarter of it across, as tall as the area's shape asks. */
-    private val map = MinimapProjection(93.75, 93.75 * AREA_HEIGHT / AREA_WIDTH)
+    /** The whole map, shown larger, on a 375-point-wide phone: four fifths of it across, as tall as the area's shape asks. */
+    private val map = MinimapProjection(300.0, 300.0 * AREA_HEIGHT / AREA_WIDTH)
+
+    /** The small map on the same phone: a quarter of it across, the window round the character. */
+    private val window = MinimapProjection(93.75, 93.75 * 267 / 239, Minimap.WINDOW_ACROSS)
 
     /**
      * The ways real north and real east lie on the game map, one square long, worked out as the map's own script turns
@@ -31,8 +34,8 @@ class MinimapTest {
     private val eastX = cos(turn)
     private val eastZ = -sin(turn)
 
-    /** Every square of the grid the character could stand on: all but the water. */
-    private val standable = RealVancouver.map.let { ground ->
+    /** Every square of the wide map the character could stand on: all but the water. */
+    private val standable = Neighbourhood.map.let { ground ->
         (0 until ground.rows).flatMap { z -> (0 until ground.columns).map { x -> Cell(x, z) } }
             .filter { ground.terrainAt(it) != Terrain.WATER }
     }
@@ -97,12 +100,56 @@ class MinimapTest {
         for (margin in listOf(left, projection.width - right, top, projection.height - bottom)) {
             assertTrue(margin in 6.0..7.0, "a margin of $margin squares")
         }
-        // Taller than wide, as the grid's land turned north up is.
-        assertTrue(AREA_HEIGHT.toDouble() / AREA_WIDTH in 1.0..1.2, "$AREA_WIDTH by $AREA_HEIGHT")
+        // About as tall as wide, as the wide map's land turned north up is: downtown to Burnaby runs down and right.
+        assertTrue(AREA_HEIGHT.toDouble() / AREA_WIDTH in 0.85..1.15, "$AREA_WIDTH by $AREA_HEIGHT")
     }
 
     @Test
-    fun `wherever the character can stand, it is on the small map`() {
+    fun `the small map shows the ground round the character, north up, the character in its middle`() {
+        for (place in listOf(Place.HOME, Place.OFFICE)) {
+            val door = Neighbourhood.venue(place).door
+            window.centreOn(door.x, door.z)
+            assertEquals(window.width / 2, window.left(door.x, door.z), 1e-9)
+            assertEquals(window.height / 2, window.top(door.x, door.z), 1e-9)
+            // A hundred squares across, the same scale down; real north straight up.
+            assertEquals(window.width / Minimap.WINDOW_ACROSS, window.scale, 1e-9)
+            assertEquals(window.top(door.x, door.z) - 10 * window.scale, window.top(door.x + northX * 10, door.z + northZ * 10), 1e-9)
+            assertEquals(window.left(door.x, door.z), window.left(door.x + northX * 10, door.z + northZ * 10), 1e-9)
+        }
+        // In Burnaby too: 내 방 for zone 2 in the middle, and the big park's station on the map near it.
+        val home = Neighbourhood.home(2).door
+        window.centreOn(home.x, home.z)
+        val station = TransitLines.stations[7].door
+        assertTrue(window.left(station.x, station.z) in 0.0..window.width && window.top(station.x, station.z) in 0.0..window.height)
+        // Downtown is far off it.
+        val office = Neighbourhood.venue(Place.OFFICE).door
+        assertFalse(window.left(office.x, office.z) in 0.0..window.width && window.top(office.x, office.z) in 0.0..window.height)
+    }
+
+    @Test
+    fun `off the small map, 내 방 and 회사 show as arrows on its edge`() {
+        val minimap = Minimap(HomeSite.of(2))
+        document.body!!.appendChild(minimap.element)
+        shown += minimap.element
+        minimap.measure()
+        // At 내 방 in Burnaby, 회사 downtown is off the small map; 내 방 is on it.
+        val home = Neighbourhood.home(2).door
+        minimap.draw(home.x, home.z, 0.0, home.x, home.z + 20.0, home.x, home.z, 0.8, marked = null)
+        assertEquals(setOf(Place.OFFICE), minimap.pointedTo)
+        // Downtown, 내 방 in Burnaby is off it, and 회사 on it.
+        val office = Neighbourhood.venue(Place.OFFICE).door
+        minimap.draw(office.x, office.z, 0.0, office.x, office.z + 20.0, office.x, office.z, 0.8, marked = null)
+        assertEquals(setOf(Place.HOME), minimap.pointedTo)
+        // The whole map, shown larger, has everything on it and no arrows.
+        minimap.isLarge = true
+        minimap.measure()
+        minimap.draw(office.x, office.z, 0.0, office.x, office.z + 20.0, office.x, office.z, 0.8, marked = null)
+        assertEquals(emptySet(), minimap.pointedTo)
+        assertEquals("$AREA_WIDTH / $AREA_HEIGHT", minimap.element.style.getPropertyValue("aspect-ratio"))
+    }
+
+    @Test
+    fun `wherever the character can stand, it is on the whole map`() {
         val narrowest = MinimapProjection(80.0, 80.0 * AREA_HEIGHT / AREA_WIDTH)
         for (projection in listOf(map, narrowest)) {
             for (cell in standable) {
@@ -212,6 +259,8 @@ class MinimapTest {
     fun `the map is painted north up, with the north shore, the character's arrow, the places and north marked`() {
         val minimap = Minimap()
         val element = minimap.element
+        // The whole map, as a tap shows it.
+        minimap.isLarge = true
         // One CSS pixel a square, so each square can be looked at.
         element.style.position = "fixed"
         element.style.width = "${AREA_WIDTH}px"
@@ -249,8 +298,9 @@ class MinimapTest {
         assertEquals(standLeft, minimap.dotLeft, 1e-9)
         assertEquals(standTop, minimap.dotTop, 1e-9)
         assertEquals(0xFFD23F, colourAt(standLeft, standTop - 1.0))
-        // The north arrow in ink at the top right.
-        assertEquals(0x3B2F25, colourAt(AREA_WIDTH - Minimap.NORTH_INSET + 0.5, Minimap.NORTH_TOP + 3.5))
+        // The north arrow in ink at the top right, as large as the map is.
+        val large = 1.6
+        assertEquals(0x3B2F25, colourAt(AREA_WIDTH - Minimap.NORTH_INSET * large + 0.5, (Minimap.NORTH_TOP + 3.5) * large))
         // 내 방 in its roof's red, the others dark; on an interview day 회사 takes the colour its name does.
         fun middleOf(place: Place): Pair<Double, Double> {
             val venue = Neighbourhood.venue(place)
