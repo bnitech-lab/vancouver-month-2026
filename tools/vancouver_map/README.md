@@ -86,15 +86,17 @@ mountains line is the city's boundary where it runs along the middle of Burrard 
    turned rectangle round the real block, with a turn in the sense of `Block.turn`; blocks on parks or water, under 2
    squares or over 25 ha, are left out.
 8. The zones a room can be in: 1 is the City of Vancouver's local areas Downtown and West End (by name, the only key
-   that layer has), 2 the City of Burnaby community plan area round the big station, 3 a strip of the plan area
-   north-west of the big park, within 375 m of the city line, at the grid's top edge; each cut to the grid. The two
-   Burnaby areas are picked by their `OBJECTID` in the plan-area layer, and the build stops unless each is the size
-   recorded (within 3%), zone 2's holds two stations and zone 3's reaches the city line.
+   that layer has), 2 the City of Burnaby community plan area round the big station, 3 the outer, pricier one: a
+   strip of the plan area on the slope south of the big park, within 225 m of the city line, down toward the river;
+   each cut to the grid. The two Burnaby areas are picked by their `OBJECTID` in the plan-area layer, and the build
+   stops unless each is the size recorded (within 3%), zone 2's holds two stations and zone 3's reaches the city
+   line.
 9. Each zone has a room. Zone 1's is the town's 내 방. In zones 2 and 3 a written rule picks it, never a hand: of the
    squares in the zone with a 5 x 5 block of plain land round them, at least 5 squares inside the grid's edges, 2
    off every main street and 4 off the guideway, whose middle lies on a road (outside every Burnaby legal block and
-   Vancouver block outline, so never on a lot), the one farthest from the last station inside the grid. The rooms
-   are stored as grid squares, not as points, and the build checks again that neither lies on a lot.
+   Vancouver block outline, so never on a lot), the one farthest from the last station inside the grid in zone 2,
+   and the one farthest from 회사 in zone 3. The build stops unless zone 3's room is farther from 회사 than zone 2's.
+   The rooms are stored as grid squares, not as points, and the build checks again that neither lies on a lot.
 10. A guard: the build stops if water lies along the city line inland, where the two cities' outlines meet.
 
 ## Data and licence
