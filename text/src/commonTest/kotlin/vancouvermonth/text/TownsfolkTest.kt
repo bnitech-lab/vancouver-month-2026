@@ -47,6 +47,8 @@ class TownsfolkTest {
         // Two weeks of rest leave the coding level low, and nothing else to notice.
         assertEquals(listOf(Situation.LOW_CODING, Situation.ORDINARY), situations(month, false, emptyList()))
         assertEquals("커피 내릴 줄 알지? 오늘도 한나절 부탁해.", greeting(Townsperson.HANA, month, false, emptyList()))
+        // The neighbour's everyday word fits any hour of the day.
+        assertEquals("밥은 챙겨 먹었어? 든든히 먹고 다녀.", greeting(Townsperson.GRANDMA, month, false, emptyList()))
         assertEquals(Situation.ORDINARY, situations(month(), true, emptyList()).last())
     }
 
@@ -85,8 +87,11 @@ class TownsfolkTest {
         assertEquals("늦었구먼. 얼른 들어가 자.", lines[Townsperson.GRANDMA])
         for ((person, line) in lines) assertTrue(line.isNotBlank() && '\u2014' !in line, "$person: $line")
         assertEquals(Townsperson.entries.size, lines.values.toSet().size)
-        // A first meeting still comes first, and the next morning is not night.
-        assertEquals(Situation.FIRST_MEETING, situations(month, true, emptyList()).first())
+        // A first meeting at night comes first: 하나 asks the player back in the morning, the others greet as on any
+        // first meeting. The next morning is not night.
+        assertEquals(Situation.FIRST_MEETING_AT_NIGHT, situations(month, true, emptyList()).first())
+        assertEquals("새로 왔구나? 오늘은 문 닫았어. 내일 아침에 와 줄래?", greeting(Townsperson.HANA, month, true, emptyList()))
+        assertEquals("조용히... 영어 책은... 저쪽 창가에 있어요.", greeting(Townsperson.LEO, month, true, emptyList()))
         month.take(Action.REST)
         assertTrue(Situation.NIGHT !in situations(month, false, emptyList()))
     }

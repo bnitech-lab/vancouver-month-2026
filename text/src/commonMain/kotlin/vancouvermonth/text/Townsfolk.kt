@@ -30,6 +30,7 @@ fun keyword(action: Action): String = when (action) {
 /** What a townsperson can notice about the player today. The order is the order they care about it. */
 enum class Situation {
     OFFER,
+    FIRST_MEETING_AT_NIGHT,
     FIRST_MEETING,
     NIGHT,
     TECHNICAL_TODAY,
@@ -63,6 +64,7 @@ fun situations(
     val stageToday = if (month.hasInterviewToday) month.interview?.stage else null
     val holds = mapOf(
         Situation.OFFER to (month.ending == Ending.OFFER),
+        Situation.FIRST_MEETING_AT_NIGHT to (firstMeeting && month.isNight),
         Situation.FIRST_MEETING to firstMeeting,
         Situation.NIGHT to month.isNight,
         Situation.TECHNICAL_TODAY to (stageToday == InterviewStage.TECHNICAL),
@@ -104,6 +106,7 @@ fun smallTalk(person: Townsperson, month: Month, count: Int): String {
 /** Each person's line for each situation they react to. Every person has an [Situation.ORDINARY] line. */
 private val greetings: Map<Townsperson, Map<Situation, String>> = mapOf(
     Townsperson.HANA to mapOf(
+        Situation.FIRST_MEETING_AT_NIGHT to "새로 왔구나? 오늘은 문 닫았어. 내일 아침에 와 줄래?",
         Situation.FIRST_MEETING to "새로 왔구나? 오늘 손이 모자라. 오후까지만 도와줄래?",
         Situation.NIGHT to "오늘은 문 닫았어. 들어가서 푹 자.",
         Situation.INTERVIEW_TODAY to "오늘 면접이라며? 일은 면접 보고 와서 해. 회사로 가 봐.",
@@ -150,7 +153,7 @@ private val greetings: Map<Townsperson, Map<Situation, String>> = mapOf(
         Situation.INTERVIEW_TODAY to "오늘 면접이라며? 따뜻하게 입고 회사로 가.",
         Situation.LOW_ENERGY to "오늘은 그만 자. 쉬는 것도 일이야.",
         Situation.RAINY to "여기 비는 조용히 오지. 금방 익숙해져.",
-        Situation.ORDINARY to "아침은 먹었어? 든든히 먹고 다녀.",
+        Situation.ORDINARY to "밥은 챙겨 먹었어? 든든히 먹고 다녀.",
     ),
 )
 
