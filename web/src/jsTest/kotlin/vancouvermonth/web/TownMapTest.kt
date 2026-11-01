@@ -31,6 +31,23 @@ class TownMapTest {
     }
 
     @Test
+    fun `each place keeps the number a kept month saves for it, numbered from 0 within its kind with none missing`() {
+        // Pinned: a month kept in a browser says "W2" or "A1", so these numbers never change.
+        val numbers = mapOf(
+            Place.HOME to 0, Place.CAFE to 0, Place.LIBRARY to 0, Place.COWORKING to 0, Place.OFFICE to 0,
+            Place.JUNCTION_OFFICE to 1, Place.EAST_VILLAGE_LIBRARY to 1, Place.SMALL_PARK_CAFE to 1,
+            Place.HIGH_STREET_COWORKING to 1, Place.BIG_PARK_LIBRARY to 2, Place.TOWN_CENTRE_OFFICE to 2,
+            Place.SLOPE_CAFE to 2,
+        )
+        assertEquals(Place.entries.toSet(), numbers.keys)
+        for ((place, number) in numbers) assertEquals(number, place.number, "$place")
+        for (kind in PlaceKind.entries) {
+            val kept = Place.entries.filter { it.kind == kind }.map { it.number }.sorted()
+            assertEquals((0 until kept.size).toList(), kept, "$kind")
+        }
+    }
+
+    @Test
     fun `the picture has one building for each kind of place, west to east, with its kind's word`() {
         assertEquals(PlaceKind.entries, buildings.map { it.place.kind })
         assertEquals(listOf("내 방", "카페", "도서관", "코워킹", "회사"), buildings.map { it.place.kind.label })
