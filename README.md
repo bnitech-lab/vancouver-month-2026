@@ -399,9 +399,9 @@ and docks, the places as dots with 회사 and 카페 named, and a pin for each r
 (the West End for zone 1, Burnaby for zones 2 and 3), so the player sees how far each room is from work. A pin carries
 the room's number; a tap on it picks the room and shows its card under the map (rent, zone, utilities), the guess and
 the real total following as before, and the picked pin stays filled in. The pins are buttons, 44 points across, reached
-with Tab in the rooms' order, each heard by a screen reader as its room in full ("1번 방, 월세 $1,070, 교통 1구역, 공과금
-포함"); 회사's and 카페's names are placed where they cover no pin. Pins closer than a finger on a narrow map are pushed
-apart, with a line back to their doors. The map is a 2D canvas, so it is the same on the button screen; where a browser
+with Tab in the rooms' order, each heard by a screen reader as its room in full ("1번 방, 월세 $1,070, 교통 1구역,
+웨스트엔드, 공과금 포함", the area standing in for the map); 회사's and 카페's names are placed where they cover no pin.
+Pins closer than a finger on a narrow map are pushed apart, with a line back to their doors. The map is a 2D canvas, so it is the same on the button screen; where a browser
 cannot draw one, the rooms are the list of buttons they were before. Nothing of the town is made until the month starts.
 `RoomMap` draws it, with the small map's painting (`Minimap`).
 

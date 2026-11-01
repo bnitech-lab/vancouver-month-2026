@@ -100,7 +100,8 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
             pin.style.margin = "-${PIN / 2}px 0 0 -${PIN / 2}px"
             // Seen, its number; heard, the room in full, as the list of rooms said it.
             pin.appendChild(span("room-pin-number", "${index + 1}번"))
-            val heard = " 방, 월세 ${money(room.rent)}, 교통 ${room.zone.number}구역, ${utilitiesLabel(room)}"
+            val zone = room.zone.number
+            val heard = " 방, 월세 ${money(room.rent)}, 교통 ${zone}구역, ${areaOf(zone)}, ${utilitiesLabel(room)}"
             pin.appendChild(span("visually-hidden", heard))
             pin.onclick = { event -> if (event.timeStamp.toDouble() >= shownAt) onPick(index) }
             element.appendChild(pin)
@@ -278,6 +279,12 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
 
         /** The map's width before the page lays it out: the column of a 375-point phone. */
         private const val NOMINAL_WIDTH = 343.0
+
+        /**
+         * Where a room in [zone] stands, in a word, for a screen reader, which does not see the map: the West End for
+         * zone 1, Burnaby for the others, as 내 방 does ([Neighbourhood.homes]).
+         */
+        fun areaOf(zone: Int): String = if (zone == 1) "웨스트엔드" else "버나비"
 
         /** True when [box] comes within [reach] of the spot [left], [top]. */
         fun covers(box: DoubleArray, left: Double, top: Double, reach: Double): Boolean =

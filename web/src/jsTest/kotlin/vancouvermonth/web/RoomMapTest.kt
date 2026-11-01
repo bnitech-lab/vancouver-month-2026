@@ -299,7 +299,8 @@ class RoomMapTest {
             assertEquals("button", pin.type)
             assertNull(pin.getAttribute("aria-hidden"))
             assertEquals(
-                "${index + 1}번 방, 월세 ${money(room.rent)}, 교통 ${room.zone.number}구역, ${utilitiesLabel(room)}",
+                "${index + 1}번 방, 월세 ${money(room.rent)}, 교통 ${room.zone.number}구역, " +
+                    "${if (room.zone.number == 1) "웨스트엔드" else "버나비"}, ${utilitiesLabel(room)}",
                 pin.textContent,
             )
             pin.focus()
