@@ -206,9 +206,10 @@ class WalkableTownTest {
 
     /** Seed 1011's balance on its first day, in its cheapest room. */
     private val firstBalance: Int
-        get() = FirstMinute(1011).let { it.startMonth(it.cheapestRoomIndex).balance }
+        get() = FirstMinute(1011).let { it.startMonth(it.cheapestRoomIndex, it.lowestTotal).balance }
 
     private fun startMonth() {
+        passIntro(root)
         val game = FirstMinute(1011)
         tap("${game.cheapestRoomIndex + 1}번 방")
         val input = root.querySelector("input") as HTMLInputElement
@@ -336,7 +337,7 @@ class WalkableTownTest {
         val names = town.querySelectorAll(".place-name").asList().map { it.textContent }
         assertEquals(listOf("내 방", "카페", "도서관", "코워킹", "회사", "자전거 가게"), names)
         assertEquals("three.js r169", town.querySelector("canvas")?.getAttribute("data-engine"))
-        assertTrue("오늘9월 2일" in screen && "잔고\$1,835" in screen && "10월 총비용\$1,165" in screen, screen)
+        assertTrue("오늘9월 2일" in screen && "잔고\$1,935" in screen && "10월 총비용\$1,165" in screen, screen)
         assertTrue("영어 1/10 · 코딩 3/10 · 체력 5/5" in screen, screen)
         assertTrue("땅을 누르면 걷고" in (root.querySelector(".town-hint")?.textContent ?: ""), "the first day's hint")
         assertNull(root.querySelector(".actions"))
@@ -574,7 +575,7 @@ class WalkableTownTest {
         startInTown()
         talkTo(Place.LIBRARY)
         tap("영어 공부")
-        val month = FirstMinute(1011).let { it.startMonth(it.cheapestRoomIndex) }
+        val month = FirstMinute(1011).let { it.startMonth(it.cheapestRoomIndex, it.lowestTotal) }
         month.take(Action.STUDY_ENGLISH)
         assertTrue("오늘9월 3일" in screen, screen)
         assertTrue("잔고${money(month.balance)}" in screen, screen)
@@ -751,7 +752,7 @@ class WalkableTownTest {
                 assertEquals(listOf("그만"), answers)
                 assertNull(root.querySelector(".talk .spend"), "a talk with a passerby spends a day")
                 assertSame(talk, document.activeElement)
-                assertTrue("오늘9월 2일" in screen && "잔고\$1,835" in screen, screen)
+                assertTrue("오늘9월 2일" in screen && "잔고\$1,935" in screen, screen)
                 assertFalse(town.isChangingDay)
             },
             Step("그만, then the street", { true }) {

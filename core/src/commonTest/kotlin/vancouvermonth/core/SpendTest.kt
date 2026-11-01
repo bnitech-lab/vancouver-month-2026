@@ -218,8 +218,8 @@ class SpendTest {
     @Test
     fun `spending between days changes the balance only, never the days or the luck`() {
         for (seed in 1..60) {
-            val plain = FirstMinute(seed).startMonth(0)
-            val spender = FirstMinute(seed).startMonth(0)
+            val plain = FirstMinute(seed).startMonth(0, guess = 1_000)
+            val spender = FirstMinute(seed).startMonth(0, guess = 1_000)
             var spent = 0
             var turn = 0
             while (!plain.isOver) {

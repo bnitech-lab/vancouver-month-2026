@@ -7,9 +7,10 @@ the money runs out.
    so first you need a room for the month. Its total is paid now and again on October 1st, so a cheaper room needs
    fewer café shifts and leaves more days for the job hunt. Three rooms show rent, a transit zone and whether
    utilities are included, next to a price board. Pick the room you think is cheapest in total, guess what it really
-   costs a month, and see the real total and a score: 100 points for the cheapest room, and up to 100 for the guess,
-   one point off per dollar missed. One more line says how much more a month the pick costs than the cheapest room,
-   or, for the cheapest, that it leaves the most money. The rule behind it: compare rooms by their total monthly
+   costs a month, and see the real total. The guess moves money as the month starts: $100 less the dollars it missed
+   by, never below -$300 (exact +$100, $100 off $0, $250 off -$150, $400 off or more -$300). One more line says how
+   much more a month the pick costs than the cheapest room, or, for the cheapest, that it leaves the most money; the
+   cheapest pick earns nothing extra beyond paying less. The rule behind it: compare rooms by their total monthly
    cost (rent, utilities and a transit pass), not by rent alone.
 2. **September 2nd to 30th: one action a day.** Work a café shift, study English, practise coding, send an
    application, or rest. Every day costs living money, and every action but rest costs energy.
@@ -17,8 +18,8 @@ the money runs out.
    interview (passed on coding). Passing both is a job offer and ends the game. Applications close after the
    27th, so both interviews always fit in September.
 4. **The end.** No offer by the 30th means October's total for the same room is due: you either can pay it or you
-   cannot. What is left after the first room always covers September's living cost, so October's total is where
-   the money runs short.
+   cannot. What is left after the first room, even after the largest penalty for the guess, always covers
+   September's living cost, so October's total is where the money runs short.
 
 ## Play
 
@@ -60,18 +61,21 @@ BNI Tech
   2) 월세   $970   교통 3구역   공과금 별도
   3) 월세 $1,020   교통 2구역   공과금 포함
 
+총비용 짐작: 방을 고른 뒤 그 방의 한 달 총비용을 짐작해 적어요.
+             맞힐수록 최대 $100을 더 받고, $100보다 더 틀리면 그만큼 잃어요(최대 $300).
+
 어느 방? (1-3) > 2
 이 방의 한 달 총비용은 얼마일까요? ($) > 1300
 
   한 달 총비용  $1,345
   월세 $970 + 공과금 $180 + 교통 $195
 
-  총비용이 가장 싼 방은 3번이었어요 ($1,165).   +0
-  내 짐작과 차이 $45   +55
-  방 고르기 점수 55 / 200
-
-  첫 달을 내고 남은 잔고 $1,655
+  총비용이 가장 싼 방은 3번이었어요 ($1,165).
+  내 짐작과 차이 $45
   가장 싼 방보다 한 달에 $180 더 내요. 10월 1일에도 그만큼 더 나가요.
+
+  짐작 보상 +$55, 잔고 $1,710
+  $100에서 틀린 만큼 빼고 받아요.
 
 9월 한 달이 시작돼요.
   목표: 9월 30일까지 취업 제안 받기
@@ -79,7 +83,7 @@ BNI Tech
   면접은 두 번이에요. 1차 영어 면접은 영어 실력, 2차 기술 면접은 코딩 실력으로 붙어요.
 
 [9월 2일] 남은 날 29일
-  잔고 $1,655 · 10월 1일에 낼 총비용 $1,345
+  잔고 $1,710 · 10월 1일에 낼 총비용 $1,345
   영어 1/10 · 코딩 3/10 · 체력 5/5
 오늘 할 일 하나:
   1) 카페 알바     +$110, 체력 -1
@@ -89,7 +93,7 @@ BNI Tech
   5) 쉬기          체력 +2
 오늘 할 일? (1-5) > 2
   영어 실력이 올랐어요. 영어 2/10
-  생활비 -$40, 잔고 $1,615
+  생활비 -$40, 잔고 $1,670
 ```
 
 A test plays this seed and checks that the screen still matches this sample.
@@ -114,10 +118,10 @@ the run number, so no server is needed. At the end, the result comes as one line
 number, no link and nothing about the player:
 
 ```
-밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 155/200 · 9월 19일 취업 제안
+밴쿠버 한 달 · 10월 30일 오늘의 판 · 짐작 보상 +$55 · 9월 19일 취업 제안
 ```
 
-The other two endings read `9월을 버팀` and `10월 총비용 모자람`.
+A guess that lost money reads `짐작 패널티 -$150`. The other two endings read `9월을 버팀` and `10월 총비용 모자람`.
 
 ```sh
 ./play --today              # today's run, from this computer's date
@@ -144,17 +148,19 @@ spend in the town (what, and how much). Nothing more is needed, since the same s
 the same way. The record is written when the month starts, after every day and after every spend, and emptied at any
 ending. Continued, a month keeps what was bought, and what was spent today still heads today's log.
 
-Opened again for the same run, the page first offers that month: a card shows the day and the balance it goes on from,
-with 이어하기 and 새로 시작. 이어하기 rebuilds the month by playing the recorded days again through the same rules and goes
-straight to that day, in the town or on the button screen; 새로 시작 drops the record and shows the rooms. An address with
-no run (neither `?seed` nor `?today`) opens the kept month's run, and there 새로 시작 plays a new run instead. There is one
+Opened again for the same run, the intro first offers that month: at its top, the day and the balance it goes on from,
+and at its foot 이어하기 and 새로 시작 in place of 시작하기. 이어하기 rebuilds the month by playing the recorded days again
+through the same rules (the guess's money included) and goes straight to that day, in the town or on the button screen;
+새로 시작 drops the record and shows the rooms. An address with no run (neither `?seed` nor `?today`) opens the kept
+month's run, and there 새로 시작 plays a new run instead, straight to its rooms. There is one
 slot: a page opened for another run leaves the kept month alone, its start card says that starting will drop the month
 kept on that day, and starting takes its place. Two tabs share the slot too, so the day last played in either is the one
 kept. A record that cannot be read or replayed (another version, or a day the rules refuse) is dropped without a word,
 and where the browser refuses storage there is no card and nothing is kept.
 
 A test replays a few kept lines to months written down by hand, so a change to the rules fails it until
-`MonthRecord.VERSION` goes up, which drops the older lines rather than continuing them into a different month.
+`MonthRecord.VERSION` goes up, which drops the older lines rather than continuing them into a different month. It is 3
+since the guess began to move money (v0.14): a month kept before that started with another balance.
 
 ### The 3D town
 
@@ -321,7 +327,7 @@ all of it, and
 `Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the map included, is about 874 KB
 (about 238 KB gzipped).
 
-### Sound and the first-run guide
+### Sound and the guide
 
 The page has a calm background tune of its own, made entirely in code with the Web Audio API: no audio files, no
 samples, nothing downloaded. It is written by rules, not copied from any game or song: a music-box melody in F major
@@ -339,17 +345,30 @@ after dark, in the town's own night or late on the player's clock. They follow t
 the tune.
 
 Sound is off until the player turns it on with the switch in the town's top card, at the top of the button screen, and
-by the title on the room and ending screens. It is a plain button whose words say what a tap does, 소리 켜기 or 소리 끄기;
+by the title on the intro, the room screen and the ending. It is a plain button whose words say what a tap does, 소리 켜기 or 소리 끄기;
 it has no `aria-pressed`, since ARIA's guidance for toggle buttons keeps a toggle's name steady. The browser's
 audio is made only on that tap, as browsers require. The choice is kept in `localStorage`; when it was left on, the
 sound comes back on the first tap anywhere. It pauses while the page is hidden, fades in and out, and plays quietly
 through a limiter. Where the browser has no Web Audio there is no switch, and where storage is refused nothing is
 remembered.
 
-The first time the town opens, one card says how to play: tap the ground to walk, tap twice to dash, drag to look
-around and pinch to zoom, and tap a person or a building to talk, where picking a job ends the day. It ends with the
-month's goal, in the words the month's start uses. 시작 or Escape closes it, and the "?" in the top card opens it again.
-The button screen has no card, since its buttons say what they do.
+How to play is said on the intro (see below) and again on a card the "?" in the town's top card opens: tap the ground
+to walk and twice to dash, drag to look around and pinch to zoom, tap a person or a building to talk (picking a job ends
+the day), tap a station, stop or dock to ride, buy or rent a bike or call a taxi, and find yourself on the small map. The
+card ends with the month's goal, in the words the month's start uses; 닫기 or Escape closes it. It never opens by
+itself, since the intro has just said the same. The button screen has no card, since its buttons say what they do.
+
+### The intro
+
+The page opens on an intro: the title with the version, 업데이트 소식 and the sound switch; the arrival story (September
+1st, $3,000, the goal, a room first); how to play, in the same six lines as the "?" card; how the guess pays, in one
+line ("맞힐수록 최대 $100을 더 받고, $100보다 더 틀리면 그만큼 잃어요(최대 $300).") with three worked examples; and the
+map's credit.
+시작하기 sits in a bar held at the foot of the screen, so it is in sight on a 375 x 812 or 320 x 568 phone and on one
+turned on its side, however long the rest; it leads to the rooms. With a month kept for the run, the intro opens with it
+and offers 이어하기 and 새로 시작 instead (see Continuing a month). 다시 하기 on the ending goes straight to a new run's
+rooms: it opens `?seed=...&start`, and the page writes the address back without `&start`, so a reload or a shared link
+opens on the intro.
 
 `Music.kt` writes the tune as notes and is tested without sound; `Synth.kt` plays it, and the tests render it into an
 `OfflineAudioContext` to check it is heard, never clips, is quietest at night, and keeps the rain under it; `Sound.kt`
@@ -382,7 +401,7 @@ is the newest, and the lines' widths and words.
 
 | Part | What | Notes |
 |---|---|---|
-| `core` | The rules: rooms, the score, the month, interviews, endings, money spent in the town, and the run number for a date | Kotlin Multiplatform, standard library only, so the same rules run on the JVM and in a browser. All luck goes through one `Dice` interface, so tests can control it |
+| `core` | The rules: rooms, the guess's money, the month, interviews, endings, money spent in the town, and the run number for a date | Kotlin Multiplatform, standard library only, so the same rules run on the JVM and in a browser. All luck goes through one `Dice` interface, so tests can control it |
 | `save` | A month in progress as a short record, and the month rebuilt from it by playing each day's choice and each spend again | Kotlin Multiplatform, core only, so the JVM tests it by replaying hundreds of random months beside the live ones |
 | `text` | The Korean lines both screens share (amounts, dates, actions, events, endings, today's result line, the townspeople's lines) and how a typed amount is read | Kotlin Multiplatform, no layout |
 | `terminal` | The text screen | Kotlin on the JVM |
@@ -401,10 +420,13 @@ and `test` in `terminal` (for example `./gradlew :terminal:test --tests '*Termin
 Rooms come from a seed. Farther zones have lower rent and a dearer pass, and utilities may or may not be
 included, so the room with the lowest rent has the lowest total in only a bit more than half of the deals.
 
-The month is balanced by bots that play 2,000 runs with the real rules (`BalanceTest`). A bot that rests when
-tired, works when the rent is at risk, studies and applies lands an offer in about 43% of runs; a bot that picks
-at random lands one in about 24%; a bot that only rests never does. (Measured on seeds 1 to 2,000 with Kotlin
-2.4.21; the test itself only checks a range.)
+The month is balanced by bots that play 2,000 runs with the real rules (`BalanceTest`). Each picks the cheapest room
+and guesses its total in a fixed way. A bot that reads the price board for its guess (rent, pass, and the middle of the
+utilities' range when they are separate: +$94 on average), then rests when tired, works when the rent is at risk,
+studies and applies, lands an offer in about 47% of runs (43% before the guess moved money); the same bot with a guess
+$500 off lands one in about 32%. A bot that takes the rent for the total and picks its days at random lands one in about
+24%, and a bot that only rests never does. (Measured on seeds 1 to 2,000 with Kotlin 2.4.21; the test itself only
+checks ranges.)
 
 ## Who wrote what
 
@@ -424,7 +446,7 @@ Dawn plays the month on a phone and decides what grows next.
 
 `tools/vancouver_map` traces real Vancouver (the peninsula, the big park at its tip, False Creek and its south shore)
 into a grid of squares in `VancouverMapData.kt`, with its city blocks and small parks, and the town is built on it.
-The page shows the licence's statement at the foot of the card on how to play. Its sources are
+The page shows the licence's statement at the foot of the intro and of the card on how to play. Its sources are
 the City of Vancouver's open datasets Shoreline 2002, Parks - polygon representation, Rapid transit lines, City
 boundary, Block outlines and Local area boundary, fetched on 2026-10-31 from
 [opendata.vancouver.ca](https://opendata.vancouver.ca).
@@ -433,7 +455,7 @@ Contains information licensed under the
 [Open Government Licence – Vancouver](https://opendata.vancouver.ca/pages/licence/).
 
 The map data is licensed under that licence (version 1.0), not MIT, and keeps its attribution: on the page, the
-card on how to play shows the statement with a link to the licence, and `MAP-DATA-NOTICE.txt` ships beside the
+intro and the card on how to play show the statement with a link to the licence, and `MAP-DATA-NOTICE.txt` ships beside the
 script. The code that makes and reads the data is MIT. How to fetch the data again and rebuild the map is in
 [tools/vancouver_map/README.md](tools/vancouver_map/README.md).
 
