@@ -766,7 +766,11 @@ object Neighbourhood {
             val out = if (venue.doorFacesSouth) 0.0 else -0.06
             add(doorX - 0.45, 0.0, front + out, 0.9, 1.6, 0.06, DOOR)
             add(doorX - 0.55, 1.6, front + out - 0.01, 1.1, 0.12, 0.08, WOOD_DARK)
-            addWindows(x, z, width, depth, venue.height, doorX, venue.doorFacesSouth)
+            if (venue.place.kind == PlaceKind.OFFICE) {
+                addWindowBands(x, z, width, depth, venue.height, doorX, venue.doorFacesSouth)
+            } else {
+                addWindows(x, z, width, depth, venue.height, doorX, venue.doorFacesSouth)
+            }
             // What marks the kind out, on the side the door is on: [ahead] is how far out from the front wall a thing
             // [deep] squares deep starts.
             val south = venue.doorFacesSouth
@@ -827,6 +831,37 @@ object Neighbourhood {
             for (layer in 0 until layers) {
                 val inset = layer * (depth / 2) / layers
                 add(x - 0.2, top + layer * 0.3, z - 0.25 + inset, width + 0.4, 0.3, depth + 0.5 - 2 * inset, colour)
+            }
+        }
+
+        /**
+         * An office tower's windows: a band of glass round each storey, as the windows of [addWindows] would sit, the
+         * door's storey open at the door; four boxes a storey rather than one a window, so three towers stay light.
+         */
+        fun addWindowBands(
+            x: Double,
+            z: Double,
+            width: Double,
+            depth: Double,
+            height: Double,
+            doorX: Double,
+            doorSouth: Boolean,
+        ) {
+            var bottom = 0.75
+            while (bottom + 0.7 < height - 0.2) {
+                for (south in listOf(false, true)) {
+                    val faceZ = if (south) z + depth else z - 0.05
+                    if (bottom < 1.5 && south == doorSouth) {
+                        glow(x + 0.2, bottom, faceZ, doorX - 1.0 - x - 0.2, 0.65, 0.05, WINDOW)
+                        glow(doorX + 1.0, bottom, faceZ, x + width - 0.2 - doorX - 1.0, 0.65, 0.05, WINDOW)
+                    } else {
+                        glow(x + 0.2, bottom, faceZ, width - 0.4, 0.65, 0.05, WINDOW)
+                    }
+                }
+                for (east in listOf(false, true)) {
+                    glow(if (east) x + width else x - 0.05, bottom, z + 0.2, 0.05, 0.65, depth - 0.4, WINDOW)
+                }
+                bottom += 1.4
             }
         }
 
