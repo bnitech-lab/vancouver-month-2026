@@ -5,6 +5,7 @@ package vancouvermonth.web
 import kotlin.js.Json
 import org.khronos.webgl.Float32Array
 import org.khronos.webgl.Uint8Array
+import org.w3c.dom.HTMLCanvasElement
 
 // Kotlin declarations for the parts of Three.js (https://threejs.org) the town uses, and nothing more.
 // An `external` class is written in JavaScript; Kotlin only learns its name and the members listed here.
@@ -102,6 +103,12 @@ external class WebGLRenderer(parameters: Json) {
     fun setSize(width: Int, height: Int, updateStyle: Boolean)
     fun render(scene: Scene, camera: Camera)
 
+    /** Makes the shaders [scene]'s materials need, ahead of the first frame drawn with them. */
+    fun compile(scene: Scene, camera: Camera)
+
+    /** Sends [texture] to the graphics card now, rather than on the first frame that draws it. */
+    fun initTexture(texture: CanvasTexture)
+
     /** Lets go of what the renderer holds on the graphics card. */
     fun dispose()
 }
@@ -131,6 +138,15 @@ external class DataTexture(data: Uint8Array, width: Int, height: Int, format: In
     var minFilter: Int
     var magFilter: Int
     var needsUpdate: Boolean
+    fun dispose()
+}
+
+/** A picture drawn on a 2D [canvas], such as a sign's words. Set [needsUpdate] once it is drawn. */
+external class CanvasTexture(canvas: HTMLCanvasElement) {
+    var needsUpdate: Boolean
+
+    /** How its colours are written: "srgb" for a picture drawn as a screen shows it. */
+    var colorSpace: String
     fun dispose()
 }
 

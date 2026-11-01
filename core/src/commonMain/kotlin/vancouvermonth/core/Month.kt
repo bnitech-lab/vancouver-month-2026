@@ -59,21 +59,45 @@ enum class Item { BIKE, E_SCOOTER }
 
 /**
  * What money can go on in the town without spending stamina or time: something to keep ([buys]), or one ride's fare.
- * Each costs [price]; a taxi's fare depends on the trip, so it may cost anything from its [price] up to [most]
- * ([TaxiFare]). All of them are invented. A ride that is free with the month's pass (the SkyTrain, the bus) needs no
- * spending at all.
+ * Each costs [price]; a taxi's fare, and a shared bike's or e-scooter's, depends on the trip, so it may cost anything
+ * from its [price] up to [most] ([TaxiFare], [SharedFare]). All of them are invented. A ride that is free with the
+ * month's pass (the SkyTrain, the bus) needs no spending at all.
  */
 enum class Spending(val price: Int, val buys: Item? = null, val most: Int = price) {
     BIKE(350, Item.BIKE),
     E_SCOOTER(550, Item.E_SCOOTER),
-    SHARED_BIKE_RIDE(3),
-    SHARED_E_SCOOTER_RIDE(4),
+    SHARED_BIKE_RIDE(SharedFare.BIKE.base, most = SharedFare.BIKE.most),
+    SHARED_E_SCOOTER_RIDE(SharedFare.E_SCOOTER.base, most = SharedFare.E_SCOOTER.most),
     WATER_BUS_RIDE(4),
     TAXI_RIDE(TaxiFare.BASE, most = TaxiFare.MOST),
     ;
 
-    /** True when [amount] is what this costs: its price, or for a taxi any fare its meter can show. */
+    /** True when [amount] is what this costs: its price, or for a fare by distance any fare its meter can show. */
     fun costs(amount: Int): Boolean = amount in price..most
+}
+
+/**
+ * A shared bike's or e-scooter's fare: [base] dollars, and [perTenSquares] more for every ten squares of the town's map
+ * ridden (a square stands for 25 m), rounded to the dollar as the taxi's meter is; it stops at [most]. Invented, like
+ * every price in the game.
+ */
+enum class SharedFare(val base: Int, val perTenSquares: Double, val most: Int) {
+    BIKE(1, 0.4, 15),
+    E_SCOOTER(1, 0.6, 20),
+    ;
+
+    /** The fare for a ride of [squares] squares along the streets. */
+    fun forDistance(squares: Double): Int =
+        (base + squares.coerceAtLeast(0.0) / 10 * perTenSquares).roundToInt().coerceAtMost(most)
+
+    companion object {
+        /** The fare of [kind], a shared bike's or e-scooter's ride; null for anything else. */
+        fun of(kind: Spending): SharedFare? = when (kind) {
+            Spending.SHARED_BIKE_RIDE -> BIKE
+            Spending.SHARED_E_SCOOTER_RIDE -> E_SCOOTER
+            else -> null
+        }
+    }
 }
 
 /**

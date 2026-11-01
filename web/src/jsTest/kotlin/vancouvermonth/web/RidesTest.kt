@@ -205,6 +205,28 @@ class RidesTest {
         assertFalse(Ride.BIKE.shared)
     }
 
+    @Test
+    fun `a long shared ride goes faster, up to a bike's 16 and an e-scooter's 20, as a taxi's long ride does`() {
+        for (vehicle in Vehicle.entries) {
+            // Across downtown, as ever.
+            assertEquals(vehicle.speed, vehicle.cruise(40.0), "$vehicle")
+            assertEquals(vehicle.speed, vehicle.cruise(0.0), "$vehicle")
+            var last = vehicle.speed
+            for (squares in 0..800 step 10) {
+                val cruise = vehicle.cruise(squares.toDouble())
+                assertTrue(cruise >= last && cruise in vehicle.speed..vehicle.top, "$vehicle, $squares: $cruise")
+                last = cruise
+            }
+            assertEquals(vehicle.top, vehicle.cruise(800.0))
+            assertTrue(vehicle.top > vehicle.dashSpeed, "$vehicle")
+            // Out to Burnaby, about 400 squares, well under half a minute, not most of a minute.
+            assertTrue(400.0 / vehicle.cruise(400.0) <= 25.0, "$vehicle")
+        }
+        assertEquals(16.0, Vehicle.BIKE.top)
+        assertEquals(20.0, Vehicle.E_SCOOTER.top)
+        assertTrue(Vehicle.E_SCOOTER.top < Journey.TAXI_TOP)
+    }
+
     /** At a bike's best speed, in 16 ms frames, the camera keeps within a couple of units of the character. */
     @Test
     fun `the camera keeps up with a ride`() {
@@ -221,6 +243,18 @@ class RidesTest {
             farthest = maxOf(farthest, hypot(camera.focus.x - spot.x, camera.focus.z - spot.z))
         }
         assertTrue(farthest < 2.0, "the camera fell $farthest behind")
+        // And at a long shared ride's top speed, as on a taxi's long ride.
+        val fast = Trip(route, Vehicle.E_SCOOTER.top)
+        val follows = FollowCamera(Point(start.x, 1.0, start.z))
+        elapsed = 0.0
+        var behind = 0.0
+        while (!fast.isOverAfter(elapsed)) {
+            elapsed += 16.0
+            val spot = fast.spotAfter(elapsed)
+            follows.follow(Point(spot.x, 1.0, spot.z), 16.0)
+            behind = maxOf(behind, hypot(follows.focus.x - spot.x, follows.focus.z - spot.z))
+        }
+        assertTrue(behind < 3.0, "the camera fell $behind behind at top speed")
     }
 
     private fun distanceToSegment(spot: Spot, a: Spot, b: Spot): Double {

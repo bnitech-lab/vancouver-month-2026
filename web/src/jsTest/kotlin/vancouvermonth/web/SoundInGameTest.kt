@@ -31,8 +31,14 @@ internal class QuietTown : WalkableTown {
     override var riding: Ride? = null
     override var travelling: Transport? = null
 
-    /** How far a taxi drives to any place, or null when none goes: the test's to set. */
+    /** How far a taxi drives, or a shared one rides, to any place, or null when none goes: the test's to set. */
     var taxiSquares: Double? = 30.0
+
+    /** How far to each place in turn, when a test wants them to differ: null where nothing goes. */
+    var squaresTo: ((Spot) -> Double?)? = null
+
+    /** False to make the town refuse to ride a shared one off, as when the way there is gone. */
+    var canRideNow = true
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
     override var onArrived: (Place) -> Unit = {}
@@ -61,7 +67,9 @@ internal class QuietTown : WalkableTown {
         riding = null
     }
 
-    override fun taxiDistance(to: Spot): Double? = taxiSquares
+    override fun canRideTo(ride: Ride, to: Spot): Boolean = canRideNow && canRide(ride)
+
+    override fun taxiDistance(to: Spot): Double? = squaresTo.let { if (it == null) taxiSquares else it(to) }
 
     /** False to make the town refuse to set off, as by night or away from the stop. */
     var canTravelNow = true

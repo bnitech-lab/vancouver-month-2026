@@ -226,7 +226,7 @@ nearest, as in "지도: 내 방 근처", or, more than 40 squares from any of th
 | Pinch, or the mouse wheel | The camera comes nearer or goes farther |
 | Tap a person, a building or its name, or walk up to a door or a person | The character goes to that place's person, and a talk opens (a second quick tap only hurries it there) |
 | Tap the bike shop, its name or its keeper | The character goes to 벤, and his talk opens |
-| Tap a shared bike or e-scooter | The character walks up to it, pays its fare and rides off on it |
+| Tap a shared bike or e-scooter | The character walks up to it, and a card offers where to ride it, each place with its fare; it rides to the one chosen |
 | Tap 자전거 타기 or 퀵보드 타기 on the top card, once bought | The character gets on; 내리기 gets off |
 | Tap a SkyTrain station, a bus stop or a water bus dock | The character walks there, and a card offers where to go from it |
 | Tap 택시 부르기 on the top card | A card offers every place a taxi goes, each with its fare, before anything is paid |
@@ -264,10 +264,20 @@ offers 자전거 타기 or 퀵보드 타기, and while riding says what is ridde
 bike goes about 9 units a second and an e-scooter 11, against 3.6 on foot (a double tap is a little faster still), along
 the same streets, never over the water, the rider pedalling on the saddle or standing on the deck, and the camera keeps
 up. Shared bikes stand two to a dock near the West End's 내 방, 도서관, 카페 and the station, and in Burnaby near 내 방 in
-zones 2 and 3 and the two stations of the town centre, and shared e-scooters on four street corners, all in an invented purple. A tap on one walks up to it, pays its fare ($3 a bike ride, $4 an e-scooter ride)
-once, there, and rides off on it; it goes back to its dock or corner when the player taps 내리기 or a talk opens. Any
-talk gets the character off first, and the day's end too, so each morning starts on foot; a fare is only ever paid for
-a ride that starts. The money spent before an action heads that action's log, in two lines at most ("그 밖에 5건 -$15" for the
+zones 2 and 3 and the two stations of the town centre, and shared e-scooters on four street corners, all in an invented purple. A tap on one walks up to it, and a card like the taxi's
+lists every place a taxi goes with the fare there, by the way along the streets from where it stands: a bike $1 and
+$0.40 for every ten squares (250 m), at most $15, an e-scooter $1 and $0.60, at most $20, to the dollar as the taxi's
+meter is (across downtown a few dollars, out to Burnaby the most). A place whose fare would leave too little for
+September's living cost is greyed out and says why; when even the cheapest one is, the top card says so instead of the
+card. The fare shown is the fare paid, through core, as the ride sets off and only then; it is kept in the record (s and
+q with the amount). The character rides there along the very way priced and gets off; on the way the town takes no taps, and 내리기 gets off
+where it is. Across downtown it goes at its everyday speed; a long ride goes faster, up to 16 squares a second on a bike
+and 20 on an e-scooter (a taxi's top is 24), so the West End to the town centre's station is about half a minute; like
+every ride, however long, it takes no stamina and leaves the day's clock where it was. At a
+place's door, 내 방's or the bike shop's, the character turns to the person there and the talk opens, as at the end of
+a walk there. The shared one goes back to its dock or corner when the character gets off, a talk opens or the day ends.
+Any talk gets the character off first, and the day's end too, so each morning starts on foot; a fare is only ever paid
+for a ride that starts. The money spent before an action heads that action's log, in two lines at most ("그 밖에 5건 -$15" for the
 rest), and on a small phone the log gives up its last lines before a talk would leave the screen. Every price is invented, and no shop, brand or bike-share or scooter company is real. On the
 button screen there is no shop and no riding.
 
@@ -278,8 +288,17 @@ names (크릭 끝역, 갈림길역, 동쪽 마을역, 작은 공원역, 경계�
 on the ground under its platform, but the first, whose entrance stands on a downtown street. The line goes on past the
 town centre into the haze, where the game stops nowhere. A tap on a station's building
 walks the character to its door, and a card lists the other stations; the train comes in, the camera follows it along
-the guideway (under downtown it waits at the entrance and cuts to the train as it leaves the tunnel), and the character
-steps out at the station chosen. A long ride goes faster, so downtown to Burnaby takes about 18 seconds. A bus runs a
+the guideway, and the character steps out at the station chosen. A long ride goes faster, so downtown to Burnaby takes
+about 18 seconds on the move. Under downtown the town gives way to the station's platform and the tunnel, drawn on
+their own in eight draws (`Underground.kt`): getting on at 다운타운역, the character waits at the platform's edge under
+the station's sign, the train comes in out of the tunnel, opens its doors, takes the character and pulls out, with the
+camera behind it; in the tunnel the lamps on its walls go by and the mouth comes up ahead, in the sky's colour by day
+or by night; the camera rides out in the tunnel for most of a second (until it comes to the mouth on a long ride) while
+the train runs on out into the open, and then cuts to the town as the train comes out of the mouth at 터널 입구역. The other way, the camera follows the train in from the
+mouth, and at the platform the doors open and the character steps out and walks off before the street door. The camera
+is never still for more than a moment down there, the rumble is heard where it rides, the small map's arrow goes with
+the train under the streets, and no name floats over the platform. With less motion the lamps are left out and the
+camera does not drift. A bus runs a
 loop on its own along the West End's and downtown's streets, with five stops (공원 입구, 쇼핑 거리, 다운타운, 다운타운
 남쪽, 웨스트엔드), and another out and back along Burnaby's main streets, from 경계역 앞 by the station at the city line
 past 버나비 큰길 (by 내 방 in zone 2) and 큰 공원 옆 to 비탈 마을 (by 내 방 in zone 3); each stop is a shelter and a
@@ -361,7 +380,8 @@ spot belongs to), `HomeSite` (the town for each zone's room: where 내 방 stand
 (the guideway the train follows), `Grid` (the A* search for the way around things), `Trip` (a walk or a dash, and the
 double tap), `Rides` (the bikes and e-scooters, their speeds, and where the shared ones stand), `Transit` (the stations,
 the two bus lines and their stops, the water bus's docks and way over the water, the places a taxi goes, and each ride's glide
-along its way), `FollowCamera`
+along its way), `UndergroundRide` (a ride under downtown as it is shown: the train coming in, the doors, the character
+on the platform and the camera), `FollowCamera`
 (turning, zooming, keeping out of the places' walls, and what a tap lands on), `Cutaway`
 (which of the city's buildings fold down out of the camera's way, and how far), `Minimap` (where the grid lies on the
 small map turned north up, and which place is nearest), `DayLight` (the light
@@ -372,9 +392,9 @@ rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, al
 `Passersby.kt` for the passersby's), and so are each day's weather (`Weather.kt`) and the bike shop's and riding's
 words (`Shop.kt`), and the SkyTrain's, the bus's, the water bus's and the taxi's (`Transit.kt`). `WalkableTown` draws
 all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about 983 KB
-(about 277 KB gzipped). `TownBudgetTest` measures what a frame costs downtown (by day and at night), in East Vancouver, in Burnaby, on a walk
-and on the train, and keeps it within a phone's budget.
+`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about 999 KB
+(about 283 KB gzipped). `TownBudgetTest` measures what a frame costs downtown (by day and at night), in East Vancouver,
+in Burnaby, on a walk, on the train and under downtown, and keeps it within a phone's budget.
 
 ### Sound and the guide
 

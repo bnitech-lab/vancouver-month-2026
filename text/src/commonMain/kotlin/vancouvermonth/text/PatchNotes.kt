@@ -32,10 +32,29 @@ class PatchNote(
  */
 object PatchNotes {
     /** The newest version, shown by the title; it is [ALL]'s first entry. */
-    const val CURRENT = "0.17"
+    const val CURRENT = "0.18"
 
     /** Every update, newest first. */
     val ALL: List<PatchNote> = listOf(
+        PatchNote(
+            version = "0.18",
+            date = "2026-11-01",
+            headline = "움직이는 지하역과 거리 요금",
+            added = listOf(
+                "다운타운역에서는 땅 밑 승강장으로 열차가 들어와 문이 열려요.",
+                "터널 안에서는 벽의 불빛이 지나가고, 터널 입구에서 바깥으로 나와요.",
+                "공유 자전거나 퀵보드에 다가가면 갈 곳마다 요금이 먼저 나와요.",
+            ),
+            improved = listOf(
+                "공유 자전거는 기본 \$1에 250m마다 \$0.40씩 붙고, 최대 \$15예요.",
+                "공유 퀵보드는 기본 \$1에 250m마다 \$0.60씩 붙고, 최대 \$20이에요.",
+                "고른 곳까지 타고 가서 내려요. 가는 길에 '내리기'로 내릴 수도 있어요.",
+                "멀리 가는 공유 자전거와 퀵보드는 더 빨리 달려요.",
+                "장소나 자전거 가게까지 타고 가면 내리자마자 말을 걸어요.",
+                "요금은 출발할 때 한 번만 나가요. 9월 생활비가 모자라면 고를 수 없어요.",
+                "땅 밑을 달리는 동안에도 미니맵의 내 위치가 열차를 따라가요.",
+            ),
+        ),
         PatchNote(
             version = "0.17",
             date = "2026-11-01",

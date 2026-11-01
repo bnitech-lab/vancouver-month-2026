@@ -168,7 +168,35 @@ class TownBudgetTest {
         }.then { }
     }
 
+    @Test
+    fun `under downtown, on the platform and in the tunnel, a few draws and no town`(): Promise<Unit> {
+        val town = open(1)
+        town.standAt(TransitLines.stations[0].door)
+        // Its shaders and sign are readied ahead, while the town idles after its first frame.
+        return whenReady({ town.isStill && town.isUndergroundReady }) {
+            town.travel(Transport.SKYTRAIN, 0, 1)
+        }.then {
+            whenReady({ town.isUnderground && town.undergroundShown.isRiderShown }) {
+                val cost = town.measureFrames(FRAMES)
+                report("under downtown, on the platform", cost)
+                withinBudget(cost)
+                assertTrue(cost.draws <= UNDERGROUND_DRAWS, "${cost.draws} draws")
+            }
+        }.then {
+            // Out in the tunnel, or just short of it: the camera is there for most of a second, and a slow test browser
+            // may draw only a few frames in that time.
+            whenReady({ town.isUnderground && town.undergroundShown.eye.x > UndergroundRide.HALL_EAST - 2.0 }) {
+                val cost = town.measureFrames(FRAMES)
+                report("under downtown, in the tunnel", cost)
+                withinBudget(cost)
+                assertTrue(cost.draws <= UNDERGROUND_DRAWS, "${cost.draws} draws")
+            }
+        }.then { }
+    }
+
     private companion object {
+        /** Under downtown only the platform and the tunnel are drawn: a handful of draws, the town none. */
+        const val UNDERGROUND_DRAWS = 10
         const val FRAMES = 4
         const val RIDE_MILLIS = 7_000.0
         /**

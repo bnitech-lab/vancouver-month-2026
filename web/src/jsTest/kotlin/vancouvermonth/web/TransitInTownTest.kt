@@ -186,6 +186,65 @@ class TransitInTownTest {
     /** True once the ride is over and nothing of the player's moves. */
     private fun arrived(town: NeighbourhoodScene): () -> Boolean = { town.travelling == null && town.isStill }
 
+    /**
+     * The camera's eye under the ground each time it is looked at there, with when, to find how long it stood still;
+     * and what was seen whenever the eye was out in the tunnel, east of the hall, so a short stretch drawn between two
+     * looks is not missed by a step waiting for it.
+     */
+    private class Underground(val town: NeighbourhoodScene) {
+        private val eyes = mutableListOf<Pair<Double, Point>>()
+
+        /** How many times the names were laid out by the first look under the ground, and by the last. */
+        private var layoutsFirst = -1
+        private var layoutsLast = -1
+
+        /** How many more times the names were laid out while under the ground, after the first look there. */
+        val layoutsUnder: Int
+            get() = layoutsLast - layoutsFirst
+
+        /** How many looks found the eye in the tunnel, and in how many of them the lamps, the character, open doors. */
+        var inTunnel = 0
+        var lampsInTunnel = 0
+        var riderInTunnel = 0
+        var doorsInTunnel = 0
+
+        /** Notes where the eye is now, when under the ground; true, so it can sit in any step's readiness. */
+        fun look(): Boolean {
+            if (!town.isUnderground) return true
+            val shown = town.undergroundShown
+            eyes += Date.now() to shown.eye
+            // The hidden names are not laid out again under the ground, however the train moves.
+            if (layoutsFirst < 0) layoutsFirst = town.labelLayouts
+            layoutsLast = town.labelLayouts
+            if (shown.eye.x > UndergroundRide.HALL_EAST) {
+                inTunnel += 1
+                if (shown.areLampsShown) lampsInTunnel += 1
+                if (shown.isRiderShown) riderInTunnel += 1
+                if (shown.doorsDrawn > 0.0) doorsInTunnel += 1
+            }
+            return true
+        }
+
+        /** How many times the eye was looked at under the ground. */
+        val looks: Int
+            get() = eyes.size
+
+        /** The longest time, in milliseconds, the eye was found in the same place. */
+        val longestStill: Double
+            get() {
+                var longest = 0.0
+                var since = eyes.firstOrNull()?.first ?: return 0.0
+                for ((before, after) in eyes.zipWithNext()) {
+                    if (before.second != after.second) since = after.first else longest = maxOf(longest, after.first - since)
+                }
+                return longest
+            }
+    }
+
+    /** No place's name floats over the town's picture: under the ground, none is shown. */
+    private fun namesShown(town: NeighbourhoodScene): Int =
+        town.element.querySelectorAll(".place-name").asList().count { !(it as HTMLElement).classList.contains("behind") }
+
     @Test
     fun `the SkyTrain from the station by the tunnel to the one past the creek's head, on the pass, no day gone`():
         Promise<Unit> {
@@ -229,13 +288,11 @@ class TransitInTownTest {
     }
 
     @Test
-    fun `from the station under downtown the camera waits there, then cuts to the train out of the tunnel`():
+    fun `from the station under downtown the platform shows, the train comes in and takes the character, then the mouth`():
         Promise<Unit> {
         val town = startInTown()
         val from = Stop(Transport.SKYTRAIN, 0)
-        val downtown = TransitLines.stations[0].door
-        var waited = false
-        var cut = false
+        val under = Underground(town)
         return play(
             Step("stand at the entrance under downtown", { town.isStill }) { standAt(town, from, 0.0) },
             Step("tap it and ride east", { town.isStill }) {
@@ -244,16 +301,33 @@ class TransitInTownTest {
                 goButton("터널 입구역").click()
                 assertEquals(Transport.SKYTRAIN, town.travelling)
             },
-            Step("underground, the camera at the entrance", { town.travelling != null && !town.isCharacterShown }) {
-                waited = town.characterSpot == downtown
-                assertTrue(waited, "${town.characterSpot}")
+            Step("on the platform, the character waiting", { town.isUnderground && town.undergroundShown.isRiderShown }) {
+                under.look()
+                val eye = town.undergroundShown.eye
+                assertTrue(eye.x in UndergroundRide.HALL_WEST..UndergroundRide.HALL_EAST, "$eye")
+                assertFalse(town.isCharacterShown, "the town's own character is drawn too")
+                assertEquals(0, namesShown(town), "a place's name over the platform")
+                // On the small map the character goes with the train, under the streets.
+                assertEquals(UndergroundRide.LINE_Z, town.characterSpot.z, 0.01)
             },
-            Step("out of the tunnel, on the line", { town.characterSpot.x > Neighbourhood.guideway.points.first().x }) {
-                cut = true
+            Step("the doors open", { under.look() && town.undergroundShown.doorsDrawn > 0.99 }) {
+                assertTrue(town.undergroundShown.isRiderShown || !town.isUnderground)
+            },
+            Step("out of the tunnel, on the line", {
+                under.look() && !town.isUnderground && town.characterSpot.x > UndergroundRide.MOUTH.x
+            }) {
+                // On the way, behind the train in the tunnel, its lamps going by, the doors shut, the character in.
+                assertTrue(under.inTunnel > 0, "the camera was never seen in the tunnel")
+                assertEquals(0, under.layoutsUnder, "the hidden names were laid out under the ground")
+                assertEquals(under.inTunnel, under.lampsInTunnel)
+                assertEquals(0, under.riderInTunnel)
+                assertEquals(0, under.doorsInTunnel)
+                assertFalse(town.isUnderground)
                 assertTrue(town.cameraReach < 40.0)
+                assertTrue(under.looks > 10, "${under.looks} looks")
+                assertTrue(under.longestStill < STILL_MILLIS, "the camera stood still ${under.longestStill} ms")
             },
             Step("out at the station by the tunnel", arrived(town)) {
-                assertTrue(waited && cut)
                 assertEquals(TransitLines.stations[1].door, town.characterSpot)
                 assertTrue(money(firstBalance) in hud(), hud())
             },
@@ -261,10 +335,12 @@ class TransitInTownTest {
     }
 
     @Test
-    fun `from the station by the tunnel west into it, the camera cuts to the entrance under downtown`(): Promise<Unit> {
+    fun `from the station by the tunnel west into it, then the platform under downtown, where the character steps out`():
+        Promise<Unit> {
         val town = startInTown()
         val from = Stop(Transport.SKYTRAIN, 1)
         val downtown = TransitLines.stations[0].door
+        val under = Underground(town)
         return play(
             Step("stand at the station by the tunnel", { town.isStill }) { standAt(town, from, 0.0) },
             Step("ride west", { town.isStill }) {
@@ -272,12 +348,23 @@ class TransitInTownTest {
                 goButton("다운타운역").click()
                 assertEquals(Transport.SKYTRAIN, town.travelling)
             },
-            Step("into the tunnel: the camera at the entrance", {
-                town.travelling != null && town.characterSpot == downtown
-            }) {
+            Step("into the tunnel: the camera at its mouth, after the train", { town.isUnderground }) {
+                under.look()
                 assertFalse(town.isCharacterShown)
+                val eye = town.undergroundShown.eye
+                assertTrue(UndergroundRide.MOUTH.x - eye.x < 6.0, "$eye")
+                assertFalse(town.undergroundShown.isRiderShown)
             },
-            Step("out under downtown, the camera at the door", arrived(town)) {
+            Step("at the platform the character steps out", {
+                under.look() && town.isUnderground && town.undergroundShown.isRiderShown
+            }) {
+                val eye = town.undergroundShown.eye
+                assertTrue(eye.x in UndergroundRide.HALL_WEST..UndergroundRide.HALL_EAST, "$eye")
+                assertTrue(town.undergroundShown.doorsDrawn > 0.0)
+            },
+            Step("out under downtown, the camera at the door", { under.look() && arrived(town)() }) {
+                assertTrue(under.longestStill < STILL_MILLIS, "the camera stood still ${under.longestStill} ms")
+                assertFalse(town.isUnderground)
                 assertEquals(downtown, town.characterSpot)
                 assertTrue(town.isCharacterShown)
                 val door = onScreen(town, Point(downtown.x, 1.0, downtown.z))
@@ -285,6 +372,73 @@ class TransitInTownTest {
                 assertTrue(money(firstBalance) in hud(), hud())
             },
         )
+    }
+
+    @Test
+    fun `under the ground the train still rumbles, heard where the camera rides with it`(): Promise<Unit> {
+        val town = opened()
+        var loudest = 0.0
+        var drawnUnder = 0
+        town.onSounds = { train, _, _ -> if (town.isUnderground) loudest = maxOf(loudest, train) }
+        return play(
+            Step("stand at the entrance under downtown", { town.isStill }) {
+                town.standAt(TransitLines.stations[0].door)
+            },
+            Step("ride east", { town.isStill }) {
+                town.travel(Transport.SKYTRAIN, 0, 1)
+                drawnUnder = town.framesDrawn
+            },
+            Step("out of the tunnel", { town.travelling != null && !town.isUnderground && town.framesDrawn > drawnUnder }) {
+                assertTrue(loudest > 0.05, "the train under the ground was silent: $loudest")
+            },
+        )
+    }
+
+    @Test
+    fun `with less motion the platform and the tunnel are calm: no lamps going by, and no drift while waiting`():
+        Promise<Unit> {
+        val town = opened()
+        town.asksLessMotion = { true }
+        val under = Underground(town)
+        var waiting: Point? = null
+        var frames = 0
+        return play(
+            Step("stand at the entrance under downtown", { town.isStill }) {
+                town.standAt(TransitLines.stations[0].door)
+            },
+            Step("ride east", { town.isStill }) { town.travel(Transport.SKYTRAIN, 0, 1) },
+            Step("waiting on the platform", { town.isUnderground && town.undergroundShown.isRiderShown }) {
+                waiting = town.undergroundShown.eye
+                frames = town.framesDrawn
+                assertFalse(town.undergroundShown.areLampsShown)
+            },
+            Step("still waiting a moment later", after(300.0)) {
+                assertTrue(town.framesDrawn > frames, "nothing was drawn")
+                // Still waiting: the train has not taken the character yet, so the camera's stillness is the calm's.
+                assertTrue(town.isUnderground && town.undergroundShown.isRiderShown, "the wait was over before the check")
+                assertEquals(waiting, town.undergroundShown.eye)
+            },
+            Step("the train takes it on through the tunnel and out", {
+                under.look() && town.travelling != null && !town.isUnderground && under.looks > 0
+            }) {
+                assertTrue(under.inTunnel > 0, "the camera was never seen in the tunnel")
+                assertEquals(0, under.lampsInTunnel, "lamps went by with less motion")
+            },
+        )
+    }
+
+    @Test
+    fun `the town's one switch for less motion passes the time and the night at once, as the phone's does`() {
+        val town = opened()
+        town.asksLessMotion = { true }
+        var mornings = 0
+        town.onMorning = { mornings += 1 }
+        town.passTime(0.5)
+        assertFalse(town.isPassingTime, "the time was passing slowly")
+        assertEquals(0.5, town.timeShown)
+        town.endDay()
+        assertFalse(town.isChangingDay, "the night was falling slowly")
+        assertEquals(1, mornings)
     }
 
     @Test
@@ -530,5 +684,13 @@ class TransitInTownTest {
                 assertTrue(town.isChangingDay)
             },
         )
+    }
+
+    private companion object {
+        /**
+         * The longest the camera may be found in one place under the ground: a moment. The test browser draws on the
+         * computer's processor, a few frames a second at worst, so it is generous; the exact rule is UndergroundRideTest's.
+         */
+        const val STILL_MILLIS = 600.0
     }
 }

@@ -348,8 +348,8 @@ class KoreanTest {
             listOf(
                 "자전거를 샀어요. -\$350",
                 "퀵보드를 샀어요. -\$550",
-                "공유 자전거를 빌렸어요. -\$3",
-                "공유 퀵보드를 빌렸어요. -\$4",
+                "공유 자전거를 빌렸어요. -\$1",
+                "공유 퀵보드를 빌렸어요. -\$1",
                 "수상버스를 탔어요. -\$4",
                 "택시를 탔어요. -\$4",
             ),
@@ -357,6 +357,7 @@ class KoreanTest {
         )
         for (line in lines) assertFalse('\u2014' in line, line)
         assertEquals("택시를 탔어요. -\$23", eventLine(Event.Spent(Spending.TAXI_RIDE, 23), month))
+        assertEquals("공유 퀵보드를 빌렸어요. -\$7", eventLine(Event.Spent(Spending.SHARED_E_SCOOTER_RIDE, 7), month))
     }
 
     @Test

@@ -131,6 +131,27 @@ class MonthRecordTest {
     }
 
     @Test
+    fun `shared rides keep their fares by distance as s and q, and the old flat fares are still fares they show`() {
+        val moves = listOf(english, Spend(Spending.SHARED_BIKE_RIDE, 1), work, Spend(Spending.SHARED_BIKE_RIDE, 15))
+        val record = MonthRecord(1011, null, 2, 1165, moves + Spend(Spending.SHARED_E_SCOOTER_RIDE, 20))
+        assertEquals("4|1011||2|1165|Es1Ws15q20", record.encode())
+        assertEquals(record, MonthRecord.decode(record.encode()))
+        val replayed = assertNotNull(record.replay())
+        val plain = assertNotNull(MonthRecord(1011, null, 2, 1165, listOf(english, work)).replay())
+        assertEquals(plain.month.balance - 1 - 15 - 20, replayed.month.balance)
+        assertEquals(
+            listOf(Event.Spent(Spending.SHARED_BIKE_RIDE, 15), Event.Spent(Spending.SHARED_E_SCOOTER_RIDE, 20)),
+            replayed.spentToday,
+        )
+        // $3 and $4 a ride, as a shared bike and an e-scooter once cost whatever the way, are fares the meters show.
+        val flat = assertNotNull(MonthRecord.decode("4|1011||2|1165|Eq4Wb350s3")?.replay())
+        assertEquals(plain.month.balance - 4 - 350 - 3, flat.month.balance)
+        for (past in listOf(Spend(Spending.SHARED_BIKE_RIDE, 16), Spend(Spending.SHARED_E_SCOOTER_RIDE, 21))) {
+            assertNull(MonthRecord(1011, null, 2, 1165, listOf(english, past)).replay(), "$past")
+        }
+    }
+
+    @Test
     fun `a tampered fare does not replay, and a fare with no amount is not read`() {
         val tampered = mapOf(
             "a water bus for $5" to Spend(Spending.WATER_BUS_RIDE, 5),
@@ -294,8 +315,8 @@ class MonthRecordTest {
     }
 
     /**
-     * Money to spend before today's day, about one time in four: mostly a ride's fare (a taxi's anything its meter can
-     * show), sometimes something to keep.
+     * Money to spend before today's day, about one time in four: mostly a ride's fare (a taxi's or a shared one's
+     * anything its meter can show), sometimes something to keep.
      */
     private fun randomSpend(month: Month, random: Random): Spend? {
         if (random.nextInt(4) != 0) return null
@@ -307,7 +328,7 @@ class MonthRecordTest {
             7 -> Spending.WATER_BUS_RIDE
             else -> Spending.TAXI_RIDE
         }
-        val amount = if (kind == Spending.TAXI_RIDE) random.nextInt(kind.price, kind.most + 1) else kind.price
+        val amount = if (kind.most > kind.price) random.nextInt(kind.price, kind.most + 1) else kind.price
         return Spend(kind, amount).takeIf { month.canSpend(kind, amount) }
     }
 

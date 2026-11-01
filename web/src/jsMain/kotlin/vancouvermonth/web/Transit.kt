@@ -427,8 +427,8 @@ class Glide(val length: Double, cruise: Double, ramp: Double) {
 /**
  * One ride on [transport]: the vehicle goes along [way] from its start, stops at [stopAt] along it, where the character
  * steps out at [out], and then goes on to the way's end out of the stop and away. The character gets on in the first
- * [Journey.BOARD_MILLIS]. For the SkyTrain, the way is the guideway from [railFrom], so how far along the line the train
- * is follows from how far it has gone.
+ * [boardMillis] and steps out in the last [alightMillis]. For the SkyTrain, the way is the guideway from [railFrom], so
+ * how far along the line the train is follows from how far it has gone.
  */
 class Journey(
     val transport: Transport,
@@ -441,26 +441,33 @@ class Journey(
     private val railWay: Double = 1.0,
     /** Where the character gets on from, for a ride it is seen on: the dock it waits at for the water bus. */
     val from: Spot? = null,
+    /** How long getting on takes, and stepping out: longer on the platform under downtown, which is shown. */
+    val boardMillis: Double = BOARD_MILLIS,
+    val alightMillis: Double = ALIGHT_MILLIS,
 ) {
     private val there = Glide(stopAt, cruise, ramp)
     private val away = Glide(way.length - stopAt, cruise, ramp)
 
     /** When the character steps out, from setting off, in milliseconds. */
-    val millis: Double = BOARD_MILLIS + there.millis + ALIGHT_MILLIS
+    val millis: Double = boardMillis + there.millis + alightMillis
 
     /** When the vehicle has gone on out of sight, in milliseconds from setting off. */
     val goneMillis: Double = millis + away.millis
 
     /** How far along [way] the vehicle is [elapsed] milliseconds after the ride began. */
     fun travelled(elapsed: Double): Double =
-        if (elapsed < millis) there.at(elapsed - BOARD_MILLIS) else stopAt + away.at(elapsed - millis)
+        if (elapsed < millis) there.at(elapsed - boardMillis) else stopAt + away.at(elapsed - millis)
 
     /** How fast the vehicle goes then, in units a second. */
     fun speedAt(elapsed: Double): Double =
-        if (elapsed < millis) there.speedAt(elapsed - BOARD_MILLIS) else away.speedAt(elapsed - millis)
+        if (elapsed < millis) there.speedAt(elapsed - boardMillis) else away.speedAt(elapsed - millis)
 
     /** How far along the guideway the train's middle is then: for the SkyTrain only. */
     fun alongAt(elapsed: Double): Double = railFrom + railWay * travelled(elapsed)
+
+    /** How far along the guideway the train stops for the character: for the SkyTrain only. */
+    val railTo: Double
+        get() = railFrom + railWay * stopAt
 
     fun isOverAfter(elapsed: Double): Boolean = elapsed >= millis
 
@@ -470,6 +477,28 @@ class Journey(
         /** How long getting on takes, and stepping out. */
         const val BOARD_MILLIS = 600.0
         const val ALIGHT_MILLIS = 300.0
+
+        /**
+         * A ride on the SkyTrain from [from] to [to], carried on [goingOn] past [to] the same way, quicker on a long ride;
+         * getting on or stepping out at the station under downtown takes as long as its platform is shown
+         * ([UndergroundRide]).
+         */
+        fun train(from: Station, to: Station, goingOn: Double = TRAIN_GOING_ON): Journey {
+            val start = from.along
+            val end = to.along
+            val way = wayOn(Neighbourhood.guideway, start, end, goingOn)
+            // A long ride goes faster at its quickest, as a train between far stations does.
+            val cruise = trainCruise(abs(end - start))
+            return Journey(
+                Transport.SKYTRAIN, way, abs(end - start), to.door, cruise, trainRamp(cruise), start,
+                if (end >= start) 1.0 else -1.0,
+                boardMillis = if (from.underground) UndergroundRide.BOARD_MILLIS else BOARD_MILLIS,
+                alightMillis = if (to.underground) UndergroundRide.ALIGHT_MILLIS else ALIGHT_MILLIS,
+            )
+        }
+
+        /** How far the train goes on along the line after a ride, out of the station, before it fades away. */
+        const val TRAIN_GOING_ON = 24.0
 
         /** How fast each goes at its quickest, in units a second (walking is 3.6), and how long it takes to get there. */
         const val TRAIN_SPEED = 12.0
