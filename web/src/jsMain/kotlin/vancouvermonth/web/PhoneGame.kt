@@ -557,7 +557,7 @@ class PhoneGame private constructor(
         if (walkable == null) town = makeTown()
         guide?.onOpenChange = { walkable?.isCovered = isTownCovered() }
         // In the town the update news open from the guide's foot, never over a talk or the change of day.
-        guide?.notes = { notes.takeIf { talkingAt == null && chattingWith == null && !dayChanging } }
+        guide?.notes = { notes.takeIf { talkingAt == null && chattingWith == null && !atShop && !dayChanging } }
         show()
         window.scrollTo(0.0, 0.0)
     }
@@ -904,7 +904,7 @@ class PhoneGame private constructor(
         town.mark(if (month.hasInterviewToday) interviewPlace else null)
         town.isCovered = isTownCovered()
         town.weather = weatherOf(month.day)
-        root.child("div", "over-town") {
+        val cards = root.child("div", "over-town") {
             child("header", "hud") {
                 setAttribute("tabindex", "-1")
                 child("div", "hud-figures") {
@@ -969,6 +969,8 @@ class PhoneGame private constructor(
                 child("p", "town-hint", "땅을 누르면 걷고, 두 번 누르면 빨리 가요. 사람이나 건물을 누르면 걸어가서 말을 걸어요.")
             }
         }
+        // Drawn while the guide is open, as on an arrival: under it, out of reach.
+        guide?.keepUnder(cards)
         // The names of the buildings hide where the top card and the day's log cover the town.
         town.coveredTop = { coverOf(town) }
         // A keyboard or a screen reader follows what happens: into a talk that opens, to the log after an answer.

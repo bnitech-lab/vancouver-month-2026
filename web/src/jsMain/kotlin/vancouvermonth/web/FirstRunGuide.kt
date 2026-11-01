@@ -73,6 +73,23 @@ internal class FirstRunGuide {
         card.scrollTop = 0.0
     }
 
+    /**
+     * Keeps [under], drawn afresh while the card is open, out of reach as the rest under the card is. Should the update
+     * news no longer open ([notes]), as with a talk opened under the card on arrival, its link goes.
+     */
+    fun keepUnder(under: HTMLElement) {
+        val cover = shown ?: return
+        if (!cover.isConnected) return
+        under.setAttribute("inert", "")
+        stilled.removeAll { !it.isConnected }
+        stilled += under
+        if (notes() == null) {
+            val foot = cover.querySelector(".patch-guide-foot") ?: return
+            if (foot.contains(document.activeElement)) (cover.querySelector("button.primary") as? HTMLElement)?.focus()
+            foot.remove()
+        }
+    }
+
     /** Closes the card and gives the focus back to the "?". */
     fun close() {
         val cover = shown ?: return

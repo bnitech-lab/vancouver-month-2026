@@ -76,7 +76,10 @@ class ArriveFirstTest {
             }
         })
         game.talkSettleMillis = 0.0
-        if (withGuide) game.guide = FirstRunGuide().also { guide = it }
+        if (withGuide) {
+            game.guide = FirstRunGuide().also { guide = it }
+            game.notes = PatchNotesCard(Memory { FakeStore() })
+        }
         if (kept != null) {
             val store = FakeStore()
             store.items[SaveSlot.KEY] = kept.encode()
@@ -633,18 +636,25 @@ class ArriveFirstTest {
     }
 
     @Test
-    fun `arriving with the guide open opens the talk under it, and leaves the focus on the guide`(): Promise<Unit> {
+    fun `arriving with the guide open opens the talk under it, out of reach, and takes the news away from the guide`():
+        Promise<Unit> {
         val town = open(zone = 3, withGuide = true)
+        fun cards(): HTMLElement = assertNotNull(root.querySelector(".over-town") as? HTMLElement)
         return play(
             Step("set off for the near café, and open the guide on the way", { town.isStill }) {
                 tapName(Place.SLOPE_CAFE)
                 (assertNotNull(root.querySelector(".guide-open")) as HTMLElement).click()
                 assertNotNull(root.querySelector(".guide-card"))
+                assertNotNull(root.querySelector(".guide-card .patch-link"), "no news on the way")
             },
             Step("arrived", { town.isStill && talk() != null }) {
                 assertNotNull(root.querySelector(".guide-card"), "the arrival closed the guide")
                 assertTrue(assertNotNull(root.querySelector(".guide-card")).contains(document.activeElement))
+                // The talk under the card is out of reach, as the rest under it, and the news do not open over a talk.
+                assertTrue(cards().hasAttribute("inert"), "the talk can be reached under the guide")
+                assertNull(root.querySelector(".guide-card .patch-link"), "the news would open over the talk")
                 root.button("닫기").click()
+                assertFalse(cards().hasAttribute("inert"), "the talk stayed out of reach")
                 assertFalse(answer().disabled, answer().textContent)
             },
         )
