@@ -106,6 +106,19 @@ class TownBudgetTest {
     }
 
     @Test
+    fun `Burnaby at night, at zone 2's 내 방 among the houses, costs what the day does`(): Promise<Unit> {
+        val town = open(2)
+        town.showTime(1.0)
+        return whenReady({ town.isStill }) {
+            val cost = town.measureFrames(FRAMES)
+            report("Burnaby at night, 내 방 zone 2", cost)
+            withinBudget(cost)
+            assertEquals(DayLight.NIGHT, town.lightShown)
+            assertTrue(town.houseDetailBoxes > 0, "no houses drawn near 내 방 at night")
+        }
+    }
+
+    @Test
     fun `East Vancouver, at the station by the junction`(): Promise<Unit> {
         val town = open(1)
         town.standAt(TransitLines.stations[3].door)
