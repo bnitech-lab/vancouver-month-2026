@@ -277,6 +277,3 @@ object TownMap {
     private const val HAIR = 0x2B2118
     private const val EYES = 0x1C1D1F
 }
-
-/** Interviews are at the office, where the applications went. */
-val INTERVIEW_PLACE: Place = Place.OFFICE

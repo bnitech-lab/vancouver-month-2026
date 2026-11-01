@@ -762,6 +762,7 @@ class WalkableTownTest {
                     assertEquals("면접 보기", spendButton().querySelector(".action-name")?.textContent)
                     assertFalse(spendButton().disabled)
                     assertEquals(Place.OFFICE.label, root.querySelector(".place-name.here")?.textContent)
+                    assertTrue("오늘은 면접 날이에요. 항구 회사로 가세요." in screen, screen)
                     spendButton().click()
                     assertTrue("1차 영어 면접 통과!" in screen || "1차 영어 면접에서 떨어졌어요." in screen, screen)
                     resolve(Unit)
