@@ -811,9 +811,9 @@ internal object WideMapData {
 
     /**
      * Where each transit zone a room can be in lies: 1 downtown and the West End (the town's corner), 2 the
-     * Burnaby plan area round the big station, 3 a strip of the Burnaby plan area north-west of the big park,
-     * along the city line at the grid's top edge. Each zone is one or more areas, each a string of points
-     * round its edge, cut to the grid.
+     * Burnaby plan area round the big station, 3 the outer one: a strip of the Burnaby plan area on the slope
+     * south of the big park, along the city line down toward the river. Each zone is one or more areas, each
+     * a string of points round its edge, cut to the grid.
      */
     val zones: Map<Int, List<String>> = mapOf(
         1 to listOf(
@@ -826,7 +826,7 @@ internal object WideMapData {
             "536.5,0.0 510.6,25.2 553.0,67.9 575.7,45.5 586.9,56.3 602.1,41.4 613.6,29.7 602.6,18.8 621.6,0.0",
         ),
         3 to listOf(
-            "506.8,0.0 489.3,0.0 487.5,1.8 510.6,25.2 521.4,14.7",
+            "559.4,61.5 553.0,67.9 596.2,110.7 602.4,105.0",
         ),
     )
 
@@ -837,6 +837,6 @@ internal object WideMapData {
     val homes: Map<Int, Cell> = mapOf(
         1 to Cell(115, 92),
         2 to Cell(516, 23),
-        3 to Cell(495, 6),
+        3 to Cell(593, 97),
     )
 }
