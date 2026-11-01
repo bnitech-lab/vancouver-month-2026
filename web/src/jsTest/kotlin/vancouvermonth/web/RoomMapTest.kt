@@ -159,7 +159,10 @@ class RoomMapTest {
     }
 
     @Test
-    fun `회사 and 카페 are named on the map, clear of every pin and of each other`() {
+    fun `every 회사 and 카페 is named on the map, clear of every pin and of each other`() {
+        // Three offices and three cafés, downtown, in East Vancouver and in Burnaby.
+        assertEquals(6, RoomMap.NAMED.size)
+        assertEquals(setOf(PlaceKind.OFFICE, PlaceKind.CAFE), RoomMap.NAMED.map { it.kind }.toSet())
         for (width in listOf(343, 288)) {
             val holder = (document.createElement("div") as HTMLElement).also { it.style.width = "${width}px" }
             root.appendChild(holder)
@@ -167,16 +170,24 @@ class RoomMapTest {
             holder.appendChild(map.element)
             map.paint()
             assertTrue(map.painted)
-            assertEquals(RoomMap.NAMED.toSet(), map.names.keys, "Not both named at $width")
+            assertEquals(RoomMap.NAMED.toSet(), map.names.keys, "Not all named at $width")
             for ((place, box) in map.names) {
+                val inside = box[0] >= 0.0 && box[1] >= 0.0 && box[2] <= width && box[3] <= map.element.clientHeight
+                assertTrue(inside, "$place off the map at $width")
                 for (at in map.pins.indices) {
                     val under = RoomMap.covers(box, map.pinLeft[at], map.pinTop[at], RoomMap.PIN / 2.0)
                     assertFalse(under, "$place under pin ${at + 1} at $width")
                 }
             }
-            val (office, cafe) = RoomMap.NAMED.map { map.names.getValue(it) }
-            val overlap = office[0] < cafe[2] && cafe[0] < office[2] && office[1] < cafe[3] && cafe[1] < office[3]
-            assertFalse(overlap, "회사 and 카페 overlap at $width")
+            val boxes = map.names.entries.toList()
+            for ((index, a) in boxes.withIndex()) {
+                for (b in boxes.drop(index + 1)) {
+                    val one = a.value
+                    val two = b.value
+                    val overlap = one[0] < two[2] && two[0] < one[2] && one[1] < two[3] && two[1] < one[3]
+                    assertFalse(overlap, "${a.key} and ${b.key} overlap at $width")
+                }
+            }
             holder.remove()
         }
     }

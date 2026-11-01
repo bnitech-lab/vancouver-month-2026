@@ -21,9 +21,9 @@ import vancouvermonth.web.MinimapProjection.Companion.AREA_WIDTH
 /**
  * September 1st's rooms as pins on the whole wide map, north up, as the small map shows it larger: its painted ground
  * and the marks of the ways about town ([Minimap.paintGround], [MinimapProjection] for the whole area), the places as
- * dots with 회사 and 카페 named (placed as that map places names, clear of the pins), so the player sees how far each
- * room is from work, and a pin for each room at the door 내 방 has in the room's zone ([Neighbourhood.home], where
- * [HomeSite] puts it), carrying the room's number. The pins are buttons, which a keyboard and a screen reader reach,
+ * dots with every 회사 and 카페 named by its kind (placed as that map places names, clear of the pins), so the player
+ * sees how far each room is from work, and a pin for each room at the door 내 방 has in the room's zone
+ * ([Neighbourhood.home], where [HomeSite] puts it), carrying the room's number. The pins are buttons, which a keyboard and a screen reader reach,
  * each heard as its room in full; a tap picks the room ([onPick]). The picked one is drawn pressed, and once [locked]
  * none can be picked. Pins that would lie closer than a finger's width are pushed apart, with a line from each moved
  * pin back to its door. The map is a picture, drawn at its width once it is on the page ([draw]); it is all 2D, so
@@ -165,15 +165,15 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
             Minimap.dot(c, left, top, Minimap.BIG_DOT * scale, Minimap.HOME, square = true)
         }
         Minimap.north(c, width - Minimap.NORTH_INSET * scale, Minimap.NORTH_TOP * scale, scale, large = true)
-        // 회사 and 카페 by name, placed as the town's whole map places names: over the dot, or else the first spot round
-        // it that covers no pin and no other name, with a short line back to the dot.
+        // Every 회사 and 카페 by its kind, placed as the town's whole map places names: over the dot, or else the first
+        // spot round it that covers no pin and no other name, with a short line back to the dot.
         names.clear()
         val lift = Minimap.BIG_DOT * scale + 3
         for (place in NAMED) {
             val venue = Neighbourhood.venue(place)
             val dotLeft = middleLeft(map, venue)
             val dotTop = middleTop(map, venue)
-            val wide = Minimap.measureName(c, place.label)
+            val wide = Minimap.measureName(c, place.kind.label)
             val spot = Minimap.NAME_SPOTS_X.indices.firstOrNull { each ->
                 val foot = dotTop + Minimap.NAME_SPOTS_Y[each] - lift
                 isNameClear(map, nameBox(dotLeft + Minimap.NAME_SPOTS_X[each], foot, wide))
@@ -182,7 +182,7 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
             val top = dotTop + Minimap.NAME_SPOTS_Y[spot] - lift
             if (spot > 0) Minimap.leader(c, dotLeft, dotTop, left, top)
             names[place] = nameBox(left, top, wide)
-            Minimap.name(c, place.label, left, top)
+            Minimap.name(c, place.kind.label, left, top)
         }
     }
 
@@ -271,8 +271,8 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
         /** How far apart two pins' middles must be, in CSS pixels, or they are pushed apart. */
         const val APART = PIN + 2.0
 
-        /** The places named on the map: where the job hunt goes, and where the café shifts are. */
-        val NAMED = listOf(Place.OFFICE, Place.CAFE)
+        /** The places named on the map: where the job hunt goes, and where the café shifts are, every one of each. */
+        val NAMED = listOf(PlaceKind.OFFICE, PlaceKind.CAFE).flatMap { kind -> Place.entries.filter { it.kind == kind } }
 
         /** How many times the pins are pushed apart and kept on the map, enough for three to settle. */
         private const val SPREAD_ROUNDS = 6

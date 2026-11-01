@@ -128,9 +128,10 @@ class BurnabyTownTest {
                 // The line's own train runs at the station nearest 내 방 from the first morning.
                 assertEquals(SkyTrainRun.nearestStand(home.door.x, home.door.z), town.trainStand)
                 assertTrue(town.trainStand > SkyTrainRun.STAND)
-                // Downtown is far off: 회사 is an arrow on the small map's edge.
-                assertTrue(Place.OFFICE in town.minimapPointsTo, "${town.minimapPointsTo}")
-                // Its name is lost in the haze: out of sight, out of the Tab order, and hidden from a screen reader.
+                // Downtown is far off: the nearest 회사, the town centre's, is an arrow on the small map's edge.
+                assertTrue(Place.TOWN_CENTRE_OFFICE in town.minimapPointsTo, "${town.minimapPointsTo}")
+                // Downtown's 회사's name is lost in the haze: out of sight, out of the Tab order, and hidden from a screen
+                // reader.
                 val names = root.querySelectorAll(".place-name").asList().map { it as HTMLElement }
                 val office = names.first { it.textContent == Place.OFFICE.label }
                 assertTrue(office.classList.contains("behind"))
