@@ -965,6 +965,26 @@ class WalkableTownTest {
         )
     }
 
+    @Test
+    fun `while an action's time passes, the town draws no more than thirty frames a second`(): Promise<Unit> {
+        val town = startInTown(pass = 1_500.0)
+        var from = 0
+        return play(
+            Step("let the time pass", { town.isStill }) {
+                from = town.framesDrawn
+                town.passTime(0.6)
+                assertTrue(town.isPassingTime)
+            },
+            Step("one second later", after(1_000)) {
+                val drawn = town.framesDrawn - from
+                assertTrue(town.isPassingTime, "the time passed too soon")
+                assertTrue(town.timeShown > 0.0, "the light did not move")
+                // The first frame answers the action at once; the rest come on the beat of the town's own life.
+                assertTrue(drawn in 2..FramePace.AMBIENT_FPS.toInt() + 2, "$drawn frames in a second")
+            },
+        )
+    }
+
     /** Turns the camera to look east along the street 미나 walks, from high in the west of the character. */
     private fun lookAlongMinasStreet(town: NeighbourhoodScene) =
         town.aimCamera(-PI / 2, 1.0, FollowCamera.START_DISTANCE)

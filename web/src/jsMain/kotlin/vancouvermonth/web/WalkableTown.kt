@@ -1084,6 +1084,8 @@ internal class NeighbourhoodScene(
         timeFrom = shownShare
         timeTo = share.coerceIn(0.0, 1.0)
         timePassed = window.performance.now()
+        // The player just did something: the light moves on the quicker beat, even after a long talk.
+        touched()
         askForFrame()
     }
 
@@ -2027,8 +2029,10 @@ internal class NeighbourhoodScene(
     private fun drawFrame(now: Double) {
         if (closed) return
         val hidden = pageHidden() || contextLost
+        // The time an action took passes on the beat of the town's own life, not on every frame the screen offers: only
+        // the light changes, so the sun's shadows need not be drawn again for it.
         val moving = urgent || trip != null || nightFell != null || gliding || cutaway.isMoving || journey != null ||
-            leaving != null || trainRide != null || timePassed != null
+            leaving != null || trainRide != null
         if (!pace.shouldDraw(now, moving, hidden)) {
             // Hidden or without WebGL, nothing more is asked for until that ends; otherwise the life waits its turn.
             if (!hidden) nextFrame()

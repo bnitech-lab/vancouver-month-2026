@@ -336,9 +336,9 @@ starts at 내 방's door in the morning, and so does each day after a night's sl
 rules as the buttons, so the same seed and the same choices end the same way in the town and with buttons; a test plays
 a whole month both ways. After an offer in the town, the neighbour has a word on the ending.
 
-The town draws every frame the screen offers while the character walks, the camera moves, time passes or the day
-changes, but its own
-life moves at most 30 times a second. While only that life moves, it draws at most 30 frames a second, and 15 once
+The town draws every frame the screen offers while the character walks, the camera moves or the day changes, but its
+own life moves at most 30 times a second, and so does the light while an action's time passes. While only that life
+moves, it draws at most 30 frames a second, and 15 once
 nobody has touched the town for 20 seconds or while a talk covers it; the sun's shadows are drawn again on every other
 of those frames. It draws nothing while the page is hidden. It draws at most two pixels per point however sharp the
 phone, and boxes of a kind together: the buildings, trees and the rest that stand still and cast shadows in one draw for
