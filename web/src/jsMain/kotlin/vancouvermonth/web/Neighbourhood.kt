@@ -685,7 +685,9 @@ object Neighbourhood {
         }
 
         private fun addBeyond(x: Double, z: Double, chances: Random, turn: Double) {
-            val height = 3.0 + chances.nextDouble() * 3.5
+            // Past the wide map's edges the city goes on as low as its far suburbs; past the corner's, as it always was.
+            val tall = 3.0 + chances.nextDouble() * 3.5
+            val height = if (turn == 0.0) tall else BEYOND_LOW + (tall - 3.0) / 3.5 * BEYOND_LOW_SPREAD
             val colour = LOW_COLOURS[chances.nextInt(LOW_COLOURS.size)]
             val body = blocks.size
             val size = BEYOND_BLOCK.toDouble()
@@ -1419,6 +1421,10 @@ object Neighbourhood {
     private const val HOUSE_BUCKET = 8.0
     private const val HOUSE_BUCKETS = 1_000
     private const val HOUSE_APART = 0.1
+
+    /** How tall the low blocks past the wide map's edges stand: as low as the far suburbs' houses, and a little more. */
+    private const val BEYOND_LOW = 1.3
+    private const val BEYOND_LOW_SPREAD = 0.7
 
     // A soft, warm palette, as in a storybook village.
     /** The sea's colour on a sunny day. */
