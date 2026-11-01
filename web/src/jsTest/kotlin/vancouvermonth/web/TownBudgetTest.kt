@@ -64,7 +64,7 @@ class TownBudgetTest {
     }
 
     private fun report(name: String, cost: FrameCost) {
-        println("BUDGET $name: ${cost.draws} draws, ${cost.triangles} triangles, ${cost.boxes} boxes, ${cost.millis} ms")
+        println("BUDGET $name: ${cost.draws} draws, ${cost.triangles} triangles, ${cost.boxes} boxes, ${cost.millis} ms, detail ${town?.houseDetailBoxes}")
     }
 
     /** Within the phone's budget: about what downtown always cost, and never the whole wide map at once. */
@@ -109,6 +109,16 @@ class TownBudgetTest {
                 withinBudget(cost)
             }
         }.then { }
+    }
+
+    @Test
+    fun `Burnaby, at 내 방 in zone 3`(): Promise<Unit> {
+        val town = open(3)
+        return whenReady({ town.isStill }) {
+            val cost = town.measureFrames(FRAMES)
+            report("Burnaby, 내 방 zone 3", cost)
+            withinBudget(cost)
+        }
     }
 
     @Test
