@@ -141,8 +141,8 @@ class MinimapProjection(val width: Double, val height: Double, squaresAcross: Do
  * shop as small marks, the places of [site] (내 방 a square in its roof's red, the others dots, the place of an
  * interview day in the colour its name takes), the camera's view as a pale wedge, and the character as an arrow the
  * way it faces. The larger map names each place by its kind (카페, 회사), and an interview day's office by its own name.
- * Off the small map, 내 방, the 회사 nearest the character and an interview day's office show as arrows on its edge,
- * pointing the way to them. It is drawn again only when asked, as the character or the camera moves, and makes nothing
+ * Off the small map, 내 방 and the 회사 nearest the character (on an interview day, that day's office instead) show as
+ * arrows on its edge, pointing the way to them. It is drawn again only when asked, as the character or the camera moves, and makes nothing
  * new each time. It is a picture: a screen reader hears only which place the character is nearest.
  */
 internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
@@ -321,12 +321,12 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         c.stroke()
         val scale = if (large) LARGE_SCALE else 1.0
         drawMarks(c, map, scale)
-        // The places: 내 방 a square in its roof's red, the others round; off the small map, 내 방, the nearest 회사 and
-        // an interview day's an arrow on its edge, the way to go.
+        // The places: 내 방 a square in its roof's red, the others round; off the small map, 내 방 and the nearest 회사 an
+        // arrow on its edge, the way to go, and on an interview day that day's office instead of the nearest.
         var nearestOffice = -1
         var officeAway = Double.MAX_VALUE
         for (at in venues.indices) {
-            if (venues[at].place.kind != PlaceKind.OFFICE) continue
+            if (venues[at].place.kind != PlaceKind.OFFICE || marked?.kind == PlaceKind.OFFICE) continue
             val away = hypot(middleX[at] - x, middleZ[at] - z)
             if (away < officeAway) {
                 nearestOffice = at

@@ -224,8 +224,9 @@ with an arrow at its top says so. (The town itself is the real city turned 44.7 
 it; the map turns that back.) It shows the ground round the character, 100 squares (2.5 km) across, the character in its
 middle, and follows it: the land, the water, the parks and the seawall, the city's blocks faintly, the places (내 방
 a red square, the others dots, the 회사 of an interview day green as its name is), the camera's view as a pale wedge,
-and the character as a gold arrow pointing the way it faces. 내 방, the 회사 nearest the character and an interview day's,
-when off the small map, show as small arrows on its edge pointing the way to them. It is drawn again only when the
+and the character as a gold arrow pointing the way it faces. 내 방 and the 회사 nearest the character (on an interview
+day, that day's 회사 instead), when off the small map, show as small arrows on its edge pointing the way to them. It is
+drawn again only when the
 character or the camera moves. A tap shows the whole map larger, about four fifths of the screen wide with the places
 named by their kind (카페, 도서관, 코워킹, 회사, and 내 방) and an interview day's 회사 by its own name; a tap or Escape brings the small one back, and
 a talk or the guide closes it. It is a picture: a screen reader hears only which place or station the character is

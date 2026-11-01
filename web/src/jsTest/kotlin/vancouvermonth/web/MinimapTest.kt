@@ -166,7 +166,7 @@ class MinimapTest {
     }
 
     @Test
-    fun `off the small map, 내 방, the nearest 회사 and an interview day's show as arrows on its edge`() {
+    fun `off the small map, 내 방 and the nearest 회사, or an interview day's, show as arrows on its edge`() {
         val minimap = Minimap(HomeSite.of(2))
         document.body!!.appendChild(minimap.element)
         shown += minimap.element
@@ -175,9 +175,9 @@ class MinimapTest {
         val home = Neighbourhood.home(2).door
         minimap.draw(home.x, home.z, 0.0, home.x, home.z + 20.0, home.x, home.z, 0.8, marked = null)
         assertEquals(setOf(Place.TOWN_CENTRE_OFFICE), minimap.pointedTo)
-        // On an interview day downtown, the office of the day too.
+        // On an interview day downtown, that day's office instead, so no arrow leads to another office.
         minimap.draw(home.x, home.z, 0.0, home.x, home.z + 20.0, home.x, home.z, 0.8, marked = Place.OFFICE)
-        assertEquals(setOf(Place.TOWN_CENTRE_OFFICE, Place.OFFICE), minimap.pointedTo)
+        assertEquals(setOf(Place.OFFICE), minimap.pointedTo)
         // Downtown, 내 방 in Burnaby is off it, and downtown's 회사 on it.
         val office = Neighbourhood.venue(Place.OFFICE).door
         minimap.draw(office.x, office.z, 0.0, office.x, office.z + 20.0, office.x, office.z, 0.8, marked = null)
