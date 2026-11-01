@@ -55,6 +55,8 @@ class VancouverMapTest {
     fun `packed numbers are read as changes from the item before, and a broken packing is refused`() {
         // The changes 0, 1, -1, 15, 16 and -16 are A, C, D, e, gB and hB, so the numbers run 0, 1, 0, 15, 31, 15.
         assertEquals(listOf(0, 1, 0, 15, 31, 15), unpackNumbers("ACDegBhB", 1).map { it.single() })
+        // Three characters, as the map's larger numbers take: +1024 is ggC and -1024 is hgC.
+        assertEquals(listOf(1024, 0), unpackNumbers("ggChgC", 1).map { it.single() })
         assertEquals(listOf(listOf(1, 2), listOf(1, 18)), unpackNumbers("CEAgB", 2).map { it.toList() })
         assertEquals(emptyList(), unpackNumbers("", 5))
         assertEquals(listOf(Spot(1.0, 2.5), Spot(-3.0, 4.0)), unpackPoints("UyBxCe"))
