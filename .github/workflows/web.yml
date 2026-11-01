@@ -28,6 +28,15 @@ jobs:
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
       - name: Test on the JVM and in headless Chrome, then build the phone screen
         run: ./gradlew test :web:jsBrowserDistribution --console=plain
+      - name: Keep the test results when a test fails
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results
+          path: |
+            **/build/test-results/
+            **/build/reports/tests/
+          retention-days: 7
       - name: Keep the built page for publishing
         if: github.event_name == 'push' && vars.PAGES_ENABLED == 'true'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
