@@ -17,8 +17,11 @@ import vancouvermonth.core.Month
 import vancouvermonth.save.Choice
 import vancouvermonth.save.MonthRecord
 import vancouvermonth.text.Continue
+import vancouvermonth.text.Situation
+import vancouvermonth.text.greeting
 import vancouvermonth.text.interviewDayLine
 import vancouvermonth.text.keyword
+import vancouvermonth.text.situations
 
 /** A town that notes which place the game marks, as on an interview day. Everything else is [QuietTown]'s. */
 private class MarkingTown(val quiet: QuietTown = QuietTown()) : WalkableTown by quiet {
@@ -88,18 +91,25 @@ class PlacesInGameTest {
             answer.click()
             assertEquals(Choice.Take(action, place.number), kept.choices.last(), "$place")
         }
-        // Each office takes an application, and the record keeps the office.
-        for (place in Place.entries.filter { it.kind == PlaceKind.OFFICE }) {
-            sleep()
-            town.onPlace(place)
-            assertEquals("${place.person.role} · ${place.label}", talk().querySelector(".talk-role")?.textContent)
-            if (month.interview != null) continue
-            assertNotNull(talkButton(keyword(Action.APPLY))).click()
-            assertEquals(Choice.Take(Action.APPLY, place.number), kept.choices.last())
-        }
         // The line written: each place's number after its action's letter, none for the first of a kind.
         val line = kept.encode()
         for (written in listOf("E1", "W1", "C1", "E2", "W2")) assertTrue(written in line, "$written not in $line")
+    }
+
+    @Test
+    fun `each office takes an application on the first morning, and the record keeps which`() {
+        for (office in Place.entries.filter { it.kind == PlaceKind.OFFICE }) {
+            store.items.clear()
+            open()
+            startSeed1011(root)
+            town.onPlace(office)
+            assertEquals("${office.person.role} · ${office.label}", talk().querySelector(".talk-role")?.textContent)
+            assertNotNull(talkButton(keyword(Action.APPLY))).click()
+            assertEquals(listOf<Choice>(Choice.Take(Action.APPLY, office.number)), kept.choices, "$office")
+            assertEquals(office.number, kept.appliedAt)
+            val written = if (office.number == 0) "A" else "A${office.number}"
+            assertTrue(kept.encode().endsWith("|$written"), kept.encode())
+        }
     }
 
     @Test
@@ -125,7 +135,10 @@ class PlacesInGameTest {
             town.onPlace(other)
             assertNull(talkButton("면접 보기"), "$other")
             assertTrue(assertNotNull(talkButton(keyword(Action.APPLY))).disabled, "$other")
-            assertTrue("회사" in talk().querySelector(".talk-line")?.textContent.orEmpty())
+            // That desk's own line for an interview held at another office, word for word, met before or not.
+            val elsewhere = greeting(other.person, month, firstMeeting = true, lastEvents = emptyList(), elsewhere = true)
+            assertEquals(Situation.INTERVIEW_ELSEWHERE, situations(month, true, emptyList(), elsewhere = true).first())
+            assertEquals(elsewhere, talk().querySelector(".talk-line .visually-hidden")?.textContent, "$other")
         }
         // A reload goes on with the same day: the interview is still at the town centre's office.
         open()
