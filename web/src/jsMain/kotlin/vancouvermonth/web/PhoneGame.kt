@@ -158,6 +158,12 @@ class PhoneGame private constructor(
     private var choosingFrom = -1
     private var taxiFares: List<Int?> = emptyList()
 
+    /**
+     * The order a taxi's or a shared ride's places are listed in, nearest first by the way there, as the card opened, so
+     * the long list of places starts with those round the character.
+     */
+    private var listed: List<Int> = emptyList()
+
     /** What the ride under way cost, for the top card; null on the month's pass. */
     private var travelPaid: Int? = null
 
@@ -1196,9 +1202,9 @@ class PhoneGame private constructor(
         choosing = transport
         choosingFrom = from
         taxiFares = if (transport == Transport.TAXI) {
-            TransitLines.taxiStopsFor(town.homeZone).map { (_, spot) ->
-                town.taxiDistance(spot)?.let { TaxiFare.forDistance(it) }
-            }
+            val ways = TransitLines.taxiStopsFor(town.homeZone).map { (_, spot) -> town.taxiDistance(spot) }
+            listed = nearestFirst(ways)
+            ways.map { way -> way?.let { TaxiFare.forDistance(it) } }
         } else {
             emptyList()
         }
@@ -1217,8 +1223,10 @@ class PhoneGame private constructor(
         val fromName = if (from >= 0) TransitLines.nameOf(Stop(transport, from)) else null
         val empty = if (transport == Transport.TAXI && taxiFares.all { it == null }) Transit.NOWHERE else null
         val stop = { choosing = null }
+        // A taxi's places nearest first; a line's stops in the order its vehicle comes to them.
+        val order = if (transport == Transport.TAXI) listed else (0 until TransitLines.count(transport)).toList()
         whereTo(Transit.title(transport, fromName), Transit.where(transport), empty, stop) {
-            for (index in 0 until TransitLines.count(transport)) {
+            for (index in order) {
                 // A bus goes only along its own line.
                 if (index == from || !TransitLines.joins(transport, from, index)) continue
                 val fare = if (transport == Transport.TAXI) taxiFares.getOrNull(index) ?: continue else 0
@@ -1245,8 +1253,10 @@ class PhoneGame private constructor(
         val fare = SharedFare.of(kind) ?: return
         val empty = if (rideFares.all { it == null }) Riding.NOWHERE else null
         val stop = { renting = null }
+        val places = TransitLines.taxiStopsFor(town.homeZone)
         whereTo(Riding.shared(ride.vehicle.item), Riding.where(fare), empty, stop) {
-            for ((index, place) in TransitLines.taxiStopsFor(town.homeZone).withIndex()) {
+            for (index in listed) {
+                val place = places[index]
                 val amount = rideFares.getOrNull(index) ?: continue
                 val blocked = month.spendBlockedBy(kind, amount)
                 button("keyword go") {
@@ -1259,6 +1269,9 @@ class PhoneGame private constructor(
             }
         }
     }
+
+    /** The places' numbers, nearest first by [ways], the way to each in squares; those with no way go last. */
+    private fun nearestFirst(ways: List<Double?>): List<Int> = ways.indices.sortedBy { ways[it] ?: Double.MAX_VALUE }
 
     /**
      * A card over the town that asks where to go, as a talk opens: [title], the [line] under it, [empty] when there is
@@ -1419,9 +1432,8 @@ class PhoneGame private constructor(
         val kind = ride.fare ?: return
         val fare = SharedFare.of(kind) ?: return
         if (!town.canRide(ride)) return
-        val fares = TransitLines.taxiStopsFor(town.homeZone).map { (_, spot) ->
-            town.taxiDistance(spot)?.let { fare.forDistance(it) }
-        }
+        val ways = TransitLines.taxiStopsFor(town.homeZone).map { (_, spot) -> town.taxiDistance(spot) }
+        val fares = ways.map { way -> way?.let { fare.forDistance(it) } }
         val blocked = current.spendBlockedBy(kind, fares.filterNotNull().minOrNull() ?: fare.base)
         if (blocked != null) {
             rideNote = Riding.cannotRent(kind, blocked)
@@ -1432,6 +1444,7 @@ class PhoneGame private constructor(
         rideNote = null
         renting = ride
         rideFares = fares
+        listed = nearestFirst(ways)
         talkOpened = window.performance.now()
         focusNext = ".talk"
         sound?.blip()

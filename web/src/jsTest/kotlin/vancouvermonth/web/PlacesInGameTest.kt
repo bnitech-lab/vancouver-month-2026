@@ -166,4 +166,20 @@ class PlacesInGameTest {
         assertEquals(Choice.AttendInterview, kept.choices.last())
     }
 
+    @Test
+    fun `the taxi's card lists every place and station, nearest first`() {
+        open()
+        startSeed1011(root)
+        // The way to each place is how far it is from 내 방's door in the West End, as the crow flies.
+        val home = Neighbourhood.home(1).door
+        town.quiet.squaresTo = { spot -> distanceBetween(home, spot) + 1.0 }
+        root.button("택시 부르기").click()
+        val names = root.querySelectorAll(".chooser-list .action-name").asList().map { it.textContent.orEmpty() }
+        val stops = TransitLines.taxiStopsFor(1)
+        assertEquals(stops.map { it.first }.toSet(), names.toSet())
+        for (place in Place.entries) assertTrue(place.label in names, place.label)
+        val ways = names.map { name -> distanceBetween(home, stops.first { it.first == name }.second) }
+        assertEquals(ways.sorted(), ways)
+        assertEquals(Place.HOME.label, names.first())
+    }
 }
