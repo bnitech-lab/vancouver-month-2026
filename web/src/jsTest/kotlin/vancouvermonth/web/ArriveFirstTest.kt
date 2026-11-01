@@ -455,7 +455,7 @@ class ArriveFirstTest {
     }
 
     @Test
-    fun `on her own bike the character rides to the far name, and the talk there gets her off`(): Promise<Unit> {
+    fun `on the player's own bike the character rides to the far name, and the talk there gets it off`(): Promise<Unit> {
         val first = FirstMinute(1011)
         val kept = MonthRecord(1011, null, first.cheapestRoomIndex, first.lowestTotal, listOf(Spend(Spending.BIKE, 350)))
         val town = open(zone = 1, kept = kept)
