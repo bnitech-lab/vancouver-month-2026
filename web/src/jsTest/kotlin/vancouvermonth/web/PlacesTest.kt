@@ -63,12 +63,40 @@ class PlacesTest {
             }
             for (step in 0..Neighbourhood.guideway.length.toInt() * 2) {
                 val on = Neighbourhood.guideway.spotAt(step / 2.0)
-                assertTrue(body.distanceTo(on.x, on.z) >= 2.5, "${venue.place} under the guideway at $on")
+                assertTrue(body.distanceTo(on.x, on.z) >= 2.9, "${venue.place} under the guideway at $on")
+            }
+            // Its two lamps, at the square's front corners, stand off the main streets and the bus lines.
+            val lampZ = if (venue.doorFacesSouth) lot.z + lot.depth - 0.5 else lot.z + 0.5
+            for (lamp in listOf(Spot(lot.x + 0.5, lampZ), Spot(lot.x + lot.width - 0.5, lampZ))) {
+                val off = streets.minOf { line -> line.zipWithNext().minOf { (a, b) -> distanceToSegment(lamp, a, b) } }
+                assertTrue(off >= 1.2, "${venue.place}'s lamp at $lamp is $off from a street or a bus line")
             }
             // Its square's far edge, out from the door, lies within a few squares of a main street or a bus line.
             val out = Spot(venue.door.x, venue.door.z + if (venue.doorFacesSouth) 3.5 else -3.5)
             val street = streets.minOf { line -> line.zipWithNext().minOf { (a, b) -> distanceToSegment(out, a, b) } }
             assertTrue(street <= 4.5, "${venue.place}'s square is $street squares from a street")
+        }
+    }
+
+    @Test
+    fun `each lot keeps clear of the stations, stops, docks, both 내 방 out in Burnaby and the passersby's walks`() {
+        val entrances = TransitLines.stations.mapNotNull { it.entrance }
+            .map { Lot(it.x - 1, it.z - 1, it.width + 2, it.depth + 2) }
+        val homes = (2..3).map { Neighbourhood.lotFor(Neighbourhood.home(it)) }
+        val others = entrances + TransitLines.keptForStops + Rides.keptForDocks + homes
+        val walks = Strolls.all().flatMap { it.stroll.legs }
+        for (venue in outside) {
+            val lot = Neighbourhood.lotFor(venue)
+            for (other in others) assertTrue(!lot.overlaps(other), "${venue.place}'s lot $lot on $other")
+            val middle = Spot(lot.x + lot.width / 2.0, lot.z + lot.depth / 2.0)
+            val square = TurnedBox(middle.x, middle.z, lot.width.toDouble(), lot.depth.toDouble(), 0.0)
+            for ((a, b) in walks) {
+                for (step in 0..20) {
+                    val x = a.x + (b.x - a.x) * step / 20
+                    val z = a.z + (b.z - a.z) * step / 20
+                    assertTrue(square.distanceTo(x, z) >= 1.6, "${venue.place}'s lot on a passerby's walk at $x, $z")
+                }
+            }
         }
     }
 
