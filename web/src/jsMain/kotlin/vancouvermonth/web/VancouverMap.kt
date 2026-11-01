@@ -58,8 +58,8 @@ private const val VLQ_DIGITS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv
 
 /**
  * Whole numbers packed by `tools/vancouver_map`, [fields] to an item: each number written as a base-64 VLQ, as source
- * maps write them (five bits to a character, lowest first, the sixth set while more follow, the sign in the lowest bit),
- * and each the change from the same number of the item before (the first item's from 0).
+ * maps write them (five bits to a character, lowest first, the sixth set while more follow, the sign in the lowest
+ * bit), and each the change from the same number of the item before (the first item's from 0).
  */
 fun unpackNumbers(text: String, fields: Int): List<IntArray> {
     val numbers = mutableListOf<Int>()
@@ -79,7 +79,8 @@ fun unpackNumbers(text: String, fields: Int): List<IntArray> {
     }
     require(shift == 0 && numbers.size % fields == 0) { "${numbers.size} numbers do not make items of $fields" }
     val sums = IntArray(fields)
-    return numbers.chunked(fields) { item -> IntArray(fields) { sums[it] += item[it]; sums[it] } }
+    // Item by item by hand: chunked would bring Kotlin's sequence code, about 8 KB, into the page.
+    return (numbers.indices step fields).map { start -> IntArray(fields) { sums[it] += numbers[start + it]; sums[it] } }
 }
 
 /** The points of a line packed as [unpackNumbers] reads them, x and z in tenths of a square. */
