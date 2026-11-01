@@ -156,6 +156,21 @@ class TurnedBox(val x: Double, val z: Double, val width: Double, val depth: Doub
         return hypot(max(0.0, along), max(0.0, across))
     }
 
+    /** True when it comes within [margin] of [other]: the two are tried along each one's two sides' ways. */
+    fun overlaps(other: TurnedBox, margin: Double): Boolean {
+        val dx = other.x - x
+        val dz = other.z - z
+        for ((wayX, wayZ) in listOf(cosine to -sine, sine to cosine, other.cosine to -other.sine, other.sine to other.cosine)) {
+            val apart = abs(dx * wayX + dz * wayZ)
+            if (apart >= reachAlong(wayX, wayZ) + other.reachAlong(wayX, wayZ) + margin) return false
+        }
+        return true
+    }
+
+    /** How far it reaches from its middle along the way [wayX], [wayZ]. */
+    private fun reachAlong(wayX: Double, wayZ: Double): Double =
+        abs(width / 2 * (cosine * wayX - sine * wayZ)) + abs(depth / 2 * (sine * wayX + cosine * wayZ))
+
     /** True when it comes within [margin] of [lot]'s squares: the two are tried along each of their four sides' ways. */
     fun overlaps(lot: Lot, margin: Double): Boolean {
         val halfX = lot.width / 2.0 + margin

@@ -210,8 +210,9 @@ class CutawayTest {
                 assertTrue(apart, "$box overlaps ${wall.place ?: other}")
             }
         }
-        // Each one's boxes are where it says, as tall as its walls: a turned one's box is the one round it, straight on
-        // the grid, with the same middle.
+        // Each one's boxes are where it says, as tall as its walls and roof: a turned one's box is the one round it,
+        // straight on the grid, with the same middle; a suburban house's roof is drawn near the camera, its ridge on top.
+        val ridges = Neighbourhood.houses.associate { it.body to it.ridge }
         for (building in foldables) {
             val body = Neighbourhood.blocks[building.body]
             if (body.turn == 0.0) {
@@ -232,7 +233,7 @@ class CutawayTest {
                     assertTrue(z >= building.box.z - 1e-9 && z <= building.box.z + building.box.depth + 1e-9, "$body")
                 }
             }
-            val roof = if (building.roof < 0) 0.0 else Neighbourhood.blocks[building.roof].height
+            val roof = if (building.roof < 0) ridges[building.body] ?: 0.0 else Neighbourhood.blocks[building.roof].height
             assertEquals(building.box.height, body.height + roof, 1e-9)
             if (building.glassNorth < 0) continue
             assertEquals(body.height - 1.6, Neighbourhood.glowing[building.glassNorth].height, 1e-9)
