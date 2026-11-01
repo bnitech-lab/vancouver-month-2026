@@ -394,6 +394,8 @@ class PhoneGame private constructor(
                 child("li", text = cheapestLine(game, reveal))
                 child("li", text = guessLine(reveal))
             }
+            // What the room itself costs the month against the cheapest, before the guess's money.
+            child("p", "month-cost", monthCostLine(game, reveal))
             // What the guess wins or loses as the month starts, why, and the balance September starts with.
             val money = reveal.guessMoney
             child("p", "guess-money ${if (money < 0) "penalty" else "reward"}") {
@@ -402,7 +404,6 @@ class PhoneGame private constructor(
             }
             child("p", "guess-why", guessMoneyWhy(reveal.guessGap, money))
             child("p", "left", startBalanceLine(reveal.balanceAtStart))
-            child("p", "month-cost", monthCostLine(game, reveal))
         }
         root.child("section", "card start") {
             child("h2", text = "9월 한 달이 시작돼요.")

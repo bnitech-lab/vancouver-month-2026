@@ -416,7 +416,7 @@ a:focus-visible {
 }
 
 .month-cost {
-  margin-top: 2px;
+  margin: -2px 0 8px;
   font-size: 14px;
 }
 

@@ -189,7 +189,7 @@ class KoreanTest {
         )
         assertEquals("가장 싼 방보다 한 달에 \$100 더 내요. 10월 1일에도 그만큼 더 나가요.", monthCostLine(game, game.reveal(1, 0)))
         // Rooms 1 and 3 tie for the lowest total: either is the cheapest.
-        val cheapest = "가장 싼 방이라 9월을 버틸 돈이 가장 많이 남아요."
+        val cheapest = "가장 싼 방이라 매달 나가는 돈이 가장 적어요."
         assertEquals(cheapest, monthCostLine(game, game.reveal(0, 1_245)))
         assertEquals(cheapest, monthCostLine(game, game.reveal(2, 0)))
     }

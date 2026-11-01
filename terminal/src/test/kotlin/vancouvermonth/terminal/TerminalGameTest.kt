@@ -156,7 +156,7 @@ class TerminalGameTest {
         val (_, dear) = playWith(1011, "2", "1300", "n")
         assertTrue("  가장 싼 방보다 한 달에 \$180 더 내요. 10월 1일에도 그만큼 더 나가요." in dear.lines())
         val (_, cheap) = playWith(1011, "${game.cheapestRoomIndex + 1}", "${game.lowestTotal}", "n")
-        assertTrue("  가장 싼 방이라 9월을 버틸 돈이 가장 많이 남아요." in cheap.lines())
+        assertTrue("  가장 싼 방이라 매달 나가는 돈이 가장 적어요." in cheap.lines())
     }
 
     @Test

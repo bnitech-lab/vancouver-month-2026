@@ -178,7 +178,7 @@ class PhoneGameTest {
         type("${game.lowestTotal}")
         tap("총비용 확인하기")
         val cheap = root.querySelector(".reveal .month-cost")?.textContent
-        assertEquals("가장 싼 방이라 9월을 버틸 돈이 가장 많이 남아요.", cheap)
+        assertEquals("가장 싼 방이라 매달 나가는 돈이 가장 적어요.", cheap)
     }
 
     @Test
@@ -214,8 +214,8 @@ class PhoneGameTest {
         assertEquals("\$100보다 더 틀린 만큼 잃어요.", text(".reveal .guess-why"))
         val start = FirstMinute.STARTING_BALANCE - game.lowestTotal - 150
         assertEquals("9월을 시작하는 잔고 ${money(start)}", text(".reveal .left"))
-        // The order the reveal reads in: the total, the gap, the money, why, then the balance.
-        val order = listOf(".total", ".points", ".guess-money", ".guess-why", ".left").map { selector ->
+        // The order the reveal reads in: the total, the gap, what the room costs the month, the money, why, the balance.
+        val order = listOf(".total", ".points", ".month-cost", ".guess-money", ".guess-why", ".left").map { selector ->
             root.querySelector(".reveal")!!.children.asList().indexOfFirst { it.matches(selector) }
         }
         assertEquals(order.sorted(), order)

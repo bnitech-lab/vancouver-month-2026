@@ -94,10 +94,13 @@ fun whyTotalLines(): List<String> = listOf(
     "방이 쌀수록 알바 대신 취업 준비할 날이 늘어요.",
 )
 
-/** After the reveal, what the pick means for the month: how much more than the cheapest room it costs, if any. */
+/**
+ * After the reveal, what the pick means for the month: how much more than the cheapest room it costs, if any. It speaks
+ * of the room alone, so it comes before the guess's money, which can leave a dearer pick with more to start on.
+ */
 fun monthCostLine(game: FirstMinute, reveal: Reveal): String =
     if (reveal.pickedCheapest) {
-        "가장 싼 방이라 9월을 버틸 돈이 가장 많이 남아요."
+        "가장 싼 방이라 매달 나가는 돈이 가장 적어요."
     } else {
         "가장 싼 방보다 한 달에 ${money(reveal.room.totalMonthlyCost - game.lowestTotal)} 더 내요. " +
             "${date(Month.LAST_DAY + 1)}에도 그만큼 더 나가요."
