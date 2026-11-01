@@ -19,6 +19,24 @@ import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.MIDDLE
 import vancouvermonth.text.Transit
 import vancouvermonth.text.Transport
+import vancouvermonth.web.UndergroundRide.CARS
+import vancouvermonth.web.UndergroundRide.CAR_GAP
+import vancouvermonth.web.UndergroundRide.CAR_LENGTH
+import vancouvermonth.web.UndergroundRide.CAR_SIDE
+import vancouvermonth.web.UndergroundRide.DECK
+import vancouvermonth.web.UndergroundRide.EDGE
+import vancouvermonth.web.UndergroundRide.FLOOR
+import vancouvermonth.web.UndergroundRide.HALL_EAST
+import vancouvermonth.web.UndergroundRide.HALL_SOUTH
+import vancouvermonth.web.UndergroundRide.HALL_TOP
+import vancouvermonth.web.UndergroundRide.HALL_WEST
+import vancouvermonth.web.UndergroundRide.LINE_Z
+import vancouvermonth.web.UndergroundRide.MOUTH
+import vancouvermonth.web.UndergroundRide.PLATFORM_X
+import vancouvermonth.web.UndergroundRide.TAIL
+import vancouvermonth.web.UndergroundRide.TRAIN_HALF
+import vancouvermonth.web.UndergroundRide.TUNNEL_HALF
+import vancouvermonth.web.UndergroundRide.TUNNEL_TOP
 
 /**
  * A SkyTrain ride under downtown as it is shown, worked out from the ride and its time alone, so a test can ask where
@@ -42,7 +60,6 @@ object UndergroundRide {
     val STATION: Int = TransitLines.stations.indexOfFirst { it.underground }
     val NAME: String = Transit.STATIONS[STATION]
     val PLATFORM: Double = TransitLines.stations[STATION].along
-
 
     /** Where along x a point [along] the line is, under downtown. */
     fun xAt(along: Double): Double = MOUTH.x + along
@@ -316,7 +333,7 @@ internal class UndergroundScene(private val cube: BoxGeometry, shades: DataTextu
         add(still(), material)
         add(hallLights(), glow)
         lamps = add(tunnelLamps(), glow)
-        portal = add(listOf(box(MOUTH_X, MOUTH_X + 0.3, DECK, TUNNEL_TOP, -TUNNEL_HALF, TUNNEL_HALF, 0xFFFFFF)), daylight)
+        portal = add(listOf(box(MOUTH.x, MOUTH.x + 0.3, DECK, TUNNEL_TOP, -TUNNEL_HALF, TUNNEL_HALF, 0xFFFFFF)), daylight)
         train = add(List(CARS * CAR_BOXES.size) { CAR_BOXES[it % CAR_BOXES.size] }, material, moving = true)
         trainLights = add(List(CARS * CAR_LIGHTS.size) { CAR_LIGHTS[it % CAR_LIGHTS.size] } + END_LIGHTS, glow, moving = true)
         rider = add(Figures.player.map { it.block }, material, moving = true)
@@ -326,7 +343,7 @@ internal class UndergroundScene(private val cube: BoxGeometry, shades: DataTextu
     /**
      * Puts everything where [going] has it [elapsed] milliseconds in, and the [camera] with it; the mouth shows [skyHex],
      * the town's sky as it is now. [calm] leaves the lamps out and keeps the camera from drifting. It makes nothing new
-     * but the eye's point.
+     * but the character's pose while it is on the platform.
      */
     fun place(going: Journey, elapsed: Double, calm: Boolean, skyHex: Int, camera: PerspectiveCamera) {
         if (skyHex != sky) {
@@ -437,25 +454,6 @@ internal class UndergroundScene(private val cube: BoxGeometry, shades: DataTextu
     }
 
     private companion object {
-        val MOUTH_X = UndergroundRide.MOUTH.x
-        val LINE_Z = UndergroundRide.LINE_Z
-        const val DECK = UndergroundRide.DECK
-        const val FLOOR = UndergroundRide.FLOOR
-        const val TUNNEL_HALF = UndergroundRide.TUNNEL_HALF
-        const val TUNNEL_TOP = UndergroundRide.TUNNEL_TOP
-        const val HALL_TOP = UndergroundRide.HALL_TOP
-        const val HALL_SOUTH = UndergroundRide.HALL_SOUTH
-        const val EDGE = UndergroundRide.EDGE
-        const val CARS = UndergroundRide.CARS
-        const val CAR_LENGTH = UndergroundRide.CAR_LENGTH
-        const val CAR_GAP = UndergroundRide.CAR_GAP
-        const val TRAIN_HALF = UndergroundRide.TRAIN_HALF
-        const val CAR_SIDE = UndergroundRide.CAR_SIDE
-        val HALL_WEST = UndergroundRide.HALL_WEST
-        val HALL_EAST = UndergroundRide.HALL_EAST
-        val PLATFORM_X = UndergroundRide.PLATFORM_X
-        val TAIL = UndergroundRide.TAIL
-
         /** The dark of the tunnel, behind everything and in the haze, which closes in from near to far. */
         const val DARK = 0x0D1014
         const val HAZE_NEAR = 7.0
@@ -516,10 +514,10 @@ internal class UndergroundScene(private val cube: BoxGeometry, shades: DataTextu
          * and the sign's frame on its two rods.
          */
         fun still(): List<Block> = buildList {
-            add(box(TAIL, MOUTH_X, DECK, DECK + 0.3, -TUNNEL_HALF, TUNNEL_HALF, BED))
-            for (side in listOf(-1.0, 1.0)) add(box(TAIL, MOUTH_X, DECK + 0.3, DECK + 0.36, side * 0.6 - 0.04, side * 0.6 + 0.04, RAIL))
-            for ((west, east) in listOf(TAIL to HALL_WEST, HALL_EAST to MOUTH_X - LIT_REACH, MOUTH_X - LIT_REACH to MOUTH_X)) {
-                val colour = if (east == MOUTH_X) WALL_LIT else WALL
+            add(box(TAIL, MOUTH.x, DECK, DECK + 0.3, -TUNNEL_HALF, TUNNEL_HALF, BED))
+            for (side in listOf(-1.0, 1.0)) add(box(TAIL, MOUTH.x, DECK + 0.3, DECK + 0.36, side * 0.6 - 0.04, side * 0.6 + 0.04, RAIL))
+            for ((west, east) in listOf(TAIL to HALL_WEST, HALL_EAST to MOUTH.x - LIT_REACH, MOUTH.x - LIT_REACH to MOUTH.x)) {
+                val colour = if (east == MOUTH.x) WALL_LIT else WALL
                 add(box(west, east, DECK, TUNNEL_TOP, -TUNNEL_HALF - 0.3, -TUNNEL_HALF, colour))
                 add(box(west, east, DECK, TUNNEL_TOP, TUNNEL_HALF, TUNNEL_HALF + 0.3, colour))
                 add(box(west, east, TUNNEL_TOP, TUNNEL_TOP + 0.3, -TUNNEL_HALF - 0.3, TUNNEL_HALF + 0.3, colour))
@@ -567,7 +565,7 @@ internal class UndergroundScene(private val cube: BoxGeometry, shades: DataTextu
 
         /** The tunnel's lamps on both walls, every [LAMP_GAP], either side of the hall. */
         fun tunnelLamps(): List<Block> = buildList {
-            for ((west, east) in listOf(TAIL to HALL_WEST, HALL_EAST to MOUTH_X)) {
+            for ((west, east) in listOf(TAIL to HALL_WEST, HALL_EAST to MOUTH.x)) {
                 var x = west + 1.0
                 while (x + 0.7 <= east - 0.5) {
                     add(box(x, x + 0.7, DECK + 2.85, DECK + 3.0, -TUNNEL_HALF, -TUNNEL_HALF + 0.06, LAMP))
