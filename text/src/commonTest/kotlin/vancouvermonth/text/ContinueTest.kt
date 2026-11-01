@@ -9,6 +9,9 @@ class ContinueTest {
     fun `the card says the day and the balance it goes on from`() {
         assertEquals("9월 7일부터 · 잔고 \$1,455", continueFrom(7, 1_455))
         assertEquals("9월 30일부터 · 잔고 \$85", continueFrom(30, 85))
+        // Past the morning, the time the day had reached.
+        assertEquals("9월 7일 오후 2시부터 · 잔고 \$1,455", continueFrom(7, 1_455, hour = 14))
+        assertEquals("9월 7일부터 · 잔고 \$1,455", continueFrom(7, 1_455, hour = 8))
     }
 
     @Test

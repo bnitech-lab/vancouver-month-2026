@@ -37,7 +37,7 @@ class TownsfolkTest {
 
     @Test
     fun `each action has its own keyword`() {
-        assertEquals(listOf("알바하기", "영어 공부", "코딩 연습", "지원서 넣기", "쉬기"), Action.entries.map { keyword(it) })
+        assertEquals(listOf("알바하기", "영어 공부", "코딩 연습", "지원서 넣기", "자기"), Action.entries.map { keyword(it) })
     }
 
     @Test
@@ -64,10 +64,31 @@ class TownsfolkTest {
     @Test
     fun `low energy is noticed by the café and by the neighbour`() {
         val month = month()
-        repeat(4) { month.take(Action.WORK) }
+        month.take(Action.STUDY_ENGLISH)
+        month.take(Action.PRACTISE_CODING)
+        assertEquals(1, month.energy)
         assertTrue(Situation.LOW_ENERGY in situations(month, false, emptyList()))
-        assertEquals("얼굴이 피곤해 보여. 오늘은 쉬어도 돼.", greeting(Townsperson.HANA, month, false, emptyList()))
-        assertEquals("오늘은 그냥 쉬어. 쉬는 것도 일이야.", greeting(Townsperson.GRANDMA, month, false, emptyList()))
+        assertEquals("얼굴이 피곤해 보여. 오늘은 들어가서 쉬어.", greeting(Townsperson.HANA, month, false, emptyList()))
+        assertEquals("오늘은 그만 자. 쉬는 것도 일이야.", greeting(Townsperson.GRANDMA, month, false, emptyList()))
+    }
+
+    @Test
+    fun `at night, with no stamina left, everyone sends the player home to sleep`() {
+        val month = month()
+        assertTrue(Situation.NIGHT !in situations(month, false, emptyList()))
+        month.take(Action.WORK)
+        month.take(Action.STUDY_ENGLISH)
+        assertTrue(month.isNight)
+        assertEquals(Situation.NIGHT, situations(month, false, emptyList()).first())
+        val lines = Townsperson.entries.associateWith { greeting(it, month, false, emptyList()) }
+        assertEquals("오늘은 문 닫았어. 들어가서 푹 자.", lines[Townsperson.HANA])
+        assertEquals("늦었구먼. 얼른 들어가 자.", lines[Townsperson.GRANDMA])
+        for ((person, line) in lines) assertTrue(line.isNotBlank() && '\u2014' !in line, "$person: $line")
+        assertEquals(Townsperson.entries.size, lines.values.toSet().size)
+        // A first meeting still comes first, and the next morning is not night.
+        assertEquals(Situation.FIRST_MEETING, situations(month, true, emptyList()).first())
+        month.take(Action.REST)
+        assertTrue(Situation.NIGHT !in situations(month, false, emptyList()))
     }
 
     @Test
@@ -95,7 +116,10 @@ class TownsfolkTest {
         assertTrue(month.hasInterviewToday)
         assertEquals("면접이시죠? 3층입니다. 행운을 빌어요.", greeting(Townsperson.MARCUS, month, false, emptyList()))
         // Everyone else sends the player to the office.
-        assertEquals("오늘 면접이라며? 일은 내일 해. 회사로 가 봐.", greeting(Townsperson.HANA, month, false, emptyList()))
+        assertEquals(
+            "오늘 면접이라며? 일은 면접 보고 와서 해. 회사로 가 봐.",
+            greeting(Townsperson.HANA, month, false, emptyList()),
+        )
 
         month.attendInterview()
         month.playUntil(checkNotNull(month.interview).day)
@@ -172,8 +196,9 @@ class TownsfolkTest {
             greeting(Townsperson.HANA, month(), true, emptyList(), Weather.RAINY),
         )
         val tired = month()
-        repeat(4) { tired.take(Action.WORK) }
-        assertEquals("오늘은 그냥 쉬어. 쉬는 것도 일이야.", greeting(Townsperson.GRANDMA, tired, false, emptyList(), Weather.RAINY))
+        tired.take(Action.STUDY_ENGLISH)
+        tired.take(Action.PRACTISE_CODING)
+        assertEquals("오늘은 그만 자. 쉬는 것도 일이야.", greeting(Townsperson.GRANDMA, tired, false, emptyList(), Weather.RAINY))
     }
 
     @Test
