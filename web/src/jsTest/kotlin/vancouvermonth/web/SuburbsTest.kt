@@ -138,6 +138,30 @@ class SuburbsTest {
     }
 
     @Test
+    fun `no house stands in a mid-rise or a tower of the wide map, or under a park's tree`() {
+        val bodies = houses.map { it.body }.toSet()
+        val buildings = Neighbourhood.foldables.filter { it.body !in bodies }.map { Neighbourhood.blocks[it.body] }
+            .filter { it.turn != 0.0 && it.x + it.width / 2 > Neighbourhood.TOWN_COLUMNS && it.z >= 0 && it.z < Neighbourhood.ROWS }
+            .map { TurnedBox(it.x + it.width / 2, it.z + it.depth / 2, it.width, it.depth, it.turn) }
+        // The parks' trees by their trunks (0.3 wide, in the trees' bark colour), each as wide as its widest leaves.
+        val trees = Neighbourhood.blocks.filter { it.colour == 0x8A5F3D && it.width == 0.3 && it.x > Neighbourhood.TOWN_COLUMNS }
+            .map { TurnedBox(it.x + 0.15, it.z + 0.15, 2.1, 2.1, 0.0) }
+        assertTrue(buildings.size > 50 && trees.size > 100, "${buildings.size} buildings, ${trees.size} trees")
+        val buckets = houses.groupBy { floor(it.shape.x / 8).toInt() to floor(it.shape.z / 8).toInt() }
+        for (other in buildings + trees) {
+            // A house it overlaps has its middle within this of the other's.
+            val reach = maxOf(other.width, other.depth) + 2.0
+            for (column in floor((other.x - reach) / 8).toInt()..floor((other.x + reach) / 8).toInt()) {
+                for (row in floor((other.z - reach) / 8).toInt()..floor((other.z + reach) / 8).toInt()) {
+                    for (house in buckets[column to row].orEmpty()) {
+                        assertFalse(overlap(house.shape, other), "a house at ${house.shape.x}, ${house.shape.z} in ${other.x}, ${other.z}")
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun `a house blocks only the squares it stands on, so the yards between houses are walked`() {
         val open = Neighbourhood.open
         for (house in houses) assertFalse(open.isFree(Cell(floor(house.shape.x).toInt(), floor(house.shape.z).toInt())))
