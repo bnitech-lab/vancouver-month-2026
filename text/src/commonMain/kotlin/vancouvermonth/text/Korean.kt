@@ -293,6 +293,12 @@ fun todaysRunResult(run: TodaysRun, guessMoney: Int, ending: Ending, day: Int): 
     return "밴쿠버 한 달 · ${todaysRunName(run)} · ${guessMoneyLabel(guessMoney)} ${signedMoney(guessMoney)} · $result"
 }
 
+/**
+ * On the top card on an interview day, where to go: "오늘은 면접 날이에요. 항구 회사로 가세요." [office] is the name of
+ * the office applied at; every office's name ends in 회사, which takes 로.
+ */
+fun interviewDayLine(office: String): String = "오늘은 면접 날이에요. ${office}로 가세요."
+
 fun stageName(stage: InterviewStage): String = when (stage) {
     InterviewStage.PHONE_SCREEN -> "1차 영어 면접"
     InterviewStage.TECHNICAL -> "2차 기술 면접"

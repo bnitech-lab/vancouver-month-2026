@@ -30,9 +30,13 @@ class TownsfolkTest {
     }
 
     @Test
-    fun `each person offers one action, and every action has one person`() {
+    fun `each person offers one action, and every action has a person at each place of its kind`() {
         assertEquals(Action.entries.toSet(), Townsperson.entries.map { it.offers }.toSet())
-        assertEquals(Action.entries.size, Townsperson.entries.size)
+        // Three cafés, three libraries, two coworking spaces and three offices, and the neighbour at 내 방.
+        val people = Townsperson.entries.groupingBy { it.offers }.eachCount()
+        val each = mapOf(Action.WORK to 3, Action.STUDY_ENGLISH to 3, Action.PRACTISE_CODING to 2, Action.APPLY to 3)
+        assertEquals(each + (Action.REST to 1), people)
+        assertEquals(Townsperson.entries.size, Townsperson.entries.map { it.title }.toSet().size)
     }
 
     @Test
@@ -136,6 +140,38 @@ class TownsfolkTest {
     }
 
     @Test
+    fun `on an interview day another office sends the player on to the one applied at`() {
+        val month = month()
+        month.take(Action.APPLY)
+        month.playUntil(checkNotNull(month.interview).day)
+        val offices = Townsperson.entries.filter { it.offers == Action.APPLY }
+        // At the office applied at, each one's own interview line; at another, where to go instead.
+        for (person in offices) {
+            val here = greeting(person, month, false, emptyList())
+            val elsewhere = greeting(person, month, false, emptyList(), elsewhere = true)
+            assertEquals(Situation.INTERVIEW_ELSEWHERE, situations(month, false, emptyList(), elsewhere = true).first())
+            assertNotEquals(here, elsewhere, "$person")
+            assertTrue("회사" in elsewhere, "$person: $elsewhere")
+        }
+        assertEquals(
+            "오늘 면접은 다른 회사죠? 그쪽으로 가셔야 합니다.",
+            greeting(Townsperson.MARCUS, month, false, emptyList(), elsewhere = true),
+        )
+        // The others send the player to the office as on any interview day; on another day nobody says it.
+        for (person in Townsperson.entries - offices.toSet()) {
+            val anywhere = greeting(person, month, false, emptyList())
+            assertEquals(anywhere, greeting(person, month, false, emptyList(), elsewhere = true), "$person")
+        }
+        // Even on a first meeting: the player is at the wrong door.
+        assertEquals(
+            greeting(Townsperson.KENJI, month, false, emptyList(), elsewhere = true),
+            greeting(Townsperson.KENJI, month, true, emptyList(), elsewhere = true),
+        )
+        month.attendInterview()
+        assertTrue(Situation.INTERVIEW_ELSEWHERE !in situations(month, false, emptyList(), elsewhere = true))
+    }
+
+    @Test
     fun `a failed interview comforts at the library`() {
         val month = month(lucky = false)
         val failed = listOf(Event.InterviewHeld(InterviewStage.PHONE_SCREEN, passed = false, next = null))
@@ -175,12 +211,16 @@ class TownsfolkTest {
         for (person in Townsperson.entries) assertTrue(greeting(person, month, false, emptyList()).isNotBlank(), "$person")
     }
 
-    /** Each person's line for a rainy day; 수진 has none and goes on as on any day. */
+    /** Each person's line for a rainy day; 수진, 아이샤, 니나 and 마테오 have none and go on as on any day. */
     private val rainLines = mapOf(
         Townsperson.HANA to "오늘 같은 날엔 다들 따뜻한 걸 찾아. 손이 모자라.",
         Townsperson.LEO to "비 오는 날엔... 자리가 금방 차요. 창가로 가요.",
         Townsperson.MARCUS to "우산은 입구 통에 꽂아 주세요. 바닥이 미끄럽습니다.",
         Townsperson.GRANDMA to "여기 비는 조용히 오지. 금방 익숙해져.",
+        Townsperson.ROSA to "비 오는 날은 아이들 이야기 시간이 있어서 조금 시끄러워요.",
+        Townsperson.SOPHIE to "비 오면 공원 산책하던 손님들이 다 여기로 와요.",
+        Townsperson.JUNHO to "비 오는 날엔 공원 대신 다들 여기로 와요.",
+        Townsperson.KENJI to "비 오는 날엔 로비가 우산 터는 소리로 가득합니다.",
     )
 
     @Test

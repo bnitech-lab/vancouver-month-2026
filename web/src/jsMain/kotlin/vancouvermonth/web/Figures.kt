@@ -59,41 +59,68 @@ object Figures {
         Townsperson.SUJIN -> Look(skin = 0xF5D5B8, hair = 0x1E1A1A, top = 0x5B7DB1, bottom = 0x2E2E36, shoes = 0xEDEDED)
         Townsperson.MARCUS -> Look(skin = 0xB98258, hair = 0x241911, top = 0x2F3B52, bottom = 0x2F3B52, shoes = 0x1E1E1E)
         Townsperson.GRANDMA -> Look(skin = 0xF4D8C4, hair = 0xDCDCDC, top = 0xA0586B, bottom = 0x6E6259, shoes = 0x4A3B30)
+        Townsperson.AISHA -> Look(skin = 0xC68E62, hair = 0x1B1410, top = 0x3E4C66, bottom = 0x3E4C66, shoes = 0x222222)
+        Townsperson.ROSA -> Look(skin = 0xE8B990, hair = 0x5A2E1C, top = 0x9C6B8E, bottom = 0x4A4040, shoes = 0x3B2E24)
+        Townsperson.SOPHIE -> Look(skin = 0xF6D9C2, hair = 0xD9A55B, top = 0xF2E8D8, bottom = 0x55606E, shoes = 0x5A4636)
+        Townsperson.NINA -> Look(skin = 0xEFC9A8, hair = 0x3B2A20, top = 0xD9734E, bottom = 0x30343C, shoes = 0xF0F0F0)
+        Townsperson.JUNHO -> Look(skin = 0xF1CDAE, hair = 0x161414, top = 0x46705F, bottom = 0x4B4B52, shoes = 0x2E2A26)
+        Townsperson.KENJI -> Look(skin = 0xEDC7A4, hair = 0x201A16, top = 0x2C3A4E, bottom = 0x2C3A4E, shoes = 0x181818)
+        Townsperson.MATEO -> Look(skin = 0xD6A27A, hair = 0x2A1C14, top = 0xEDE3D2, bottom = 0x6A5848, shoes = 0x4A3426)
     }
 
-    /** A townsperson, with the one thing that marks them out. */
+    /**
+     * A townsperson, with what marks out the kind of place they keep, the same shapes at every place of a kind (an apron
+     * at a café, glasses and a book at a library, a badge at a coworking space, a collar and tie at an office), and on
+     * some their hair done up.
+     */
     fun townsperson(person: Townsperson): List<Part> {
         val look = lookOf(person)
         val extra = when (person) {
-            // A green apron and a bun.
-            Townsperson.HANA -> listOf(
-                Part(Limb.BODY, Block(-0.2, 0.3, 0.15, 0.4, 0.44, 0.03, 0x3E8E6A)),
-                Part(Limb.BODY, Block(-0.13, 1.42, -0.2, 0.26, 0.18, 0.26, look.hair)),
-            )
-            // Glasses, and a red book in one hand.
-            Townsperson.LEO -> listOf(
-                Part(Limb.BODY, Block(-0.24, 1.1, 0.305, 0.48, 0.03, 0.02, 0x2B2B2B)),
-                Part(Limb.RIGHT_ARM, Block(-0.1, -0.46, 0.0, 0.2, 0.26, 0.07, 0x9A3B3B)),
-            )
-            // A ponytail and a yellow badge on a lanyard.
-            Townsperson.SUJIN -> listOf(
-                Part(Limb.BODY, Block(-0.1, 0.9, -0.44, 0.2, 0.4, 0.12, look.hair)),
-                Part(Limb.BODY, Block(-0.05, 0.42, 0.15, 0.1, 0.13, 0.02, 0xF2C14E)),
-            )
-            // A white collar and a red tie.
-            Townsperson.MARCUS -> listOf(
-                Part(Limb.BODY, Block(-0.12, 0.68, 0.15, 0.24, 0.08, 0.02, 0xFFFFFF)),
-                Part(Limb.BODY, Block(-0.04, 0.4, 0.15, 0.08, 0.3, 0.025, 0xB33A3A)),
-            )
+            Townsperson.HANA -> apron(0x3E8E6A) + bun(look)
+            // A red book.
+            Townsperson.LEO -> glassesAndBook(0x9A3B3B)
+            Townsperson.SUJIN -> ponytail(look) + badge
+            Townsperson.MARCUS -> collarAndTie(0xB33A3A)
             // A bun, a shawl over the shoulders and a walking stick.
             Townsperson.GRANDMA -> listOf(
                 Part(Limb.BODY, Block(-0.13, 1.42, -0.2, 0.26, 0.16, 0.26, look.hair)),
                 Part(Limb.BODY, Block(-0.26, 0.6, -0.18, 0.52, 0.14, 0.36, 0xE8D7B0)),
                 Part(Limb.RIGHT_ARM, Block(0.0, -0.72, 0.06, 0.05, 0.72, 0.05, 0x7A5233)),
             )
+            Townsperson.AISHA -> collarAndTie(0x2F7D7A) + ponytail(look)
+            Townsperson.ROSA -> glassesAndBook(0x3B6E9A) + bun(look)
+            Townsperson.SOPHIE -> apron(0xD9A23A)
+            Townsperson.NINA -> badge + bun(look)
+            Townsperson.JUNHO -> glassesAndBook(0x5C8A3A)
+            Townsperson.KENJI -> collarAndTie(0x3A5FA8)
+            Townsperson.MATEO -> apron(0x6E4A2E)
         }
         return body(look) + extra
     }
+
+    /** An apron in [colour], as at a café. */
+    private fun apron(colour: Int): List<Part> = listOf(Part(Limb.BODY, Block(-0.2, 0.3, 0.15, 0.4, 0.44, 0.03, colour)))
+
+    /** Glasses, and a book in [colour] in one hand, as at a library. */
+    private fun glassesAndBook(colour: Int): List<Part> = listOf(
+        Part(Limb.BODY, Block(-0.24, 1.1, 0.305, 0.48, 0.03, 0.02, 0x2B2B2B)),
+        Part(Limb.RIGHT_ARM, Block(-0.1, -0.46, 0.0, 0.2, 0.26, 0.07, colour)),
+    )
+
+    /** A yellow badge on a lanyard, as at a coworking space. */
+    private val badge: List<Part> = listOf(Part(Limb.BODY, Block(-0.05, 0.42, 0.15, 0.1, 0.13, 0.02, 0xF2C14E)))
+
+    /** A white collar and a tie in [colour], as at an office. */
+    private fun collarAndTie(colour: Int): List<Part> = listOf(
+        Part(Limb.BODY, Block(-0.12, 0.68, 0.15, 0.24, 0.08, 0.02, 0xFFFFFF)),
+        Part(Limb.BODY, Block(-0.04, 0.4, 0.15, 0.08, 0.3, 0.025, colour)),
+    )
+
+    /** Hair up in a bun. */
+    private fun bun(look: Look): List<Part> = listOf(Part(Limb.BODY, Block(-0.13, 1.42, -0.2, 0.26, 0.18, 0.26, look.hair)))
+
+    /** Hair in a ponytail. */
+    private fun ponytail(look: Look): List<Part> = listOf(Part(Limb.BODY, Block(-0.1, 0.9, -0.44, 0.2, 0.4, 0.12, look.hair)))
 
     /** 벤, who keeps the bike shop: a red cap, a sage shirt, a leather apron and a spanner in his hand. */
     val keeperLook = Look(skin = 0xE9C2A0, hair = 0x5A3A22, top = 0x7A9E7E, bottom = 0x3C4A5A, shoes = 0x2E2A26)
