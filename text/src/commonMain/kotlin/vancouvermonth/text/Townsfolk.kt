@@ -218,7 +218,7 @@ private val greetings: Map<Townsperson, Map<Situation, String>> = mapOf(
         Situation.NIGHT to "문 닫을 시간이에요. 내일 또 와요.",
         Situation.INTERVIEW_TODAY to "오늘은 면접부터예요. 회사로 가요.",
         Situation.FAILED_INTERVIEW to "면접에서 받은 질문, 적어 두면 다음에 써먹어요.",
-        Situation.RAINY to "비 오는 날엔 공원 대신 다들 여기로 와요.",
+        Situation.RAINY to "비 오는 날엔 빗소리 들으면서 책 읽기 좋아요.",
         Situation.ORDINARY to "오늘도 한 시간만 집중해 봐요.",
     ),
     Townsperson.KENJI to mapOf(

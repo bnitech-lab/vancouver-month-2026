@@ -219,7 +219,7 @@ class TownsfolkTest {
         Townsperson.GRANDMA to "여기 비는 조용히 오지. 금방 익숙해져.",
         Townsperson.ROSA to "비 오는 날은 아이들 이야기 시간이 있어서 조금 시끄러워요.",
         Townsperson.SOPHIE to "비 오면 공원 산책하던 손님들이 다 여기로 와요.",
-        Townsperson.JUNHO to "비 오는 날엔 공원 대신 다들 여기로 와요.",
+        Townsperson.JUNHO to "비 오는 날엔 빗소리 들으면서 책 읽기 좋아요.",
         Townsperson.KENJI to "비 오는 날엔 로비가 우산 터는 소리로 가득합니다.",
     )
 
