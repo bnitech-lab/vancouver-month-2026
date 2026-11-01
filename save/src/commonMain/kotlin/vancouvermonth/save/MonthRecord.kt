@@ -8,17 +8,17 @@ import vancouvermonth.core.Reveal
 import vancouvermonth.core.Spending
 import vancouvermonth.core.TodaysRun
 
-/** What a record keeps, in order: a day spent ([Choice]), or money spent during a day ([Spend]). */
+/** What a record keeps, in order: something that takes time ([Choice]), or money spent between them ([Spend]). */
 sealed interface Move
 
-/** What one day of September was spent on: an action, or the interview that fell on it. */
+/** What the player did with some of a day's time: an action, the interview that fell on it, or the night's sleep. */
 sealed interface Choice : Move {
     data class Take(val action: Action) : Choice
 
     data object AttendInterview : Choice
 }
 
-/** Money spent in the town during a day, as [Month.spend] took it: no day goes by. */
+/** Money spent in the town, as [Month.spend] took it: no time goes by. */
 data class Spend(val kind: Spending, val amount: Int) : Move
 
 /** Can [move] be played now? The same checks [play] and [Month.spend] make, without playing it. */
@@ -28,7 +28,7 @@ fun Month.allows(move: Move): Boolean = when (move) {
     is Spend -> canSpend(move.kind, move.amount)
 }
 
-/** Spends today on [choice], as the month's own [Month.take] or [Month.attendInterview] does. */
+/** Plays [choice] now, as the month's own [Month.take] or [Month.attendInterview] does. */
 fun Month.play(choice: Choice): List<Event> = when (choice) {
     is Choice.Take -> take(choice.action)
     Choice.AttendInterview -> attendInterview()
@@ -36,9 +36,10 @@ fun Month.play(choice: Choice): List<Event> = when (choice) {
 
 /**
  * A month in progress, as little as rebuilds it: the run (its [seed], and its date when it is [today]'s run), the
- * [room] picked (from 0), the [guess] at its total, and in order what each day so far was spent on and what money was
- * spent between them ([moves]). Every piece of luck comes from the seed and the days, so playing the same moves again
- * gives the same month. [encode] writes it as one short line and [decode] reads it back.
+ * [room] picked (from 0), the [guess] at its total, and in order every action, interview and night's sleep so far and
+ * the money spent between them ([moves]). A day is the choices up to its sleep, so the days need no mark of their own.
+ * Every piece of luck comes from the seed and the choices, so playing the same moves again gives the same month.
+ * [encode] writes it as one short line and [decode] reads it back.
  */
 data class MonthRecord(
     val seed: Int,
@@ -47,16 +48,17 @@ data class MonthRecord(
     val guess: Int,
     val moves: List<Move> = emptyList(),
 ) {
-    /** What each day so far was spent on, in order, the money spent between them left out. */
-    val days: List<Choice>
+    /** Every action, interview and sleep so far, in order, the money spent between them left out. */
+    val choices: List<Choice>
         get() = moves.filterIsInstance<Choice>()
 
-    /** The same month with one more move: a day spent on a [Choice], or money spent on a [Spend]. */
+    /** The same month with one more move: a [Choice], or money spent on a [Spend]. */
     fun after(move: Move): MonthRecord = copy(moves = moves + move)
 
     /**
-     * "3|1011||2|1165|Eb350Wq4C": the version, the seed, today's run's date or nothing, the room, the guess, and the
-     * moves: a capital letter for each day, and a small letter with its amount for each spend.
+     * "4|1011||2|1165|Eb350Wq4RC": the version, the seed, today's run's date or nothing, the room, the guess, and the
+     * moves: a capital letter for each choice (R for a night's sleep), and a small letter with its amount for each
+     * spend.
      */
     fun encode(): String =
         listOf(VERSION, seed, today ?: "", room, guess, moves.joinToString("") { textOf(it) }).joinToString(SEPARATOR)
@@ -64,10 +66,10 @@ data class MonthRecord(
     /**
      * The month rebuilt from the record, with the same rooms and the same luck a fresh start has, then each move
      * played again in order. Null when it cannot be: today's run under another seed, a room that is not there, a
-     * negative guess, a move the rules refuse (the interview on a day without one, an action the player had no energy
-     * for, a day after the month ended, a spend for another amount than its price or than a taxi's meter can show, on
-     * what was already bought, or with too little money), or a month that ends with the last day, which leaves nothing
-     * to continue.
+     * negative guess, a move the rules refuse (the interview on a day without one, an action the player had too little
+     * stamina for, a second application in a day, anything after the month ended, a spend for another amount than its
+     * price or than a taxi's meter can show, on what was already bought, or with too little money), or a month that has
+     * ended, which leaves nothing to continue.
      */
     fun replay(): ReplayedMonth? {
         if (today != null && today.seed != seed) return null
@@ -96,8 +98,10 @@ data class MonthRecord(
          * Goes up whenever this line or the rules change so that an older record would play out differently. A new
          * kind of spend with a letter of its own does not: every older line still reads and plays out as before.
          * 3: the guess's money is added as the month starts, so a version 2 line would start with another balance.
+         * 4: a day holds several actions until the night's sleep (R), each costing stamina, so a version 3 line, one
+         * letter a day, would play out as another month.
          */
-        const val VERSION = 3
+        const val VERSION = 4
 
         private const val SEPARATOR = "|"
 
@@ -173,16 +177,16 @@ data class MonthRecord(
     }
 }
 
-/** A month rebuilt by [MonthRecord.replay], with what happened on its last day played, for the screen to show. */
+/** A month rebuilt by [MonthRecord.replay], with what its last choice brought, for the screen to show. */
 class ReplayedMonth(
     val firstMinute: FirstMinute,
     val reveal: Reveal,
     val month: Month,
     /**
-     * What happened on the day before today, the money spent during it first, or nothing when the record has no day
-     * yet.
+     * What the last action, interview or sleep brought, the money spent just before it first, or nothing when the
+     * record has no choice yet.
      */
     val lastEvents: List<Event>,
-    /** The money spent today so far, before today's day is spent. */
+    /** The money spent since the last choice, which heads the next one's log. */
     val spentToday: List<Event> = emptyList(),
 )

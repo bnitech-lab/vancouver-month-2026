@@ -3,7 +3,10 @@ package vancouvermonth.core
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** What the player can do with one day. */
+/**
+ * What the player can do with the day's stamina ([Month.cost]). [REST] is going to sleep at 내 방: it costs nothing and
+ * ends the day.
+ */
 enum class Action { WORK, STUDY_ENGLISH, PRACTISE_CODING, APPLY, REST }
 
 enum class Skill { ENGLISH, CODING }
@@ -24,19 +27,28 @@ enum class Ending {
     SURVIVED,
 }
 
-/** Why an action cannot be taken today. */
+/** Why an action cannot be taken now. */
 enum class Blocked {
     /** The month has ended. */
     MONTH_OVER,
 
-    /** Today belongs to the interview that falls on it. */
+    /** Today has an interview, which comes first: nothing else, sleep included, until it is done. */
     INTERVIEW_TODAY,
 
-    /** Out of energy: only rest is possible. */
+    /** No stamina is left: it is night, and only sleep is possible. */
     NO_ENERGY,
+
+    /** Some stamina is left, but less than the action costs. */
+    LOW_ENERGY,
+
+    /** The skill this study raises is already at the top level: studying it again would only spend stamina. */
+    SKILL_MAXED,
 
     /** An application is already in progress. */
     INTERVIEW_BOOKED,
+
+    /** An application has already gone in today: one a day. */
+    APPLIED_TODAY,
 
     /** An application now could not get both interviews done by the 30th. */
     APPLICATIONS_CLOSED,
@@ -46,10 +58,10 @@ enum class Blocked {
 enum class Item { BIKE, E_SCOOTER }
 
 /**
- * What money can go on in the town without spending a day: something to keep ([buys]), or one ride's fare. Each costs
- * [price]; a taxi's fare, and a shared bike's or e-scooter's, depends on the trip, so it may cost anything from its
- * [price] up to [most] ([TaxiFare], [SharedFare]). All of them are invented. A ride that is free with the month's pass
- * (the SkyTrain, the bus) needs no spending at all.
+ * What money can go on in the town without spending stamina or time: something to keep ([buys]), or one ride's fare.
+ * Each costs [price]; a taxi's fare, and a shared bike's or e-scooter's, depends on the trip, so it may cost anything
+ * from its [price] up to [most] ([TaxiFare], [SharedFare]). All of them are invented. A ride that is free with the
+ * month's pass (the SkyTrain, the bus) needs no spending at all.
  */
 enum class Spending(val price: Int, val buys: Item? = null, val most: Int = price) {
     BIKE(350, Item.BIKE),
@@ -129,13 +141,18 @@ enum class SpendBlocked {
 /** What happened on a day, in order, for the screen to show. */
 sealed interface Event {
     data class Earned(val amount: Int) : Event
+    /** A study that raised [skill] to [level]. */
     data class SkillUp(val skill: Skill, val level: Int) : Event
+
+    /** A study that did not raise [skill]'s [level] yet: [stepsLeft] more studies raise it. */
+    data class Studied(val skill: Skill, val level: Int, val stepsLeft: Int) : Event
     data class Applied(val interview: Interview?) : Event
+    /** A night's sleep at 내 방, which ends the day: the next morning starts with [energy] stamina. */
     data class Rested(val energy: Int) : Event
     data class InterviewHeld(val stage: InterviewStage, val passed: Boolean, val next: Interview?) : Event
     data class LivingCost(val amount: Int) : Event
 
-    /** Money spent in the town on [kind], during the day: no day goes by for it. */
+    /** Money spent in the town on [kind], between actions: it takes no stamina and no time. */
     data class Spent(val kind: Spending, val amount: Int) : Event
 
     /**
@@ -146,7 +163,11 @@ sealed interface Event {
 }
 
 /**
- * September in Vancouver, one action a day, after the room was picked on September 1st.
+ * September in Vancouver, after the room was picked on September 1st. Each day starts in the morning with full
+ * stamina ([MAX_ENERGY]); each action costs some of it ([cost]) and moves the day's clock on by as much ([hour]), so a
+ * day holds several actions while stamina lasts. With none left it is night, and sleep ([Action.REST]) ends the day
+ * and starts the next morning; sleeping with stamina left is allowed too. On an interview day the interview comes
+ * first.
  * The goal is a job offer by September 30th. On October 1st the room's total monthly cost is due again.
  * Every day, the offer day included, costs living money; what is left after the first room, even after the most a
  * guess can lose, always covers it, and money spent in the town never leaves less than the living cost of the days
@@ -171,8 +192,21 @@ class Month(
         private set
     var coding: Int = START_CODING
         private set
+
+    /** Studies made toward the next level of English and of coding, from 0 up to [STEPS_PER_LEVEL]. */
+    var englishProgress: Int = 0
+        private set
+    var codingProgress: Int = 0
+        private set
+
+    /** Stamina left today, from [MAX_ENERGY] in the morning down to 0 at night. */
     var energy: Int = MAX_ENERGY
         private set
+
+    /** True once an application has gone in today. */
+    var appliedToday: Boolean = false
+        private set
+
     var interview: Interview? = null
         private set
     var ending: Ending? = null
@@ -185,11 +219,43 @@ class Month(
     val isOver: Boolean
         get() = ending != null
 
+    /** True while today's interview is still to come: it comes before anything else today. */
     val hasInterviewToday: Boolean
         get() = !isOver && interview?.day == day
 
     val daysLeft: Int
         get() = LAST_DAY - day + 1
+
+    /** Stamina spent today so far. */
+    val energySpent: Int
+        get() = MAX_ENERGY - energy
+
+    /** The hour of today's clock: [DAY_STARTS_AT] in the morning, [HOURS_PER_ENERGY] later for each stamina spent. */
+    val hour: Int
+        get() = DAY_STARTS_AT + energySpent * HOURS_PER_ENERGY
+
+    /** How much of today has gone, from 0.0 in the morning to 1.0 at night, for the sky to follow. */
+    val dayShare: Double
+        get() = energySpent.toDouble() / MAX_ENERGY
+
+    /** True when no stamina is left today: it is night, and only sleep remains. */
+    val isNight: Boolean
+        get() = !isOver && energy == 0
+
+    /** The level of [skill]. */
+    fun level(skill: Skill): Int = when (skill) {
+        Skill.ENGLISH -> english
+        Skill.CODING -> coding
+    }
+
+    /** Studies made toward [skill]'s next level, from 0 up to [STEPS_PER_LEVEL]. */
+    fun progress(skill: Skill): Int = when (skill) {
+        Skill.ENGLISH -> englishProgress
+        Skill.CODING -> codingProgress
+    }
+
+    /** How many more studies raise [skill] a level: 0 when it is at the top. */
+    fun stepsLeft(skill: Skill): Int = if (level(skill) >= MAX_SKILL) 0 else STEPS_PER_LEVEL - progress(skill)
 
     /**
      * What the balance would be on October 1st, before October's total is paid, if every day left, today included,
@@ -202,65 +268,87 @@ class Month(
     val moneyTight: Boolean
         get() = balanceForecast < room.totalMonthlyCost
 
-    /** Chance that an application turns into a phone screen. A better coding level makes a better résumé. */
+    /**
+     * Chance that an application turns into a phone screen. A better coding level makes a better résumé. Even at the
+     * top level it stays well short of certain, as the interviews' chances do, so no cap is needed.
+     */
     val applyChance: Double
-        get() = min(MAX_CHANCE, APPLY_BASE + APPLY_PER_CODING * coding)
+        get() = APPLY_BASE + APPLY_PER_CODING * coding
 
     fun passChance(stage: InterviewStage): Double = when (stage) {
-        InterviewStage.PHONE_SCREEN -> min(MAX_CHANCE, PHONE_SCREEN_BASE + PHONE_SCREEN_PER_ENGLISH * english)
-        InterviewStage.TECHNICAL -> min(MAX_CHANCE, TECHNICAL_BASE + TECHNICAL_PER_CODING * coding)
+        InterviewStage.PHONE_SCREEN -> PHONE_SCREEN_BASE + PHONE_SCREEN_PER_ENGLISH * english
+        InterviewStage.TECHNICAL -> TECHNICAL_BASE + TECHNICAL_PER_CODING * coding
     }
 
     /** False from the day an application could no longer get both interviews done by the 30th. */
     val canStillApplyThisMonth: Boolean
         get() = day + PHONE_SCREEN_DELAY.first <= LAST_PHONE_SCREEN_DAY
 
-    /** Why [action] cannot be taken today, or null when it can. */
+    /** Why [action] cannot be taken now, or null when it can. */
     fun blockedBy(action: Action): Blocked? = when {
         isOver -> Blocked.MONTH_OVER
         hasInterviewToday -> Blocked.INTERVIEW_TODAY
         action == Action.REST -> null
+        action == Action.STUDY_ENGLISH && english >= MAX_SKILL -> Blocked.SKILL_MAXED
+        action == Action.PRACTISE_CODING && coding >= MAX_SKILL -> Blocked.SKILL_MAXED
         energy == 0 -> Blocked.NO_ENERGY
+        energy < cost(action) -> Blocked.LOW_ENERGY
         action == Action.APPLY && interview != null -> Blocked.INTERVIEW_BOOKED
+        action == Action.APPLY && appliedToday -> Blocked.APPLIED_TODAY
         action == Action.APPLY && !canStillApplyThisMonth -> Blocked.APPLICATIONS_CLOSED
         else -> null
     }
 
     fun canTake(action: Action): Boolean = blockedBy(action) == null
 
-    /** Spends today on [action]. */
+    /**
+     * Takes [action] now: its stamina comes off and the clock moves on by as much. Sleep ([Action.REST]) ends the day
+     * instead: the day's living cost comes off, and the next morning starts with full stamina.
+     */
     fun take(action: Action): List<Event> {
         require(canTake(action)) { "Cannot take $action on day $day" }
+        if (action == Action.REST) return listOf(Event.Rested(MAX_ENERGY)) + endDay()
+        energy -= cost(action)
         val event = when (action) {
             Action.WORK -> {
                 balance += WORK_PAY
-                energy -= 1
                 Event.Earned(WORK_PAY)
             }
-            Action.STUDY_ENGLISH -> {
-                english = min(MAX_SKILL, english + 1)
-                energy -= 1
-                Event.SkillUp(Skill.ENGLISH, english)
-            }
-            Action.PRACTISE_CODING -> {
-                coding = min(MAX_SKILL, coding + 1)
-                energy -= 1
-                Event.SkillUp(Skill.CODING, coding)
-            }
+            Action.STUDY_ENGLISH -> study(Skill.ENGLISH)
+            Action.PRACTISE_CODING -> study(Skill.CODING)
             Action.APPLY -> {
-                energy -= 1
+                appliedToday = true
                 if (dice.succeeds(applyChance)) {
                     val phoneScreenDay = min(LAST_PHONE_SCREEN_DAY, day + dice.daysLater(PHONE_SCREEN_DELAY))
                     interview = Interview(InterviewStage.PHONE_SCREEN, phoneScreenDay)
                 }
                 Event.Applied(interview)
             }
-            Action.REST -> {
-                energy = min(MAX_ENERGY, energy + REST_GAIN)
-                Event.Rested(energy)
+            Action.REST -> error("Sleep ends the day")
+        }
+        return listOf(event)
+    }
+
+    /**
+     * One study of [skill], below the top level ([Blocked.SKILL_MAXED] keeps it there): a step toward its next level,
+     * and the level itself every [STEPS_PER_LEVEL] steps.
+     */
+    private fun study(skill: Skill): Event {
+        val steps = progress(skill) + 1
+        val levelUp = steps == STEPS_PER_LEVEL
+        val progress = if (levelUp) 0 else steps
+        val level = level(skill) + if (levelUp) 1 else 0
+        when (skill) {
+            Skill.ENGLISH -> {
+                english = level
+                englishProgress = progress
+            }
+            Skill.CODING -> {
+                coding = level
+                codingProgress = progress
             }
         }
-        return listOf(event) + endDay()
+        return if (levelUp) Event.SkillUp(skill, level) else Event.Studied(skill, level, stepsLeft(skill))
     }
 
     fun owns(item: Item): Boolean = item in owned
@@ -296,10 +384,14 @@ class Month(
         return Event.Spent(kind, amount)
     }
 
-    /** Spends today on the interview that falls on it. */
+    /**
+     * Goes to the interview that falls on today, first thing: it costs [INTERVIEW_COST] stamina, and the rest of the
+     * day is free. Passing the technical interview is the offer, which ends the month with the day's living cost.
+     */
     fun attendInterview(): List<Event> {
         val today = interview
         check(today != null && hasInterviewToday) { "No interview on day $day" }
+        energy -= INTERVIEW_COST
         val passed = dice.succeeds(passChance(today.stage))
         val next = if (passed && today.stage == InterviewStage.PHONE_SCREEN) {
             // A phone screen is never later than the 29th, so the technical interview still fits in September.
@@ -310,7 +402,7 @@ class Month(
         interview = next
         val held = Event.InterviewHeld(today.stage, passed, next)
         val offer = passed && today.stage == InterviewStage.TECHNICAL
-        return listOf(held) + endDay(offer)
+        return if (offer) listOf(held) + endDay(offer = true) else listOf(held)
     }
 
     private fun endDay(offer: Boolean = false): List<Event> {
@@ -318,7 +410,11 @@ class Month(
         when {
             offer -> ending = Ending.OFFER
             day == LAST_DAY -> ending = if (balance >= room.totalMonthlyCost) Ending.SURVIVED else Ending.CANNOT_PAY_RENT
-            else -> day += 1
+            else -> {
+                day += 1
+                energy = MAX_ENERGY
+                appliedToday = false
+            }
         }
         return listOf(Event.LivingCost(DAILY_LIVING_COST))
     }
@@ -332,23 +428,49 @@ class Month(
         const val LAST_PHONE_SCREEN_DAY = LAST_DAY - 1
 
         const val DAILY_LIVING_COST = 40
-        const val WORK_PAY = 110
+
+        /** What a café shift pays. It takes most of a day ([WORK_COST]). */
+        const val WORK_PAY = 70
 
         const val MAX_SKILL = 10
         const val START_ENGLISH = 1
         const val START_CODING = 3
-        const val MAX_ENERGY = 5
-        const val REST_GAIN = 2
 
-        const val MAX_CHANCE = 0.9
+        /** How many studies raise a skill one level. */
+        const val STEPS_PER_LEVEL = 4
+
+        /** The stamina each morning starts with. */
+        const val MAX_ENERGY = 5
+
+        /** What each action and the interview cost in stamina. Sleep costs nothing. */
+        const val WORK_COST = 3
+        const val STUDY_COST = 2
+        const val APPLY_COST = 1
+        const val INTERVIEW_COST = 2
+
+        /** The day's clock: [DAY_STARTS_AT] o'clock in the morning, [HOURS_PER_ENERGY] hours on for each stamina. */
+        const val DAY_STARTS_AT = 8
+        const val HOURS_PER_ENERGY = 3
+
+        /** The hour it is when the day's stamina is gone: night. */
+        const val NIGHT_AT = DAY_STARTS_AT + MAX_ENERGY * HOURS_PER_ENERGY
+
         const val APPLY_BASE = 0.15
         const val APPLY_PER_CODING = 0.04
         const val PHONE_SCREEN_BASE = 0.05
-        const val PHONE_SCREEN_PER_ENGLISH = 0.09
+        const val PHONE_SCREEN_PER_ENGLISH = 0.07
         const val TECHNICAL_BASE = 0.05
-        const val TECHNICAL_PER_CODING = 0.08
+        const val TECHNICAL_PER_CODING = 0.05
 
         val PHONE_SCREEN_DELAY = 2..4
         val TECHNICAL_DELAY = 2..3
+
+        /** What [action] costs in stamina. */
+        fun cost(action: Action): Int = when (action) {
+            Action.WORK -> WORK_COST
+            Action.STUDY_ENGLISH, Action.PRACTISE_CODING -> STUDY_COST
+            Action.APPLY -> APPLY_COST
+            Action.REST -> 0
+        }
     }
 }

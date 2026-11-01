@@ -3,6 +3,7 @@ package vancouvermonth.text
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import vancouvermonth.core.Action
 import vancouvermonth.core.Blocked
@@ -153,10 +154,10 @@ class KoreanTest {
             val shifts = RoomDealer.deal(seed).sortedBy { it.totalMonthlyCost }.map { shiftsToPayOctober(it) }
             assertEquals(shifts.sorted(), shifts, "seed $seed")
         }
-        // Seed 1011: the cheapest room ($1,165) needs 5 shifts, room 2 ($1,345) needs 8.
+        // Seed 1011: the cheapest room ($1,165) needs 7 shifts, room 2 ($1,345) needs 13.
         val rooms = FirstMinute(1011).rooms
-        assertEquals(5, shiftsToPayOctober(rooms[2]))
-        assertEquals(8, shiftsToPayOctober(rooms[1]))
+        assertEquals(7, shiftsToPayOctober(rooms[2]))
+        assertEquals(13, shiftsToPayOctober(rooms[1]))
     }
 
     /** The fewest café shifts that end a month with no applications able to pay October's total, by core's rules. */
@@ -208,6 +209,8 @@ class KoreanTest {
             listOf(
                 "목표: 9월 30일까지 취업 제안 받기",
                 "매일 생활비 \$40이 나가고, 10월 1일에는 이 방의 총비용 \$1,165를 또 내야 해요.",
+                "하루는 아침 8시에 체력 5로 시작해요. 일을 하면 체력만큼 시간이 흘러요.",
+                "체력을 다 쓰면 밤이에요. 내 방에서 자면 다음 날 아침이에요.",
                 "면접은 두 번이에요. 1차 영어 면접은 영어 실력, 2차 기술 면접은 코딩 실력으로 붙어요.",
             ),
             monthStartLines(room),
@@ -215,20 +218,64 @@ class KoreanTest {
     }
 
     @Test
-    fun `actions show their effect`() {
+    fun `actions show their effect and their stamina`() {
         val month = month()
-        assertEquals("카페 알바", actionName(Action.WORK))
-        assertEquals("면접이 잡힐 확률 27%, 체력 -1", actionEffect(Action.APPLY, month))
-        assertEquals("체력 +${Month.REST_GAIN}", actionEffect(Action.REST, month))
+        assertEquals(listOf("카페 알바", "영어 공부", "코딩 연습", "지원서 넣기", "자기"), Action.entries.map { actionName(it) })
+        assertEquals(
+            listOf(
+                "+\$70, 체력 -3",
+                "레벨업까지 4번, 체력 -2",
+                "레벨업까지 4번, 체력 -2",
+                "면접이 잡힐 확률 27%, 체력 -1",
+                "다음 날 아침, 체력 5",
+            ),
+            Action.entries.map { actionEffect(it, month) },
+        )
+        month.take(Action.STUDY_ENGLISH)
+        assertEquals("레벨업까지 3번, 체력 -2", actionEffect(Action.STUDY_ENGLISH, month))
+        assertEquals("최고 레벨", stepsLine(0))
     }
 
     @Test
     fun `every reason an action is blocked reads as Korean`() {
         assertEquals("9월이 끝났어요.", whyNot(Blocked.MONTH_OVER))
-        assertEquals("오늘은 면접 날이에요.", whyNot(Blocked.INTERVIEW_TODAY))
-        assertEquals("체력이 없어요. 쉬어야 해요.", whyNot(Blocked.NO_ENERGY))
+        assertEquals("오늘은 면접부터 봐요.", whyNot(Blocked.INTERVIEW_TODAY))
+        assertEquals("체력이 없어요. 내 방에 가서 자요.", whyNot(Blocked.NO_ENERGY))
+        assertEquals("체력이 모자라요.", whyNot(Blocked.LOW_ENERGY))
+        assertEquals("이미 최고 레벨이에요.", whyNot(Blocked.SKILL_MAXED))
         assertEquals("면접이 잡혀 있어요.", whyNot(Blocked.INTERVIEW_BOOKED))
+        assertEquals("지원서는 하루에 한 번이에요.", whyNot(Blocked.APPLIED_TODAY))
         assertEquals("지금 지원하면 9월 안에 면접을 다 볼 수 없어요.", whyNot(Blocked.APPLICATIONS_CLOSED))
+        for (blocked in Blocked.entries) assertFalse('\u2014' in whyNot(blocked), "$blocked")
+    }
+
+    @Test
+    fun `the day's clock reads as people say the time`() {
+        assertEquals(
+            listOf("아침 8시", "오전 11시", "오후 2시", "오후 5시", "저녁 8시", "밤 11시"),
+            (0..Month.MAX_ENERGY).map { clockName(Month.DAY_STARTS_AT + it * Month.HOURS_PER_ENERGY) },
+        )
+        assertEquals("낮 12시", clockName(12))
+        assertEquals("밤 12시", clockName(24))
+    }
+
+    @Test
+    fun `when nothing but sleep is left, a line sends the player home`() {
+        val month = month()
+        assertNull(bedtimeLine(month))
+        month.take(Action.STUDY_ENGLISH)
+        month.take(Action.PRACTISE_CODING)
+        assertNull(bedtimeLine(month), "an application still fits")
+        month.take(Action.APPLY)
+        assertEquals("밤이에요. 체력을 다 썼어요. 내 방에 가서 자요.", bedtimeLine(month))
+        month.take(Action.REST)
+        assertNull(bedtimeLine(month))
+        // One stamina left after a shift and an application: nothing else fits.
+        val tired = month()
+        tired.take(Action.WORK)
+        tired.take(Action.APPLY)
+        assertEquals(1, tired.energy)
+        assertEquals("오늘 할 수 있는 일은 다 했어요. 내 방에 가서 자요.", bedtimeLine(tired))
     }
 
     @Test
@@ -236,12 +283,19 @@ class KoreanTest {
         val month = month()
         assertEquals("카페에서 일했어요. +\$110", eventLine(Event.Earned(110), month))
         assertEquals("영어 실력이 올랐어요. 영어 2/10", eventLine(Event.SkillUp(Skill.ENGLISH, 2), month))
+        assertEquals("영어 공부를 했어요. 레벨업까지 3번", eventLine(Event.Studied(Skill.ENGLISH, 1, 3), month))
+        assertEquals("코딩 연습을 했어요. 레벨업까지 1번", eventLine(Event.Studied(Skill.CODING, 3, 1), month))
         assertEquals("지원서를 냈지만 아직 연락이 없어요.", eventLine(Event.Applied(null), month))
         assertEquals(
             "연락이 왔어요! 1차 영어 면접이 9월 6일에 잡혔어요.",
             eventLine(Event.Applied(Interview(InterviewStage.PHONE_SCREEN, 6)), month),
         )
-        assertEquals("푹 쉬었어요. 체력 5/5", eventLine(Event.Rested(5), month))
+        assertEquals("내 방에서 푹 잤어요. 체력 5/5", eventLine(Event.Rested(5), month))
+        // After the last night there is no morning: no stamina is promised.
+        val over = month()
+        var last = emptyList<Event>()
+        while (!over.isOver) last = over.take(Action.REST)
+        assertEquals("내 방에서 푹 잤어요.", eventLine(last.first(), over))
         assertEquals(
             "1차 영어 면접 통과! 2차 기술 면접이 9월 9일이에요.",
             eventLine(Event.InterviewHeld(InterviewStage.PHONE_SCREEN, true, Interview(InterviewStage.TECHNICAL, 9)), month),
@@ -320,10 +374,10 @@ class KoreanTest {
         )
         val day = listOf(bike, ride, scooter, Event.Rested(5), Event.LivingCost(40))
         assertEquals(
-            listOf("자전거를 샀어요. -\$350", "그 밖에 2건 -\$7", "푹 쉬었어요. 체력 5/5", "생활비 -\$40, 잔고 \$1,800"),
+            listOf("자전거를 샀어요. -\$350", "그 밖에 2건 -\$7", "내 방에서 푹 잤어요. 체력 5/5", "생활비 -\$40, 잔고 \$1,800"),
             dayLog(day, month),
         )
-        assertEquals(listOf("푹 쉬었어요. 체력 5/5"), dayLog(listOf(Event.Rested(5)), month))
+        assertEquals(listOf("내 방에서 푹 잤어요. 체력 5/5"), dayLog(listOf(Event.Rested(5)), month))
     }
 
     @Test

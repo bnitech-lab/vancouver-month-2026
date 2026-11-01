@@ -141,9 +141,12 @@ class BurnabyTownTest {
                 assertNull(homeName.getAttribute("aria-hidden"))
                 town.walkFor(TransitLines.stations[7].door)
             },
-            Step("walked toward the station, the day ends", { town.tripMillis == null && town.isStill }) {
+            Step("walked toward the station and back, a night's sleep", { town.tripMillis == null && town.isStill }) {
                 assertTrue(distanceBetween(town.characterSpot, home.door) > 5.0, "still at ${town.characterSpot}")
-                town.endDay(Place.CAFE)
+                town.walkFor(home.door)
+            },
+            Step("home again, sleep", { town.tripMillis == null && town.isStill }) {
+                town.endDay()
             },
             Step("the next morning", { !town.isChangingDay }) {
                 assertEquals(home.door, town.characterSpot)
@@ -166,7 +169,7 @@ class BurnabyTownTest {
             },
             Step("the next morning, kept; the page opens again and goes on", { !first.isChangingDay }) {
                 val kept = assertNotNull(MonthRecord.decode(store.items[SaveSlot.KEY]), "nothing kept")
-                assertTrue(kept.days.isNotEmpty(), "the day was not kept")
+                assertTrue(kept.choices.isNotEmpty(), "the day was not kept")
                 first.close()
                 town = null
                 openGame(300.0, store)

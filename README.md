@@ -13,11 +13,16 @@ the money runs out.
    much more a month the pick costs than the cheapest room, or, for the cheapest, that it leaves the most money; the
    cheapest pick earns nothing extra beyond paying less. The rule behind it: compare rooms by their total monthly
    cost (rent, utilities and a transit pass), not by rent alone.
-2. **September 2nd to 30th: one action a day.** Work a café shift, study English, practise coding, send an
-   application, or rest. Every day costs living money, and every action but rest costs energy.
+2. **September 2nd to 30th: a day of stamina.** Each day starts at 8 in the morning with 5 stamina. Work a café shift
+   (3 stamina, $70), study English or practise coding (2 each; four studies raise a skill a level), or send an
+   application (1, once a day). Each action moves the day's clock on 3 hours for each stamina it costs, so a day holds
+   several actions; with no stamina left it is night (11 in the evening), and sleep at 내 방 ends the day and starts
+   the next morning. Sleeping early, with stamina left, is allowed and costs nothing more. Every day costs living money,
+   paid at night.
 3. **Interviews.** An application may book a phone screen (passed on English), and passing it books a technical
-   interview (passed on coding). Passing both is a job offer and ends the game. Applications close after the
-   27th, so both interviews always fit in September.
+   interview (passed on coding). On an interview day the interview comes first (2 stamina), and the rest of the day is
+   free. Passing both is a job offer and ends the game. Applications close after the 27th, so both interviews always
+   fit in September.
 4. **The end.** No offer by the 30th means October's total for the same room is due: you either can pay it or you
    cannot. What is left after the first room, even after the largest penalty for the guess, always covers
    September's living cost, so October's total is where the money runs short.
@@ -38,7 +43,7 @@ In a terminal, which needs Java 21:
 ```
 
 The game text is in Korean for now. This is `./play --seed 1011`, picking the room with the lowest rent and
-studying English on the first day:
+studying English first thing on the first day, which takes the morning and leaves the afternoon:
 
 ```
 BNI Tech
@@ -81,20 +86,32 @@ BNI Tech
 9월 한 달이 시작돼요.
   목표: 9월 30일까지 취업 제안 받기
   매일 생활비 $40이 나가고, 10월 1일에는 이 방의 총비용 $1,345를 또 내야 해요.
+  하루는 아침 8시에 체력 5로 시작해요. 일을 하면 체력만큼 시간이 흘러요.
+  체력을 다 쓰면 밤이에요. 내 방에서 자면 다음 날 아침이에요.
   면접은 두 번이에요. 1차 영어 면접은 영어 실력, 2차 기술 면접은 코딩 실력으로 붙어요.
 
-[9월 2일] 남은 날 29일
+[9월 2일 아침 8시] 남은 날 29일
   잔고 $1,710 · 10월 1일에 낼 총비용 $1,345
   영어 1/10 · 코딩 3/10 · 체력 5/5
-오늘 할 일 하나:
-  1) 카페 알바     +$110, 체력 -1
-  2) 영어 공부     영어 +1, 체력 -1
-  3) 코딩 연습     코딩 +1, 체력 -1
+지금 할 일:
+  1) 카페 알바     +$70, 체력 -3
+  2) 영어 공부     레벨업까지 4번, 체력 -2
+  3) 코딩 연습     레벨업까지 4번, 체력 -2
   4) 지원서 넣기   면접이 잡힐 확률 27%, 체력 -1
-  5) 쉬기          체력 +2
-오늘 할 일? (1-5) > 2
-  영어 실력이 올랐어요. 영어 2/10
-  생활비 -$40, 잔고 $1,670
+  5) 자기          다음 날 아침, 체력 5
+지금 할 일? (1-5) > 2
+  영어 공부를 했어요. 레벨업까지 3번
+
+[9월 2일 오후 2시] 남은 날 29일
+  잔고 $1,710 · 10월 1일에 낼 총비용 $1,345
+  영어 1/10 · 코딩 3/10 · 체력 3/5
+지금 할 일:
+  1) 카페 알바     +$70, 체력 -3
+  2) 영어 공부     레벨업까지 3번, 체력 -2
+  3) 코딩 연습     레벨업까지 4번, 체력 -2
+  4) 지원서 넣기   면접이 잡힐 확률 27%, 체력 -1
+  5) 자기          다음 날 아침, 체력 5
+지금 할 일? (1-5) >
 ```
 
 A test plays this seed and checks that the screen still matches this sample.
@@ -144,13 +161,16 @@ different runs.
 ### Continuing a month
 
 The phone screen keeps the month in progress in the browser's `localStorage`: a short record of the run (its seed, or
-today's run and its date), the room picked, the guess, what each day was spent on, and in its place between the days each
-spend in the town (what, and how much). Nothing more is needed, since the same seed and the same choices always play out
-the same way. The record is written when the month starts, after every day and after every spend, and emptied at any
-ending. Continued, a month keeps what was bought, and what was spent today still heads today's log.
+today's run and its date), the room picked, the guess, every action, interview and night's sleep in order, and in its
+place between them each spend in the town (what, and how much). A day is everything up to its sleep, so the days need no
+mark of their own. Nothing more is needed, since the same seed and the same choices always play out the same way. The
+record is written when the month starts, after every action, interview, sleep and spend, and emptied at any ending.
+Continued, a month keeps what was bought, the day's time and stamina, and what was spent since the last action still
+heads the next one's log; the character starts at 내 방's door, at the time the day had reached.
 
-Opened again for the same run, the intro first offers that month: at its top, the day and the balance it goes on from,
-and at its foot 이어하기 and 새로 시작 in place of 시작하기. 이어하기 rebuilds the month by playing the recorded days again
+Opened again for the same run, the intro first offers that month: at its top, the day (with the time, once the day is
+past its morning) and the balance it goes on from, and at its foot 이어하기 and 새로 시작 in place of 시작하기. 이어하기
+rebuilds the month by playing the recorded choices again
 through the same rules (the guess's money included) and goes straight to that day, in the town or on the button screen;
 새로 시작 drops the record and shows the rooms. An address with no run (neither `?seed` nor `?today`) opens the kept
 month's run, and there 새로 시작 plays a new run instead, straight to its rooms. There is one
@@ -160,8 +180,9 @@ kept. A record that cannot be read or replayed (another version, or a day the ru
 and where the browser refuses storage there is no card and nothing is kept.
 
 A test replays a few kept lines to months written down by hand, so a change to the rules fails it until
-`MonthRecord.VERSION` goes up, which drops the older lines rather than continuing them into a different month. It is 3
-since the guess began to move money (v0.14): a month kept before that started with another balance.
+`MonthRecord.VERSION` goes up, which drops the older lines rather than continuing them into a different month. It is 4
+since a day began to hold several actions until the night's sleep (v0.17): a month kept before that, one letter a day,
+would play out as another month.
 
 ### The 3D town
 
@@ -226,11 +247,12 @@ talk opens, until the morning.
 Each place has one person, all invented: 하나 at the 카페, 레오 at the 도서관, 수진 at 코워킹, 마커스 at the 회사 desk and
 the neighbour grandmother by the bench at 내 방. A talk shows their name, a small face drawn from their colours, and a
 line typed one letter at a time (a tap shows all of it) that fits the day: a first meeting, low energy, money running
-short, an interview booked or failed, the first or the last week, and so on. The answers are the place's action with its
-effect (알바하기, 영어 공부, 코딩 연습, 지원서 넣기, 쉬기) or the reason it cannot be done today, 이야기 for small talk,
-and 그만. On an interview day only 회사 offers 면접 보기, and its name is marked.
+short, an interview booked or failed, the night, the first or the last week, and so on. The answers are the place's
+action with its effect and its stamina (알바하기, 영어 공부, 코딩 연습, 지원서 넣기, and at 내 방 자기, which is there
+any time) or the reason it cannot be done now (too little stamina, an application already in today, and so on),
+이야기 for small talk, and 그만. On an interview day only 회사 offers 면접 보기, first thing, and its name is marked.
 
-Money can be spent in the town without spending a day. On the West End's wide street toward downtown, on the way from
+Money can be spent in the town without spending stamina or time. On the West End's wide street toward downtown, on the way from
 내 방 to the business district, stands a bike shop (자전거 가게), kept by 벤, invented like everyone else, with a bike on
 show beside it. It is not one of the five places, as no day is spent there, but it matters as they do: its name floats
 over it, it never folds and the camera keeps out of it. His talk offers 자전거 사기 ($350), 퀵보드 사기 ($550), 이야기 and
@@ -248,18 +270,17 @@ $0.40 for every ten squares (250 m), at most $15, an e-scooter $1 and $0.60, at 
 meter is (across downtown a few dollars, out to Burnaby the most). A place whose fare would leave too little for
 September's living cost is greyed out and says why; when even the cheapest one is, the top card says so instead of the
 card. The fare shown is the fare paid, through core, as the ride sets off and only then; it is kept in the record (s and
-q with the amount, the record's version unchanged, so a month kept at the old $3 and $4 a ride still goes on). The
-character rides there along the very way priced and gets off; on the way the town takes no taps, and 내리기 gets off
+q with the amount). The character rides there along the very way priced and gets off; on the way the town takes no taps, and 내리기 gets off
 where it is. Across downtown it goes at its everyday speed; a long ride goes faster, up to 16 squares a second on a bike
 and 20 on an e-scooter (a taxi's top is 24), so the West End to the town centre's station is about half a minute. At a
 place's door, 내 방's or the bike shop's, the character turns to the person there and the talk opens, as at the end of
 a walk there. The shared one goes back to its dock or corner when the character gets off, a talk opens or the day ends.
 Any talk gets the character off first, and the day's end too, so each morning starts on foot; a fare is only ever paid
-for a ride that starts. The money spent during a day heads that day's log, in two lines at most ("그 밖에 5건 -$15" for the
+for a ride that starts. The money spent before an action heads that action's log, in two lines at most ("그 밖에 5건 -$15" for the
 rest), and on a small phone the log gives up its last lines before a talk would leave the screen. Every price is invented, and no shop, brand or bike-share or scooter company is real. On the
 button screen there is no shop and no riding.
 
-The SkyTrain, buses, a water bus and taxis take the character across town, still without spending a day. The SkyTrain
+The SkyTrain, buses, a water bus and taxis take the character across town, still without spending stamina. The SkyTrain
 has nine stations, named for what is round them: 다운타운역 under downtown, 터널 입구역 (the station by the tunnel's
 mouth, as before), then the Expo Line's real stations from the open data out to the Burnaby town centre under made-up
 names (크릭 끝역, 갈림길역, 동쪽 마을역, 작은 공원역, 경계역, 큰 공원역, 중심가역), each up on the line with an entrance
@@ -288,7 +309,7 @@ along the streets up to 160 squares and $0.70 for every ten past that, to the do
 the meter stops at $60); a taxi appears where the
 character stands and drives there fast, faster still on a long ride (up to 24 squares a second, so Burnaby to downtown
 takes about 20 seconds), and its 내리기 lets the character out on the way. A fare is paid through core
-when the ride sets off and only then, heads that day's log ("수상버스를 탔어요. -$4", "택시를 탔어요. -$12"), is kept
+when the ride sets off and only then, heads the next action's log ("수상버스를 탔어요. -$4", "택시를 탔어요. -$12"), is kept
 in the record (w and t, the record's version unchanged, so a month kept before still goes on), and is refused with the
 reason, as a purchase is, when what would be left could not pay September's living cost. While riding, the town takes no
 taps and no talk opens, so no day can end mid-ride; the camera follows the vehicle, the buildings in its way fold and
@@ -319,15 +340,25 @@ the sea darkens, thin rain falls slanted by a light wind with small splashes on 
 and 미나 and 프리야 walk under open umbrellas (올리버 runs on, and 테오 trusts his hat). Most of the townspeople and every
 passerby have a word about the rain. A new day's weather comes in the dark of the night.
 
-An answer that spends the day ends it: a golden evening, a night with the windows, lamps and campfire lit, and the
-morning, in 1.5 seconds, with the character back at 내 방's door and the day's log over the top of the screen. On a day
-of rest the character spends the night sitting on the bench by the campfire, with the camera come round to the far side
-of the fire; in the morning it stands at 내 방's door and the camera is the player's own again. Every answer goes to the same rules as the buttons, so the same seed and the
-same choices end the same way in the town and with buttons; a test plays a whole month both ways. After an offer in the
-town, the neighbour has a word on the ending.
+An answer that takes an action leaves the character where it is, and the time it took passes over the town in two
+seconds: the sky, the sun, the lamps and the windows move little by little from the time before to the time after, from
+a soft morning (8:00) through a bright day (14:00) and a warm late afternoon (17:00) to a golden evening (20:00) and the
+night (23:00), with the lamps and windows coming on toward evening and the passersby going home; a rainy day greys every
+one of those hours. What happened goes over the top of the screen, and the top card shows the time and the stamina left.
+With nothing but sleep left (no stamina, or too little for anything still open), a line there says to go home to sleep;
+the character walks, rides or takes a taxi home as by day. Sleep starts only with the character at 내 방: in a talk
+with the neighbour opened from afar, 자기 waits with "내 방에 도착하면 잘 수 있어요." until it arrives. Sleep ends the day: from the
+time it is, on to a
+night with the windows, lamps and campfire lit, then the morning, in 1.5 seconds; the character spends the night sitting
+on the bench by the campfire, with the camera come round to the far side of the fire, and in the morning it stands at
+내 방's door and the camera is the player's own again. Nothing ever takes the character home on its own: a new month
+starts at 내 방's door in the morning, and so does each day after a night's sleep there. Every answer goes to the same
+rules as the buttons, so the same seed and the same choices end the same way in the town and with buttons; a test plays
+a whole month both ways. After an offer in the town, the neighbour has a word on the ending.
 
-The town draws every frame the screen offers while the character walks, the camera moves or the day changes, but its own
-life moves at most 30 times a second. While only that life moves, it draws at most 30 frames a second, and 15 once
+The town draws every frame the screen offers while the character walks, the camera moves or the day changes, but its
+own life moves at most 30 times a second, and so does the light while an action's time passes. While only that life
+moves, it draws at most 30 frames a second, and 15 once
 nobody has touched the town for 20 seconds or while a talk covers it; the sun's shadows are drawn again on every other
 of those frames. It draws nothing while the page is hidden. It draws at most two pixels per point however sharp the
 phone, and boxes of a kind together: the buildings, trees and the rest that stand still and cast shadows in one draw for
@@ -353,16 +384,16 @@ on the platform and the camera), `FollowCamera`
 (turning, zooming, keeping out of the places' walls, and what a tap lands on), `Cutaway`
 (which of the city's buildings fold down out of the camera's way, and how far), `Minimap` (where the grid lies on the
 small map turned north up, and which place is nearest), `DayLight` (the light
-through the change of day, and when the passersby are out, and how each weather greys it), `Passersby` (their loops, and
+through the day's hours and through a night's sleep, when the passersby are out, and how each weather greys it), `Passersby` (their loops, and
 stopping for the character), `Greeter` (the five turning and waving), `TownLife` (the train's round and how loud it
 rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, all worked out from the time) and
 `FramePace` (which frames are drawn). The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`, and
 `Passersby.kt` for the passersby's), and so are each day's weather (`Weather.kt`) and the bike shop's and riding's
 words (`Shop.kt`), and the SkyTrain's, the bus's, the water bus's and the taxi's (`Transit.kt`). `WalkableTown` draws
 all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about 990 KB
-(about 280 KB gzipped). `TownBudgetTest` measures what a frame costs downtown, in East Vancouver, in Burnaby, on a walk,
-on the train and under downtown, and keeps it within a phone's budget.
+`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about SIZE_KB
+(about GZIP_KB gzipped). `TownBudgetTest` measures what a frame costs downtown (by day and at night), in East Vancouver,
+in Burnaby, on a walk, on the train and under downtown, and keeps it within a phone's budget.
 
 ### Sound and the guide
 
@@ -370,15 +401,16 @@ The page has a calm background tune of its own, made entirely in code with the W
 samples, nothing downloaded. It is written by rules, not copied from any game or song: a music-box melody in F major
 pentatonic over soft chords and a low note, at 70 beats a minute, in a loop of 16 bars shaped like a short song
 (A A' B A''). The theme comes from a fixed seed, and each pass through the loop changes a few notes a little, so it
-never repeats exactly. The player's own clock colours it: the whole tune by day (from 6:00), a softer, sparser and
-darker one in the evening (from 18:00), and at night (from 22:00) only a quiet bed of soft noise that rises and falls
-like the sea, under a few slow notes. A talk opens with a soft blip, a line types out with very quiet ticks (at most
+never repeats exactly. The clock colours it, the month's own while a month is played and the phone's on the screens
+around it: the whole tune by day (from 6:00), a softer, sparser and darker one in the evening (from 18:00), and at
+night (from 22:00) only a quiet bed of soft noise that rises and falls like the sea, under a few slow notes. A talk
+opens with a soft blip, a line types out with very quiet ticks (at most
 one every 110 ms), and the change of day rings a gentle chime.
 
 The town has sounds of its own, made from noise in code in the same way. On a rainy day a soft bed of rain plays under
 the tune, well below its loudest notes. The SkyTrain rumbles softly as it pulls out and comes in, louder the nearer it is
 to the camera and silent while it stands at the station. The campfire crackles quietly when the character is near it
-after dark, in the town's own night or late on the player's clock. They follow the same switch, fade and limiter as
+after dark, in the town's own evening and night. They follow the same switch, fade and limiter as
 the tune.
 
 Sound is off until the player turns it on with the switch in the town's top card, at the top of the button screen, and
@@ -390,15 +422,16 @@ through a limiter. Where the browser has no Web Audio there is no switch, and wh
 remembered.
 
 How to play is said on the intro (see below) and again on a card the "?" in the town's top card opens: tap the ground
-to walk and twice to dash, drag to look around and pinch to zoom, tap a person or a building to talk (picking a job ends
-the day), tap a station, stop or dock to ride, buy or rent a bike or call a taxi, and find yourself on the small map. The
+to walk and twice to dash, drag to look around and pinch to zoom, tap a person or a building to talk (an action takes
+stamina and time), sleep at 내 방 once the stamina is spent, tap a station, stop or dock to ride, buy or rent a bike or
+call a taxi, and find yourself on the small map. The
 card ends with the month's goal, in the words the month's start uses; 닫기 or Escape closes it. It never opens by
 itself, since the intro has just said the same. The button screen has no card, since its buttons say what they do.
 
 ### The intro
 
 The page opens on an intro: the title with the version, 업데이트 소식 and the sound switch; the arrival story (September
-1st, $3,000, the goal, a room first); how to play, in the same six lines as the "?" card; how the guess pays, in one
+1st, $3,000, the goal, a room first); how to play, in the same seven lines as the "?" card; how the guess pays, in one
 line ("맞힐수록 최대 $100을 더 받고, $100보다 더 틀리면 그만큼 잃어요(최대 $300).") with three worked examples; and the
 map's credit.
 시작하기 sits in a bar held at the foot of the screen, so it is in sight on a 375 x 812 or 320 x 568 phone and on one
@@ -458,7 +491,7 @@ is the newest, and the lines' widths and words.
 | Part | What | Notes |
 |---|---|---|
 | `core` | The rules: rooms, the guess's money, the month, interviews, endings, money spent in the town, and the run number for a date | Kotlin Multiplatform, standard library only, so the same rules run on the JVM and in a browser. All luck goes through one `Dice` interface, so tests can control it |
-| `save` | A month in progress as a short record, and the month rebuilt from it by playing each day's choice and each spend again | Kotlin Multiplatform, core only, so the JVM tests it by replaying hundreds of random months beside the live ones |
+| `save` | A month in progress as a short record, and the month rebuilt from it by playing each action, interview, sleep and spend again | Kotlin Multiplatform, core only, so the JVM tests it by replaying hundreds of random months beside the live ones |
 | `text` | The Korean lines both screens share (amounts, dates, actions, events, endings, today's result line, the townspeople's lines) and how a typed amount is read | Kotlin Multiplatform, no layout |
 | `terminal` | The text screen | Kotlin on the JVM |
 | `web` | The phone screen in a browser, with the 3D town to walk in | Kotlin/JS drawing the page with the DOM, plain CSS, no framework. The town is drawn with Three.js |
@@ -477,12 +510,15 @@ Rooms come from a seed. Farther zones have lower rent and a dearer pass, and uti
 included, so the room with the lowest rent has the lowest total in only a bit more than half of the deals.
 
 The month is balanced by bots that play 2,000 runs with the real rules (`BalanceTest`). Each picks the cheapest room
-and guesses its total in a fixed way. A bot that reads the price board for its guess (rent, pass, and the middle of the
-utilities' range when they are separate: +$94 on average), then rests when tired, works when the rent is at risk,
-studies and applies, lands an offer in about 47% of runs (43% before the guess moved money); the same bot with a guess
-$500 off lands one in about 32%. A bot that takes the rent for the total and picks its days at random lands one in about
-24%, and a bot that only rests never does. (Measured on seeds 1 to 2,000 with Kotlin 2.4.21; the test itself only
-checks ranges.)
+and guesses its total in a fixed way, and is asked again and again through each day; what it asks for that cannot be
+taken is sleep instead. A bot that reads the price board for its guess (rent, pass, and the middle of the utilities'
+range when they are separate: +$94 on average), then works a shift a day when the rent is at risk, applies once a day
+and studies the weaker skill, sleeping when none of that fits, lands an offer in about 46% of runs (47% when a day held
+one action, 43% before the guess moved money); the same bot with a guess $500 off lands one in about 38%. The same bot
+never working fails to pay October in about 47% of runs, so September's money stays tight. A bot that takes the rent
+for the total and picks at random lands one in about 12%, and a bot that only sleeps never does. (Measured on seeds 1
+to 2,000 with Kotlin 2.4.21; the test checks the thoughtful rate within 3 points of one action a day's, and ranges for
+the rest.)
 
 ## Who wrote what
 

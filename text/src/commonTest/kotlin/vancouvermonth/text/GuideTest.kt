@@ -16,16 +16,19 @@ class GuideTest {
     }
 
     @Test
-    fun `how to play says how to walk, dash, look about, talk, ride and find the way, in six short lines`() {
-        assertEquals(6, Guide.LINES.size)
+    fun `how to play says how to walk, dash, look about, talk, spend the day, ride and find the way, in seven lines`() {
+        assertEquals(7, Guide.LINES.size)
         assertTrue("땅을 누르면" in Guide.LINES[0] && "두 번 누르면" in Guide.LINES[0])
         assertTrue("끌면" in Guide.LINES[1] && "벌리면" in Guide.LINES[1] && "모으면" in Guide.LINES[1])
-        assertTrue("말을 걸어요" in Guide.LINES[2] && "하루가 끝나요" in Guide.LINES[2])
-        for (ride in listOf("스카이트레인", "버스", "수상버스")) assertTrue(ride in Guide.LINES[3], ride)
-        for (ride in listOf("자전거", "택시")) assertTrue(ride in Guide.LINES[4], ride)
+        assertTrue("말을 걸어요" in Guide.LINES[2] && "체력만큼 시간이 흘러요" in Guide.LINES[2])
+        assertTrue("밤" in Guide.LINES[3] && "내 방에서 자면" in Guide.LINES[3])
+        for (ride in listOf("스카이트레인", "버스", "수상버스")) assertTrue(ride in Guide.LINES[4], ride)
+        for (ride in listOf("자전거", "택시")) assertTrue(ride in Guide.LINES[5], ride)
         // The shop sells; shared bikes are rented on the street.
-        assertTrue("길에서 빌리고" in Guide.LINES[4])
-        assertTrue("작은 지도" in Guide.LINES[5] && "지도 전체" in Guide.LINES[5])
+        assertTrue("길에서 빌리고" in Guide.LINES[5])
+        assertTrue("작은 지도" in Guide.LINES[6] && "지도 전체" in Guide.LINES[6])
+        // A day is no longer one action: nothing says a choice ends it.
+        assertTrue(Guide.LINES.none { "하루가 끝나요" in it || "하나를 고르면" in it })
         for (line in Guide.LINES) {
             assertTrue(line.length <= 40, "More than 40 characters: $line")
             assertFalse('\u2014' in line, "Em dash in: $line")

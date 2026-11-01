@@ -143,10 +143,10 @@ class FirstMinuteTest {
         val room = game.cheapestRoomIndex
         val total = game.lowestTotal
 
-        /** Five café shifts, then rest to the end: enough for October with an exact guess, short of it $500 off. */
+        /** Six café shifts, one a day, then sleep to the end: October paid with an exact guess, short $500 off. */
         fun endingAfter(guess: Int): Month {
             val month = game.startMonth(room, guess)
-            repeat(5) { month.take(Action.WORK) }
+            repeat(6) { month.takeAll(Action.WORK, Action.REST) }
             while (!month.isOver) month.take(Action.REST)
             return month
         }
@@ -188,3 +188,6 @@ class FirstMinuteTest {
         assertFailsWith<IllegalArgumentException> { FirstMinute(seed = 1).reveal(3, 1_000) }
     }
 }
+
+/** Takes [actions] in order. */
+private fun Month.takeAll(vararg actions: Action) = actions.forEach { take(it) }
