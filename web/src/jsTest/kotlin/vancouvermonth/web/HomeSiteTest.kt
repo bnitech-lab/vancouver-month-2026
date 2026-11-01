@@ -42,6 +42,36 @@ class HomeSiteTest {
     }
 
     @Test
+    fun `the corner's buildings, trees and low blocks past its edge are just as they were on main`() {
+        // Pinned from main at 68929ca, before the town reached Burnaby: the same lots, the same buildings with the same
+        // heights and colours, the same low blocks past the south edge, the same tree trunks and blossom trees.
+        val lots = Neighbourhood.cityLots
+        assertEquals(listOf(402, 71521, 33328, 1489, 1331), listOf(lots.size, lots.sumOf { it.x }, lots.sumOf { it.z },
+            lots.sumOf { it.width }, lots.sumOf { it.depth }))
+        val corner = Neighbourhood.foldables.filter {
+            val middleX = it.box.x + it.box.width / 2
+            val middleZ = it.box.z + it.box.depth / 2
+            middleX < Neighbourhood.TOWN_COLUMNS && middleZ >= 0 && middleZ < Neighbourhood.ROWS
+        }
+        assertEquals(402, corner.size)
+        assertEquals(71581.3, corner.sumOf { it.box.x }, 1e-6)
+        assertEquals(33388.3, corner.sumOf { it.box.z }, 1e-6)
+        assertEquals(2244.1429907367474, corner.sumOf { it.box.height }, 1e-6)
+        assertEquals(5683607188L, corner.sumOf { it.box.colour.toLong() })
+        val beyond = Neighbourhood.foldables.filter { it.box.z >= Neighbourhood.ROWS && it.box.x < Neighbourhood.TOWN_COLUMNS }
+        assertEquals(42, beyond.size)
+        assertEquals(198.3841444445423, beyond.sumOf { it.box.height }, 1e-6)
+        assertEquals(628649216L, beyond.sumOf { it.box.colour.toLong() })
+        val trunks = Neighbourhood.blocks.filter { it.colour == 0x8A5F3D && it.width == 0.3 && it.x + 0.15 < Neighbourhood.TOWN_COLUMNS }
+        assertEquals(226, trunks.size)
+        assertEquals(18386.1, trunks.sumOf { it.x }, 1e-6)
+        assertEquals(15587.1, trunks.sumOf { it.z }, 1e-6)
+        assertEquals(25, Neighbourhood.blossoms.size)
+        assertEquals(4095.5, Neighbourhood.blossoms.sumOf { it.x }, 1e-6)
+        assertEquals(2655.5, Neighbourhood.blossoms.sumOf { it.z }, 1e-6)
+    }
+
+    @Test
     fun `at the corner's edge, no building of the wide map stands in one of the corner's`() {
         val turned = Neighbourhood.foldables.map { Neighbourhood.blocks[it.body] }.filter { it.turn != 0.0 && it.z >= 0 }
         val nearEdge = turned.filter { it.x < Neighbourhood.TOWN_COLUMNS + 10 }
