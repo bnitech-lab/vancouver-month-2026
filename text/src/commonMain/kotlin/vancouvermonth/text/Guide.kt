@@ -29,7 +29,8 @@ object Guide {
         "오른쪽 위 작은 지도에 내가 있는 곳이 보여요.",
     )
 
-    const val START = "시작"
+    /** The card's button: it opens mid-month from the "?", so it closes the card rather than starts anything. */
+    const val CLOSE = "닫기"
 
     /** The name of the small "?" button that opens the card again. */
     const val HELP = "하는 법 보기"

@@ -74,7 +74,7 @@ class FirstRunGuideTest {
         // The lines and the goal describe the card, since the focus lands on its button.
         val described = card.getAttribute("aria-describedby")!!.split(" ").map { document.getElementById(it)!!.textContent }
         assertEquals(listOf(Guide.LINES.joinToString(""), goalLine()), described)
-        assertSame(root.button(Guide.START), document.activeElement)
+        assertSame(root.button(Guide.CLOSE), document.activeElement)
         // The map's credit, as its licence asks, at the card's foot, after its button, with the licence's name a link
         // to the licence that opens in a new tab.
         val credit = assertNotNull(card.lastElementChild)
@@ -97,7 +97,7 @@ class FirstRunGuideTest {
         val under = listOf(".walk-town", ".over-town").map { assertNotNull(root.querySelector(it), it) }
         for (element in under) assertTrue(element.hasAttribute("inert"), "${element.className} is not inert")
         assertTrue(!card!!.hasAttribute("inert"))
-        root.button(Guide.START).click()
+        root.button(Guide.CLOSE).click()
         for (element in under) assertTrue(!element.hasAttribute("inert"), "${element.className} stayed inert")
         helpButton().click()
         for (element in under) assertTrue(element.hasAttribute("inert"))
@@ -111,7 +111,7 @@ class FirstRunGuideTest {
         assertTrue(!town.isCovered, "The town is covered before the card opens")
         helpButton().click()
         assertTrue(town.isCovered, "The town was not told the card covers it")
-        root.button(Guide.START).click()
+        root.button(Guide.CLOSE).click()
         assertTrue(!town.isCovered, "The town stayed covered after the card closed")
         helpButton().click()
         assertTrue(town.isCovered)
@@ -120,10 +120,10 @@ class FirstRunGuideTest {
     }
 
     @Test
-    fun `시작 closes it, the focus goes back to the ?, and it opens by itself on no later visit either`() {
+    fun `닫기 closes it, the focus goes back to the ?, and it opens by itself on no later visit either`() {
         startMonth()
         helpButton().click()
-        root.button(Guide.START).click()
+        root.button(Guide.CLOSE).click()
         assertNull(card)
         assertSame(helpButton(), document.activeElement)
 
@@ -143,17 +143,17 @@ class FirstRunGuideTest {
 
         helpButton().click()
         assertNotNull(card)
-        assertSame(root.button(Guide.START), document.activeElement)
+        assertSame(root.button(Guide.CLOSE), document.activeElement)
         // Tab goes round the card's button and its link to the licence while it is open, either way.
         val link = assertNotNull(card!!.querySelector(".guide-credit a") as? HTMLElement)
         press("Tab")
         assertSame(link, document.activeElement)
         press("Tab")
-        assertSame(root.button(Guide.START), document.activeElement)
+        assertSame(root.button(Guide.CLOSE), document.activeElement)
         press("Tab", shift = true)
         assertSame(link, document.activeElement)
         press("Tab", shift = true)
-        assertSame(root.button(Guide.START), document.activeElement)
+        assertSame(root.button(Guide.CLOSE), document.activeElement)
         press("Escape")
         assertNull(card)
         assertSame(helpButton(), document.activeElement)

@@ -12,7 +12,7 @@ import vancouvermonth.text.goalLine
 
 /**
  * One card on how to play, over the town, from the "?" in the town's top card. It never opens by itself: the intro says
- * the same before the month starts. It is a dialog: it takes the focus, 시작 or Escape closes it, and the focus goes
+ * the same before the month starts. It is a dialog: it takes the focus, 닫기 or Escape closes it, and the focus goes
  * back to the "?". While it is open the town and its top card under it are inert, out of reach of taps, keys and screen
  * readers.
  */
@@ -42,16 +42,16 @@ internal class FirstRunGuide {
         card.setAttribute("role", "dialog")
         card.setAttribute("aria-modal", "true")
         card.setAttribute("aria-labelledby", "guide-title")
-        // The focus lands on 시작, so a screen reader is pointed to the lines and the goal as the card's description.
+        // The focus lands on 닫기, so a screen reader is pointed to the lines and the goal as the card's description.
         card.setAttribute("aria-describedby", "guide-lines guide-goal")
         card.add("h2", "guide-title", Guide.TITLE).id = "guide-title"
         val lines = card.add("ul", "guide-lines")
         lines.id = "guide-lines"
         for (line in Guide.LINES) lines.add("li", text = line)
         card.add("p", "guide-goal", goalLine()).id = "guide-goal"
-        val start = card.add("button", "primary", Guide.START) as HTMLButtonElement
-        start.type = "button"
-        start.onclick = { close() }
+        val closeButton = card.add("button", "primary", Guide.CLOSE) as HTMLButtonElement
+        closeButton.type = "button"
+        closeButton.onclick = { close() }
         // At the foot, next to the map's credit: the update news, which open over this card and come back to it.
         notes()?.let { news -> news.button(card.add("p", "patch-guide-foot"), root, "patch-link") }
         // The town is traced from the City of Vancouver's open data, whose licence asks for this line where it shows.
@@ -66,8 +66,8 @@ internal class FirstRunGuide {
         shown = cover
         onOpenChange(true)
         document.addEventListener("keydown", onKey)
-        start.focus()
-        // On a short screen the card scrolls; focusing 시작 would scroll past the title, so it opens at its top.
+        closeButton.focus()
+        // On a short screen the card scrolls; focusing 닫기 would scroll past the title, so it opens at its top.
         card.scrollTop = 0.0
     }
 

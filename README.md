@@ -355,7 +355,7 @@ remembered.
 How to play is said on the intro (see below) and again on a card the "?" in the town's top card opens: tap the ground
 to walk and twice to dash, drag to look around and pinch to zoom, tap a person or a building to talk (picking a job ends
 the day), tap a station, stop or dock to ride, buy or rent a bike or call a taxi, and find yourself on the small map. The
-card ends with the month's goal, in the words the month's start uses; 시작 or Escape closes it. It never opens by
+card ends with the month's goal, in the words the month's start uses; 닫기 or Escape closes it. It never opens by
 itself, since the intro has just said the same. The button screen has no card, since its buttons say what they do.
 
 ### The intro

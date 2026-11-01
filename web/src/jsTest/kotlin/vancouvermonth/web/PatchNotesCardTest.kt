@@ -318,7 +318,7 @@ class PatchNotesCardTest {
         startInTown(town)
         helpButton().click()
         assertNotNull(guideLink, "No link on the card")
-        root.button(Guide.START).click()
+        root.button(Guide.CLOSE).click()
 
         town.onPlace(Place.LIBRARY)
         assertNotNull(root.querySelector(".talk"))
