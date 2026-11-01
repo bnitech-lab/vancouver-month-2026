@@ -25,7 +25,7 @@ class GuideTest {
         for (ride in listOf("자전거", "택시")) assertTrue(ride in Guide.LINES[4], ride)
         // The shop sells; shared bikes are rented on the street.
         assertTrue("길에서 빌리고" in Guide.LINES[4])
-        assertTrue("작은 지도" in Guide.LINES[5])
+        assertTrue("작은 지도" in Guide.LINES[5] && "지도 전체" in Guide.LINES[5])
         for (line in Guide.LINES) {
             assertTrue(line.length <= 40, "More than 40 characters: $line")
             assertFalse('\u2014' in line, "Em dash in: $line")
