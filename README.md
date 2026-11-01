@@ -250,7 +250,10 @@ September's living cost is greyed out and says why; when even the cheapest one i
 card. The fare shown is the fare paid, through core, as the ride sets off and only then; it is kept in the record (s and
 q with the amount, the record's version unchanged, so a month kept at the old $3 and $4 a ride still goes on). The
 character rides there along the very way priced and gets off; on the way the town takes no taps, and 내리기 gets off
-where it is. The shared one goes back to its dock or corner when the character gets off, a talk opens or the day ends.
+where it is. Across downtown it goes at its everyday speed; a long ride goes faster, up to 16 squares a second on a bike
+and 20 on an e-scooter (a taxi's top is 24), so the West End to the town centre's station is about half a minute. At a
+place's door, 내 방's or the bike shop's, the character turns to the person there and the talk opens, as at the end of
+a walk there. The shared one goes back to its dock or corner when the character gets off, a talk opens or the day ends.
 Any talk gets the character off first, and the day's end too, so each morning starts on foot; a fare is only ever paid
 for a ride that starts. The money spent during a day heads that day's log, in two lines at most ("그 밖에 5건 -$15" for the
 rest), and on a small phone the log gives up its last lines before a talk would leave the screen. Every price is invented, and no shop, brand or bike-share or scooter company is real. On the
@@ -268,7 +271,8 @@ about 18 seconds on the move. Under downtown the town gives way to the station's
 their own in eight draws (`Underground.kt`): getting on at 다운타운역, the character waits at the platform's edge under
 the station's sign, the train comes in out of the tunnel, opens its doors, takes the character and pulls out, with the
 camera behind it; in the tunnel the lamps on its walls go by and the mouth comes up ahead, in the sky's colour by day
-or by night, and the camera cuts to the town as the train comes out of the mouth at 터널 입구역. The other way, the camera follows the train in from the
+or by night; the camera rides out in the tunnel for most of a second (until it comes to the mouth on a long ride) while
+the train runs on out into the open, and then cuts to the town as the train comes out of the mouth at 터널 입구역. The other way, the camera follows the train in from the
 mouth, and at the platform the doors open and the character steps out and walks off before the street door. The camera
 is never still for more than a moment down there, the rumble is heard where it rides, the small map's arrow goes with
 the train under the streets, and no name floats over the platform. With less motion the lamps are left out and the
