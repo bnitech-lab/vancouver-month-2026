@@ -817,10 +817,12 @@ class PhoneGame private constructor(
         town.onPasserby = { passer -> if (!dayChanging && town.travelling == null) chatWith(passer) }
         town.onShop = { if (!dayChanging && town.travelling == null) openShop() }
         town.onSentTo = { name, squares ->
-            sentTo = name
-            farWalkNow = name != null && squares > FAR_WALK_SQUARES && town.riding == null && !farWalkTold
-            if (farWalkNow) farWalkTold = true
-            show()
+            if (name != sentTo) {
+                sentTo = name
+                farWalkNow = name != null && squares > FAR_WALK_SQUARES && town.riding == null && !farWalkTold
+                if (farWalkNow) farWalkTold = true
+                show()
+            }
         }
         town.onRent = { ride -> if (!dayChanging && town.travelling == null) rent(ride) }
         town.onStop = { stop -> if (!dayChanging && town.travelling == null) choose(stop.transport, stop.index) }

@@ -81,7 +81,8 @@ interface WalkableTown {
     /**
      * Called when a tap on a far place or on the far bike shop sends the character off, with the [name] of where it
      * goes and how many [squares] the way is: the talk there opens on arrival. Called with null when no such walk is
-     * under way any more: it got there, stopped, or was sent somewhere else.
+     * under way any more: it got there, stopped, or was sent somewhere else. A walk of a few squares is not told, as
+     * a line about it would only come and go.
      */
     var onSentTo: (name: String?, squares: Double) -> Unit
 
@@ -691,7 +692,8 @@ internal class NeighbourhoodScene(
         set(value) {
             if (field == value) return
             field = value
-            onSentTo(value, trip?.length ?: 0.0)
+            val squares = trip?.length ?: 0.0
+            onSentTo(value?.takeIf { squares > TOLD_WALK_SQUARES }, squares)
         }
 
     /** True when the trip under way is a dash, after a double tap. */
@@ -3179,6 +3181,9 @@ internal class NeighbourhoodScene(
         /** How far the budget test turns the camera before each moving frame it measures, and how long a frame lasts. */
         const val TURN_PIXELS = 6.0
         const val FRAME_MILLIS = 1000.0 / 60
+
+        /** A walk sent by a tap from afar is told to the game over this many squares, about a second on foot. */
+        const val TOLD_WALK_SQUARES = 4.0
 
         /** A place's name farther than this from the camera's eye is hidden, its place deep in the haze. */
         const val NAMES_REACH = 170.0

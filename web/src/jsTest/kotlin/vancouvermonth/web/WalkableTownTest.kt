@@ -1772,7 +1772,6 @@ class WalkableTownTest {
                 assertFalse(town.shopName.classList.contains("behind"), "the shop's name is not over it")
                 tapScreen(town, onScreen(town, Point(shop.keeper.x, 1.3, shop.keeper.z)))
                 assertNull(root.querySelector(".talk"), "he talks before the character has come")
-                assertEquals("자전거 가게로 가는 중", root.querySelector(".hud-going")?.textContent)
             },
             Step("walked up to him: his talk, then buy a bike", { town.isStill }) {
                 val talk = root.querySelector(".talk")?.textContent.orEmpty()

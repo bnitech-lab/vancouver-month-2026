@@ -34,7 +34,6 @@ import vancouvermonth.text.DO_ON_ARRIVAL
 import vancouvermonth.text.FAR_WALK_HINT
 import vancouvermonth.text.Riding
 import vancouvermonth.text.SLEEP_ON_ARRIVAL
-import vancouvermonth.text.Shop
 import vancouvermonth.text.Transit
 import vancouvermonth.text.Transport
 import vancouvermonth.text.keyword
@@ -285,7 +284,9 @@ class ArriveFirstTest {
                 town.standAt(Spot(shop.talkSpot.x - 2.5, shop.talkSpot.z + 1.5))
                 town.shopName.click()
                 assertNull(talk(), "the keeper talks before the character has come: $screen")
-                assertEquals("${Shop.NAME}로 가는 중", going())
+                // A few squares: the walk is there to see, and no line comes and goes on the top card for it.
+                assertNull(going(), "a line for a few steps: $screen")
+                assertEquals(Neighbourhood.shop.talkSpot, town.markerSpot)
             },
             Step("arrived: his talk", { town.isStill }) {
                 assertNull(going())
