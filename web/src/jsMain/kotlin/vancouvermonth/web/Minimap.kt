@@ -149,9 +149,6 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
     private val canvas = document.createElement("canvas") as HTMLCanvasElement
     private val context = canvas.getContext("2d") as CanvasRenderingContext2D
 
-    /** The area painted once, north up, [GROUND_DETAIL] pixels a square, and stretched over the map each time it is drawn. */
-    private val ground = groundPicture
-
     private var projection = MinimapProjection(1.0, 1.0)
     private var ratio = 1.0
 
@@ -294,9 +291,7 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         val large = isLarge
         if (!large) map.centreOn(x, z)
         c.setTransform(ratio, 0.0, 0.0, ratio, 0.0, 0.0)
-        c.fillStyle = WATER_CSS
-        c.fillRect(0.0, 0.0, map.width, map.height)
-        drawGround(map)
+        paintGround(c, map)
         // The camera's view: a pale wedge from where it stands, opening the way it looks.
         val eyeLeft = map.left(eyeX, eyeZ)
         val eyeTop = map.top(eyeX, eyeZ)
@@ -312,14 +307,7 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         c.strokeStyle = WEDGE_EDGE
         c.stroke()
         val scale = if (large) LARGE_SCALE else 1.0
-        // The ways about town and the bike shop, small under the five places: stations square, the rest round. Only
-        // those on the map are drawn.
-        for (at in MARK_X.indices) {
-            val left = map.left(MARK_X[at], MARK_Z[at])
-            val top = map.top(MARK_X[at], MARK_Z[at])
-            if (!isOn(map, left, top, 0.0)) continue
-            dot(left, top, MARK * scale, MARK_FILLS[MARK_KIND[at]], MARK_KIND[at] == 0)
-        }
+        drawMarks(c, map, scale)
         // The five places: 내 방 a square in its roof's red, the others round; off the small map, 내 방 and 회사 an
         // arrow on its edge, the way to go.
         for (at in venues.indices) {
@@ -334,7 +322,7 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
                 else -> PLACE
             }
             if (isOn(map, px, pz, 0.0)) {
-                dot(px, pz, (if (special) BIG_DOT else DOT) * scale, fill, square = place == Place.HOME)
+                dot(c, px, pz, (if (special) BIG_DOT else DOT) * scale, fill, square = place == Place.HOME)
             } else if (!large && (place == Place.HOME || place == Place.OFFICE || place == marked)) {
                 edgeArrow(map, px, pz, fill)
                 pointed[at] = true
@@ -359,7 +347,7 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         c.lineWidth = 1.2
         c.strokeStyle = INK
         c.stroke()
-        north(map.width - NORTH_INSET * scale, NORTH_TOP * scale, scale, large)
+        north(c, map.width - NORTH_INSET * scale, NORTH_TOP * scale, scale, large)
         // The names on the larger map, last, over the wedge and the arrow: 내 방's first. The places downtown lie close
         // together on the whole map, so a name that would lie over another goes to the first clear spot round its dot,
         // with a short line back to the dot.
@@ -383,12 +371,12 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
                 if (spot < 0) spot = 0
                 val left = dotLeft + NAME_SPOTS_X[spot]
                 val top = dotTop + NAME_SPOTS_Y[spot] - lift
-                if (spot > 0) leader(dotLeft, dotTop, left, top)
+                if (spot > 0) leader(c, dotLeft, dotTop, left, top)
                 nameLeft[namesDrawn] = left
                 nameTop[namesDrawn] = top
                 nameOf[namesDrawn] = at
                 namesDrawn += 1
-                name(venues[at].place.label, left, top)
+                name(c, venues[at].place.label, left, top)
             }
         }
         // A screen reader hears the place or station the character is nearest, "근처" only within NEAR_REACH squares,
@@ -423,43 +411,6 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         return true
     }
 
-    /** A short line from a place's dot at [dotLeft], [dotTop] to its name moved off it, at [left], [top]. */
-    private fun leader(dotLeft: Double, dotTop: Double, left: Double, top: Double) {
-        val c = context
-        val nameMiddle = top - NAME_HEIGHT / 2
-        // To the name's nearer edge, top or bottom, so the line does not cross it.
-        val end = if (nameMiddle < dotTop) top else top - NAME_HEIGHT
-        c.beginPath()
-        c.moveTo(dotLeft, dotTop)
-        c.lineTo(left, end)
-        c.lineWidth = 1.2
-        c.strokeStyle = INK
-        c.stroke()
-    }
-
-    /** The painted ground, the part of it on the map only, so a window of the wide map costs no more than the whole. */
-    private fun drawGround(map: MinimapProjection) {
-        val detail = GROUND_DETAIL.toDouble()
-        // The picture's top left corner on the map: the area's, [GROUND_PAD] squares further out.
-        val pictureLeft = map.areaLeft - GROUND_PAD * map.scale
-        val pictureTop = map.areaTop - GROUND_PAD * map.scale
-        // The window's corners in the picture's pixels, kept inside the picture.
-        val fromX = max(0.0, (0.0 - pictureLeft) / map.scale * detail)
-        val fromY = max(0.0, (0.0 - pictureTop) / map.scale * detail)
-        val toX = min(ground.width.toDouble(), (map.width - pictureLeft) / map.scale * detail)
-        val toY = min(ground.height.toDouble(), (map.height - pictureTop) / map.scale * detail)
-        if (toX <= fromX || toY <= fromY) return
-        context.drawImage(
-            ground, fromX, fromY, toX - fromX, toY - fromY,
-            pictureLeft + fromX / detail * map.scale, pictureTop + fromY / detail * map.scale,
-            (toX - fromX) / detail * map.scale, (toY - fromY) / detail * map.scale,
-        )
-    }
-
-    /** True when [left], [top] is on the map, [inset] pixels in from its edges. */
-    private fun isOn(map: MinimapProjection, left: Double, top: Double, inset: Double): Boolean =
-        left >= inset && left <= map.width - inset && top >= inset && top <= map.height - inset
-
     /**
      * An arrow on the small map's edge where the way from its middle to [left], [top] (off the map) leaves it, pointing
      * out that way, in [fill]: the way to a place out of sight.
@@ -492,57 +443,6 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         c.stroke()
     }
 
-    private fun dot(x: Double, y: Double, radius: Double, fill: String, square: Boolean) {
-        val c = context
-        c.beginPath()
-        if (square) c.rect(x - radius, y - radius, 2 * radius, 2 * radius) else c.arc(x, y, radius, 0.0, 2 * PI)
-        c.fillStyle = fill
-        c.fill()
-        c.lineWidth = 1.0
-        c.strokeStyle = RING
-        c.stroke()
-    }
-
-    /**
-     * The map's north: an arrow pointing up with its tip at [x], [y], and an N under it, [scale] times their small
-     * size, with a pale edge so they read over any ground.
-     */
-    private fun north(x: Double, y: Double, scale: Double, large: Boolean) {
-        val c = context
-        val wide = NORTH_WIDE * scale
-        val tall = NORTH_TALL * scale
-        c.beginPath()
-        c.moveTo(x, y)
-        c.lineTo(x + wide, y + tall)
-        c.lineTo(x, y + tall * 0.7)
-        c.lineTo(x - wide, y + tall)
-        c.closePath()
-        c.lineWidth = 2.0
-        c.strokeStyle = RING
-        c.stroke()
-        c.fillStyle = INK
-        c.fill()
-        c.font = if (large) NORTH_FONT_LARGE else NORTH_FONT
-        c.textAlign = CanvasTextAlign.CENTER
-        c.textBaseline = CanvasTextBaseline.TOP
-        c.lineWidth = 2.5
-        c.strokeText("N", x, y + tall + scale)
-        c.fillText("N", x, y + tall + scale)
-    }
-
-    /** A place's name over its dot, on the larger map only, with a pale edge so it reads over any ground. */
-    private fun name(label: String, x: Double, y: Double) {
-        val c = context
-        c.font = NAME_FONT
-        c.textAlign = CanvasTextAlign.CENTER
-        c.textBaseline = CanvasTextBaseline.BOTTOM
-        c.lineWidth = 3.0
-        c.strokeStyle = RING
-        c.strokeText(label, x, y)
-        c.fillStyle = INK
-        c.fillText(label, x, y)
-    }
-
     companion object {
         /**
          * The small marks, worked out once: each station's door (kind 0), bus stop (1) and dock (2), and the bike shop's
@@ -559,6 +459,132 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         /** How many marks of each kind the map draws, for tests. */
         fun marksOf(kind: Int): Int = MARK_KIND.count { it == kind }
 
+        /**
+         * Paints the ground's picture now, with the city's layout it is painted from, if that is not done yet, so the
+         * first map drawn need not wait for it. Its width in pixels.
+         */
+        internal fun warmUp(): Int = groundPicture.width
+
+        /**
+         * The water over the whole of [map], then the painted ground, the part of it on the map only, so a window of
+         * the wide map costs no more than the whole.
+         */
+        internal fun paintGround(c: CanvasRenderingContext2D, map: MinimapProjection) {
+            c.fillStyle = WATER_CSS
+            c.fillRect(0.0, 0.0, map.width, map.height)
+            val ground = groundPicture
+            val detail = GROUND_DETAIL.toDouble()
+            // The picture's top left corner on the map: the area's, [GROUND_PAD] squares further out.
+            val pictureLeft = map.areaLeft - GROUND_PAD * map.scale
+            val pictureTop = map.areaTop - GROUND_PAD * map.scale
+            // The window's corners in the picture's pixels, kept inside the picture.
+            val fromX = max(0.0, (0.0 - pictureLeft) / map.scale * detail)
+            val fromY = max(0.0, (0.0 - pictureTop) / map.scale * detail)
+            val toX = min(ground.width.toDouble(), (map.width - pictureLeft) / map.scale * detail)
+            val toY = min(ground.height.toDouble(), (map.height - pictureTop) / map.scale * detail)
+            if (toX <= fromX || toY <= fromY) return
+            c.drawImage(
+                ground, fromX, fromY, toX - fromX, toY - fromY,
+                pictureLeft + fromX / detail * map.scale, pictureTop + fromY / detail * map.scale,
+                (toX - fromX) / detail * map.scale, (toY - fromY) / detail * map.scale,
+            )
+        }
+
+        /**
+         * The ways about town and the bike shop, [scale] times their small size, under the places: stations square,
+         * the rest round. Only those on [map] are drawn.
+         */
+        internal fun drawMarks(c: CanvasRenderingContext2D, map: MinimapProjection, scale: Double) {
+            for (at in MARK_X.indices) {
+                val left = map.left(MARK_X[at], MARK_Z[at])
+                val top = map.top(MARK_X[at], MARK_Z[at])
+                if (!isOn(map, left, top, 0.0)) continue
+                dot(c, left, top, MARK * scale, MARK_FILLS[MARK_KIND[at]], MARK_KIND[at] == 0)
+            }
+        }
+
+        /** True when [left], [top] is on the map, [inset] pixels in from its edges. */
+        private fun isOn(map: MinimapProjection, left: Double, top: Double, inset: Double): Boolean =
+            left >= inset && left <= map.width - inset && top >= inset && top <= map.height - inset
+
+        /** A dot of [radius] at [x], [y] in [fill], a square when [square], with a pale ring. */
+        internal fun dot(
+            c: CanvasRenderingContext2D,
+            x: Double,
+            y: Double,
+            radius: Double,
+            fill: String,
+            square: Boolean,
+        ) {
+            c.beginPath()
+            if (square) c.rect(x - radius, y - radius, 2 * radius, 2 * radius) else c.arc(x, y, radius, 0.0, 2 * PI)
+            c.fillStyle = fill
+            c.fill()
+            c.lineWidth = 1.0
+            c.strokeStyle = RING
+            c.stroke()
+        }
+
+        /**
+         * The map's north: an arrow pointing up with its tip at [x], [y], and an N under it, [scale] times their small
+         * size, with a pale edge so they read over any ground.
+         */
+        internal fun north(c: CanvasRenderingContext2D, x: Double, y: Double, scale: Double, large: Boolean) {
+            val wide = NORTH_WIDE * scale
+            val tall = NORTH_TALL * scale
+            c.beginPath()
+            c.moveTo(x, y)
+            c.lineTo(x + wide, y + tall)
+            c.lineTo(x, y + tall * 0.7)
+            c.lineTo(x - wide, y + tall)
+            c.closePath()
+            c.lineWidth = 2.0
+            c.strokeStyle = RING
+            c.stroke()
+            c.fillStyle = INK
+            c.fill()
+            c.font = if (large) NORTH_FONT_LARGE else NORTH_FONT
+            c.textAlign = CanvasTextAlign.CENTER
+            c.textBaseline = CanvasTextBaseline.TOP
+            c.lineWidth = 2.5
+            c.strokeText("N", x, y + tall + scale)
+            c.fillText("N", x, y + tall + scale)
+        }
+
+        /** A place's name centred on [x], its foot at [y], with a pale edge so it reads over any ground. */
+        internal fun name(c: CanvasRenderingContext2D, label: String, x: Double, y: Double) {
+            c.font = NAME_FONT
+            c.textAlign = CanvasTextAlign.CENTER
+            c.textBaseline = CanvasTextBaseline.BOTTOM
+            c.lineWidth = 3.0
+            c.strokeStyle = RING
+            c.strokeText(label, x, y)
+            c.fillStyle = INK
+            c.fillText(label, x, y)
+        }
+
+        /** How wide [label] is as a name on the map, in pixels. */
+        internal fun measureName(c: CanvasRenderingContext2D, label: String): Double {
+            c.font = NAME_FONT
+            return c.measureText(label).width
+        }
+
+        /**
+         * A short line from a place's dot at [dotLeft], [dotTop] to its name moved off it ([NAME_SPOTS_X]), the name's
+         * foot at [left], [top].
+         */
+        internal fun leader(c: CanvasRenderingContext2D, dotLeft: Double, dotTop: Double, left: Double, top: Double) {
+            val nameMiddle = top - NAME_HEIGHT / 2
+            // To the name's nearer edge, top or bottom, so the line does not cross it.
+            val end = if (nameMiddle < dotTop) top else top - NAME_HEIGHT
+            c.beginPath()
+            c.moveTo(dotLeft, dotTop)
+            c.lineTo(left, end)
+            c.lineWidth = 1.2
+            c.strokeStyle = INK
+            c.stroke()
+        }
+
         /** The place of zone 1's town whose door is nearest the spot [x], [z]. */
         fun nearestPlace(x: Double, z: Double): Place =
             HomeSite.of(1).venues.minBy { hypot(it.door.x - x, it.door.z - z) }.place
@@ -570,9 +596,9 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
          * north shore's forest across the inlet.
          */
         /** The ground's picture, painted once for every map the page makes. */
-        private val groundPicture: HTMLCanvasElement by lazy { paintGround() }
+        private val groundPicture: HTMLCanvasElement by lazy { makeGroundPicture() }
 
-        private fun paintGround(): HTMLCanvasElement {
+        private fun makeGroundPicture(): HTMLCanvasElement {
             val columns = Neighbourhood.COLUMNS
             val rows = Neighbourhood.ROWS
             val across = (AREA_WIDTH + 2 * GROUND_PAD) * GROUND_DETAIL
@@ -645,11 +671,11 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
 
         /** The town's dark forest green, on the north shore across the inlet. */
         private const val FOREST = 0x4D7A5E
-        private const val PLACE = "#3b2f25"
-        private const val HOME = "#c0584a"
+        internal const val PLACE = "#3b2f25"
+        internal const val HOME = "#c0584a"
         private const val MARKED = "#1d6b57"
         private const val RING = "#fffaee"
-        private const val INK = "#3b2f25"
+        internal const val INK = "#3b2f25"
         private const val CHARACTER = "#ffd23f"
         private const val WEDGE = "rgba(255, 214, 90, 0.42)"
         private const val WEDGE_EDGE = "rgba(122, 82, 51, 0.5)"
@@ -661,13 +687,13 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         private const val GROUND_DETAIL = 2
 
         /** The dots' and the arrow's sizes in CSS pixels, and how much larger they are on the larger map. */
-        private const val DOT = 2.6
-        private const val BIG_DOT = 3.6
+        internal const val DOT = 2.6
+        internal const val BIG_DOT = 3.6
         private const val ARROW = 5.5
 
         /** The small marks' size, under the places' dots. */
         private const val MARK = 1.7
-        private const val LARGE_SCALE = 1.6
+        internal const val LARGE_SCALE = 1.6
 
         /** Where the north arrow's tip is, from the map's right edge and its top, and its half width and height. */
         const val NORTH_INSET = 10.0
@@ -696,18 +722,19 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         const val GROUND_PAD = 56
 
         /** How tall a name on the larger map is, and the room kept between two names, in pixels. */
-        private const val NAME_HEIGHT = 14.0
-        private const val NAME_GAP = 2.0
+        internal const val NAME_HEIGHT = 14.0
+        internal const val NAME_GAP = 2.0
 
         /** How far, in squares, from a place's or station's door a screen reader still hears "근처". */
         const val NEAR_REACH = 40.0
 
         /**
-         * Where a name may go round its dot on the larger map, the first clear one taken: right over it, then under it,
-         * then out to the sides and farther up and down. Offsets of the name's bottom middle, in pixels.
+         * Where a name may go round its dot on the larger map and on the map of the rooms ([RoomMap]), the first clear
+         * one taken: right over it, then under it, then out to the sides and farther up and down. Offsets of the name's
+         * bottom middle, in pixels; a name moved off its dot gets a [leader].
          */
-        private val NAME_SPOTS_X = doubleArrayOf(0.0, 0.0, -34.0, 34.0, -34.0, 34.0, 0.0, 0.0, -56.0, 56.0, -48.0, 48.0)
-        private val NAME_SPOTS_Y = doubleArrayOf(0.0, 26.0, -6.0, -6.0, 22.0, 22.0, -20.0, 44.0, 8.0, 8.0, -24.0, -24.0)
+        internal val NAME_SPOTS_X = doubleArrayOf(0.0, 0.0, -34.0, 34.0, -34.0, 34.0, 0.0, 0.0, -56.0, 56.0, -48.0, 48.0)
+        internal val NAME_SPOTS_Y = doubleArrayOf(0.0, 26.0, -6.0, -6.0, 22.0, 22.0, -20.0, 44.0, 8.0, 8.0, -24.0, -24.0)
 
         /** How far in from the small map's edge an arrow to a place out of sight sits, and how big it is, in pixels. */
         private const val EDGE_INSET = 6.0

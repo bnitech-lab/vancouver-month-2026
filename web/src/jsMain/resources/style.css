@@ -274,6 +274,59 @@ a:focus-visible {
   color: var(--muted);
 }
 
+/* The rooms on the whole map: where the map and its pins sit and their size are set in code. It is a picture that
+   looks the same in both themes, as the small map does, and so are its pins. */
+.room-map canvas {
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 1px rgba(122, 82, 51, 0.35), 0 1px 3px rgba(59, 47, 37, 0.3);
+}
+
+.room-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid #1d6b57;
+  background: #fffaee;
+  color: #1d6b57;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  /* A thin dark ring outside the green one keeps the pin's edge clear of the water and the parks it may sit on. */
+  box-shadow: 0 0 0 1px #3b2f25, 0 1px 4px rgba(59, 47, 37, 0.45);
+}
+
+.room-pin[aria-pressed="true"] {
+  border: 3px solid #fffaee;
+  background: #1d6b57;
+  color: #ffffff;
+  box-shadow: 0 0 0 2px #1d6b57, 0 0 0 3px #3b2f25, 0 2px 6px rgba(59, 47, 37, 0.5);
+}
+
+.room-pin:disabled:not([aria-pressed="true"]) {
+  opacity: 0.6;
+}
+
+.room-map-hint {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* The picked room under the map, laid out as the list's rooms were. */
+.room-card {
+  display: grid;
+  grid-template-columns: 3.4em 1fr;
+  grid-template-areas:
+    "number rent"
+    "number clues";
+  align-items: center;
+  column-gap: 14px;
+  border: 2px solid var(--accent);
+  background: var(--accent-soft);
+  padding: 9px 13px;
+}
+
 .guess {
   display: flex;
   flex-direction: column;

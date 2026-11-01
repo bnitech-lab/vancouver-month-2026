@@ -32,10 +32,25 @@ class PatchNote(
  */
 object PatchNotes {
     /** The newest version, shown by the title; it is [ALL]'s first entry. */
-    const val CURRENT = "0.15"
+    const val CURRENT = "0.16"
 
     /** Every update, newest first. */
     val ALL: List<PatchNote> = listOf(
+        PatchNote(
+            version = "0.16",
+            date = "2026-10-31",
+            headline = "지도에서 내 방 고르기",
+            added = listOf(
+                "방은 지도에서 골라요. 지도 전체에 방 세 곳이 번호 핀으로 보여요.",
+                "핀을 누르면 그 방의 월세, 교통 구역, 공과금이 카드로 나와요.",
+                "지도에는 회사와 카페도 나와서, 방마다 두 곳까지 얼마나 먼지 보여요.",
+            ),
+            improved = listOf(
+                "고른 방의 핀은 색이 채워져, 짐작하는 동안에도 어느 방인지 보여요.",
+                "지도에서 고른 핀 자리가 9월 2일 아침의 내 방이에요.",
+                "핀은 키보드와 화면 낭독기로도 고를 수 있어요.",
+            ),
+        ),
         PatchNote(
             version = "0.15",
             date = "2026-10-31",
@@ -50,7 +65,7 @@ object PatchNotes {
                 "버나비에도 지나가는 사람이 둘 있어요. 말을 걸어 보세요.",
             ),
             improved = listOf(
-                "내 방은 방의 구역에 있어요. 1구역은 웨스트엔드, 2·3구역은 버나비예요.",
+                "내 방은 고른 방의 구역에 있어요. 1구역 웨스트엔드, 2·3구역 버나비예요.",
                 "아침은 그 내 방 앞에서 시작해요. 정원, 벤치, 모닥불, 이웃도 함께 있어요.",
                 "2·3구역 방이면 웨스트엔드의 예전 내 방 자리는 빈 땅이에요.",
                 "미니맵이 내 주변을 보여 주고, 걸으면 따라와요.",

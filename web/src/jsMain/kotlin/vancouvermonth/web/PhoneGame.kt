@@ -75,7 +75,8 @@ import vancouvermonth.text.whyNotSpend
 import vancouvermonth.text.whyTotalLines
 
 /**
- * Draws one run in [root]: the intro, the room and the guess on September 1st, then one action a day, then the ending.
+ * Draws one run in [root]: the intro, the room picked on the map and the guess on September 1st, then one action a day,
+ * then the ending.
  * The rules are in core and the wording in text; this only shows the state and passes each tap on.
  * Every tap redraws the whole screen from that state. A run comes from a seed or from today's date, never both.
  * The month is played in a town the player walks in, which [makeWalkableTown] makes on the first day for the room's
@@ -215,8 +216,22 @@ class PhoneGame private constructor(
      */
     internal var introPassed = false
 
+    /**
+     * True to show the rooms as pins on the whole map ([RoomMap]), as the page does where it can draw one; false for
+     * the list of rooms, which a test may ask for.
+     */
+    internal var roomsOnMap = true
+
+    /** The map of the rooms on the screen, if it is; let go when the screen is drawn again. */
+    private var roomMap: RoomMap? = null
+
+    /** True once the map's picture has been set to be painted while the intro is read. */
+    private var mapWarming = false
+
     fun show() {
         stopTyping()
+        roomMap?.close()
+        roomMap = null
         val current = month
         // Rain is heard on a rainy day of the month, and nowhere else.
         sound?.weather(if (current != null && !current.isOver) weatherOf(current.day) else Weather.SUNNY)
@@ -288,13 +303,33 @@ class PhoneGame private constructor(
             mapCredit(this, "intro-credit")
             burnabyCredit(this, "intro-credit")
         }
+        warmUpMap()
     }
 
-    /** Leaves the intro for the rooms, from the top of the page. */
+    /**
+     * Paints the whole map's ground, and lays out the city it is painted from, while the intro is read: once, after the
+     * intro shows, when the browser has nothing else to do. So the rooms open at once after 시작하기. A failure only
+     * leaves the work to the rooms.
+     */
+    private fun warmUpMap() {
+        if (mapWarming || !roomsOnMap) return
+        mapWarming = true
+        window.requestAnimationFrame {
+            whenIdle {
+                try {
+                    Minimap.warmUp()
+                } catch (error: Throwable) {
+                    // The rooms paint it themselves, or show the list.
+                }
+            }
+        }
+    }
+
+    /** Leaves the intro for the rooms, from the top of the page the game is on. */
     private fun toRooms() {
         introPassed = true
         show()
-        window.scrollTo(0.0, 0.0)
+        (root.ownerDocument?.defaultView ?: window).scrollTo(0.0, 0.0)
     }
 
     private fun showRooms() {
@@ -305,6 +340,25 @@ class PhoneGame private constructor(
             child("p", "formula", "한 달 총비용 = 월세 + 공과금 + 교통 정기권")
             for (text in whyTotalLines()) child("p", "why", text)
         }
+        // The rooms as pins on the whole map, where the browser draws one; as a list where it does not. The map comes
+        // right after what to do, so a phone shows all of it on the first screen.
+        val map = if (roomsOnMap) RoomMap(game.rooms, picked, reveal != null, ::pick).takeIf { it.canDraw } else null
+        roomMap = map
+        root.child("section", "rooms") {
+            child("h2", text = "어느 방?")
+            if (map == null) {
+                roomList()
+            } else {
+                appendChild(map.element)
+                val index = picked
+                if (index == null) {
+                    child("p", "room-map-hint", "핀을 누르면 그 방의 월세, 교통 구역, 공과금이 나와요.")
+                } else {
+                    roomCard(index)
+                }
+            }
+        }
+        // The prices right before the guess, where the player adds rent, utilities and the pass.
         root.child("section", "card") {
             child("h2", text = "요금표")
             child("dl", "board") {
@@ -314,24 +368,45 @@ class PhoneGame private constructor(
                 child("dd", text = utilitiesPrices())
             }
         }
-        root.child("section", "rooms") {
-            child("h2", text = "어느 방?")
-            game.rooms.forEachIndexed { index, room ->
-                button("room") {
-                    setAttribute("aria-pressed", (index == picked).toString())
-                    disabled = reveal != null
-                    child("span", "room-number", "${index + 1}번 방")
-                    child("span", "room-rent", "월세 ${money(room.rent)}")
-                    child("span", "room-clues", "교통 ${room.zone.number}구역 · ${utilitiesLabel(room)}")
-                    onclick = {
-                        picked = index
-                        show()
-                    }
-                }
-            }
-        }
         showGuess()
         reveal?.let { showReveal(it) }
+        // Placed at the width it takes on the page, measured only once the whole screen is there: measured any earlier,
+        // the page would be shorter than where the player has scrolled to, and the browser would pull it back up. The
+        // picture is painted just after the screen is first drawn, so the screen shows at once.
+        map?.draw()
+    }
+
+    /** Picks room [index] and draws the screen again, the focus kept on its pin, or its button in the list. */
+    private fun pick(index: Int) {
+        picked = index
+        show()
+        val again = root.querySelector(".room-pin[data-room=\"$index\"]")
+            ?: root.querySelectorAll("button.room").item(index)
+        (again as? HTMLElement)?.focus()
+    }
+
+    /** The rooms as a list of buttons, for a browser that cannot draw the map. */
+    private fun HTMLElement.roomList() {
+        game.rooms.forEachIndexed { index, room ->
+            button("room") {
+                setAttribute("aria-pressed", (index == picked).toString())
+                disabled = reveal != null
+                child("span", "room-number", "${index + 1}번 방")
+                child("span", "room-rent", "월세 ${money(room.rent)}")
+                child("span", "room-clues", "교통 ${room.zone.number}구역 · ${utilitiesLabel(room)}")
+                onclick = { pick(index) }
+            }
+        }
+    }
+
+    /** The picked room's card under the map: its number, rent, zone and utilities, as the list showed them. */
+    private fun HTMLElement.roomCard(index: Int) {
+        val room = game.rooms[index]
+        child("div", "card room-card") {
+            child("span", "room-number", "${index + 1}번 방")
+            child("span", "room-rent", "월세 ${money(room.rent)}")
+            child("span", "room-clues", "교통 ${room.zone.number}구역 · ${utilitiesLabel(room)}")
+        }
     }
 
     private fun showGuess() {
@@ -1352,6 +1427,15 @@ private fun HTMLElement.result(line: String) {
                 selectInstead()
             }
         }
+    }
+}
+
+/** Runs [work] when the browser has nothing else to do, or straight after this task where it cannot tell when. */
+private fun whenIdle(work: () -> Unit) {
+    if (window.asDynamic().requestIdleCallback == undefined) {
+        window.setTimeout({ work() }, 0)
+    } else {
+        window.asDynamic().requestIdleCallback({ work() })
     }
 }
 
