@@ -543,9 +543,8 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         fun marksOf(kind: Int): Int = MARK_KIND.count { it == kind }
 
         /** The place of zone 1's town whose door is nearest the spot [x], [z]. */
-        fun nearestPlace(x: Double, z: Double): Place = zoneOne.nearestPlace(x, z)
-
-        private val zoneOne by lazy { Minimap(HomeSite.of(1)) }
+        fun nearestPlace(x: Double, z: Double): Place =
+            HomeSite.of(1).venues.minBy { hypot(it.door.x - x, it.door.z - z) }.place
 
         /**
          * The area the map shows as a picture, north up, [GROUND_DETAIL] pixels a square: water, the city's ground, its
