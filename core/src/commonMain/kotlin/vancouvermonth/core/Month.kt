@@ -65,16 +65,23 @@ enum class Spending(val price: Int, val buys: Item? = null, val most: Int = pric
 
 /**
  * A taxi's fare: [BASE] dollars, and [PER_TEN_SQUARES] more for every ten squares of the town's map driven (a square
- * stands for 25 m), rounded to the dollar; the meter stops at [MOST]. Invented, like every price in the game.
+ * stands for 25 m) up to [LONG_FROM] squares, a long drive's [LONG_PER_TEN_SQUARES] for every ten past that, rounded to
+ * the dollar; the meter stops at [MOST]. A drive across downtown costs what it always did, and one out to Burnaby less
+ * than twice the short rate would make it. Invented, like every price in the game.
  */
 object TaxiFare {
     const val BASE = 4
     const val PER_TEN_SQUARES = 1.5
+    const val LONG_FROM = 160.0
+    const val LONG_PER_TEN_SQUARES = 0.7
     const val MOST = 60
 
     /** The fare for a drive of [squares] squares along the streets. */
     fun forDistance(squares: Double): Int {
-        val fare = (BASE + squares.coerceAtLeast(0.0) / 10 * PER_TEN_SQUARES).roundToInt()
+        val driven = squares.coerceAtLeast(0.0)
+        val short = driven.coerceAtMost(LONG_FROM)
+        val long = driven - short
+        val fare = (BASE + short / 10 * PER_TEN_SQUARES + long / 10 * LONG_PER_TEN_SQUARES).roundToInt()
         return fare.coerceAtMost(MOST)
     }
 }

@@ -43,18 +43,21 @@ class SpendTest {
     }
 
     @Test
-    fun `a taxi's fare is $4 and $1·50 for every ten squares, to the dollar, and the meter stops at $60`() {
+    fun `a taxi's fare is $4 and $1·50 for every ten squares, $0·70 past 160, to the dollar, and the meter stops at $60`() {
         assertEquals(4, TaxiFare.forDistance(0.0))
         assertEquals(4, TaxiFare.forDistance(3.0))
         assertEquals(5, TaxiFare.forDistance(4.0))
         assertEquals(6, TaxiFare.forDistance(10.0))
         assertEquals(7, TaxiFare.forDistance(20.0))
         assertEquals(19, TaxiFare.forDistance(100.0))
-        assertEquals(60, TaxiFare.forDistance(372.0))
+        assertEquals(28, TaxiFare.forDistance(160.0))
+        // Out to Burnaby: 160 squares at the short rate, the rest at the long one.
+        assertEquals(43, TaxiFare.forDistance(372.0))
+        assertEquals(48, TaxiFare.forDistance(441.0))
         assertEquals(60, TaxiFare.forDistance(5_000.0))
         assertEquals(4, TaxiFare.forDistance(-5.0))
         var last = TaxiFare.BASE
-        for (squares in 0..400) {
+        for (squares in 0..800) {
             val fare = TaxiFare.forDistance(squares.toDouble())
             assertTrue(fare >= last && Spending.TAXI_RIDE.costs(fare), "$squares squares: $fare")
             last = fare
