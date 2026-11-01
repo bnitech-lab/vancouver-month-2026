@@ -19,10 +19,10 @@ python3 -I -B tools/vancouver_map/build_map.py /tmp/vancouver-raw --preview /tmp
 python3 -I -B tools/vancouver_map/build_map.py /tmp/vancouver-raw --town   # also rewrites VancouverMapData.kt
 ```
 
-Each run paints the town's map again and stops if it comes out different from `VancouverMapData.kt` by a single
-square, and stops if the wide map's top-left corner differs from it. It writes `VancouverMapData.kt` itself only with
-`--town`: its blocks follow the order of the block file, the town draws heights in that order, and a fetch over the
-wide area lists the blocks in another order, so rewriting it would move building heights about.
+Each run paints the town's map again and stops if its squares come out different from `VancouverMapData.kt` by a
+single square, and stops if the wide map's top-left corner differs from it. `--town` also rewrites
+`VancouverMapData.kt` from the same files; on the data fetched for 24a only its header changes (the fetch time and
+the block file's SHA-1), as the town's blocks come out the same and in the same order.
 
 Python 3 standard library only, and no network once the files are fetched. The downloaded files are data, never code:
 the script only parses them as JSON, and `-I` keeps Python from loading anything from the current directory. `--png`
@@ -85,12 +85,17 @@ mountains line is the city's boundary where it runs along the middle of Burrard 
 7. The blocks right of the town's corner (Vancouver's block outlines, Burnaby's legal blocks) are each the smallest
    turned rectangle round the real block, with a turn in the sense of `Block.turn`; blocks on parks or water, under 2
    squares or over 25 ha, are left out.
-8. The zones a room can be in: 1 is the City of Vancouver's local areas Downtown and West End, 2 the City of
-   Burnaby's Metrotown community plan area, 3 the strip of its South Slope plan area within 250 m of its west edge
-   (the city line), the quiet side of the slope down to the river, off the line; each cut to the grid. Each zone
-   has a proposed room: zone 1's is the town's 내 방, and the others are rough points among residential streets,
-   never an address, checked to stand on plain land with a 5 x 5 block of it around, inside their zone, off the
-   main streets and away from the guideway.
+8. The zones a room can be in: 1 is the City of Vancouver's local areas Downtown and West End (by name, the only key
+   that layer has), 2 the City of Burnaby community plan area round the big station, 3 a strip of the plan area
+   north-west of the big park, within 375 m of the city line, at the grid's top edge; each cut to the grid. The two
+   Burnaby areas are picked by their `OBJECTID` in the plan-area layer, and the build stops unless each is the size
+   recorded (within 3%), zone 2's holds two stations and zone 3's reaches the city line.
+9. Each zone has a room. Zone 1's is the town's 내 방. In zones 2 and 3 a written rule picks it, never a hand: of the
+   squares in the zone with a 5 x 5 block of plain land round them, at least 5 squares inside the grid's edges, 2
+   off every main street and 4 off the guideway, whose middle lies on a road (outside every Burnaby legal block and
+   Vancouver block outline, so never on a lot), the one farthest from the last station inside the grid. The rooms
+   are stored as grid squares, not as points, and the build checks again that neither lies on a lot.
+10. A guard: the build stops if water lies along the city line inland, where the two cities' outlines meet.
 
 ## Data and licence
 
@@ -130,13 +135,13 @@ licence where possible, and no suggestion that the City endorses the game. Its o
 | [Burnaby Boundary](https://data.burnaby.ca/datasets/d903b87782734451ae286cb0b59938ac) (OpenData3/MapServer/12) | Where Burnaby's land can be |
 | [District Lot](https://data.burnaby.ca/datasets/81781be23e764ce1b7d6efec5b32e86d) (OpenData4/MapServer/6) | Burnaby's land up to the Fraser's bank |
 | [Legal Block](https://data.burnaby.ca/datasets/bb9ca652d6da4733ae32ab56e5127d1c) (OpenData4/MapServer/9) | Burnaby's land and city blocks |
-| [Park Inventory](https://data.burnaby.ca/datasets/a1a896a4209d4325bacacea417ffc400) (OpenData1/MapServer/6) | Burnaby's parks, the big park among them |
+| [Park Inventory](https://data.burnaby.ca/datasets/a1a896a4209d4325bacacea417ffc400) (OpenData1/MapServer/6) | Burnaby's parks, the big park among them (name only, to join a park's pieces) |
 | [SkyTrain](https://data.burnaby.ca/datasets/b39d6277a1ec4edb8bba956664d30dc1) (OpenData5/MapServer/11) | The Expo Line past the second Burnaby station |
 | [SkyTrain Station](https://data.burnaby.ca/datasets/cff871aeb8494cb58dd65a2d06af9454) (OpenData5/MapServer/10) | The stations in Burnaby |
 | [Street](https://data.burnaby.ca/datasets/18cb9099908640c68910b76033309d75) (OpenData5/MapServer/8) | Burnaby's main streets (arterials and major collectors, their class only) |
-| [Community Plan Area Boundaries](https://data.burnaby.ca/datasets/c1efbda18f5a448583cc1deb939af351) (OpenData1/MapServer/10) | Zones 2 and 3 |
+| [Community Plan Area Boundaries](https://data.burnaby.ca/datasets/c1efbda18f5a448583cc1deb939af351) (OpenData1/MapServer/10) | Zones 2 and 3, by `OBJECTID` only |
 
-Fetched on 2026-11-01 at 00:07 UTC (2026-10-31 in Vancouver), the whole south-west of Burnaby from Boundary Road to
+Fetched on 2026-11-01 at 01:15 UTC (2026-10-31 in Vancouver), the whole south-west of Burnaby from Boundary Road to
 about 2 km past the big station and from Kingsway to the Fraser for the large layers. The part of the wide map derived
 from these datasets is licensed under the Open Government Licence – Burnaby, not MIT, with the statement, the credit
 and a link to the licence; the SHA-1 of each file is at the top of `WideMapData.kt`. No OpenStreetMap data is used.

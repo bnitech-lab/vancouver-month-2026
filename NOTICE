@@ -1,0 +1,6 @@
+The code in this repository is under the MIT licence in LICENSE.
+
+The map data is not. VancouverMapData.kt and WideMapData.kt (in web/src/jsMain/kotlin/vancouvermonth/web/) are
+derived from City of Vancouver open data under the Open Government Licence – Vancouver, and WideMapData.kt also from
+City of Burnaby open data under the Open Government Licence – Burnaby. Their sources, attribution statements and
+licence links are in the README's Map data section and in web/src/jsMain/resources/MAP-DATA-NOTICE.txt.

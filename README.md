@@ -454,7 +454,7 @@ the credit and a link to the licence. No OpenStreetMap data is used.
 
 ## Licence
 
-MIT, except the map data: see [LICENSE](LICENSE), and Map data above for the map. The page carries both notices
+MIT, except the map data: see [LICENSE](LICENSE), [NOTICE](NOTICE), and Map data above for the map. The page carries both notices
 beside its script, `three-LICENSE.txt` and `MAP-DATA-NOTICE.txt`.
 
 The phone screen bundles [Three.js](https://github.com/mrdoob/three.js) 0.169.0, which is also under the MIT
