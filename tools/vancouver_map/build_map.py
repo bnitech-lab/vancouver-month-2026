@@ -27,6 +27,7 @@ import heapq
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -1524,7 +1525,10 @@ def unpack_numbers(text, fields):
 
 def tenths(v):
     """[v] in tenths of a square, exactly as [fmt] writes it, so the game reads back the same number."""
-    return int(fmt(v).replace(".", ""))
+    text = fmt(v)
+    # One decimal, or this would be hundredths and the game would read every number ten times too far.
+    assert re.fullmatch(r"-?\d+\.\d", text), f"{text} is not written to one decimal"
+    return int(text.replace(".", ""))
 
 
 def packed_points(points):
