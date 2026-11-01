@@ -537,6 +537,8 @@ class PhoneGame private constructor(
                 if (replacing != null) setAttribute("aria-describedby", "replaces")
                 onclick = {
                     val room = checkNotNull(picked)
+                    // Where a month this one replaces was left means nothing to this one.
+                    this@PhoneGame.slot?.forgetSpot()
                     beginMonth(game.startMonth(room, reveal.guess), MonthRecord(game.seed, today, room, reveal.guess))
                 }
             }
@@ -608,6 +610,8 @@ class PhoneGame private constructor(
         // In the town, the focus lands where a choice ends: on the last one's log, or on the top card at the start.
         focusNext = if (record.choices.isEmpty()) ".hud" else ".over-town .log"
         beginMonth(month, record)
+        // Where the character was left, while the record is as it was then; otherwise, and after a night, 내 방's door.
+        slot?.keptSpot(record.moves.size)?.let { walkable?.standAgain(it) }
     }
 
     private fun showDay(month: Month) {
@@ -782,10 +786,17 @@ class PhoneGame private constructor(
                 }
             } else {
                 walking?.passTime(month.dayShare)
+                walking?.let { keepSpot(it.characterSpot) }
             }
         }
         show()
         window.scrollTo(0.0, 0.0)
+    }
+
+    /** Keeps [spot] as where the character is to be found, as of the moves the record holds now. */
+    private fun keepSpot(spot: Spot) {
+        val moves = record?.moves?.size ?: return
+        slot?.keepSpot(spot, moves)
     }
 
     /** The hour on the month's own clock while a month is played, or null around it. */
@@ -826,6 +837,8 @@ class PhoneGame private constructor(
         }
         town.onRent = { ride -> if (!dayChanging && town.travelling == null) rent(ride) }
         town.onStop = { stop -> if (!dayChanging && town.travelling == null) choose(stop.transport, stop.index) }
+        // Not through a night, which ends at 내 방's door: what the night's sleep moved past no longer counts.
+        town.onSettled = { spot -> if (!dayChanging) keepSpot(spot) }
         town.onTravelled = {
             travelPaid = null
             // Not out from under the guide, if it was opened on the way.
@@ -1516,6 +1529,7 @@ class PhoneGame private constructor(
         spentToday = spentToday + spent
         record = record?.after(Spend(kind, spent.amount))
         record?.let { slot?.keep(it) }
+        walkable?.let { keepSpot(it.characterSpot) }
         sound?.blip()
         return true
     }

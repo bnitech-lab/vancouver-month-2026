@@ -169,7 +169,12 @@ everything up to its sleep, so the days need no
 mark of their own. Nothing more is needed, since the same seed and the same choices always play out the same way. The
 record is written when the month starts, after every action, interview, sleep and spend, and emptied at any ending.
 Continued, a month keeps what was bought, the day's time and stamina, and what was spent since the last action still
-heads the next one's log; the character starts at 내 방's door, at the time the day had reached.
+heads the next one's log; the character stands where it was left, at the time the day had reached, or at 내 방's door
+where nothing says otherwise. Where it stands is not in the record: a second key beside it holds the spot and how many
+moves the record held then, written when a walk or a ride ends, a fare is paid or an action is taken, and read only while
+that count still matches. As a ride sets off it holds where the ride will leave the character, as the fare is paid by
+then, so a page discarded on the way loses neither. A night's sleep moves the record on, so each morning starts at 내 방's
+door. A month kept before there was such a key, or a spot that is no ground to stand on, starts at the door too.
 
 Opened again for the same run, the intro first offers that month: at its top, the day (with the time, once the day is
 past its morning) and the balance it goes on from, and at its foot 이어하기 and 새로 시작 in place of 시작하기. 이어하기

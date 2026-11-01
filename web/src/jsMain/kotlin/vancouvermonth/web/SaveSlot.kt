@@ -25,7 +25,27 @@ internal class SaveSlot(
     fun keep(record: MonthRecord) = memory.write(KEY, record.encode())
 
     /** Empties the slot. The storage offers only get and set, so an empty line stands for no month. */
-    fun clear() = memory.write(KEY, "")
+    fun clear() {
+        memory.write(KEY, "")
+        forgetSpot()
+    }
+
+    /**
+     * Keeps where the character stands beside the record, which knows nothing of it, with how many [moves] the record
+     * holds: "12|153.5|52.5". A month that moves on without it no longer finds it ([keptSpot]).
+     */
+    fun keepSpot(spot: Spot, moves: Int) = memory.write(SPOT_KEY, "$moves|${spot.x}|${spot.z}")
+
+    /** Where the character stood when the record held [moves] moves, or null: none kept, an older one, or not one read. */
+    fun keptSpot(moves: Int): Spot? {
+        val parts = memory.read(SPOT_KEY)?.split('|') ?: return null
+        if (parts.size != 3 || parts[0].toIntOrNull() != moves) return null
+        val x = parts[1].toDoubleOrNull()?.takeIf { it.isFinite() } ?: return null
+        val z = parts[2].toDoubleOrNull()?.takeIf { it.isFinite() } ?: return null
+        return Spot(x, z)
+    }
+
+    fun forgetSpot() = memory.write(SPOT_KEY, "")
 
     /**
      * The month kept for the run of [seed] (and of [today], for today's run), replayed, or null. A month kept for
@@ -69,5 +89,6 @@ internal class SaveSlot(
 
     companion object {
         const val KEY = "vancouver-month.save"
+        const val SPOT_KEY = "vancouver-month.spot"
     }
 }

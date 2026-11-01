@@ -174,6 +174,21 @@ interface WalkableTown {
     /** Gets out of the taxi where it is now: the character stands there on foot, the taxi drives on, nothing opens. */
     fun leaveTaxi()
 
+    /** Where the character is now. */
+    val characterSpot: Spot
+
+    /**
+     * Called with where the character is to be found should the page open again now: where a walk, a ride or getting
+     * out has left it; and, as a ride sets off, where that ride will leave it, its fare being paid by then.
+     */
+    var onSettled: (Spot) -> Unit
+
+    /**
+     * Stands the character at [spot], the camera with it, as for a month taken up again where it was left; at 내 방's door
+     * still, should [spot] not be ground to stand on.
+     */
+    fun standAgain(spot: Spot)
+
     /** Called once if the town stops drawing, so the game can go on with buttons. */
     var onFail: () -> Unit
 
@@ -317,6 +332,7 @@ internal class NeighbourhoodScene(
     override var onRent: (Ride) -> Unit = {}
     override var onStop: (Stop) -> Unit = {}
     override var onTravelled: () -> Unit = {}
+    override var onSettled: (Spot) -> Unit = {}
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
     override var onArrived: (Place) -> Unit = {}
@@ -687,8 +703,10 @@ internal class NeighbourhoodScene(
     private var heading = home.facing
     private var trip: Trip? = null
         set(value) {
+            val ended = field != null && value == null
             field = value
             if (value == null) sentTo = null
+            if (ended) onSettled(spot)
         }
     private var tripStarted = 0.0
 
@@ -1420,6 +1438,7 @@ internal class NeighbourhoodScene(
         cameraMovedOnWalk = false
         marker.position.set(to.x, 0.0, to.z)
         marker.visible = true
+        onSettled(to)
         askForFrame()
     }
 
@@ -1517,6 +1536,7 @@ internal class NeighbourhoodScene(
             trainRide = made
             trainRideStarted = now
         }
+        onSettled(made.out)
         touched()
         askForFrame()
     }
@@ -1595,6 +1615,7 @@ internal class NeighbourhoodScene(
         character.visible = true
         touched()
         askForFrame()
+        onSettled(at)
         onTravelled()
     }
 
@@ -1876,8 +1897,7 @@ internal class NeighbourhoodScene(
         if (!soundsQuiet) tellSounds(0.0, 0.0, 0.0)
     }
 
-    /** Where the character is now, for tests. */
-    internal val characterSpot: Spot
+    override val characterSpot: Spot
         get() = spot
 
     /** Which way the character faces, as [Trip] counts it (0 faces south). For tests. */
@@ -1903,6 +1923,12 @@ internal class NeighbourhoodScene(
     /** Sends the character walking to [target], as a tap on the ground there would. For tests. */
     internal fun walkFor(target: Spot) {
         walkTo(target, dash = false, opensOnArrival = false)
+    }
+
+    override fun standAgain(spot: Spot) {
+        if (!site.grid.isFree(site.grid.cellAt(spot))) return
+        standAt(spot)
+        labelsStale = true
     }
 
     /** Puts the character at [spot] at once, the camera with it, for tests that start somewhere on purpose. */
