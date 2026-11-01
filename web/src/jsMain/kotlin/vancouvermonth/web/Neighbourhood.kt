@@ -314,7 +314,8 @@ object Neighbourhood {
     /**
      * East Vancouver's and Burnaby's residential blocks, a detached house on each lot ([Suburbs]), and every one of the
      * houses. A house's walls are among [blocks], for the cutaway and taps, and it folds as the city's buildings do, but
-     * it is drawn only near the camera ([HouseDetail]); farther off, each row of houses is one low box of [blocks].
+     * it is drawn only near the camera ([HouseDetail]); farther off, each row of houses is one low box of [blocks], or
+     * each house one out where the yards are wide ([Suburbs.ROWS_UP_TO]).
      */
     val yards: List<Yard>
     val houses: List<House>
@@ -1070,13 +1071,15 @@ object Neighbourhood {
          * A residential block split into lots, a detached house on each ([Suburbs.layOut]): each house folding as the
          * city's buildings do and blocking only the squares it stands on, so the yards between are walked through; a
          * yard tree's trunk blocks its square. Far off, each row of houses is one low box, as long as the row and as
-         * tall as its houses on the whole; a row a house is missing from is a box for each house. A house on a park, on
+         * tall as its houses on the whole, out to [Suburbs.ROWS_UP_TO]; farther out, where the yards are wide enough to
+         * see, and on a row a house is missing from, it is a box for each house. A house on a park, on
          * the water, in the town's corner or on a lot in [kept] is left out, and a block that reaches such a lot has no
          * lawn or trees. The small map shows the block as it did.
          */
         fun addHouses(block: TurnedBox, kept: List<Lot>) {
             val walls = if (block.x < BOUNDARY_X) WEST_END_COLOURS else LOW_COLOURS
-            val plan = Suburbs.layOut(block, Suburbs.share(Spot(block.x, block.z)), walls, houseRandom)
+            val share = Suburbs.share(Spot(block.x, block.z))
+            val plan = Suburbs.layOut(block, share, walls, houseRandom)
             val standing = plan.houses.filter { house ->
                 house.shape.x > TOWN_COLUMNS && kept.none { house.shape.overlaps(it, 0.5) } &&
                     Suburbs.cornersOf(house.shape).all { (x, z) ->
@@ -1091,7 +1094,7 @@ object Neighbourhood {
             val firstRow = blocks.size
             for (front in standing.map { it.front }.distinct()) {
                 val row = standing.filter { it.front == front }
-                if (row.size == plan.houses.count { it.front == front }) {
+                if (share <= Suburbs.ROWS_UP_TO && row.size == plan.houses.count { it.front == front }) {
                     val first = row.first().shape
                     val last = row.last().shape
                     val length = hypot(last.x - first.x, last.z - first.z) + first.width

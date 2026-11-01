@@ -34,8 +34,8 @@ class House(
 /**
  * One residential [block], brought in from its streets: its houses, drawn one by one only near the camera
  * ([HouseDetail]) with its [lawn] (none on a block that reaches a lot kept clear) and the trees in its yards, each a
- * trunk and then a crown; farther off, each row of houses as one low box, [rows] of them in [Neighbourhood.blocks] from
- * [firstRow]. Everything of it lies within [reach] of its [middle].
+ * trunk and then a crown; farther off, each row of houses as one low box (each house one, out where the yards are
+ * wide), [rows] of them in [Neighbourhood.blocks] from [firstRow]. Everything of it lies within [reach] of its [middle].
  */
 class Yard(
     val block: TurnedBox,

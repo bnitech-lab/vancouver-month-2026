@@ -10,9 +10,10 @@ import org.khronos.webgl.set
 
 /**
  * The suburbs' houses as drawn near the camera ([Neighbourhood.yards]): each house's walls, pitched roof and door, and
- * each block's lawn and yard trees. Far off, each row of houses is one low box, which the town always draws; within
- * [REACH] of the camera and in its view, a block's houses stand one by one instead ([shown]), their roofs and doors
- * growing on over the last [GROW] as the camera comes nearer, and the lawns reach on to [LAWN_REACH]. A house folds out
+ * each block's lawn and yard trees. Far off, each row of houses is one low box (or each house, out where the yards are
+ * wide), which the town always draws; within [REACH] of the camera and in its view, a block's houses stand one by one
+ * instead ([shown]), their roofs and doors growing on over the last [GROW] as the camera comes nearer, and the lawns
+ * reach on to [LAWN_REACH]. A house folds out
  * of the camera's way as the city's buildings do, its roof sinking with its walls. [fill] writes them into [numbers]
  * (sixteen for each box, as a draw of many boxes keeps them) and [colours], the nearest blocks first and never more than
  * [CAPACITY] boxes, making nothing new.

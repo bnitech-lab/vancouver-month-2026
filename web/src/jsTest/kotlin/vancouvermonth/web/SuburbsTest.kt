@@ -170,7 +170,7 @@ class SuburbsTest {
     }
 
     @Test
-    fun `far off, each row of houses is one low box as long as the row`() {
+    fun `far off, each row of houses is one low box as long as the row, and out where the yards are wide each house one`() {
         var rows = 0
         for (yard in yards) {
             assertTrue(yard.rows >= 1, "${yard.middle}")
@@ -191,8 +191,11 @@ class SuburbsTest {
                 assertTrue(rowOf, "${house.shape.x}, ${house.shape.z} has no low box far off")
             }
         }
-        // About one for each block, as the city had before the houses.
-        assertTrue(rows < yards.size * 1.3, "$rows low boxes for ${yards.size} blocks")
+        // Up to halfway out, about one for each block, as the city had before the houses; farther out, one a house, so
+        // the wide yards show from far off too.
+        val (near, far) = yards.partition { Suburbs.share(it.middle) <= Suburbs.ROWS_UP_TO }
+        assertTrue(near.sumOf { it.rows } < near.size * 1.3, "${near.sumOf { it.rows }} low boxes for ${near.size} blocks")
+        assertEquals(far.sumOf { it.houses.size }, far.sumOf { it.rows })
     }
 
     @Test
