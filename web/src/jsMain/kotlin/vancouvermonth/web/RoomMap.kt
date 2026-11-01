@@ -174,10 +174,11 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
             val dotLeft = middleLeft(map, venue)
             val dotTop = middleTop(map, venue)
             val wide = Minimap.measureName(c, place.kind.label)
+            // With no clear spot the name is left out, its dot still drawn, rather than laid over a pin or a name.
             val spot = Minimap.NAME_SPOTS_X.indices.firstOrNull { each ->
                 val foot = dotTop + Minimap.NAME_SPOTS_Y[each] - lift
                 isNameClear(map, nameBox(dotLeft + Minimap.NAME_SPOTS_X[each], foot, wide))
-            } ?: 0
+            } ?: continue
             val left = dotLeft + Minimap.NAME_SPOTS_X[spot]
             val top = dotTop + Minimap.NAME_SPOTS_Y[spot] - lift
             if (spot > 0) Minimap.leader(c, dotLeft, dotTop, left, top)

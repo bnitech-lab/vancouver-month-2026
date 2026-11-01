@@ -131,19 +131,20 @@ class MinimapTest {
     fun `the whole map on a tap names every place by its kind, an interview day's office by its own name, none over another`() {
         val offices = Place.entries.filter { it.kind == PlaceKind.OFFICE }
         for (zone in 1..3) {
-            for (width in listOf(300, 256)) {
-                val minimap = Minimap(HomeSite.of(zone))
-                val element = minimap.element
-                minimap.isLarge = true
-                // As large as on a 375-point phone, four fifths of it, and on a 320-point one.
+            val minimap = Minimap(HomeSite.of(zone))
+            val element = minimap.element
+            minimap.isLarge = true
+            document.body!!.appendChild(element)
+            shown += element
+            // Every width the larger map takes on a phone, four fifths of the screen up to 480 px, upright or turned.
+            for (width in 256..480 step 4) {
                 element.style.width = "${width}px"
-                document.body!!.appendChild(element)
-                shown += element
                 minimap.measure()
                 val office = Neighbourhood.venue(Place.OFFICE).door
                 for (marked in listOf(null) + offices) {
                     minimap.draw(office.x, office.z, 0.0, office.x, office.z + 20.0, office.x, office.z, 0.8, marked)
-                    assertEquals(Place.entries.size, minimap.namesDrawn, "zone $zone")
+                    assertEquals(0, minimap.namesLeftOut, "zone $zone at $width, $marked: a name found no clear spot")
+                    assertEquals(Place.entries.size, minimap.namesDrawn, "zone $zone at $width")
                     val names = minimap.namesShown
                     // 내 방 first, then the office of the day; every other place by its kind's word.
                     assertEquals(Place.HOME.label, names[0])

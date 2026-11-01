@@ -200,6 +200,10 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
     var namesDrawn = 0
         private set
 
+    /** How many names found no clear spot on the last drawing and were left out. For tests. */
+    var namesLeftOut = 0
+        private set
+
     /** Where each name was drawn on the larger map, as its box's left, top, right and bottom. For tests. */
     val nameBoxes: List<List<Double>>
         get() = (0 until namesDrawn).map { at ->
@@ -371,6 +375,7 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         // The places downtown lie close together on the whole map, so a name that would lie over another goes to the
         // first clear spot round its dot, with a short line back to the dot.
         namesDrawn = 0
+        namesLeftOut = 0
         if (large) {
             c.font = NAME_FONT
             if (marked != nameOrderFor) {
@@ -394,7 +399,11 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
                         break
                     }
                 }
-                if (spot < 0) spot = 0
+                // With no clear spot the name is left out, its dot still drawn, rather than laid over another.
+                if (spot < 0) {
+                    namesLeftOut += 1
+                    continue
+                }
                 val left = dotLeft + NAME_SPOTS_X[spot]
                 val top = dotTop + NAME_SPOTS_Y[spot] - lift
                 if (spot > 0) leader(c, dotLeft, dotTop, left, top)
