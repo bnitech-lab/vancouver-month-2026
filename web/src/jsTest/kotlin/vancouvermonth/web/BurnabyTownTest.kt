@@ -125,6 +125,9 @@ class BurnabyTownTest {
                 val name = assertNotNull(town.screenPoint(home.labelAnchor), "내 방 is behind the camera")
                 assertTrue(name.left in 0.0..1.0 && name.top in 0.0..1.0, "내 방's name at $name")
                 assertEquals("지도: 내 방 근처", town.minimapElement.getAttribute("aria-label"))
+                // The line's own train runs at the station nearest 내 방 from the first morning.
+                assertEquals(SkyTrainRun.nearestStand(home.door.x, home.door.z), town.trainStand)
+                assertTrue(town.trainStand > SkyTrainRun.STAND)
                 // Downtown is far off: 회사 is an arrow on the small map's edge.
                 assertTrue(Place.OFFICE in town.minimapPointsTo, "${town.minimapPointsTo}")
                 town.walkFor(TransitLines.stations[7].door)

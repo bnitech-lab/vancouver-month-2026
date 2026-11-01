@@ -350,10 +350,11 @@ internal class NeighbourhoodScene(
     private var trainShift = 0.0
 
     /**
-     * Where along the guideway the line's own train stands at the station it runs at now: the one by the tunnel's mouth
-     * at first, and then the one nearest where the player looks ([SkyTrainRun.nearestStand]).
+     * Where along the guideway the line's own train stands at the station it runs at now: the one nearest 내 방 at
+     * first (by the tunnel's mouth, from the West End), and then the one nearest where the player looks
+     * ([SkyTrainRun.nearestStand]).
      */
-    private var runStand = SkyTrainRun.STAND
+    private var runStand = SkyTrainRun.nearestStand(site.home.door.x, site.home.door.z)
 
     /** The weather drawn now, and the one to come in the dark when it was set while the day changed. */
     private var shownWeather = Weather.SUNNY
@@ -1641,6 +1642,10 @@ internal class NeighbourhoodScene(
     /** How far east of its stop at the station the train was last drawn, for tests. */
     internal val trainShiftDrawn: Double
         get() = trainShift
+
+    /** Where along the guideway the line's own train stands at its station now, for tests. */
+    internal val trainStand: Double
+        get() = runStand
 
     /** Each passerby and where they are, for tests. */
     internal val passerbySpots: List<Pair<Passer, Spot>>
