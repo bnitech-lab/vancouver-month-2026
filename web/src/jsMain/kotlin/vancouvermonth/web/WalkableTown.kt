@@ -2556,11 +2556,13 @@ internal class NeighbourhoodScene(
         for (index in greeters.indices) {
             val pose = greeters[index].step(now, millis, player)
             val draw = folkDrawOf[index]
-            greeterFigures[index].write(pose, folkDraws[draw].instanceMatrix.array, folkFirst[draw])
+            // A draw left out far off is not written: its people stand where they were until it is near again.
+            val mesh = folkDraws[draw]
+            if (mesh.visible) greeterFigures[index].write(pose, mesh.instanceMatrix.array, folkFirst[draw])
             folkFirst[draw] += greeterFigures[index].count
         }
         keeperFigure.write(keeper.step(now, millis, player), townsfolk.instanceMatrix.array, folkFirst[0])
-        for (draw in folkDraws) draw.instanceMatrix.needsUpdate = true
+        for (draw in folkDraws) if (draw.visible) draw.instanceMatrix.needsUpdate = true
         val out = if (nightFell == null) {
             DayLight.outdoorsAt(shownShare)
         } else {
@@ -3004,7 +3006,8 @@ internal class NeighbourhoodScene(
         label.classList.toggle("under", under)
         label.tabIndex = if (shown) 0 else -1
         if (shown) label.removeAttribute("aria-hidden") else label.setAttribute("aria-hidden", "true")
-        if (point != null) {
+        // A hidden name is not moved: it is placed again when it shows.
+        if (shown && point != null) {
             val left = point.left * width
             val top = point.top * height
             label.style.transform = "translate(${left}px, ${top}px) translate(-50%, -100%)"
