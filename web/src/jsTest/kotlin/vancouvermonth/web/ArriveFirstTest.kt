@@ -17,6 +17,8 @@ import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.asList
+import org.w3c.dom.events.MouseEvent
+import org.w3c.dom.events.MouseEventInit
 import org.w3c.dom.pointerevents.PointerEvent
 import org.w3c.dom.pointerevents.PointerEventInit
 import vancouvermonth.core.Action
@@ -109,6 +111,13 @@ class ArriveFirstTest {
         val name = root.querySelectorAll(".place-name").asList().map { it as HTMLButtonElement }
             .first { it.textContent == place.label }
         name.click()
+    }
+
+    /** Taps the floating name of [place] with a finger, which a double tap is told by; a script's click never is one. */
+    private fun fingerOnName(place: Place) {
+        val name = root.querySelectorAll(".place-name").asList().map { it as HTMLButtonElement }
+            .first { it.textContent == place.label }
+        name.dispatchEvent(MouseEvent("click", MouseEventInit(detail = 1, clientX = 180, clientY = 300, bubbles = true)))
     }
 
     /** A place a card asks whether to go to, by its name. */
@@ -395,6 +404,39 @@ class ArriveFirstTest {
                 assertEquals("내 방으로 가는 중", going())
             },
             Step("arrived", { town.isStill }) {
+                assertNotNull(talk(), "no talk on arrival: $screen")
+                assertFalse(answer().disabled, answer().textContent)
+            },
+        )
+    }
+
+    @Test
+    fun `a double tap on a name dashes there, and another tap on it keeps the dash`(): Promise<Unit> {
+        val town = open(zone = 3)
+        val home = HomeSite.of(3).venue(Place.HOME)
+        return play(
+            Step("at 내 방's door its name twice: the talk at once, and a hurry to the person", { town.isStill }) {
+                fingerOnName(Place.HOME)
+                assertNotNull(talk(), "no talk at the place: $screen")
+                assertFalse(town.isDashing, "the first tap dashed")
+                fingerOnName(Place.HOME)
+                assertTrue(town.isDashing, "the second tap did not dash")
+                assertNotNull(talk(), "the second tap closed the talk")
+            },
+            Step("the near café's name twice from afar: a dash, and no talk", { town.isStill }) {
+                root.button("그만").click()
+                town.standAt(home.door)
+                fingerOnName(Place.SLOPE_CAFE)
+                assertFalse(town.isDashing, "the first tap dashed")
+                fingerOnName(Place.SLOPE_CAFE)
+                assertTrue(town.isDashing, "the second tap did not dash")
+                assertNull(talk(), "a talk before the character has come: $screen")
+                assertEquals("비탈 카페로 가는 중", going())
+                // Once more, as an impatient player does on a long walk: it does not slow down.
+                fingerOnName(Place.SLOPE_CAFE)
+                assertTrue(town.isDashing, "another tap slowed the dash")
+            },
+            Step("arrived: the talk", { town.isStill }) {
                 assertNotNull(talk(), "no talk on arrival: $screen")
                 assertFalse(answer().disabled, answer().textContent)
             },

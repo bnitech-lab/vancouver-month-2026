@@ -26,6 +26,7 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.RenderingContext
 import org.w3c.dom.events.Event
 import org.w3c.dom.events.KeyboardEvent
+import org.w3c.dom.events.MouseEvent
 import org.w3c.dom.events.WheelEvent
 import org.w3c.dom.pointerevents.PointerEvent
 import vancouvermonth.text.Passer
@@ -1229,9 +1230,10 @@ internal class NeighbourhoodScene(
             label.style.position = "absolute"
             label.style.left = "0"
             label.style.top = "0"
-            label.onclick = {
+            label.onclick = { event ->
                 touched()
-                if (nightFell == null && journey == null && rideTo == null) goTalk(venue.place, dash = false)
+                val dash = isDoubleTap(event)
+                if (nightFell == null && journey == null && rideTo == null) goTalk(venue.place, dash)
             }
             element.appendChild(label)
             labels[venue.place] = label
@@ -1242,12 +1244,20 @@ internal class NeighbourhoodScene(
         shopLabel.style.position = "absolute"
         shopLabel.style.left = "0"
         shopLabel.style.top = "0"
-        shopLabel.onclick = {
+        shopLabel.onclick = { event ->
             touched()
-            if (nightFell == null && journey == null && rideTo == null) goToShop(dash = false)
+            val dash = isDoubleTap(event)
+            if (nightFell == null && journey == null && rideTo == null) goToShop(dash)
         }
         element.appendChild(shopLabel)
     }
+
+    /**
+     * True when the click on a name is the second tap of a double tap, as a tap on the canvas may be ([tap]). A click from
+     * a key or a script (its detail is 0) has no finger behind it, so it is never one.
+     */
+    private fun isDoubleTap(click: MouseEvent): Boolean =
+        click.detail != 0 && taps.isDouble(window.performance.now(), click.x, click.y)
 
     /** One draw for boxes that move, placed again on every beat of the town's life, as the train's are. */
     private fun movingBoxes(blocks: List<Block>, material: Material): InstancedMesh {
@@ -2276,7 +2286,8 @@ internal class NeighbourhoodScene(
             if (!dash) opens()
         } else {
             onPlace(null)
-            walkTo(talkSpot, dash, opensOnArrival = true, sentTo = name)
+            // Another tap on where it is going keeps a dash already under way.
+            walkTo(talkSpot, dash || (sentTo == name && tripDash), opensOnArrival = true, sentTo = name)
         }
     }
 
