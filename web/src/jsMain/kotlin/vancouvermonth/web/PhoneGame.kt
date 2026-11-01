@@ -312,16 +312,8 @@ class PhoneGame private constructor(
             child("p", "formula", "한 달 총비용 = 월세 + 공과금 + 교통 정기권")
             for (text in whyTotalLines()) child("p", "why", text)
         }
-        root.child("section", "card") {
-            child("h2", text = "요금표")
-            child("dl", "board") {
-                child("dt", text = "교통 정기권")
-                child("dd", text = passPrices())
-                child("dt", text = "공과금")
-                child("dd", text = utilitiesPrices())
-            }
-        }
-        // The rooms as pins on the whole map, where the browser draws one; as a list where it does not.
+        // The rooms as pins on the whole map, where the browser draws one; as a list where it does not. The map comes
+        // right after what to do, so a phone shows all of it on the first screen.
         val map = if (roomsOnMap) RoomMap(game.rooms, picked, reveal != null, ::pick).takeIf { it.canDraw } else null
         root.child("section", "rooms") {
             child("h2", text = "어느 방?")
@@ -339,6 +331,16 @@ class PhoneGame private constructor(
         }
         // Drawn once on the page, at the width it takes there.
         map?.draw()
+        // The prices right before the guess, where the player adds rent, utilities and the pass.
+        root.child("section", "card") {
+            child("h2", text = "요금표")
+            child("dl", "board") {
+                child("dt", text = "교통 정기권")
+                child("dd", text = passPrices())
+                child("dt", text = "공과금")
+                child("dd", text = utilitiesPrices())
+            }
+        }
         showGuess()
         reveal?.let { showReveal(it) }
     }

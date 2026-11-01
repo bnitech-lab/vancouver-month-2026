@@ -253,6 +253,30 @@ class RoomMapTest {
         assertEquals("true", again.getAttribute("aria-pressed"))
     }
 
+    /** The rooms screen's parts from the top: each card's heading, then the guess form as "guess". */
+    private fun order(into: HTMLElement = root): List<String> =
+        into.children.asList().filter { it.tagName != "HEADER" }.map {
+            if (it.classList.contains("guess")) "guess" else it.querySelector("h2")?.textContent.orEmpty()
+        }
+
+    @Test
+    fun `the map comes right after what to do, and the price board right before the guess, map or list`() {
+        open()
+        passIntro(root)
+        assertEquals(listOf("할 일", "어느 방?", "요금표", "guess"), order())
+        // The card or the hint sits under the map, inside the rooms.
+        assertNotNull(root.querySelector(".rooms .room-map + .room-map-hint"))
+        pins()[0].click()
+        assertNotNull(root.querySelector(".rooms .room-map + .room-card"))
+        assertEquals(listOf("할 일", "어느 방?", "요금표", "guess"), order())
+        root.innerHTML = ""
+        val game = PhoneGame(root, 1011, playAgain = {})
+        game.roomsOnMap = false
+        game.show()
+        passIntro(root)
+        assertEquals(listOf("할 일", "어느 방?", "요금표", "guess"), order())
+    }
+
     @Test
     fun `where the map cannot be drawn the rooms are the list, and it plays the same`() {
         root.innerHTML = ""
@@ -326,14 +350,18 @@ class RoomMapTest {
     }
 
     @Test
-    fun `laid out as published, the map fits the phone and every pin and 시작하기 takes a finger`() {
+    fun `laid out as published, the whole map is on a phone's first screen and every pin and 시작하기 takes a finger`() {
         for ((width, height) in listOf(375 to 812, 320 to 568)) {
             val app = phone(width, height)
             open(into = app)
             val page = app.ownerDocument!!
             assertTrue(takesFinger(app.button(Intro.START), width, height), "시작하기 is covered at $width")
             passIntro(app)
+            page.defaultView!!.scrollTo(0.0, 0.0)
             val map = assertNotNull(app.querySelector(".room-map") as? HTMLElement)
+            // The whole map is on a 375 x 812 phone's first screen, right after 시작하기.
+            val bottom = map.getBoundingClientRect().bottom
+            if (width == 375) assertTrue(bottom <= height, "The map ends at $bottom, below the first screen")
             assertTrue(map.getBoundingClientRect().width <= width - 32 + 0.5, "The map is wider than the column")
             assertTrue(page.documentElement!!.scrollWidth <= width, "The rooms scroll sideways at $width x $height")
             for ((index, pin) in pins(app).withIndex()) {
