@@ -21,6 +21,7 @@ import org.w3c.dom.CanvasTextBaseline
 import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.TOP
+import vancouvermonth.text.Transit
 import vancouvermonth.text.minimapLabel
 import vancouvermonth.web.MinimapProjection.Companion.AREA_HEIGHT
 import vancouvermonth.web.MinimapProjection.Companion.AREA_LEFT
@@ -153,7 +154,6 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
 
     private var projection = MinimapProjection(1.0, 1.0)
     private var ratio = 1.0
-    private var nearest: Place? = null
 
     /** The five places of [site], worked out once: each one's middle, and its door, so nothing new is made to draw them. */
     private val venues = site.venues
@@ -161,6 +161,23 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
     private val middleZ = DoubleArray(venues.size) { venues[it].z + venues[it].depth / 2.0 }
     private val doorX = DoubleArray(venues.size) { venues[it].door.x }
     private val doorZ = DoubleArray(venues.size) { venues[it].door.z }
+
+    /**
+     * What a screen reader can hear the character is near: the five places of [site], then the line's stations, each
+     * one's door and name, worked out once; and which one it heard last, and whether close by.
+     */
+    private val landmarks = venues.size + TransitLines.stations.size
+    private val landmarkX = DoubleArray(landmarks) {
+        if (it < venues.size) doorX[it] else TransitLines.stations[it - venues.size].door.x
+    }
+    private val landmarkZ = DoubleArray(landmarks) {
+        if (it < venues.size) doorZ[it] else TransitLines.stations[it - venues.size].door.z
+    }
+    private val landmarkName = Array(landmarks) {
+        if (it < venues.size) venues[it].place.label else Transit.STATIONS[it - venues.size]
+    }
+    private var heard = -1
+    private var heardNear = false
 
     /** Where the character's arrow was last drawn, in CSS pixels from the map's top left corner, for tests. */
     var dotLeft = 0.0
@@ -374,11 +391,22 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
                 name(venues[at].place.label, left, top)
             }
         }
-        // A screen reader hears the place the character is nearest, told again only when that changes.
-        val near = nearestPlace(x, z)
-        if (near != nearest) {
-            nearest = near
-            element.setAttribute("aria-label", minimapLabel(near.label))
+        // A screen reader hears the place or station the character is nearest, "근처" only within NEAR_REACH squares,
+        // told again only when that changes.
+        var best = 0
+        var bestDistance = Double.MAX_VALUE
+        for (at in 0 until landmarks) {
+            val distance = hypot(landmarkX[at] - x, landmarkZ[at] - z)
+            if (distance < bestDistance) {
+                best = at
+                bestDistance = distance
+            }
+        }
+        val near = bestDistance <= NEAR_REACH
+        if (best != heard || near != heardNear) {
+            heard = best
+            heardNear = near
+            element.setAttribute("aria-label", minimapLabel(landmarkName[best], near))
         }
     }
 
@@ -459,20 +487,6 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         c.lineWidth = 1.0
         c.strokeStyle = RING
         c.stroke()
-    }
-
-    /** The place of [site] whose door is nearest the spot [x], [z]. It makes nothing new. */
-    fun nearestPlace(x: Double, z: Double): Place {
-        var best = 0
-        var bestDistance = Double.MAX_VALUE
-        for (at in doorX.indices) {
-            val distance = hypot(doorX[at] - x, doorZ[at] - z)
-            if (distance < bestDistance) {
-                best = at
-                bestDistance = distance
-            }
-        }
-        return venues[best].place
     }
 
     private fun dot(x: Double, y: Double, radius: Double, fill: String, square: Boolean) {
@@ -670,6 +684,9 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         /** How tall a name on the larger map is, and the room kept between two names, in pixels. */
         private const val NAME_HEIGHT = 14.0
         private const val NAME_GAP = 2.0
+
+        /** How far, in squares, from a place's or station's door a screen reader still hears "근처". */
+        const val NEAR_REACH = 40.0
 
         /**
          * Where a name may go round its dot on the larger map, the first clear one taken: right over it, then under it,

@@ -5,9 +5,11 @@ fun soundLabel(on: Boolean): String = if (on) "소리 끄기" else "소리 켜�
 
 /**
  * What a screen reader hears for the small map in the town's corner, which is a picture: roughly where the character
- * is, by the name of the place it is nearest.
+ * is, by the name of the place or station it is nearest; "근처" when it is close by, and only which way ("쪽") when
+ * the nearest is still far off.
  */
-fun minimapLabel(nearest: String): String = "지도: $nearest 근처"
+fun minimapLabel(nearest: String, near: Boolean = true): String =
+    if (near) "지도: $nearest 근처" else "지도: $nearest 쪽"
 
 /**
  * How to play: on the intro, the page's first screen, and on the card the "?" in the town opens, with the button that

@@ -14,6 +14,7 @@ import kotlinx.browser.document
 import org.w3c.dom.CanvasRenderingContext2D
 import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLElement
+import vancouvermonth.text.Transit
 import vancouvermonth.web.MinimapProjection.Companion.AREA_HEIGHT
 import vancouvermonth.web.MinimapProjection.Companion.AREA_WIDTH
 
@@ -278,6 +279,19 @@ class MinimapTest {
         minimap.draw(cafe.x, cafe.z, 0.0, cafe.x, cafe.z + 20.0, cafe.x, cafe.z, 0.8, marked = null)
         assertEquals("지도: 카페 근처", minimap.element.getAttribute("aria-label"))
         assertEquals("img", minimap.element.getAttribute("role"))
+        // Out on the wide map, at a station, that station's name.
+        val fork = TransitLines.stations[3].door
+        minimap.draw(fork.x, fork.z, 0.0, fork.x, fork.z + 20.0, fork.x, fork.z, 0.8, marked = null)
+        assertEquals("지도: ${Transit.STATIONS[3]} 근처", minimap.element.getAttribute("aria-label"))
+        // Far from every place and station, it says only which way the nearest is, not that it is near.
+        val doors = Neighbourhood.venues.map { it.door } + TransitLines.stations.map { it.door }
+        fun reach(x: Double, z: Double) = doors.minOf { hypot(it.x - x, it.z - z) }
+        val far = (0 until Neighbourhood.COLUMNS step 10)
+            .flatMap { x -> (0 until Neighbourhood.ROWS step 10).map { z -> x + 0.5 to z + 0.5 } }
+            .first { (x, z) -> reach(x, z) > Minimap.NEAR_REACH }
+        minimap.draw(far.first, far.second, 0.0, far.first, far.second + 20.0, far.first, far.second, 0.8, marked = null)
+        val label = minimap.element.getAttribute("aria-label").orEmpty()
+        assertTrue(label.startsWith("지도: ") && label.endsWith(" 쪽"), label)
     }
 
     @Test

@@ -66,5 +66,6 @@ class GuideTest {
     fun `the small map tells a screen reader which place the character is near`() {
         assertEquals("지도: 내 방 근처", minimapLabel("내 방"))
         assertEquals("지도: 회사 근처", minimapLabel("회사"))
+        assertEquals("지도: 큰 공원역 쪽", minimapLabel("큰 공원역", near = false))
     }
 }
