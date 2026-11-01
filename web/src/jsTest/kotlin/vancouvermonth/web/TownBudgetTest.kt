@@ -158,7 +158,11 @@ class TownBudgetTest {
     private companion object {
         const val FRAMES = 4
         const val RIDE_MILLIS = 7_000.0
-        const val MOST_DRAWS = 90
-        const val MOST_BOXES = 9_000
+        /**
+         * The busiest frame measured, downtown's east end looking east, takes 48 draws and 4,131 boxes; the budget is that
+         * and about a sixth more, so a frame much dearer than today's fails.
+         */
+        const val MOST_DRAWS = 56
+        const val MOST_BOXES = 4_800
     }
 }

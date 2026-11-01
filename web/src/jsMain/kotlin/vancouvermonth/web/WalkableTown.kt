@@ -215,9 +215,21 @@ internal class NeighbourhoodScene(
     /** The town as lived in for the room's zone: 내 방 where the room is, and the ground to walk on with it. */
     private val site = HomeSite.of(homeZone)
 
+    /**
+     * Where a taxi goes from this zone, and its way from where the character stands to each place, worked out once
+     * while it stands there: all of them in one search over the ground, as the wide map's ways are long. Set before
+     * the town is built, so nothing that builds it can find them unset.
+     */
+    private val taxiStops = TransitLines.taxiStopsFor(homeZone)
+    private var taxiFrom: Spot? = null
+    private val taxiWays = mutableMapOf<Spot, List<Spot>?>()
+
     /** Every box that stands still: the town's, then 내 방's; and every glowing one, likewise. */
     private val stillBlocks = Neighbourhood.blocks + site.blocks
     private val glowingBlocks = Neighbourhood.glowing + site.glowing
+
+    /** The light glinting on the sea downtown, off this zone's places. */
+    private val shimmer = Shimmer.of(homeZone)
 
     override val element = document.createElement("div") as HTMLElement
     override var onPlace: (Place?) -> Unit = {}
@@ -260,8 +272,10 @@ internal class NeighbourhoodScene(
 
     /**
      * Each draw of the town that may be left out when far from the camera: where its middle is, how far its boxes reach
-     * from it, and whether it holds anything tall. The haze hides low boxes long before the far plane, so those are
-     * left out from [LOW_REACH] on, tall ones only from [FollowCamera.FAR_PLANE].
+     * from it, and whether it holds anything tall. The haze is linear, so a low box still shows some of its own colour
+     * until the haze's far end: a low draw is left out only once its nearest box is [LOW_FOG] of the way into the haze
+     * as it is now (about 214 squares on a clear day, nearer in the rain), where it shows a tenth of its colour at
+     * most; a tall one, which shows over the haze longer, only at the far plane. A reach below 0 marks a low draw.
      */
     private val farMeshes = mutableListOf<InstancedMesh>()
     private var farX = DoubleArray(0)
@@ -270,7 +284,8 @@ internal class NeighbourhoodScene(
     private var farReach = DoubleArray(0)
 
     /** The city's buildings that fold down out of the camera's way, and where the camera and character last were. */
-    private val cutaway = Cutaway(Neighbourhood.foldables.map { it.box })
+    private val cutaway =
+        Cutaway(Neighbourhood.foldables.map { it.box }, Neighbourhood.foldables.map { Neighbourhood.blocks[it.body] })
     private var aimedEyeX = Double.NaN
     private var aimedEyeY = Double.NaN
     private var aimedEyeZ = Double.NaN
@@ -347,10 +362,11 @@ internal class NeighbourhoodScene(
     private var trainShift = 0.0
 
     /**
-     * Where along the guideway the line's own train stands at the station it runs at now: the one by the tunnel's mouth
-     * at first, and then the one nearest where the player looks ([SkyTrainRun.nearestStand]).
+     * Where along the guideway the line's own train stands at the station it runs at now: the one nearest 내 방 at
+     * first (by the tunnel's mouth, from the West End), and then the one nearest where the player looks
+     * ([SkyTrainRun.nearestStand]).
      */
-    private var runStand = SkyTrainRun.STAND
+    private var runStand = SkyTrainRun.nearestStand(site.home.door.x, site.home.door.z)
 
     /** The weather drawn now, and the one to come in the dark when it was set while the day changed. */
     private var shownWeather = Weather.SUNNY
@@ -733,7 +749,7 @@ internal class NeighbourhoodScene(
         farX[index] = (west + east) / 2
         farZ[index] = (north + south) / 2
         farRadius[index] = hypot(east - west, south - north) / 2
-        farReach[index] = if (tallest > TALL) FollowCamera.FAR_PLANE else LOW_REACH
+        farReach[index] = if (tallest > TALL) FollowCamera.FAR_PLANE else -1.0
     }
 
     /**
@@ -741,9 +757,11 @@ internal class NeighbourhoodScene(
      * can be seen, and draws the rest. It makes nothing new, as it runs every frame.
      */
     private fun leaveOutFar(eyeX: Double, eyeZ: Double) {
+        val lowReach = haze.near + LOW_FOG * (haze.far - haze.near)
         for (index in farMeshes.indices) {
             val away = hypot(farX[index] - eyeX, farZ[index] - eyeZ) - farRadius[index]
-            farMeshes[index].visible = away < farReach[index]
+            val reach = if (farReach[index] < 0) lowReach else farReach[index]
+            farMeshes[index].visible = away < reach
         }
     }
 
@@ -852,7 +870,7 @@ internal class NeighbourhoodScene(
         scene.add(flames)
         fireLight.position.set(fire.x, FIRE_LIGHT_HEIGHT, fire.z)
         scene.add(fireLight)
-        drifting = boxes(Shimmer.at(0.0, 0.0) + Petals.at(0.0) + Clouds.at(0.0), material)
+        drifting = boxes(shimmer.at(0.0, 0.0) + Petals.at(0.0) + Clouds.at(0.0), material)
         drifting.castShadow = false
         drifting.receiveShadow = false
         drifting.frustumCulled = false
@@ -1069,14 +1087,6 @@ internal class NeighbourhoodScene(
     override val travelling: Transport?
         get() = journey?.transport
 
-    /**
-     * The taxi's way from where the character stands to each place, worked out once while it stands there: all of the
-     * places a taxi goes in one search over the ground, as the wide map's ways are long.
-     */
-    private var taxiFrom: Spot? = null
-    private val taxiWays = mutableMapOf<Spot, List<Spot>?>()
-    private val taxiStops = TransitLines.taxiStopsFor(homeZone)
-
     /** The way along the streets from where the character stands to [to], or null when it cannot get there. */
     private fun taxiWay(to: Spot): List<Spot>? {
         if (taxiFrom != spot) {
@@ -1165,7 +1175,9 @@ internal class NeighbourhoodScene(
             val there = route.zipWithNext { a, b -> distanceBetween(a, b) }.sum()
             // After dropping the character, the taxi turns back down the street it came along.
             val back = alongFor(route.reversed(), Journey.GOING_ON)
-            Journey(transport, RailLine(route + back.drop(1)), there, route.last(), Journey.TAXI_SPEED, Journey.TAXI_RAMP)
+            // A long ride goes faster at its quickest, as the train does.
+            val cruise = Journey.taxiCruise(there)
+            Journey(transport, RailLine(route + back.drop(1)), there, route.last(), cruise, Journey.taxiRamp(cruise))
         }
     }
 
@@ -1636,6 +1648,10 @@ internal class NeighbourhoodScene(
     /** How far east of its stop at the station the train was last drawn, for tests. */
     internal val trainShiftDrawn: Double
         get() = trainShift
+
+    /** Where along the guideway the line's own train stands at its station now, for tests. */
+    internal val trainStand: Double
+        get() = runStand
 
     /** Each passerby and where they are, for tests. */
     internal val passerbySpots: List<Pair<Passer, Spot>>
@@ -2152,7 +2168,7 @@ internal class NeighbourhoodScene(
         fireLight.intensity = FIRE_LIGHT * glowLevel * flicker
         // Grey skies dull the glints on the water, as the night does.
         val dull = max(glowLevel, DayLight.dullness(shownWeather))
-        placeBlocks(drifting, Shimmer.at(now, dull) + Petals.at(now) + Clouds.at(now))
+        placeBlocks(drifting, shimmer.at(now, dull) + Petals.at(now) + Clouds.at(now))
         if (rain.visible) placeRain(now)
         // How loud the train and the fire are where the player is: the train at the camera, the fire at the character.
         val night = if (nightFell == null) 0.0 else DayLight.at(nightProgress).glow
@@ -2233,7 +2249,7 @@ internal class NeighbourhoodScene(
         val colour = Color(0)
         sea.setColorAt(0, colour.setHex(DayLight.sea(weather)))
         sea.instanceColor?.needsUpdate = true
-        val clouds = Shimmer.count + Petals.count
+        val clouds = shimmer.count + Petals.count
         for (index in clouds until clouds + Clouds.count) {
             drifting.setColorAt(index, colour.setHex(Clouds.colour(weather)))
         }
@@ -2614,9 +2630,9 @@ internal class NeighbourhoodScene(
         /** A place's name farther than this from the camera's eye is hidden, its place deep in the haze. */
         const val NAMES_REACH = 170.0
 
-        /** A draw with nothing taller than this is left out [LOW_REACH] from the camera, deep in the haze. */
+        /** A draw with nothing taller than this is low: it is left out [LOW_FOG] of the way into the haze. */
         const val TALL = 6.5
-        const val LOW_REACH = 130.0
+        const val LOW_FOG = 0.9
 
         /** How far a bike goes for one turn of its pedals, and how far the legs swing with them, in radians. */
         const val PEDAL_LENGTH = 1.8

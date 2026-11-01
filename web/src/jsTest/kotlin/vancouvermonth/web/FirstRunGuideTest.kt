@@ -86,6 +86,7 @@ class FirstRunGuideTest {
         assertEquals(Guide.MAP_LICENCE_URL, link.href)
         assertEquals("_blank", link.target)
         assertEquals("noopener", link.rel)
+        assertEquals("${Guide.MAP_LICENCE} (새 탭에서 열려요)", link.getAttribute("aria-label"))
         assertEquals(Guide.BURNABY_MAP_LINE, burnaby.textContent)
         assertEquals("guide-credit burnaby-credit", burnaby.className)
         val burnabyLink = assertNotNull(burnaby.querySelector("a") as? HTMLAnchorElement, "No link to Burnaby's licence")
@@ -93,6 +94,7 @@ class FirstRunGuideTest {
         assertEquals(Guide.BURNABY_MAP_LICENCE_URL, burnabyLink.href)
         assertEquals("_blank", burnabyLink.target)
         assertEquals("noopener", burnabyLink.rel)
+        assertEquals("${Guide.BURNABY_MAP_LICENCE} (새 탭에서 열려요)", burnabyLink.getAttribute("aria-label"))
         // Over the town, its top card and its first-day hint.
         assertTrue(root.querySelector(".over-town") != null && root.querySelector(".guide") != null)
     }

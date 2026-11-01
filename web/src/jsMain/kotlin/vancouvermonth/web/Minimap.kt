@@ -21,6 +21,7 @@ import org.w3c.dom.CanvasTextBaseline
 import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.TOP
+import vancouvermonth.text.Transit
 import vancouvermonth.text.minimapLabel
 import vancouvermonth.web.MinimapProjection.Companion.AREA_HEIGHT
 import vancouvermonth.web.MinimapProjection.Companion.AREA_LEFT
@@ -150,7 +151,6 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
 
     private var projection = MinimapProjection(1.0, 1.0)
     private var ratio = 1.0
-    private var nearest: Place? = null
 
     /** The five places of [site], worked out once: each one's middle, and its door, so nothing new is made to draw them. */
     private val venues = site.venues
@@ -159,17 +159,48 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
     private val doorX = DoubleArray(venues.size) { venues[it].door.x }
     private val doorZ = DoubleArray(venues.size) { venues[it].door.z }
 
+    /**
+     * What a screen reader can hear the character is near: the five places of [site], then the line's stations, each
+     * one's door and name, worked out once; and which one it heard last, and whether close by.
+     */
+    private val landmarks = venues.size + TransitLines.stations.size
+    private val landmarkX = DoubleArray(landmarks) {
+        if (it < venues.size) doorX[it] else TransitLines.stations[it - venues.size].door.x
+    }
+    private val landmarkZ = DoubleArray(landmarks) {
+        if (it < venues.size) doorZ[it] else TransitLines.stations[it - venues.size].door.z
+    }
+    private val landmarkName = Array(landmarks) {
+        if (it < venues.size) venues[it].place.label else Transit.STATIONS[it - venues.size]
+    }
+    private var heard = -1
+    private var heardNear = false
+
     /** Where the character's arrow was last drawn, in CSS pixels from the map's top left corner, for tests. */
     var dotLeft = 0.0
         private set
     var dotTop = 0.0
         private set
 
-    /** The order the larger map names the places in, 내 방 and 회사 first; and where each name went, to keep them apart. */
+    /**
+     * The order the larger map names the places in, 내 방 and 회사 first; each name's width, measured once; and where each
+     * name went on the last drawing (its bottom middle), to keep them apart. For tests, [namesDrawn] is how many were.
+     */
     private val nameOrder = venues.indices.sortedBy { if (venues[it].place == Place.HOME) 0 else if (venues[it].place == Place.OFFICE) 1 else 2 + it }
         .toIntArray()
+    private val nameWidth = DoubleArray(venues.size) { -1.0 }
     private val nameLeft = DoubleArray(venues.size)
     private val nameTop = DoubleArray(venues.size)
+    private val nameOf = IntArray(venues.size)
+    var namesDrawn = 0
+        private set
+
+    /** Where each name was drawn on the larger map, as its box's left, top, right and bottom. For tests. */
+    val nameBoxes: List<List<Double>>
+        get() = (0 until namesDrawn).map { at ->
+            val half = nameWidth[nameOf[at]] / 2
+            listOf(nameLeft[at] - half, nameTop[at] - NAME_HEIGHT, nameLeft[at] + half, nameTop[at])
+        }
 
     /** Which of the five places were last drawn as arrows on the small map's edge, out of its sight, by their number. */
     private val pointed = BooleanArray(venues.size)
@@ -317,30 +348,67 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         c.strokeStyle = INK
         c.stroke()
         north(c, map.width - NORTH_INSET * scale, NORTH_TOP * scale, scale, large)
-        // The names on the larger map, last, over the wedge and the arrow: 내 방's first, and none over another, as the
-        // places downtown are close together on the whole map.
+        // The names on the larger map, last, over the wedge and the arrow: 내 방's first. The places downtown lie close
+        // together on the whole map, so a name that would lie over another goes to the first clear spot round its dot,
+        // with a short line back to the dot.
+        namesDrawn = 0
         if (large) {
-            var named = 0
+            c.font = NAME_FONT
             for (at in nameOrder) {
-                val left = map.left(middleX[at], middleZ[at])
-                val top = map.top(middleX[at], middleZ[at]) - BIG_DOT * scale - 3
-                var clear = true
-                for (other in 0 until named) {
-                    if (abs(nameLeft[other] - left) < NAME_WIDTH && abs(nameTop[other] - top) < NAME_HEIGHT) clear = false
+                if (nameWidth[at] < 0) nameWidth[at] = c.measureText(venues[at].place.label).width
+                val dotLeft = map.left(middleX[at], middleZ[at])
+                val dotTop = map.top(middleX[at], middleZ[at])
+                val lift = BIG_DOT * scale + 3
+                var spot = -1
+                for (each in NAME_SPOTS_X.indices) {
+                    val left = dotLeft + NAME_SPOTS_X[each]
+                    val top = dotTop + NAME_SPOTS_Y[each] - lift
+                    if (isNameClear(at, left, top, map)) {
+                        spot = each
+                        break
+                    }
                 }
-                if (!clear) continue
-                nameLeft[named] = left
-                nameTop[named] = top
-                named += 1
+                if (spot < 0) spot = 0
+                val left = dotLeft + NAME_SPOTS_X[spot]
+                val top = dotTop + NAME_SPOTS_Y[spot] - lift
+                if (spot > 0) leader(c, dotLeft, dotTop, left, top)
+                nameLeft[namesDrawn] = left
+                nameTop[namesDrawn] = top
+                nameOf[namesDrawn] = at
+                namesDrawn += 1
                 name(c, venues[at].place.label, left, top)
             }
         }
-        // A screen reader hears the place the character is nearest, told again only when that changes.
-        val near = nearestPlace(x, z)
-        if (near != nearest) {
-            nearest = near
-            element.setAttribute("aria-label", minimapLabel(near.label))
+        // A screen reader hears the place or station the character is nearest, "근처" only within NEAR_REACH squares,
+        // told again only when that changes.
+        var best = 0
+        var bestDistance = Double.MAX_VALUE
+        for (at in 0 until landmarks) {
+            val distance = hypot(landmarkX[at] - x, landmarkZ[at] - z)
+            if (distance < bestDistance) {
+                best = at
+                bestDistance = distance
+            }
         }
+        val near = bestDistance <= NEAR_REACH
+        if (best != heard || near != heardNear) {
+            heard = best
+            heardNear = near
+            element.setAttribute("aria-label", minimapLabel(landmarkName[best], near))
+        }
+    }
+
+    /** True when place [at]'s name, its bottom middle at [left], [top], lies on [map] and over no name drawn yet. */
+    private fun isNameClear(at: Int, left: Double, top: Double, map: MinimapProjection): Boolean {
+        val half = nameWidth[at] / 2
+        if (left - half < 0 || left + half > map.width || top - NAME_HEIGHT < 0 || top > map.height) return false
+        for (other in 0 until namesDrawn) {
+            val otherHalf = nameWidth[nameOf[other]] / 2
+            if (abs(nameLeft[other] - left) < half + otherHalf + NAME_GAP && abs(nameTop[other] - top) < NAME_HEIGHT + NAME_GAP) {
+                return false
+            }
+        }
+        return true
     }
 
     /**
@@ -375,20 +443,6 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         c.stroke()
     }
 
-    /** The place of [site] whose door is nearest the spot [x], [z]. It makes nothing new. */
-    fun nearestPlace(x: Double, z: Double): Place {
-        var best = 0
-        var bestDistance = Double.MAX_VALUE
-        for (at in doorX.indices) {
-            val distance = hypot(doorX[at] - x, doorZ[at] - z)
-            if (distance < bestDistance) {
-                best = at
-                bestDistance = distance
-            }
-        }
-        return venues[best].place
-    }
-
     companion object {
         /**
          * The small marks, worked out once: each station's door (kind 0), bus stop (1) and dock (2), and the bike shop's
@@ -414,15 +468,18 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
             c.fillRect(0.0, 0.0, map.width, map.height)
             val ground = groundPicture
             val detail = GROUND_DETAIL.toDouble()
+            // The picture's top left corner on the map: the area's, [GROUND_PAD] squares further out.
+            val pictureLeft = map.areaLeft - GROUND_PAD * map.scale
+            val pictureTop = map.areaTop - GROUND_PAD * map.scale
             // The window's corners in the picture's pixels, kept inside the picture.
-            val fromX = max(0.0, (0.0 - map.areaLeft) / map.scale * detail)
-            val fromY = max(0.0, (0.0 - map.areaTop) / map.scale * detail)
-            val toX = min(ground.width.toDouble(), (map.width - map.areaLeft) / map.scale * detail)
-            val toY = min(ground.height.toDouble(), (map.height - map.areaTop) / map.scale * detail)
+            val fromX = max(0.0, (0.0 - pictureLeft) / map.scale * detail)
+            val fromY = max(0.0, (0.0 - pictureTop) / map.scale * detail)
+            val toX = min(ground.width.toDouble(), (map.width - pictureLeft) / map.scale * detail)
+            val toY = min(ground.height.toDouble(), (map.height - pictureTop) / map.scale * detail)
             if (toX <= fromX || toY <= fromY) return
             c.drawImage(
                 ground, fromX, fromY, toX - fromX, toY - fromY,
-                map.areaLeft + fromX / detail * map.scale, map.areaTop + fromY / detail * map.scale,
+                pictureLeft + fromX / detail * map.scale, pictureTop + fromY / detail * map.scale,
                 (toX - fromX) / detail * map.scale, (toY - fromY) / detail * map.scale,
             )
         }
@@ -488,7 +545,7 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
             c.fillText("N", x, y + tall + scale)
         }
 
-        /** A place's name centred over [x], its foot at [y], with a pale edge so it reads over any ground. */
+        /** A place's name centred on [x], its foot at [y], with a pale edge so it reads over any ground. */
         internal fun name(c: CanvasRenderingContext2D, label: String, x: Double, y: Double) {
             c.font = NAME_FONT
             c.textAlign = CanvasTextAlign.CENTER
@@ -500,19 +557,35 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
             c.fillText(label, x, y)
         }
 
-        /** How wide a place's name is on the map, in CSS pixels. */
-        internal fun nameWidth(c: CanvasRenderingContext2D, label: String): Double {
+        /** How wide [label] is as a name on the map, in pixels. */
+        internal fun measureName(c: CanvasRenderingContext2D, label: String): Double {
             c.font = NAME_FONT
             return c.measureText(label).width
         }
 
-        /** The place of zone 1's town whose door is nearest the spot [x], [z]. */
-        fun nearestPlace(x: Double, z: Double): Place = zoneOne.nearestPlace(x, z)
+        /**
+         * A short line from a place's dot at [dotLeft], [dotTop] to its name moved off it ([NAME_SPOTS_X]), the name's
+         * foot at [left], [top].
+         */
+        internal fun leader(c: CanvasRenderingContext2D, dotLeft: Double, dotTop: Double, left: Double, top: Double) {
+            val nameMiddle = top - NAME_HEIGHT / 2
+            // To the name's nearer edge, top or bottom, so the line does not cross it.
+            val end = if (nameMiddle < dotTop) top else top - NAME_HEIGHT
+            c.beginPath()
+            c.moveTo(dotLeft, dotTop)
+            c.lineTo(left, end)
+            c.lineWidth = 1.2
+            c.strokeStyle = INK
+            c.stroke()
+        }
 
-        private val zoneOne by lazy { Minimap(HomeSite.of(1)) }
+        /** The place of zone 1's town whose door is nearest the spot [x], [z]. */
+        fun nearestPlace(x: Double, z: Double): Place =
+            HomeSite.of(1).venues.minBy { hypot(it.door.x - x, it.door.z - z) }.place
 
         /**
-         * The area the map shows as a picture, north up, [GROUND_DETAIL] pixels a square: water, the city's ground, its
+         * The area the map shows, and [GROUND_PAD] squares more on each side, as a picture, north up, [GROUND_DETAIL]
+         * pixels a square: water, the city's ground, its
          * blocks, the park and the seawall, and past the grid's edges what the town lays there: land, water, and the
          * north shore's forest across the inlet.
          */
@@ -522,8 +595,8 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         private fun paintGround(): HTMLCanvasElement {
             val columns = Neighbourhood.COLUMNS
             val rows = Neighbourhood.ROWS
-            val across = AREA_WIDTH * GROUND_DETAIL
-            val down = AREA_HEIGHT * GROUND_DETAIL
+            val across = (AREA_WIDTH + 2 * GROUND_PAD) * GROUND_DETAIL
+            val down = (AREA_HEIGHT + 2 * GROUND_PAD) * GROUND_DETAIL
             val canvas = document.createElement("canvas") as HTMLCanvasElement
             canvas.width = across
             canvas.height = down
@@ -534,9 +607,9 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
             val map = Neighbourhood.map
             val built = Neighbourhood.built
             for (j in 0 until down) {
-                val south = AREA_TOP + (j + 0.5) / GROUND_DETAIL
+                val south = AREA_TOP - GROUND_PAD + (j + 0.5) / GROUND_DETAIL
                 for (i in 0 until across) {
-                    val east = AREA_LEFT + (i + 0.5) / GROUND_DETAIL
+                    val east = AREA_LEFT - GROUND_PAD + (i + 0.5) / GROUND_DETAIL
                     val gridX = MinimapProjection.gridX(east, south)
                     val gridZ = MinimapProjection.gridZ(east, south)
                     val x = floor(gridX).toInt()
@@ -632,9 +705,30 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         const val WINDOW_ACROSS = 100.0
         private const val WINDOW_SHAPE = "239 / 267"
 
-        /** How far apart two names on the larger map must be, across and down, in pixels, or the later one is left out. */
-        private const val NAME_WIDTH = 40.0
-        private const val NAME_HEIGHT = 14.0
+        /** How many squares the small map's window shows from top to bottom, from its shape. */
+        const val WINDOW_DOWN = WINDOW_ACROSS * 267 / 239
+
+        /**
+         * How many squares the ground's picture reaches past the whole map's area on each side: half the small window's
+         * height, rounded up, so the window, centred on the character wherever it stands, never runs off the picture
+         * into a bare sea where the town draws land.
+         */
+        const val GROUND_PAD = 56
+
+        /** How tall a name on the larger map is, and the room kept between two names, in pixels. */
+        internal const val NAME_HEIGHT = 14.0
+        internal const val NAME_GAP = 2.0
+
+        /** How far, in squares, from a place's or station's door a screen reader still hears "근처". */
+        const val NEAR_REACH = 40.0
+
+        /**
+         * Where a name may go round its dot on the larger map and on the map of the rooms ([RoomMap]), the first clear
+         * one taken: right over it, then under it, then out to the sides and farther up and down. Offsets of the name's
+         * bottom middle, in pixels; a name moved off its dot gets a [leader].
+         */
+        internal val NAME_SPOTS_X = doubleArrayOf(0.0, 0.0, -34.0, 34.0, -34.0, 34.0, 0.0, 0.0, -56.0, 56.0, -48.0, 48.0)
+        internal val NAME_SPOTS_Y = doubleArrayOf(0.0, 26.0, -6.0, -6.0, 22.0, 22.0, -20.0, 44.0, 8.0, 8.0, -24.0, -24.0)
 
         /** How far in from the small map's edge an arrow to a place out of sight sits, and how big it is, in pixels. */
         private const val EDGE_INSET = 6.0

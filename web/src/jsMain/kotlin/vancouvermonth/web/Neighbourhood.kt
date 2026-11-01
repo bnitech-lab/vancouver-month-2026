@@ -315,10 +315,11 @@ object Neighbourhood {
     internal val built: BooleanArray
 
     /**
-     * What blocks the way in every zone's town: the water, a footprint for each building, trunk, fence, bench and lamp
-     * but 내 방's, and the four other places' people and the shop's keeper.
+     * The ground every zone's town shares, before 내 방 and its garden stand on it ([HomeSite.grid] adds them): blocked
+     * by the water, a footprint for each building, trunk, fence, bench and lamp but 내 방's, and the four other places'
+     * people and the shop's keeper. Only the grid is kept, not the list of every blocked square it was made from.
      */
-    internal val blocked: List<Cell>
+    internal val open: Grid
 
     /** What a tap stops at besides the five places, which [HomeSite.walls] adds: see [walls]. */
     internal val sharedWalls: List<Wall>
@@ -383,11 +384,9 @@ object Neighbourhood {
         val people = (venues.filter { it.place != Place.HOME }.map { it.person } + shop.keeper).map {
             Cell(floor(it.x).toInt(), floor(it.z).toInt())
         }
-        blocked = map.cellsOf(Terrain.WATER) + town.footprints.flatMap { cellsUnder(it) } + town.turnedFootprints + people
+        val blocked = map.cellsOf(Terrain.WATER) + town.footprints.flatMap { cellsUnder(it) } + town.turnedFootprints + people
+        open = Grid(COLUMNS, ROWS, blocked)
     }
-
-    /** The ground every zone's town shares, before 내 방 and its garden stand on it ([HomeSite.grid] adds them). */
-    internal val open: Grid by lazy { Grid(COLUMNS, ROWS, blocked) }
 
     /** 내 방, its garden, bench, campfire and lamps at [home], built as [HomeSite] keeps them. */
     internal fun homeParts(home: Venue): HomeParts {
@@ -999,7 +998,8 @@ object Neighbourhood {
                 if (rail.any { lot.isNear(it.x, it.z, 4.0) }) height = min(height, DECK_HEIGHT - 1.5)
                 addBuilding(lot, height, colour)
             }
-            addWideCity(kept + TransitLines.keptForStops + Rides.keptForDocks)
+            // The corner's own buildings are kept too, where a wide block reaches back over the corner's edge.
+            addWideCity(kept + cityLots + TransitLines.keptForStops + Rides.keptForDocks)
         }
 
         /**

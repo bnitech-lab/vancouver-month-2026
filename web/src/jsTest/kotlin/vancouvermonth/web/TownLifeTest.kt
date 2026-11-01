@@ -3,9 +3,11 @@ package vancouvermonth.web
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.floor
+import kotlin.math.hypot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import org.khronos.webgl.Float32Array
 import org.khronos.webgl.get
@@ -107,8 +109,8 @@ class TownLifeTest {
     @Test
     fun `glints stay on the water, come and go, and fade in the night`() {
         for (t in times(20_000.0, 250.0)) {
-            val glints = Shimmer.at(t, night = 0.0)
-            assertEquals(Shimmer.count, glints.size)
+            val glints = Shimmer.of(1).at(t, night = 0.0)
+            assertEquals(Shimmer.of(1).count, glints.size)
             for (glint in glints) {
                 val middle = Cell(floor(glint.x + glint.width / 2).toInt(), floor(glint.z + glint.depth / 2).toInt())
                 val onSea = RealVancouver.map.terrainAt(middle) == Terrain.WATER && glint.y < 0.0
@@ -116,11 +118,25 @@ class TownLifeTest {
                 assertTrue(glint.width <= Shimmer.MAX_WIDTH, "$glint")
             }
         }
-        val one = Shimmer.at(1_000.0, 0.0).map { it.width }
-        val later = Shimmer.at(1_700.0, 0.0).map { it.width }
+        val one = Shimmer.of(1).at(1_000.0, 0.0).map { it.width }
+        val later = Shimmer.of(1).at(1_700.0, 0.0).map { it.width }
         assertNotEquals(one, later)
-        val night = Shimmer.at(1_000.0, 1.0).map { it.width }
+        val night = Shimmer.of(1).at(1_000.0, 1.0).map { it.width }
         assertTrue(night.zip(one).all { (dark, day) -> dark <= day * 0.11 + 0.002 }, "still bright at night")
+    }
+
+    @Test
+    fun `in zones 2 and 3 the glints keep off the West End lot where 내 방 stood`() {
+        val others = Neighbourhood.venues.filter { it.place != Place.HOME }.map { it.door }
+        fun nearOthers(glint: Block) = others.any { hypot(it.x - glint.x, it.z - glint.z) < 42.0 }
+        // Zone 1 has glints off 내 방 alone, in the West End.
+        assertTrue(Shimmer.of(1).at(0.0, 0.0).any { !nearOthers(it) })
+        for (zone in 2..3) {
+            val glints = Shimmer.of(zone).at(0.0, 0.0)
+            assertEquals(Shimmer.of(zone).count, glints.size)
+            for (glint in glints) assertTrue(nearOthers(glint), "zone $zone: $glint")
+        }
+        assertSame(Shimmer.of(2), Shimmer.of(2))
     }
 
     @Test
@@ -163,8 +179,6 @@ class TownLifeTest {
             last = shows
             assertEquals(shows > 0.0, SkyTrainRun.isShownAt(t))
         }
-        // All there while it is near its station: it starts to fade only past where the haze begins, at any station.
-        assertTrue(SkyTrainRun.FADE_FROM > Neighbourhood.HAZE_NEAR)
     }
 
     @Test

@@ -19,12 +19,13 @@ import vancouvermonth.web.MinimapProjection.Companion.AREA_WIDTH
 /**
  * September 1st's rooms as pins on the whole wide map, north up, as the small map shows it larger: its painted ground
  * and the marks of the ways about town ([Minimap.paintGround], [MinimapProjection] for the whole area), the places as
- * dots with 회사 and 카페 named, so the player sees how far each room is from work, and a pin for each room at the door
- * 내 방 has in the room's zone ([Neighbourhood.home], where [HomeSite] puts it), carrying the room's number. The pins
- * are buttons, which a keyboard and a screen reader reach, each heard as its room in full; a tap picks the room
- * ([onPick]). The picked one is drawn pressed, and once [locked] none can be picked. Pins that would lie closer than a
- * finger's width are pushed apart, with a line from each moved pin back to its door. The map is a picture, drawn at its
- * width once it is on the page ([draw]); it is all 2D, so nothing of the town runs under it.
+ * dots with 회사 and 카페 named (placed as that map places names, clear of the pins), so the player sees how far each
+ * room is from work, and a pin for each room at the door 내 방 has in the room's zone ([Neighbourhood.home], where
+ * [HomeSite] puts it), carrying the room's number. The pins are buttons, which a keyboard and a screen reader reach,
+ * each heard as its room in full; a tap picks the room ([onPick]). The picked one is drawn pressed, and once [locked]
+ * none can be picked. Pins that would lie closer than a finger's width are pushed apart, with a line from each moved
+ * pin back to its door. The map is a picture, drawn at its width once it is on the page ([draw]); it is all 2D, so
+ * nothing of the town runs under it.
  */
 internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick: (Int) -> Unit) {
     val element = document.createElement("div") as HTMLElement
@@ -126,13 +127,24 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
             Minimap.dot(c, left, top, Minimap.BIG_DOT * scale, Minimap.HOME, square = true)
         }
         Minimap.north(c, width - Minimap.NORTH_INSET * scale, Minimap.NORTH_TOP * scale, scale, large = true)
-        // 회사 and 카페 by name, each where it covers no pin and no other name.
+        // 회사 and 카페 by name, placed as the town's whole map places names: over the dot, or else the first spot round
+        // it that covers no pin and no other name, with a short line back to the dot.
         names.clear()
+        val lift = Minimap.BIG_DOT * scale + 3
         for (place in NAMED) {
             val venue = Neighbourhood.venue(place)
-            val box = nameBox(c, map, place.label, middleLeft(map, venue), middleTop(map, venue), Minimap.DOT * scale)
-            names[place] = box
-            Minimap.name(c, place.label, (box[0] + box[2]) / 2, box[3])
+            val dotLeft = middleLeft(map, venue)
+            val dotTop = middleTop(map, venue)
+            val wide = Minimap.measureName(c, place.label)
+            val spot = Minimap.NAME_SPOTS_X.indices.firstOrNull { each ->
+                val foot = dotTop + Minimap.NAME_SPOTS_Y[each] - lift
+                isNameClear(map, nameBox(dotLeft + Minimap.NAME_SPOTS_X[each], foot, wide))
+            } ?: 0
+            val left = dotLeft + Minimap.NAME_SPOTS_X[spot]
+            val top = dotTop + Minimap.NAME_SPOTS_Y[spot] - lift
+            if (spot > 0) Minimap.leader(c, dotLeft, dotTop, left, top)
+            names[place] = nameBox(left, top, wide)
+            Minimap.name(c, place.label, left, top)
         }
     }
 
@@ -175,38 +187,19 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
         }
     }
 
-    /**
-     * The box for [label], the name of a place whose dot of [radius] is at [left], [top]: over the dot, or else under
-     * it, to its right or to its left, the first of those on the map that covers no pin and no name placed before it;
-     * over the dot when none does.
-     */
-    private fun nameBox(
-        c: CanvasRenderingContext2D,
-        map: MinimapProjection,
-        label: String,
-        left: Double,
-        top: Double,
-        radius: Double,
-    ): DoubleArray {
-        val wide = Minimap.nameWidth(c, label)
-        val gap = radius + NAME_GAP
-        // Each way as the middle of the name's foot.
-        val ways = listOf(
-            left to top - gap,
-            left to top + gap + NAME_HEIGHT,
-            left + gap + wide / 2 to top + NAME_HEIGHT / 2,
-            left - gap - wide / 2 to top + NAME_HEIGHT / 2,
-        )
-        val boxes = ways.map { (middle, foot) ->
-            doubleArrayOf(middle - wide / 2, foot - NAME_HEIGHT, middle + wide / 2, foot)
+    /** The box of a name [wide] pixels wide whose foot's middle is at [left], [top]: left, top, right, bottom. */
+    private fun nameBox(left: Double, top: Double, wide: Double): DoubleArray =
+        doubleArrayOf(left - wide / 2, top - Minimap.NAME_HEIGHT, left + wide / 2, top)
+
+    /** True when [box] lies on [map] and covers no pin and no name placed before it. */
+    private fun isNameClear(map: MinimapProjection, box: DoubleArray): Boolean {
+        if (box[0] < 0.0 || box[1] < 0.0 || box[2] > map.width || box[3] > map.height) return false
+        val reach = PIN / 2.0 + Minimap.NAME_GAP
+        if (pinLeft.indices.any { at -> covers(box, pinLeft[at], pinTop[at], reach) }) return false
+        val gap = Minimap.NAME_GAP
+        return names.values.none { other ->
+            box[0] < other[2] + gap && other[0] < box[2] + gap && box[1] < other[3] + gap && other[1] < box[3] + gap
         }
-        return boxes.firstOrNull { box ->
-            box[0] >= 0.0 && box[1] >= 0.0 && box[2] <= map.width && box[3] <= map.height &&
-                pinLeft.indices.none { at -> covers(box, pinLeft[at], pinTop[at], PIN / 2.0 + NAME_GAP) } &&
-                names.values.none { other ->
-                    box[0] < other[2] && other[0] < box[2] && box[1] < other[3] && other[1] < box[3]
-                }
-        } ?: boxes.first()
     }
 
     private fun middleLeft(map: MinimapProjection, venue: Venue): Double =
@@ -230,10 +223,6 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
 
         /** The map's width before the page lays it out: the column of a 375-point phone. */
         private const val NOMINAL_WIDTH = 343.0
-
-        /** A name's height on the map, and how far it keeps from its dot and from a pin, in CSS pixels. */
-        private const val NAME_HEIGHT = 14.0
-        private const val NAME_GAP = 3.0
 
         /** True when [box] comes within [reach] of the spot [left], [top]. */
         fun covers(box: DoubleArray, left: Double, top: Double, reach: Double): Boolean =

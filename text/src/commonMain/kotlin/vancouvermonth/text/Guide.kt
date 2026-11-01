@@ -5,9 +5,11 @@ fun soundLabel(on: Boolean): String = if (on) "소리 끄기" else "소리 켜�
 
 /**
  * What a screen reader hears for the small map in the town's corner, which is a picture: roughly where the character
- * is, by the name of the place it is nearest.
+ * is, by the name of the place or station it is nearest; "근처" when it is close by, and only which way ("쪽") when
+ * the nearest is still far off.
  */
-fun minimapLabel(nearest: String): String = "지도: $nearest 근처"
+fun minimapLabel(nearest: String, near: Boolean = true): String =
+    if (near) "지도: $nearest 근처" else "지도: $nearest 쪽"
 
 /**
  * How to play: on the intro, the page's first screen, and on the card the "?" in the town opens, with the button that
@@ -26,7 +28,7 @@ object Guide {
         "사람이나 건물을 누르면 말을 걸어요. 일 하나를 고르면 하루가 끝나요.",
         "스카이트레인 역, 버스 정류장, 수상버스 선착장을 누르면 타요.",
         "자전거는 가게에서 사거나 길에서 빌리고, 택시는 위 카드로 불러요.",
-        "오른쪽 위 작은 지도는 내 둘레를, 누르면 지도 전체를 보여요.",
+        "오른쪽 위 작은 지도는 내 주변을, 누르면 지도 전체를 보여요.",
     )
 
     /** The card's button: it opens mid-month from the "?", so it closes the card rather than starts anything. */
@@ -70,4 +72,7 @@ object Guide {
      * links to [BURNABY_MAP_LICENCE_URL].
      */
     const val BURNABY_MAP_LINE = "$BURNABY_MAP_CREDIT ($BURNABY_MAP_SOURCE, $BURNABY_MAP_LICENCE)"
+
+    /** What a screen reader hears after a licence link's name: the link opens in a new tab, and the game stays. */
+    const val NEW_TAB = "(새 탭에서 열려요)"
 }

@@ -497,6 +497,18 @@ class Journey(
         const val TRAIN_RIDE_SECONDS = 12.0
 
         /**
+         * How fast a taxi goes at its quickest on a ride [length] units long, and how long it takes to get there: as
+         * always on a ride downtown, or quicker on a long one, up to [TAXI_TOP], so a ride from Burnaby to downtown takes
+         * about [TAXI_RIDE_SECONDS] at full speed rather than most of a minute.
+         */
+        fun taxiCruise(length: Double): Double = (length / TAXI_RIDE_SECONDS).coerceIn(TAXI_SPEED, TAXI_TOP)
+
+        fun taxiRamp(cruise: Double): Double = TAXI_RAMP * cruise / TAXI_SPEED
+
+        const val TAXI_TOP = 24.0
+        const val TAXI_RIDE_SECONDS = 20.0
+
+        /**
          * The way along [line] from along [from] to along [to], carried on [beyond] past [to] the same way: the line's
          * own corners on the way, so it follows the line exactly. Along may be below 0 or past the line's end, where
          * the line carries on straight.

@@ -141,7 +141,8 @@ internal class FirstRunGuide {
 
 /**
  * The map's credit, as the City of Vancouver's open data licence asks wherever its data shows, at the end of [parent]:
- * the statement, with the licence's name a link to the licence that opens in a new tab, so the game stays where it is.
+ * the statement, with the licence's name a link to the licence that opens in a new tab, so the game stays where it is;
+ * a screen reader hears that it opens in a new tab.
  */
 internal fun mapCredit(parent: HTMLElement, className: String): HTMLElement {
     val credit = document.createElement("p") as HTMLElement
@@ -150,6 +151,7 @@ internal fun mapCredit(parent: HTMLElement, className: String): HTMLElement {
     credit.appendChild(document.createTextNode(Guide.MAP_CREDIT.substring(0, name)))
     val link = document.createElement("a") as HTMLAnchorElement
     link.textContent = Guide.MAP_LICENCE
+    link.setAttribute("aria-label", "${Guide.MAP_LICENCE} ${Guide.NEW_TAB}")
     link.href = Guide.MAP_LICENCE_URL
     link.target = "_blank"
     link.rel = "noopener"
@@ -171,6 +173,7 @@ internal fun burnabyCredit(parent: HTMLElement, className: String): HTMLElement 
     credit.appendChild(document.createTextNode(line.substring(0, name)))
     val link = document.createElement("a") as HTMLAnchorElement
     link.textContent = Guide.BURNABY_MAP_LICENCE
+    link.setAttribute("aria-label", "${Guide.BURNABY_MAP_LICENCE} ${Guide.NEW_TAB}")
     link.href = Guide.BURNABY_MAP_LICENCE_URL
     link.target = "_blank"
     link.rel = "noopener"

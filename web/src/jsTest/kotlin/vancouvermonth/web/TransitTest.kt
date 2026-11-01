@@ -97,10 +97,12 @@ class TransitTest {
         for (line in TransitLines.busLines) {
             val loop = line.loop
             assertEquals(loop.points.first(), loop.points.last())
+            // Downtown's loop keeps to the streets; Burnaby's main streets pass along the edges of its parks.
+            val ground = if (line === TransitLines.busLines[0]) setOf(Terrain.LAND) else setOf(Terrain.LAND, Terrain.PARK)
             for (spot in samples(loop)) {
                 val cell = town.cellAt(spot)
                 assertTrue(town.isFree(cell), "the bus runs over $cell at $spot")
-                assertTrue(map.terrainAt(cell) == Terrain.LAND || map.terrainAt(cell) == Terrain.PARK, "off the streets at $spot")
+                assertTrue(map.terrainAt(cell) in ground, "off the streets at $spot")
                 for (city in Neighbourhood.cityLots) assertFalse(city.isNear(spot.x, spot.z, 0.0), "into a building at $spot")
             }
             assertEquals(line.stops.sortedBy { it.along }, line.stops)
@@ -172,6 +174,24 @@ class TransitTest {
         val office = Neighbourhood.venue(Place.OFFICE).door
         val squares = length(town.route(home, office))
         assertEquals((TaxiFare.BASE + squares * 0.15).roundToInt(), TaxiFare.forDistance(squares))
+    }
+
+    @Test
+    fun `a taxi goes as fast as ever downtown, and quicker out to Burnaby, about 20 seconds from zone 3 to 회사`() {
+        // Between any two of the stops in the town's own corner, the top speed a taxi always had.
+        val corner = TransitLines.taxiStops.map { it.second }.filter { it.x < Neighbourhood.TOWN_COLUMNS }
+        var longest = 0.0
+        for (from in corner) for (to in corner) longest = maxOf(longest, length(town.route(from, to)))
+        assertEquals(Journey.TAXI_SPEED, Journey.taxiCruise(longest), "$longest squares")
+        assertEquals(Journey.TAXI_RAMP, Journey.taxiRamp(Journey.TAXI_SPEED))
+        // From zone 3's 내 방 to 회사, the longest ride a taxi takes: faster, no faster than its top, and about 20 s.
+        val site = HomeSite.of(3)
+        val far = length(site.grid.route(site.home.door, Neighbourhood.venue(Place.OFFICE).door))
+        val cruise = Journey.taxiCruise(far)
+        val ride = Glide(far, cruise, Journey.taxiRamp(cruise))
+        println("A taxi from zone 3 to 회사: $far squares at up to $cruise a second, ${ride.millis} ms")
+        assertTrue(cruise > Journey.TAXI_SPEED && cruise <= Journey.TAXI_TOP, "$cruise")
+        assertTrue(ride.millis < 25_000.0, "${ride.millis} ms")
     }
 
     @Test

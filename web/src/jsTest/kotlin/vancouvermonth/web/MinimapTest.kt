@@ -14,6 +14,7 @@ import kotlinx.browser.document
 import org.w3c.dom.CanvasRenderingContext2D
 import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLElement
+import vancouvermonth.text.Transit
 import vancouvermonth.web.MinimapProjection.Companion.AREA_HEIGHT
 import vancouvermonth.web.MinimapProjection.Companion.AREA_WIDTH
 
@@ -124,6 +125,31 @@ class MinimapTest {
         // Downtown is far off it.
         val office = Neighbourhood.venue(Place.OFFICE).door
         assertFalse(window.left(office.x, office.z) in 0.0..window.width && window.top(office.x, office.z) in 0.0..window.height)
+    }
+
+    @Test
+    fun `the whole map on a tap names all five places, none over another, in every zone`() {
+        for (zone in 1..3) {
+            val minimap = Minimap(HomeSite.of(zone))
+            val element = minimap.element
+            minimap.isLarge = true
+            // As large as on a 375-point phone: four fifths of it.
+            element.style.width = "300px"
+            document.body!!.appendChild(element)
+            shown += element
+            minimap.measure()
+            val office = Neighbourhood.venue(Place.OFFICE).door
+            minimap.draw(office.x, office.z, 0.0, office.x, office.z + 20.0, office.x, office.z, 0.8, marked = null)
+            assertEquals(5, minimap.namesDrawn, "zone $zone")
+            val boxes = minimap.nameBoxes
+            for ((index, a) in boxes.withIndex()) {
+                assertTrue(a[0] >= 0.0 && a[1] >= 0.0 && a[2] <= element.clientWidth && a[3] <= element.clientHeight, "zone $zone: $a")
+                for (b in boxes.drop(index + 1)) {
+                    val apart = a[2] <= b[0] || b[2] <= a[0] || a[3] <= b[1] || b[3] <= a[1]
+                    assertTrue(apart, "zone $zone: $a over $b")
+                }
+            }
+        }
     }
 
     @Test
@@ -238,6 +264,27 @@ class MinimapTest {
     }
 
     @Test
+    fun `the small window stays on the ground's picture wherever the character stands`() {
+        // The picture reaches GROUND_PAD squares past the area on each side; the window is centred on the character.
+        val pictureLeft = MinimapProjection.AREA_LEFT - Minimap.GROUND_PAD
+        val pictureTop = MinimapProjection.AREA_TOP - Minimap.GROUND_PAD
+        val pictureRight = MinimapProjection.AREA_LEFT + MinimapProjection.AREA_WIDTH + Minimap.GROUND_PAD
+        val pictureBottom = MinimapProjection.AREA_TOP + MinimapProjection.AREA_HEIGHT + Minimap.GROUND_PAD
+        val halfAcross = Minimap.WINDOW_ACROSS / 2
+        val halfDown = Minimap.WINDOW_DOWN / 2
+        val map = Neighbourhood.map
+        for (z in 0 until map.rows) {
+            for (x in 0 until map.columns) {
+                if (map.terrainAt(x, z) == Terrain.WATER) continue
+                val across = MinimapProjection.turnedAcross(x + 0.5, z + 0.5)
+                val down = MinimapProjection.turnedDown(x + 0.5, z + 0.5)
+                assertTrue(across - halfAcross >= pictureLeft && across + halfAcross <= pictureRight, "at $x, $z")
+                assertTrue(down - halfDown >= pictureTop && down + halfDown <= pictureBottom, "at $x, $z")
+            }
+        }
+    }
+
+    @Test
     fun `a screen reader hears the place the character is nearest`() {
         for (venue in Neighbourhood.venues) {
             assertEquals(venue.place, Minimap.nearestPlace(venue.door.x, venue.door.z))
@@ -253,6 +300,19 @@ class MinimapTest {
         minimap.draw(cafe.x, cafe.z, 0.0, cafe.x, cafe.z + 20.0, cafe.x, cafe.z, 0.8, marked = null)
         assertEquals("지도: 카페 근처", minimap.element.getAttribute("aria-label"))
         assertEquals("img", minimap.element.getAttribute("role"))
+        // Out on the wide map, at a station, that station's name.
+        val fork = TransitLines.stations[3].door
+        minimap.draw(fork.x, fork.z, 0.0, fork.x, fork.z + 20.0, fork.x, fork.z, 0.8, marked = null)
+        assertEquals("지도: ${Transit.STATIONS[3]} 근처", minimap.element.getAttribute("aria-label"))
+        // Far from every place and station, it says only which way the nearest is, not that it is near.
+        val doors = Neighbourhood.venues.map { it.door } + TransitLines.stations.map { it.door }
+        fun reach(x: Double, z: Double) = doors.minOf { hypot(it.x - x, it.z - z) }
+        val far = (0 until Neighbourhood.COLUMNS step 10)
+            .flatMap { x -> (0 until Neighbourhood.ROWS step 10).map { z -> x + 0.5 to z + 0.5 } }
+            .first { (x, z) -> reach(x, z) > Minimap.NEAR_REACH }
+        minimap.draw(far.first, far.second, 0.0, far.first, far.second + 20.0, far.first, far.second, 0.8, marked = null)
+        val label = minimap.element.getAttribute("aria-label").orEmpty()
+        assertTrue(label.startsWith("지도: ") && label.endsWith(" 쪽"), label)
     }
 
     @Test

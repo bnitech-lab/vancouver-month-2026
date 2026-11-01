@@ -210,7 +210,6 @@ class FollowCamera(
         stops: List<Block> = emptyList(),
     ): Picked? {
         val ray = rayThrough(left, top)
-        lastRay = ray
         var nearest = Double.MAX_VALUE
         var wallHit: Wall? = null
         for (wall in TAPPABLE) {
@@ -232,7 +231,7 @@ class FollowCamera(
             )
             // A turned building of the wide map fills only part of the box round it: the tap is tried on it, turned.
             val body = blocks[building.body]
-            if (hit > 0.0 && body.turn != 0.0) hit = enterTurned(body, height)
+            if (hit > 0.0 && body.turn != 0.0) hit = enterTurned(ray, body, height)
             // The camera may stand inside one, as it folds out of the way; it is seen through from in there.
             if (hit > 0.0 && hit < nearest && hit <= MAX_TAP_DISTANCE) {
                 nearest = hit
@@ -287,12 +286,11 @@ class FollowCamera(
      * How far along the ray from the eye going [ray] it enters [body], a box turned about its middle, [height] tall as
      * the cutaway draws it, or -1 when it misses: the eye and the ray turned back by the box's turn, then the box's slabs.
      */
-    private fun enterTurned(body: Block, height: Double): Double {
+    private fun enterTurned(ray: Point, body: Block, height: Double): Double {
         val middleX = body.x + body.width / 2
         val middleZ = body.z + body.depth / 2
         val cosine = cos(body.turn)
         val sine = sin(body.turn)
-        val ray = lastRay
         val ex = eye.x - middleX
         val ez = eye.z - middleZ
         return enterAt(
@@ -301,9 +299,6 @@ class FollowCamera(
             -body.width / 2, body.y, -body.depth / 2, body.width / 2, body.y + height, body.depth / 2,
         )
     }
-
-    /** The way the last tap's ray went, for [enterTurned]. */
-    private var lastRay = Point(0.0, -1.0, 0.0)
 
     /** The way from the eye through the point [left], [top] of the screen, as a vector one unit long. */
     private fun rayThrough(left: Double, top: Double): Point {
