@@ -54,8 +54,10 @@ internal class FirstRunGuide {
         closeButton.onclick = { close() }
         // At the foot, next to the map's credit: the update news, which open over this card and come back to it.
         notes()?.let { news -> news.button(card.add("p", "patch-guide-foot"), root, "patch-link") }
-        // The town is traced from the City of Vancouver's open data, whose licence asks for this line where it shows.
+        // The town is traced from the City of Vancouver's and the City of Burnaby's open data, whose licences ask for
+        // these lines where it shows.
         mapCredit(card, "guide-credit")
+        burnabyCredit(card, "guide-credit")
         for (under in root.children.asList()) {
             if (under is HTMLElement && !under.hasAttribute("inert")) {
                 under.setAttribute("inert", "")
@@ -153,6 +155,27 @@ internal fun mapCredit(parent: HTMLElement, className: String): HTMLElement {
     link.rel = "noopener"
     credit.appendChild(link)
     credit.appendChild(document.createTextNode(Guide.MAP_CREDIT.substring(name + Guide.MAP_LICENCE.length)))
+    parent.appendChild(credit)
+    return credit
+}
+
+/**
+ * The Burnaby part of the map's credit, as the City of Burnaby's open data licence asks, at the end of [parent], next to
+ * [mapCredit]'s line: the statement, the source, and the licence's name a link to the licence, opening in a new tab.
+ */
+internal fun burnabyCredit(parent: HTMLElement, className: String): HTMLElement {
+    val credit = document.createElement("p") as HTMLElement
+    credit.className = "$className burnaby-credit"
+    val line = Guide.BURNABY_MAP_LINE
+    val name = line.lastIndexOf(Guide.BURNABY_MAP_LICENCE)
+    credit.appendChild(document.createTextNode(line.substring(0, name)))
+    val link = document.createElement("a") as HTMLAnchorElement
+    link.textContent = Guide.BURNABY_MAP_LICENCE
+    link.href = Guide.BURNABY_MAP_LICENCE_URL
+    link.target = "_blank"
+    link.rel = "noopener"
+    credit.appendChild(link)
+    credit.appendChild(document.createTextNode(line.substring(name + Guide.BURNABY_MAP_LICENCE.length)))
     parent.appendChild(credit)
     return credit
 }

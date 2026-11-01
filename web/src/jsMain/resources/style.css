@@ -1400,6 +1400,12 @@ html:has(.walk-town) {
   text-decoration: underline;
 }
 
+/* The Burnaby line sits right under the Vancouver one, as one credit. */
+.guide-credit + .burnaby-credit,
+.intro-credit + .burnaby-credit {
+  margin-top: 2px;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .guide-card {
     animation: talk-up 180ms ease-out;
