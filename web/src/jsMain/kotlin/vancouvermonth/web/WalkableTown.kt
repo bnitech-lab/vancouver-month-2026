@@ -772,7 +772,11 @@ internal class NeighbourhoodScene(
     private fun addHouseDetail() {
         casterDetails = nearDraw(HouseDetail.CASTER_CAPACITY, castsShadows = true)
         details = nearDraw(HouseDetail.CAPACITY, castsShadows = false)
-        houseDetail = HouseDetail(Neighbourhood.yards, casterDetails.instanceMatrix.array, details.instanceMatrix.array)
+        houseDetail = HouseDetail(
+            Neighbourhood.yards,
+            casterDetails.instanceMatrix.array, casterDetails.instanceColor!!.array,
+            details.instanceMatrix.array, details.instanceColor!!.array,
+        )
     }
 
     private fun nearDraw(capacity: Int, castsShadows: Boolean): InstancedMesh {
@@ -782,6 +786,7 @@ internal class NeighbourhoodScene(
         mesh.frustumCulled = false
         mesh.instanceMatrix.setUsage(DynamicDrawUsage)
         for (index in 0 until capacity) mesh.setColorAt(index, detailColour)
+        mesh.instanceColor?.setUsage(DynamicDrawUsage)
         mesh.count = 0
         meshes.add(mesh)
         scene.add(mesh)
@@ -819,16 +824,20 @@ internal class NeighbourhoodScene(
         sendNear(details, houseDetail.others)
     }
 
-    /** Draws the boxes [draw] holds with [mesh], sending only those to the graphics card again. */
+    /**
+     * Draws the boxes [draw] holds with [mesh], sending only those to the graphics card again, and of their colours only
+     * those written again.
+     */
     private fun sendNear(mesh: InstancedMesh, draw: NearDraw) {
         val count = draw.count
-        for (index in 0 until count) mesh.setColorAt(index, detailColour.setHex(draw.colours[index]))
         mesh.count = count
         if (count == 0) return
         mesh.instanceMatrix.addUpdateRange(0, count * 16)
         mesh.instanceMatrix.needsUpdate = true
+        val from = draw.coloursFrom
         val colours = mesh.instanceColor ?: return
-        colours.addUpdateRange(0, count * 3)
+        if (from >= count) return
+        colours.addUpdateRange(from * 3, (count - from) * 3)
         colours.needsUpdate = true
     }
 

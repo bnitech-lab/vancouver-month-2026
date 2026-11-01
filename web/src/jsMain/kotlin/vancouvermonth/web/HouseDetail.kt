@@ -3,6 +3,7 @@ package vancouvermonth.web
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 import org.khronos.webgl.Float32Array
@@ -17,17 +18,24 @@ import org.khronos.webgl.set
  * of the camera's way as the city's buildings do, its roof sinking with its walls. [fill] writes them into two draws:
  * the blocks near the character, which cast the sun's shadows ([casters], written into [casterNumbers]), and the rest in
  * view, which cast none ([others], into [numbers]), the nearest blocks first and never more than each holds, making
- * nothing new.
+ * nothing new. A block always takes the same boxes in the same order, so while the blocks drawn stay the same, so do
+ * their colours, which are written again only when they change.
  */
-internal class HouseDetail(private val yards: List<Yard>, casterNumbers: Float32Array, numbers: Float32Array) {
+internal class HouseDetail(
+    private val yards: List<Yard>,
+    casterNumbers: Float32Array,
+    casterColours: Float32Array,
+    numbers: Float32Array,
+    colours: Float32Array,
+) {
     /**
      * The blocks within [SHADOW_NEAR] of the character, all of them drawn one by one, in view or not, so the sun's
      * shadows round the character are the houses' own; only they go through the shadow pass.
      */
-    val casters = NearDraw(casterNumbers, CASTER_CAPACITY)
+    val casters = NearDraw(casterNumbers, casterColours, CASTER_CAPACITY)
 
     /** The other blocks in view and within reach, and the lawns past it, which cast no shadow. */
-    val others = NearDraw(numbers, CAPACITY)
+    val others = NearDraw(numbers, colours, CAPACITY)
 
     /** The draw being written. */
     private var into = others
@@ -46,10 +54,18 @@ internal class HouseDetail(private val yards: List<Yard>, casterNumbers: Float32
     /** True for each block within [SHADOW_NEAR] of the character. */
     private val byCharacter = BooleanArray(yards.size)
 
-    /** How many boxes each block takes at most, and the blocks to draw in the order they are drawn. */
-    private val needs = IntArray(yards.size) {
-        (if (yards[it].lawn != null) 1 else 0) + yards[it].trees.size + 3 * yards[it].houses.size
+    /**
+     * Each block's boxes' colours, in the order they are written (its lawn, each tree's trunk and leaves, each house's
+     * walls, roof and door), as 0xRRGGBB and as the graphics card takes them; so each block always takes as many boxes
+     * as it has colours, a roof or door not yet grown on taking its box at no size.
+     */
+    private val hexes: Array<IntArray> = Array(yards.size) { coloursOf(yards[it]) }
+    private val linear: Array<FloatArray> = Array(yards.size) { index ->
+        val block = hexes[index]
+        FloatArray(block.size * 3) { linearOf(block[it / 3], it % 3) }
     }
+
+    /** The blocks to draw, in the order they are drawn. */
     private val order = IntArray(yards.size)
 
     /** True for each block whose houses the last [fill] drew one by one, in place of its rows' low boxes. */
@@ -117,8 +133,8 @@ internal class HouseDetail(private val yards: List<Yard>, casterNumbers: Float32
             if (kotlin.math.abs(up) > ahead * tanUp + ball * upSlant) continue
             away[index] = kotlin.math.max(0.0, onGround)
         }
-        casters.count = 0
-        others.count = 0
+        casters.begin()
+        others.begin()
         changedCount = 0
         // The blocks round the character into the draw that casts shadows, or the other should it be full; then the
         // others within reach. Should there be more boxes than a draw holds, its blocks go nearest first, so it is the
@@ -128,16 +144,16 @@ internal class HouseDetail(private val yards: List<Yard>, casterNumbers: Float32
         for (index in yards.indices) {
             if (!byCharacter[index]) continue
             order[listed++] = index
-            needed += needs[index]
+            needed += hexes[index].size
         }
         if (needed > casters.capacity) nearestFirst(listed)
         for (at in 0 until listed) {
             val index = order[at]
             into = casters
-            var drawn = addYard(yards[index], eyeX, eyeZ, foldOf)
+            var drawn = addYard(index, eyeX, eyeZ, foldOf)
             if (!drawn) {
                 into = others
-                drawn = addYard(yards[index], eyeX, eyeZ, foldOf)
+                drawn = addYard(index, eyeX, eyeZ, foldOf)
             }
             show(index, drawn)
         }
@@ -151,14 +167,20 @@ internal class HouseDetail(private val yards: List<Yard>, casterNumbers: Float32
                 continue
             }
             order[listed++] = index
-            needed += needs[index]
+            needed += hexes[index].size
         }
         if (needed > others.capacity) nearestFirst(listed)
-        for (at in 0 until listed) show(order[at], addYard(yards[order[at]], eyeX, eyeZ, foldOf))
+        for (at in 0 until listed) show(order[at], addYard(order[at], eyeX, eyeZ, foldOf))
         for (index in yards.indices) {
             val lawn = yards[index].lawn ?: continue
-            if (away[index] > REACH && others.count < others.capacity) addBox(lawn, 1.0, lawn.colour)
+            if (away[index] <= REACH || others.count >= others.capacity) continue
+            // A lawn alone is told apart from its whole block in the order the draw remembers.
+            val start = others.count
+            addBox(lawn, 1.0)
+            if (others.note(-1 - index, start)) others.colour(start, lawn.colour, linear[index], 0)
         }
+        casters.end()
+        others.end()
     }
 
     /** Puts the first [listed] blocks of [order] nearest first, in place: they are few, so one by one will do. */
@@ -185,12 +207,22 @@ internal class HouseDetail(private val yards: List<Yard>, casterNumbers: Float32
      * A block's lawn, trees, and each house's walls, roof and door, the roof, door and trees grown as far as the
      * camera is near; false, drawing nothing, when they would not all fit.
      */
-    private fun addYard(yard: Yard, eyeX: Double, eyeZ: Double, foldOf: (Int) -> Double): Boolean {
-        if (into.count + yard.trees.size + 3 * yard.houses.size + 1 > into.capacity) return false
+    private fun addYard(index: Int, eyeX: Double, eyeZ: Double, foldOf: (Int) -> Double): Boolean {
+        val yard = yards[index]
+        val block = hexes[index]
+        if (into.count + block.size > into.capacity) return false
+        val draw = into
+        val start = draw.count
         val lawn = yard.lawn
-        if (lawn != null) addBox(lawn, 1.0, lawn.colour)
-        for (box in yard.trees) addBox(box, grown(box.x + box.width / 2, box.z + box.depth / 2, eyeX, eyeZ), box.colour)
-        for (house in yard.houses) {
+        if (lawn != null) addBox(lawn, 1.0)
+        val trees = yard.trees
+        for (at in trees.indices) {
+            val box = trees[at]
+            addBox(box, grown(box.x + box.width / 2, box.z + box.depth / 2, eyeX, eyeZ))
+        }
+        val houses = yard.houses
+        for (at in houses.indices) {
+            val house = houses[at]
             val shape = house.shape
             val grown = grown(shape.x, shape.z, eyeX, eyeZ)
             val fold = foldOf(house.foldable)
@@ -205,18 +237,22 @@ internal class HouseDetail(private val yards: List<Yard>, casterNumbers: Float32
             val tall = house.farWall + (house.wall - house.farWall) * grown
             // The walls as the cutaway draws them, and the roof on top of them, as much smaller as they are folded.
             val walls = if (tall > Cutaway.PLINTH) tall - (tall - Cutaway.PLINTH) * fold else tall
-            put(x, walls / 2, z, width, walls, shape.depth, cosine, sine, 0.0, house.colour)
-            val size = grown * (1 - fold)
-            if (size <= 0.0) continue
-            // A box turned 45 degrees about the ridge, its middle at the eaves, so its lower half stays inside the walls.
+            put(x, walls / 2, z, width, walls, shape.depth, cosine, sine, 0.0)
+            // A box turned 45 degrees about the ridge, its middle at the eaves, so its lower half stays inside the walls;
+            // no size at all before it grows on, or once the house has folded.
+            val size = kotlin.math.max(0.0, grown * (1 - fold))
             val span = (width + 2 * Suburbs.EAVE) / SQRT_TWO * size
-            put(x, walls, z, span, span, shape.depth - 0.02, cosine, sine, ROOF_PITCH, house.roof)
+            put(x, walls, z, span, span, (shape.depth - 0.02) * kotlin.math.sign(size), cosine, sine, ROOF_PITCH)
             // The door, on the front, as tall as the walls let it be.
             val door = kotlin.math.min(DOOR_HEIGHT, house.wall * DOOR_SHARE) * grown * walls / house.wall
             val out = house.front * (shape.depth / 2 + DOOR_DEPTH / 2)
             val doorX = x + house.doorAt * cosine + out * sine
             val doorZ = z - house.doorAt * sine + out * cosine
-            put(doorX, door / 2, doorZ, DOOR_WIDTH, door, DOOR_DEPTH, cosine, sine, 0.0, DOOR)
+            put(doorX, door / 2, doorZ, DOOR_WIDTH * kotlin.math.sign(door), door, DOOR_DEPTH, cosine, sine, 0.0)
+        }
+        // Its colours only when the blocks before it in the draw, or it, changed since the last time.
+        if (draw.note(index, start)) {
+            for (at in block.indices) draw.colour(start + at, block[at], linear[index], at)
         }
         return true
     }
@@ -226,12 +262,11 @@ internal class HouseDetail(private val yards: List<Yard>, casterNumbers: Float32
         ((REACH - hypot(x - eyeX, z - eyeZ)) / GROW).coerceIn(0.0, 1.0)
 
     /** [box], [share] of its size, grown from the ground up about its middle. */
-    private fun addBox(box: Block, share: Double, colour: Int) {
-        if (share <= 0.0) return
+    private fun addBox(box: Block, share: Double) {
         val height = box.height * share
         put(
             box.x + box.width / 2, box.y * share + height / 2, box.z + box.depth / 2,
-            box.width * share, height, box.depth * share, cos(box.turn), sin(box.turn), 0.0, colour,
+            box.width * share, height, box.depth * share, cos(box.turn), sin(box.turn), 0.0,
         )
     }
 
@@ -250,7 +285,6 @@ internal class HouseDetail(private val yards: List<Yard>, casterNumbers: Float32
         cosine: Double,
         sine: Double,
         tilt: Double,
-        colour: Int,
     ) {
         val draw = into
         if (draw.count >= draw.capacity) return
@@ -274,8 +308,16 @@ internal class HouseDetail(private val yards: List<Yard>, casterNumbers: Float32
         numbers[at + 13] = y.toFloat()
         numbers[at + 14] = z.toFloat()
         numbers[at + 15] = 1f
-        draw.colours[draw.count] = colour
         draw.count += 1
+    }
+
+    /** [yard]'s boxes' colours, in the order [addYard] writes its boxes. */
+    private fun coloursOf(yard: Yard): IntArray {
+        val colours = mutableListOf<Int>()
+        yard.lawn?.let { colours.add(it.colour) }
+        for (box in yard.trees) colours.add(box.colour)
+        for (house in yard.houses) colours.addAll(listOf(house.colour, house.roof, DOOR))
+        return colours.toIntArray()
     }
 
     companion object {
@@ -310,12 +352,63 @@ internal class HouseDetail(private val yards: List<Yard>, casterNumbers: Float32
         private const val DOOR_SHARE = 0.5
         private const val DOOR_DEPTH = 0.04
         private const val DOOR = 0x6B4630
+
+        /** Channel [channel] (0 red, 1 green, 2 blue) of [hex] as the graphics card takes it, linear, as Three.js turns it. */
+        private fun linearOf(hex: Int, channel: Int): Float {
+            val share = (hex shr (16 - 8 * channel) and 0xFF) / 255.0
+            val linear = if (share < 0.04045) share * 0.0773993808 else (share * 0.9478672986 + 0.0521327014).pow(2.4)
+            return linear.toFloat()
+        }
     }
 }
 
-/** One draw of the near houses: [capacity] boxes' numbers, sixteen each, and their colours, the first [count] in use. */
-internal class NearDraw(val numbers: Float32Array, val capacity: Int) {
-    /** Each box's colour, as 0xRRGGBB. */
+/**
+ * One draw of the near houses: [capacity] boxes' [numbers], sixteen each, and colours, three each as the graphics card
+ * takes them ([colourNumbers]) and as 0xRRGGBB ([colours]), the first [count] in use. The colours are written only from
+ * [coloursFrom] on: a box keeps its slot while the blocks before it in the draw stay the same.
+ */
+internal class NearDraw(val numbers: Float32Array, val colourNumbers: Float32Array, val capacity: Int) {
     val colours = IntArray(capacity)
     var count = 0
+
+    /** The first box whose colour the last fill wrote again; [count] when none changed. */
+    var coloursFrom = 0
+        private set
+
+    /** The blocks written, in order, this time; how many of them there were last time; whether one has differed yet. */
+    private val written = IntArray(capacity)
+    private var writtenCount = 0
+    private var lastCount = 0
+    private var differs = false
+
+    fun begin() {
+        lastCount = writtenCount
+        writtenCount = 0
+        count = 0
+        differs = false
+        coloursFrom = Int.MAX_VALUE
+    }
+
+    /**
+     * Notes that [entry] is written next, from box [start]: true when its colours must be written again, as it or one
+     * before it differs from last time.
+     */
+    fun note(entry: Int, start: Int): Boolean {
+        if (differs || writtenCount >= lastCount || written[writtenCount] != entry) differs = true
+        written[writtenCount++] = entry
+        if (differs && start < coloursFrom) coloursFrom = start
+        return differs
+    }
+
+    /** Box [slot] in [hex], its linear channels from [linear] at [at]. */
+    fun colour(slot: Int, hex: Int, linear: FloatArray, at: Int) {
+        colours[slot] = hex
+        colourNumbers[slot * 3] = linear[at * 3]
+        colourNumbers[slot * 3 + 1] = linear[at * 3 + 1]
+        colourNumbers[slot * 3 + 2] = linear[at * 3 + 2]
+    }
+
+    fun end() {
+        if (coloursFrom > count) coloursFrom = count
+    }
 }

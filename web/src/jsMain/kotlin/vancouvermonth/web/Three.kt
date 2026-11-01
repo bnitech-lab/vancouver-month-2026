@@ -198,12 +198,15 @@ external class InstancedMesh(geometry: BufferGeometry, material: Material, count
 }
 
 /**
- * The numbers behind [InstancedMesh.instanceColor]: [needsUpdate] sends changed colours to the graphics card, and
- * [addUpdateRange] narrows the next send to [count] numbers from [start].
+ * The numbers behind [InstancedMesh.instanceColor], three for each copy, linear: [needsUpdate] sends changed colours to
+ * the graphics card, [addUpdateRange] narrows the next send to [count] numbers from [start], and [setUsage] with
+ * [DynamicDrawUsage] tells it they change often.
  */
 external interface InstanceColours {
+    val array: Float32Array
     var needsUpdate: Boolean
     fun addUpdateRange(start: Int, count: Int)
+    fun setUsage(usage: Int)
 }
 
 /**

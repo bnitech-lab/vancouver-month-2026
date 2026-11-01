@@ -25,7 +25,9 @@ import org.khronos.webgl.get
  */
 class HouseDetailTest {
     private val casterNumbers = Float32Array(HouseDetail.CASTER_CAPACITY * 16)
+    private val casterColours = Float32Array(HouseDetail.CASTER_CAPACITY * 3)
     private val numbers = Float32Array(HouseDetail.CAPACITY * 16)
+    private val colours = Float32Array(HouseDetail.CAPACITY * 3)
 
     /** A camera's tan of half its view across, on a 375 by 812 phone, and up and down at 60 degrees. */
     private val tanUp = tan(PI / 6)
@@ -38,7 +40,7 @@ class HouseDetailTest {
         return Point(focus.x + cos(pitch) * sin(yaw) * reach, 1.0 + sin(pitch) * reach, focus.z + cos(pitch) * cos(yaw) * reach)
     }
 
-    private fun detailOf(yards: List<Yard>) = HouseDetail(yards, casterNumbers, numbers)
+    private fun detailOf(yards: List<Yard>) = HouseDetail(yards, casterNumbers, casterColours, numbers, colours)
 
     private fun HouseDetail.fillFor(eye: Point, focus: Spot, foldOf: (Int) -> Double = { 0.0 }) =
         fill(eye.x, eye.y, eye.z, focus.x, 1.0, focus.z, tanAcross, tanUp, foldOf)
@@ -109,6 +111,29 @@ class HouseDetailTest {
         // Turned the other way round, other blocks: those first shown go, and others come.
         detail.fillFor(eyeFor(focus, FollowCamera.START_YAW + PI), focus)
         assertTrue(detail.changedCount > (shown.size - round.size) / 2)
+    }
+
+    @Test
+    fun `while the same blocks are drawn their colours are not written again, and each takes the same boxes`() {
+        val focus = Neighbourhood.home(3).door
+        val detail = detailOf(Neighbourhood.yards)
+        detail.fillFor(eyeFor(focus, FollowCamera.START_YAW), focus)
+        assertEquals(0, detail.others.coloursFrom)
+        assertEquals(0, detail.casters.coloursFrom)
+        val first = detail.count
+        // Written again for the same camera, as for a house folding: the same blocks, so the same boxes, no colour to send.
+        detail.fillFor(eyeFor(focus, FollowCamera.START_YAW), focus) { if (it == Neighbourhood.houses[0].foldable) 0.5 else 0.0 }
+        assertEquals(first, detail.count)
+        assertEquals(detail.others.count, detail.others.coloursFrom)
+        assertEquals(detail.casters.count, detail.casters.coloursFrom)
+        // Turned the other way, other blocks: their colours are written, and they are right.
+        detail.fillFor(eyeFor(focus, FollowCamera.START_YAW + PI), focus)
+        assertTrue(detail.others.coloursFrom < detail.others.count)
+        val drawn = Neighbourhood.yards.filterIndexed { index, _ -> detail.shown[index] }
+        val expected = drawn.flatMap { yard -> yard.houses.map { it.colour } }.toSet()
+        assertTrue(boxes(detail).map { it.colour }.toSet().containsAll(expected))
+        // Every house takes three boxes, a roof or door not yet grown at no size.
+        assertTrue(boxes(detail).count { it.colour == 0x6B4630 } == drawn.sumOf { it.houses.size })
     }
 
     @Test
