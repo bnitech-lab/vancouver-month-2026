@@ -18,7 +18,7 @@ https://opendata.vancouver.ca/pages/licence/
 The map data is offered under that licence (version 1.0), not under the MIT licence of the game's code. The City of
 Vancouver does not endorse this game.
 
-The wide map (WideMapData, east through East Vancouver into Burnaby), wherever the page uses it, is also derived from
+The wide map (WideMapData, east through East Vancouver into Burnaby), which the town stands on, is also derived from
 the City of Vancouver's Rapid transit stations and Public streets, and from these datasets of City of Burnaby Open
 Data, https://data.burnaby.ca, credit City of Burnaby, fetched on 2026-10-31 (Vancouver time):
 

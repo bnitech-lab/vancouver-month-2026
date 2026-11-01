@@ -30,8 +30,8 @@ class TransitTest {
 
     @Test
     fun `every station, stop and dock has its own name, and the chooser and the top card say where and what`() {
-        assertEquals(4, Transit.STATIONS.size)
-        assertEquals(5, Transit.BUS_STOPS.size)
+        assertEquals(9, Transit.STATIONS.size)
+        assertEquals(9, Transit.BUS_STOPS.size)
         assertEquals(3, Transit.DOCKS.size)
         for (names in listOf(Transit.STATIONS, Transit.BUS_STOPS, Transit.DOCKS)) assertEquals(names, names.distinct())
         assertEquals("터널 입구역", Transit.stopName(Transport.SKYTRAIN, 1))

@@ -20,9 +20,14 @@ fun distanceBetween(a: Spot, b: Spot): Double = hypot(b.x - a.x, b.z - a.z)
  * [route] finds the way between two spots with A*, the usual shortest-path search in games. Inside, each square is a
  * number, z * [columns] + x, so a search on a big grid makes no new objects for the squares it looks at.
  */
-class Grid(val columns: Int, val rows: Int, blocked: Collection<Cell>) {
-    private val closed = BooleanArray(columns * rows).also { closed ->
-        for (cell in blocked) if (cell.x in 0 until columns && cell.z in 0 until rows) closed[cell.z * columns + cell.x] = true
+class Grid private constructor(val columns: Int, val rows: Int, private val closed: BooleanArray) {
+    constructor(columns: Int, rows: Int, blocked: Collection<Cell>) : this(columns, rows, closedBy(columns, rows, blocked))
+
+    /** This ground with [more] squares blocked as well: a new grid, this one left as it is. */
+    fun with(more: Collection<Cell>): Grid {
+        val both = closed.copyOf()
+        for (cell in more) if (cell.x in 0 until columns && cell.z in 0 until rows) both[cell.z * columns + cell.x] = true
+        return Grid(columns, rows, both)
     }
 
     fun isFree(cell: Cell): Boolean = isFree(cell.x, cell.z)
@@ -94,6 +99,41 @@ class Grid(val columns: Int, val rows: Int, blocked: Collection<Cell>) {
             }
         }
         return (0 until tail).mapTo(LinkedHashSet()) { Cell(waiting[it] % columns, waiting[it] / columns) }
+    }
+
+    /**
+     * Every free square the character cannot walk to from [start]: the pockets walled in by what stands round them.
+     * Worked out with arrays, so even the wide map's ground takes a moment.
+     */
+    fun cutOffFrom(start: Cell): List<Cell> {
+        val reached = BooleanArray(columns * rows)
+        if (isFree(start)) {
+            val waiting = IntArray(columns * rows)
+            var head = 0
+            var tail = 0
+            val first = start.z * columns + start.x
+            reached[first] = true
+            waiting[tail++] = first
+            while (head < tail) {
+                val square = waiting[head++]
+                val x = square % columns
+                val z = square / columns
+                for (dx in -1..1) {
+                    for (dz in -1..1) {
+                        if (!canStep(x, z, dx, dz)) continue
+                        val next = (z + dz) * columns + x + dx
+                        if (reached[next]) continue
+                        reached[next] = true
+                        waiting[tail++] = next
+                    }
+                }
+            }
+        }
+        val cut = mutableListOf<Cell>()
+        for (square in 0 until columns * rows) {
+            if (!closed[square] && !reached[square]) cut.add(Cell(square % columns, square / columns))
+        }
+        return cut
     }
 
     /** Every free square of the grid. */
@@ -206,7 +246,65 @@ class Grid(val columns: Int, val rows: Int, blocked: Collection<Cell>) {
 
     private fun distance(a: Cell, b: Cell): Double = hypot((a.x - b.x).toDouble(), (a.z - b.z).toDouble())
 
+    /**
+     * The way from [from] to each of [targets], as [route] finds it, from one search over the ground instead of one
+     * for each: the cheapest way to every square is worked out once, outward from [from], until each target's square is
+     * reached. A target cut off from [from] gets an empty way.
+     */
+    fun routes(from: Spot, targets: List<Spot>): List<List<Spot>> {
+        val start = nearestFree(cellAt(from)) ?: return targets.map { emptyList() }
+        val goals = IntArray(targets.size) { index ->
+            val goal = nearestFree(cellAt(targets[index]))
+            if (goal == null) -1 else goal.z * columns + goal.x
+        }
+        val size = columns * rows
+        val cost = DoubleArray(size) { Double.MAX_VALUE }
+        val cameFrom = IntArray(size) { -1 }
+        val done = BooleanArray(size)
+        var left = goals.count { it >= 0 }
+        val first = start.z * columns + start.x
+        cost[first] = 0.0
+        val open = OpenSquares()
+        open.push(first, 0.0)
+        while (open.isNotEmpty() && left > 0) {
+            val current = open.pop()
+            if (done[current]) continue
+            done[current] = true
+            for (goal in goals) if (goal == current) left--
+            val x = current % columns
+            val z = current / columns
+            for (dx in -1..1) {
+                for (dz in -1..1) {
+                    if (!canStep(x, z, dx, dz)) continue
+                    val next = (z + dz) * columns + x + dx
+                    if (done[next]) continue
+                    val newCost = cost[current] + if (dx != 0 && dz != 0) SLANT else 1.0
+                    if (newCost < cost[next]) {
+                        cost[next] = newCost
+                        cameFrom[next] = current
+                        open.push(next, newCost)
+                    }
+                }
+            }
+        }
+        return targets.indices.map { index ->
+            val goal = goals[index]
+            if (goal < 0 || !done[goal]) return@map emptyList()
+            val cells = wayBack(goal, cameFrom)
+            val reached = Cell(goal % columns, goal / columns)
+            val end = if (reached == cellAt(targets[index])) targets[index] else centreOf(reached)
+            straighten(listOf(from) + cells.drop(1).dropLast(1).map { centreOf(it) } + end)
+        }
+    }
+
     companion object {
+        private fun closedBy(columns: Int, rows: Int, blocked: Collection<Cell>): BooleanArray =
+            BooleanArray(columns * rows).also { closed ->
+                for (cell in blocked) {
+                    if (cell.x in 0 until columns && cell.z in 0 until rows) closed[cell.z * columns + cell.x] = true
+                }
+            }
+
         /** How far the character keeps from a blocked square, a little more than half its width. */
         const val CLEARANCE = 0.3
         const val SAMPLE_STEP = 0.1

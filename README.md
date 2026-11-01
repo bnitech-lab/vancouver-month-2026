@@ -167,28 +167,34 @@ since the guess began to move money (v0.14): a month kept before that started wi
 On the phone screen, September is played in a small 3D town that fills the screen, drawn with
 [Three.js](https://threejs.org) from boxes only, with no image files. It aims for a cosy, storybook feel: soft colours,
 cartoon shading, a warm sun with soft shadows, round-headed people, round trees in leaf or blossom, flowers, fences,
-street lamps and a campfire. The town is real Vancouver, traced from the City's open data (see Map data below) and
-shrunk so the farthest walk between two places is about half a minute: the downtown peninsula with the big park at its
-tip as a forest of round trees, the West End's low blocks and downtown's towers along the real street grid, the seawall
-round the shore, False Creek with its south shore past it, and the inlet with the mountains far across it. The five
-places stand in the neighbourhoods that suit them: 내 방 (the room picked on September 1st) with its garden in the West
-End, the 카페 by the seawall on False Creek, the 도서관 in the middle of downtown, 코워킹 in the old brick streets at the
-east end, and the 회사 tower in the business district by the inlet. The SkyTrain runs on its guideway along False Creek,
-out of its tunnel by the station. Each place's name floats over it, and so does the bike shop's (see below); no other
-building has a name. The day's figures
+street lamps and a campfire. The town is real Vancouver and south-west Burnaby, traced from the two cities' open data
+(see Map data below), one square for 25 m, so the farthest walk between two of the downtown places is about half a
+minute: the downtown peninsula with the big park at its tip as a forest of round trees, the West End's low blocks and
+downtown's towers along the real street grid, the seawall round the shore, False Creek with its south shore past it, and
+the inlet with the mountains far across it; then, east of downtown, East Vancouver and Burnaby as a low, turned box on
+each real block (taller round the Burnaby town centre) with their parks as forest, about two minutes on foot from
+downtown. The five places stand in the neighbourhoods that suit them: the 카페 by the seawall on False Creek, the 도서관 in
+the middle of downtown, 코워킹 in the old brick streets at the east end, the 회사 tower in the business district by the
+inlet, and 내 방 (the room picked on September 1st) with its garden where the room is: in the West End for a room in
+zone 1, in Burnaby for zones 2 and 3, each morning starting at its door. The SkyTrain runs on its guideway out of its
+tunnel by the station, along False Creek and out through East Vancouver to Burnaby. Each place's name floats over it,
+and so does the bike shop's (see below); no other building has a name. Only the ground and buildings near the camera
+are drawn; the far city is left to the haze. The day's figures
 sit thinly over the top of the screen, and a name that would sit under them or the day's log hides there. The month's
-first view looks over 내 방 toward downtown, high enough to show four of the buildings and their names.
+first view looks over 내 방, toward downtown from the West End, high enough to show four of the buildings and their names.
 
-A small map of the whole town sits in the top right corner, just under the day's figures and the day's log, so the
-player always knows roughly where the character is. It lies with real north up, as a paper map of the city does, and
-never turns; a small N with an arrow at its top says so. (The town itself is the real city turned 44.7 degrees, so
-downtown's streets run along it; the map turns that back.) It shows all the ground the character can walk on: the land,
-the water, the big park and the seawall, the city's blocks faintly, the north shore's forest across the inlet, the five
-places (내 방 a red square, the others dots, 회사 green on an interview day as its name is), the camera's view as a pale
-wedge, and the character as a gold arrow pointing the way it faces. It is drawn again only when the character or the
-camera moves. A tap shows it larger, about four fifths of the screen wide with the places' names; a tap or Escape brings
-it back, and a talk or the guide closes it. It is a picture: a screen reader hears only which place the character is
-nearest, as in "지도: 내 방 근처".
+A small map sits in the top right corner, just under the day's figures and the day's log, so the player always knows
+roughly where the character is. It lies with real north up, as a paper map of the city does, and never turns; a small N
+with an arrow at its top says so. (The town itself is the real city turned 44.7 degrees, so downtown's streets run along
+it; the map turns that back.) It shows the ground round the character, 100 squares (2.5 km) across, the character in its
+middle, and follows it: the land, the water, the parks and the seawall, the city's blocks faintly, the five places (내 방
+a red square, the others dots, 회사 green on an interview day as its name is), the camera's view as a pale wedge, and
+the character as a gold arrow pointing the way it faces. 내 방 and 회사, when off the small map, show as small arrows on
+its edge pointing the way to them. It is drawn again only when the character or the camera moves. A tap shows the whole
+map larger, about four fifths of the screen wide with the places' names; a tap or Escape brings the small one back, and
+a talk or the guide closes it. It is a picture: a screen reader hears only which place or station the character is
+nearest, as in "지도: 내 방 근처", or, more than 40 squares from any of them, which way the nearest is, as in
+"지도: 큰 공원역 쪽".
 
 | Do | What happens |
 |---|---|
@@ -202,7 +208,7 @@ nearest, as in "지도: 내 방 근처".
 | Tap 자전거 타기 or 퀵보드 타기 on the top card, once bought | The character gets on; 내리기 gets off |
 | Tap a SkyTrain station, a bus stop or a water bus dock | The character walks there, and a card offers where to go from it |
 | Tap 택시 부르기 on the top card | A card offers every place a taxi goes, each with its fare, before anything is paid |
-| Tap the small map | It shows larger; a tap or Escape brings it back |
+| Tap the small map | It shows the whole map larger; a tap or Escape brings the small one back |
 
 The city's buildings never get in the way. One that stands between the camera and the character, or fills the view
 just in front of the camera, folds down in a quarter of a second to a low outline of its footprint in its own colour,
@@ -234,28 +240,34 @@ be left could not pay the living cost of every day left in September, so the bal
 offers 자전거 타기 or 퀵보드 타기, and while riding says what is ridden (a shared one with its fare), with 내리기. A
 bike goes about 9 units a second and an e-scooter 11, against 3.6 on foot (a double tap is a little faster still), along
 the same streets, never over the water, the rider pedalling on the saddle or standing on the deck, and the camera keeps
-up. Shared bikes stand two to a dock near 내 방, 도서관, 카페 and the station, and shared e-scooters on four street
-corners, all in an invented purple. A tap on one walks up to it, pays its fare ($3 a bike ride, $4 an e-scooter ride)
+up. Shared bikes stand two to a dock near the West End's 내 방, 도서관, 카페 and the station, and in Burnaby near 내 방 in
+zones 2 and 3 and the two stations of the town centre, and shared e-scooters on four street corners, all in an invented purple. A tap on one walks up to it, pays its fare ($3 a bike ride, $4 an e-scooter ride)
 once, there, and rides off on it; it goes back to its dock or corner when the player taps 내리기 or a talk opens. Any
 talk gets the character off first, and the day's end too, so each morning starts on foot; a fare is only ever paid for
 a ride that starts. The money spent during a day heads that day's log, in two lines at most ("그 밖에 5건 -$15" for the
 rest), and on a small phone the log gives up its last lines before a talk would leave the screen. Every price is invented, and no shop, brand or bike-share or scooter company is real. On the
 button screen there is no shop and no riding.
 
-The SkyTrain, a bus, a water bus and taxis take the character across town, still without spending a day. The SkyTrain
-has four stations, named for their part of town: 다운타운역 under downtown, 터널 입구역 (the station by the tunnel's mouth,
-as before), 크릭 끝역 past the head of False Creek, and 동쪽역 out east, each up on the line with an entrance on the
-ground under its platform, but the first, whose entrance stands on a downtown street. A tap on a station's building
+The SkyTrain, buses, a water bus and taxis take the character across town, still without spending a day. The SkyTrain
+has nine stations, named for what is round them: 다운타운역 under downtown, 터널 입구역 (the station by the tunnel's
+mouth, as before), then the Expo Line's real stations from the open data out to the Burnaby town centre under made-up
+names (크릭 끝역, 갈림길역, 동쪽 마을역, 작은 공원역, 경계역, 큰 공원역, 중심가역), each up on the line with an entrance
+on the ground under its platform, but the first, whose entrance stands on a downtown street. The line goes on past the
+town centre into the haze, where the game stops nowhere. A tap on a station's building
 walks the character to its door, and a card lists the other stations; the train comes in, the camera follows it along
 the guideway (under downtown it waits at the entrance and cuts to the train as it leaves the tunnel), and the character
-steps out at the station chosen. A bus runs a loop on its own along the West End's and downtown's streets, with five
-stops (공원 입구, 쇼핑 거리, 다운타운, 다운타운 남쪽, 웨스트엔드), each a shelter and a sign; a tap on one offers the
-others, and a bus takes the character there the shorter way round. Both are free with the month's pass, which the room's
+steps out at the station chosen. A long ride goes faster, so downtown to Burnaby takes about 18 seconds. A bus runs a
+loop on its own along the West End's and downtown's streets, with five stops (공원 입구, 쇼핑 거리, 다운타운, 다운타운
+남쪽, 웨스트엔드), and another out and back along Burnaby's main streets, from 경계역 앞 by the station at the city line
+past 버나비 큰길 (by 내 방 in zone 2) and 큰 공원 옆 to 비탈 마을 (by 내 방 in zone 3); each stop is a shelter and a
+sign, and a tap on one offers the other stops of its line, a bus taking the character there the shorter way round. Both are free with the month's pass, which the room's
 total already pays. A water bus crosses False Creek between three docks (카페 앞 by the café, 남쪽 기슭 on the far shore,
 크릭 끝 near its head) for $4 a ride, the character standing on its open deck. 택시 부르기 on the top card, whenever the
-character is on foot and no talk is open, lists the five places, the bike shop and the four stations with each fare: $4 and $1.50 for every ten squares
-along the streets, to the dollar (the meter would stop at $60, which no trip in town reaches); a taxi appears where the
-character stands and drives there fast, and its 내리기 lets the character out on the way. A fare is paid through core
+character is on foot and no talk is open, lists the five places, the bike shop and the nine stations with each fare: $4 and $1.50 for every ten squares
+along the streets up to 160 squares and $0.70 for every ten past that, to the dollar (downtown to Burnaby is about $45;
+the meter stops at $60); a taxi appears where the
+character stands and drives there fast, faster still on a long ride (up to 24 squares a second, so Burnaby to downtown
+takes about 20 seconds), and its 내리기 lets the character out on the way. A fare is paid through core
 when the ride sets off and only then, heads that day's log ("수상버스를 탔어요. -$4", "택시를 탔어요. -$12"), is kept
 in the record (w and t, the record's version unchanged, so a month kept before still goes on), and is refused with the
 reason, as a purchase is, when what would be left could not pay September's living cost. While riding, the town takes no
@@ -270,9 +282,10 @@ character stands right in their way. A tap on one opens a short word of small ta
 they stop and face the character until it ends, and say something new each time that day. They are not obstacles, so the
 character's walks go through them. In the evening they fade out on their way home and they come back at dawn. The five
 at the places stay where they are, so they are always found there, but they look about, turn to face the character when
-it comes near, and wave as it comes up. The SkyTrain stands at the station, pulls out east along False Creek, its cars
-turning with the guideway, and comes back out of its tunnel from the west every 32 seconds, slowing into the station,
-with its windows lit at night. The campfire flickers and lights the bench after dark, light glints on the water, petals
+it comes near, and wave as it comes up. The SkyTrain stands at the station, pulls out east along the line, its cars
+turning with the guideway, and comes back from the west every 32 seconds, slowing into the station, with its windows lit
+at night: at the station nearest 내 방 at first, then at whichever station is nearest where the player looks, moving
+there while the train is away down the line. The campfire flickers and lights the bench after dark, light glints on the water, petals
 drift down from the blossom trees, and clouds drift high over the water.
 
 Each day has its weather, sunny, cloudy or rainy, worked out from the run's seed and the day, so a run always has the
@@ -308,11 +321,13 @@ where the character simply appears at each day's building. Where the browser has
 is no town and the game plays with buttons, as before. If Three.js fails, the buttons take over and the error goes to the
 console. Tests force each of these.
 
-The town's rules are plain Kotlin with tests: `Neighbourhood` (the layout on the real map, the people, which place a
-spot belongs to), `VancouverMap` (the map's squares and lines, read from the generated `VancouverMapData`), `RailLine`
+The town's rules are plain Kotlin with tests: `Neighbourhood` (the layout on the wide map, the people, which place a
+spot belongs to), `HomeSite` (the town for each zone's room: where 내 방 stands, and the ground to walk on with it),
+`VancouverMap` and `WideMap` (the maps' squares and lines, read from the generated `VancouverMapData` and
+`WideMapData`), `RailLine`
 (the guideway the train follows), `Grid` (the A* search for the way around things), `Trip` (a walk or a dash, and the
 double tap), `Rides` (the bikes and e-scooters, their speeds, and where the shared ones stand), `Transit` (the stations,
-the bus's loop and stops, the water bus's docks and way over the water, the places a taxi goes, and each ride's glide
+the two bus lines and their stops, the water bus's docks and way over the water, the places a taxi goes, and each ride's glide
 along its way), `FollowCamera`
 (turning, zooming, keeping out of the places' walls, and what a tap lands on), `Cutaway`
 (which of the city's buildings fold down out of the camera's way, and how far), `Minimap` (where the grid lies on the
@@ -324,8 +339,9 @@ rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, al
 `Passersby.kt` for the passersby's), and so are each day's weather (`Weather.kt`) and the bike shop's and riding's
 words (`Shop.kt`), and the SkyTrain's, the bus's, the water bus's and the taxi's (`Transit.kt`). `WalkableTown` draws
 all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the map included, is about 874 KB
-(about 238 KB gzipped).
+`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about 961 KB
+(about 269 KB gzipped). `TownBudgetTest` measures what a frame costs downtown, in East Vancouver, in Burnaby, on a walk
+and on the train, and keeps it within a phone's budget.
 
 ### Sound and the guide
 

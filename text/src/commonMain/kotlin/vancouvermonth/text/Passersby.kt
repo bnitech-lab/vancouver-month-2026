@@ -10,6 +10,8 @@ enum class Passer(val title: String, val role: String) {
     MINA("미나", "우산 든 학생"),
     PRIYA("프리야", "공원 산책 중"),
     THEO("테오", "출근길 회사원"),
+    JIHO("지호", "역으로 가는 학생"),
+    ELENA("엘레나", "장 보러 가는 이웃"),
 }
 
 /**
@@ -25,7 +27,10 @@ fun passerLine(passer: Passer, day: Int, count: Int, weather: Weather = Weather.
     return lines[(day + count) % lines.size]
 }
 
-/** A few lines each, about everyday life in the town: rain, coffee, the bus, the seawall and the mountains. */
+/**
+ * A few lines each, about everyday life in the town: rain, coffee, the bus, the seawall and the mountains; and out in
+ * Burnaby, the train, the big park and the town centre.
+ */
 private val passerLines: Map<Passer, List<String>> = mapOf(
     Passer.OLIVER to listOf(
         "바닷가 길은 아침이 제일 좋아요. 산이 다 보여요.",
@@ -47,6 +52,16 @@ private val passerLines: Map<Passer, List<String>> = mapOf(
         "한 정거장이라 그냥 걸어요. 산 보면서요.",
         "여기 사람들은 비 와도 모자만 써요. 우산은 여행객이래요.",
     ),
+    Passer.JIHO to listOf(
+        "스카이트레인 타면 다운타운까지 금방이에요.",
+        "큰 공원 숲길은 아침에 걷기 좋아요.",
+        "버스 타고 비탈 마을까지 가 봤어요? 조용해요.",
+    ),
+    Passer.ELENA to listOf(
+        "중심가엔 높은 건물이 자꾸 생겨요.",
+        "다운타운은 기차로 가요. 걸으면 한참이에요.",
+        "큰 공원 호수에 오리가 많아요.",
+    ),
 )
 
 /** What each one says first on a rainy day. */
@@ -55,4 +70,6 @@ private val rainLines: Map<Passer, String> = mapOf(
     Passer.MINA to "이것 봐요, 우산 들고 다닌 보람이 있죠?",
     Passer.PRIYA to "비가 오면 연못 오리들이 더 신나 해요.",
     Passer.THEO to "이 정도는 비도 아니에요. 모자면 충분해요.",
+    Passer.JIHO to "비 오는 날엔 역까지 뛰어가요. 금방이에요.",
+    Passer.ELENA to "비 와도 장은 봐야죠. 오늘은 조금만 사요.",
 )

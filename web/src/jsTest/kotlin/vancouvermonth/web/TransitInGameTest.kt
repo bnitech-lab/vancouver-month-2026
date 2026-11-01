@@ -53,7 +53,10 @@ class TransitInGameTest {
         val town = QuietTown()
         started(town)
         town.onStop(Stop(Transport.SKYTRAIN, 1))
-        assertEquals(listOf("다운타운역", "크릭 끝역", "동쪽역"), goButtons().map { it.querySelector(".action-name")?.textContent })
+        assertEquals(
+            listOf("다운타운역", "크릭 끝역", "갈림길역", "동쪽 마을역", "작은 공원역", "경계역", "큰 공원역", "중심가역"),
+            goButtons().map { it.querySelector(".action-name")?.textContent },
+        )
         assertTrue(goButtons().all { Transit.PASS in it.textContent.orEmpty() && !it.disabled })
         assertEquals("스카이트레인 · 터널 입구역", root.querySelector(".chooser")?.getAttribute("aria-label"))
         // No taxi while the chooser lies over the town.
@@ -64,6 +67,16 @@ class TransitInGameTest {
         town.onStop(Stop(Transport.WATER_BUS, 2))
         assertEquals(2, goButtons().size)
         assertTrue(goButtons().all { "\$4" in it.textContent.orEmpty() })
+        root.button(Transit.STOP).click()
+        // A bus stop offers the other stops of its own line only: downtown's loop, or the line out to Burnaby.
+        town.onStop(Stop(Transport.BUS, 0))
+        assertEquals(Transit.BUS_STOPS.subList(1, 5), goButtons().map { it.querySelector(".action-name")?.textContent })
+        root.button(Transit.STOP).click()
+        town.onStop(Stop(Transport.BUS, 6))
+        assertEquals(
+            listOf("경계역 앞", "큰 공원 옆", "비탈 마을"),
+            goButtons().map { it.querySelector(".action-name")?.textContent },
+        )
     }
 
     @Test
@@ -146,7 +159,7 @@ class TransitInGameTest {
         val town = QuietTown()
         started(town)
         town.onStop(Stop(Transport.SKYTRAIN, 1))
-        goButton("동쪽역").click()
+        goButton("중심가역").click()
         town.onPlace(Place.HOME)
         town.onShop()
         town.onStop(Stop(Transport.BUS, 0))

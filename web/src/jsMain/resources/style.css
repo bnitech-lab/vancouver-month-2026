@@ -829,7 +829,8 @@ html:has(.walk-town) {
   border-color: #1d6b57;
 }
 
-/* A name whose building is behind the camera stays in the page for screen readers, out of sight. */
+/* A name whose building is behind the camera or lost in the haze hides; the town also takes it out of the Tab order
+   and hides it from screen readers until it shows again. */
 .place-name.behind {
   opacity: 0;
   pointer-events: none;
@@ -1398,6 +1399,12 @@ html:has(.walk-town) {
 .intro-credit a {
   color: inherit;
   text-decoration: underline;
+}
+
+/* The Burnaby line sits right under the Vancouver one, as one credit. */
+.guide-credit + .burnaby-credit,
+.intro-credit + .burnaby-credit {
+  margin-top: 2px;
 }
 
 @media (prefers-reduced-motion: no-preference) {

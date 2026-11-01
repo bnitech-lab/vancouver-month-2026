@@ -16,7 +16,7 @@ import vancouvermonth.text.Transport
 /** The SkyTrain's stations, the bus's loop, the water bus's docks and the taxi's ways, on the real town's map. */
 class TransitTest {
     private val town = Neighbourhood.grid
-    private val map = RealVancouver.map
+    private val map = Neighbourhood.map
     private val home = Neighbourhood.venue(Place.HOME).door
     private val guideway = Neighbourhood.guideway
 
@@ -25,7 +25,8 @@ class TransitTest {
     private fun length(route: List<Spot>): Double = route.zipWithNext { a, b -> hypot(b.x - a.x, b.z - a.z) }.sum()
 
     /** Every door, talk spot and person, the shop's included, and each shared bike and e-scooter. */
-    private val spotsToKeepClear: List<Spot> = Neighbourhood.venues.flatMap { listOf(it.door, it.talkSpot, it.person) } +
+    private val spotsToKeepClear: List<Spot> =
+        (Neighbourhood.venues + Neighbourhood.homes.values).flatMap { listOf(it.door, it.talkSpot, it.person) } +
         listOf(Neighbourhood.shop.door, Neighbourhood.shop.talkSpot, Neighbourhood.shop.keeper) + Rides.shared.map { it.spot }
 
     /** How far [spot] is from the line between [a] and [b]. */
@@ -49,7 +50,7 @@ class TransitTest {
     }
 
     @Test
-    fun `four stations along the line: one under downtown, the old one by the tunnel's mouth, and two up on it`() {
+    fun `nine stations along the line: one under downtown, the old one by the tunnel's mouth, and the wide map's`() {
         val stations = TransitLines.stations
         assertEquals(Transit.STATIONS.size, stations.size)
         assertEquals(stations.sortedBy { it.along }, stations)
@@ -78,32 +79,54 @@ class TransitTest {
             assertEquals(guideway.turnAt(station.along - half), guideway.turnAt(station.along + half), 1e-9, name)
             assertTrue(middle.x < Neighbourhood.COLUMNS, name)
         }
+        // Out from the tunnel's station, each stands within a few squares of the real station on the wide map, up to the
+        // Burnaby town centre; the game stops at none past it.
+        for (index in 2 until stations.size) {
+            val real = WideVancouver.stations[index - 1].spot
+            assertTrue(distanceBetween(guideway.spotAt(stations[index].along), real) < 12.0, "${Transit.STATIONS[index]}")
+        }
+        assertEquals(WideVancouver.stations[TransitLines.TOWN_CENTRE], WideVancouver.stations[stations.size - 2])
     }
 
     @Test
-    fun `the bus loops along the streets, and its five stops stand by it, off every door and talk spot`() {
-        val loop = TransitLines.busLoop
-        assertEquals(loop.points.first(), loop.points.last())
-        for (spot in samples(loop)) {
-            val cell = town.cellAt(spot)
-            assertTrue(town.isFree(cell), "the bus runs over $cell at $spot")
-            assertEquals(Terrain.LAND, map.terrainAt(cell), "the bus leaves the streets at $spot")
-            for (city in Neighbourhood.cityLots) assertFalse(city.isNear(spot.x, spot.z, 0.0), "into a building at $spot")
-        }
+    fun `the buses run along the streets, and their stops stand by them, off every door and talk spot`() {
         val stops = TransitLines.busStops
         assertEquals(Transit.BUS_STOPS.size, stops.size)
-        assertEquals(stops.sortedBy { it.along }, stops)
+        assertEquals(stops, TransitLines.busLines.flatMap { it.stops })
         val ways = Strolls.all().flatMap { it.stroll.legs }
-        for ((index, stop) in stops.withIndex()) {
-            val name = Transit.BUS_STOPS[index]
-            assertWalkable(stop.wait, name)
-            val lane = loop.spotAt(stop.along)
-            assertTrue(distanceBetween(lane, stop.wait) in 0.8..1.3, "$name waits ${distanceBetween(lane, stop.wait)} off")
-            for (clear in spotsToKeepClear) assertTrue(distanceBetween(stop.wait, clear) >= 1.5, "$name by $clear")
-            for ((a, b) in ways) assertTrue(distanceToLine(stop.wait, a, b) >= 1.5, "$name on a passerby's way")
+        for (line in TransitLines.busLines) {
+            val loop = line.loop
+            assertEquals(loop.points.first(), loop.points.last())
+            // Downtown's loop keeps to the streets; Burnaby's main streets pass along the edges of its parks.
+            val ground = if (line === TransitLines.busLines[0]) setOf(Terrain.LAND) else setOf(Terrain.LAND, Terrain.PARK)
+            for (spot in samples(loop)) {
+                val cell = town.cellAt(spot)
+                assertTrue(town.isFree(cell), "the bus runs over $cell at $spot")
+                assertTrue(map.terrainAt(cell) in ground, "off the streets at $spot")
+                for (city in Neighbourhood.cityLots) assertFalse(city.isNear(spot.x, spot.z, 0.0), "into a building at $spot")
+            }
+            assertEquals(line.stops.sortedBy { it.along }, line.stops)
+            for (stop in line.stops) {
+                val name = Transit.BUS_STOPS[stops.indexOf(stop)]
+                assertWalkable(stop.wait, name)
+                val lane = loop.spotAt(stop.along)
+                assertTrue(distanceBetween(lane, stop.wait) in 0.8..1.3, "$name waits ${distanceBetween(lane, stop.wait)} off")
+                for (clear in spotsToKeepClear) assertTrue(distanceBetween(stop.wait, clear) >= 1.5, "$name by $clear")
+                for ((a, b) in ways) assertTrue(distanceToLine(stop.wait, a, b) >= 1.5, "$name on a passerby's way")
+            }
         }
-        // 내 방's stop is a short walk from its door.
-        assertTrue(length(town.route(home, stops.last().wait)) < 12.0)
+        // The town's 내 방's stop is a short walk from its door; so are the Burnaby line's for zones 2 and 3.
+        assertTrue(length(town.route(home, TransitLines.busLines[0].stops.last().wait)) < 12.0)
+        val burnaby = TransitLines.busLines[1].stops
+        for ((zone, stop) in listOf(2 to burnaby[1], 3 to burnaby.last())) {
+            val site = HomeSite.of(zone)
+            assertTrue(length(site.grid.route(site.home.door, stop.wait)) < 20.0, "zone $zone")
+        }
+        // And its first stop is a short walk from the station at the city line.
+        assertTrue(length(town.route(TransitLines.stations[6].door, burnaby.first().wait)) < 12.0)
+        // A bus goes along its own line only.
+        assertTrue(TransitLines.joins(Transport.BUS, 0, 4) && TransitLines.joins(Transport.BUS, 5, 8))
+        assertFalse(TransitLines.joins(Transport.BUS, 4, 5))
     }
 
     @Test
@@ -151,6 +174,24 @@ class TransitTest {
         val office = Neighbourhood.venue(Place.OFFICE).door
         val squares = length(town.route(home, office))
         assertEquals((TaxiFare.BASE + squares * 0.15).roundToInt(), TaxiFare.forDistance(squares))
+    }
+
+    @Test
+    fun `a taxi goes as fast as ever downtown, and quicker out to Burnaby, about 20 seconds from zone 3 to 회사`() {
+        // Between any two of the stops in the town's own corner, the top speed a taxi always had.
+        val corner = TransitLines.taxiStops.map { it.second }.filter { it.x < Neighbourhood.TOWN_COLUMNS }
+        var longest = 0.0
+        for (from in corner) for (to in corner) longest = maxOf(longest, length(town.route(from, to)))
+        assertEquals(Journey.TAXI_SPEED, Journey.taxiCruise(longest), "$longest squares")
+        assertEquals(Journey.TAXI_RAMP, Journey.taxiRamp(Journey.TAXI_SPEED))
+        // From zone 3's 내 방 to 회사, the longest ride a taxi takes: faster, no faster than its top, and about 20 s.
+        val site = HomeSite.of(3)
+        val far = length(site.grid.route(site.home.door, Neighbourhood.venue(Place.OFFICE).door))
+        val cruise = Journey.taxiCruise(far)
+        val ride = Glide(far, cruise, Journey.taxiRamp(cruise))
+        println("A taxi from zone 3 to 회사: $far squares at up to $cruise a second, ${ride.millis} ms")
+        assertTrue(cruise > Journey.TAXI_SPEED && cruise <= Journey.TAXI_TOP, "$cruise")
+        assertTrue(ride.millis < 25_000.0, "${ride.millis} ms")
     }
 
     @Test

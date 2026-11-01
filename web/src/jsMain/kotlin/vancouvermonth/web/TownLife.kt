@@ -17,12 +17,17 @@ import vancouvermonth.text.Weather
 // ask where anything is at any moment without drawing.
 
 /**
- * The SkyTrain's round, every [PERIOD]: it stands at the station for [DWELL], pulls out east faster and faster until
- * it is far down the guideway, is away for a while, then comes in from the west, out of its tunnel, slowing all the
- * way into the station. Far down the line it fades into the haze, so it never pops out of sight or into it. How far it
- * has gone is counted along [Neighbourhood.guideway], which bends.
+ * The SkyTrain's round at a station, every [PERIOD]: it stands at the station for [DWELL], pulls out east faster and
+ * faster until it is far down the guideway, is away for a while, then comes in from the west (by the tunnel's mouth,
+ * out of its tunnel), slowing all the way into the station. Far down the line it fades into the haze, so it never pops
+ * out of sight or into it. How far it has gone is counted along [Neighbourhood.guideway], which bends. The town runs
+ * it at the station nearest where the player looks ([nearestStand]), moving it there only while the train is away, so
+ * every station on the long line sees its train come and go; by the tunnel's mouth it stands at [STAND].
  */
 object SkyTrainRun {
+    /** How far along the guideway the train's middle stands at the station by the tunnel's mouth. */
+    const val STAND = Neighbourhood.TRAIN_STOP + Neighbourhood.TRAIN_LENGTH / 2
+
     const val PERIOD = 32_000.0
     const val DWELL = 8_000.0
     const val LEAVE = 10_000.0
@@ -69,9 +74,12 @@ object SkyTrainRun {
     /** How far [ear] is from the nearest part of the train at [millis], the train taken every half unit along it. */
     fun distanceTo(millis: Double, ear: Point): Double = distanceAt(shiftAt(millis), ear)
 
-    /** How far [ear] is from the nearest part of the train [shift] from its stop at the station. */
-    fun distanceAt(shift: Double, ear: Point): Double {
-        val west = Neighbourhood.TRAIN_STOP + shift
+    /** How far [ear] is from the nearest part of the train [shift] from its stop at the station by the tunnel's mouth. */
+    fun distanceAt(shift: Double, ear: Point): Double = distanceAround(STAND + shift, ear)
+
+    /** How far [ear] is from the nearest part of a train whose middle is [middle] along the guideway. */
+    fun distanceAround(middle: Double, ear: Point): Double {
+        val west = middle - Neighbourhood.TRAIN_LENGTH / 2
         val up = ear.y - (Neighbourhood.DECK_HEIGHT + 0.9)
         var nearest = Double.MAX_VALUE
         val steps = (Neighbourhood.TRAIN_LENGTH / 0.5).toInt()
@@ -99,13 +107,39 @@ object SkyTrainRun {
     fun rumbleAt(millis: Double, ear: Point): Double = rumble(shiftAt(millis), speedAt(millis), opacityAt(millis), ear)
 
     /**
-     * How loud a train [shift] from its stop at the station, going [speed] units a second and [shown] from 0.0 to 1.0,
-     * rumbles to an ear at [ear], as [rumbleAt] works it out for the line's own train: for the train of a ride too.
+     * How loud a train [shift] from its stop at the station by the tunnel's mouth, going [speed] units a second and
+     * [shown] from 0.0 to 1.0, rumbles to an ear at [ear], as [rumbleAt] works it out for the line's own train.
      */
-    fun rumble(shift: Double, speed: Double, shown: Double, ear: Point): Double {
+    fun rumble(shift: Double, speed: Double, shown: Double, ear: Point): Double =
+        rumbleAround(STAND + shift, speed, shown, ear)
+
+    /** As [rumble], for a train whose middle is [middle] along the guideway: the line's own at any station, or a ride's. */
+    fun rumbleAround(middle: Double, speed: Double, shown: Double, ear: Point): Double {
         val underWay = (abs(speed) / (TOP_SPEED * UNDER_WAY)).coerceIn(0.0, 1.0)
         if (underWay == 0.0) return 0.0
-        return shown * underWay * loudnessAt(distanceAt(shift, ear))
+        return shown * underWay * loudnessAt(distanceAround(middle, ear))
+    }
+
+    /**
+     * Where the train's middle stands at the station up on the line nearest [x], [z] on the ground: the one the town
+     * runs its train at while the player looks there. The station under downtown is out of sight, so never it.
+     */
+    fun nearestStand(x: Double, z: Double): Double {
+        var best = STAND
+        var bestDistance = Double.MAX_VALUE
+        val place = alongLine
+        val stations = TransitLines.stations
+        for (index in stations.indices) {
+            val station = stations[index]
+            if (station.underground) continue
+            Neighbourhood.guideway.placeAt(station.along, place)
+            val distance = hypot(place[0] - x, place[1] - z)
+            if (distance < bestDistance) {
+                bestDistance = distance
+                best = station.along
+            }
+        }
+        return best
     }
 
     /** Half as loud this far from the train. */
@@ -138,15 +172,18 @@ object Campfire {
 }
 
 /**
- * Light glinting on the water: short pale streaks on the sea off the seawall near the five places, each coming and
- * going on its own beat and drifting a little. They fade away in the night, when [night] is 1.0.
+ * Light glinting on the water: short pale streaks on the sea off the seawall near the places of [zone]'s town, each
+ * coming and going on its own beat and drifting a little. They fade away in the night, when [night] is 1.0.
  */
-object Shimmer {
+class Shimmer private constructor(zone: Int) {
     private class Glint(val x: Double, val z: Double, val y: Double, val width: Double, val beat: Double, val phase: Double)
 
-    /** The water squares the glints may be on: off the shore, past the seawall, near the places' doors. */
-    val seaSquares: List<Cell> = RealVancouver.map.let { map ->
-        val doors = Neighbourhood.venues.map { it.door }
+    /**
+     * The water squares the glints may be on: off the shore, past the seawall, near the places' doors downtown. In
+     * zones 2 and 3, 내 방 is in Burnaby, so its old spot in the West End is no longer one of them.
+     */
+    private val seaSquares: List<Cell> = RealVancouver.map.let { map ->
+        val doors = Neighbourhood.venues.filter { zone == 1 || it.place != Place.HOME }.map { it.door }
         fun around(cell: Cell, reach: Int, terrain: Terrain): List<Boolean> =
             (-reach..reach).flatMap { dx ->
                 (-reach..reach).map { dz -> map.terrainAt(Cell(cell.x + dx, cell.z + dz)) == terrain }
@@ -182,17 +219,24 @@ object Shimmer {
         Block(glint.x + drift - width / 2, glint.y, glint.z - 0.04, width, 0.012, 0.08, GLINT)
     }
 
-    const val MAX_WIDTH = 1.4
-    private const val MIN_WIDTH = 0.001
-    private const val SEA_GLINTS = 32
+    companion object {
+        private val made = mutableMapOf<Int, Shimmer>()
 
-    /** How near the shore and the places' doors the glints keep, so they are where the player looks. */
-    private const val SHORE_REACH = 6
-    private const val NEAR_DOORS = 40.0
+        /** The glints of the town for a room in [zone], made once; zone 1's for any number but 1 to 3, as [HomeSite]. */
+        fun of(zone: Int): Shimmer = HomeSite.of(zone).zone.let { known -> made.getOrPut(known) { Shimmer(known) } }
 
-    /** The sea's surface. */
-    const val SEA_TOP = -0.39
-    private const val GLINT = 0xF4FBFF
+        const val MAX_WIDTH = 1.4
+        private const val MIN_WIDTH = 0.001
+        private const val SEA_GLINTS = 32
+
+        /** How near the shore and the places' doors the glints keep, so they are where the player looks. */
+        private const val SHORE_REACH = 6
+        private const val NEAR_DOORS = 40.0
+
+        /** The sea's surface. */
+        const val SEA_TOP = -0.39
+        private const val GLINT = 0xF4FBFF
+    }
 }
 
 /** Petals drifting down from the blossom trees, a few from each, all the time, round and round. */
@@ -438,15 +482,19 @@ object Rain {
 
     /** True where the map has sea under [x], [z]: a splash there flashes on the water. */
     private fun isSea(x: Double, z: Double): Boolean =
-        RealVancouver.map.terrainAt(floor(x).toInt(), floor(z).toInt()) == Terrain.WATER
+        Neighbourhood.map.terrainAt(floor(x).toInt(), floor(z).toInt()) == Terrain.WATER
+
+    /** The puddles of zone 1's town ([puddlesAt]). */
+    val puddles: List<Block>
+        get() = puddlesAt(HomeSite.of(1))
 
     /**
-     * Puddles left on the street in front of each place on a rainy day, catching the grey sky: flat boxes just over
-     * the stone, which stay where they are. Two for each place, on the first open pairs of squares in front of its
-     * door.
+     * Puddles left on the street in front of each place of [site] on a rainy day, catching the grey sky: flat boxes
+     * just over the stone, which stay where they are. Two for each place, on the first open pairs of squares in front of
+     * its door.
      */
-    val puddles: List<Block> = Neighbourhood.venues.flatMap { venue ->
-        val grid = Neighbourhood.grid
+    fun puddlesAt(site: HomeSite): List<Block> = site.venues.flatMap { venue ->
+        val grid = site.grid
         val out = if (venue.doorFacesSouth) 1 else -1
         val door = grid.cellAt(venue.door)
         val found = mutableListOf<Block>()
@@ -455,7 +503,7 @@ object Rain {
                 val x = door.x + dx
                 val z = door.z + out * step
                 val open = (0..1).map { Cell(x + it, z) }.all { cell ->
-                    grid.isFree(cell) && RealVancouver.map.terrainAt(cell) == Terrain.LAND
+                    grid.isFree(cell) && Neighbourhood.map.terrainAt(cell) == Terrain.LAND
                 }
                 val apart = found.none { abs(it.x - x) < 3.0 && abs(it.z - z) < 2.0 }
                 if (open && apart && found.size < 2) {

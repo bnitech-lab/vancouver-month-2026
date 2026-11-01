@@ -116,7 +116,7 @@ class RidesTest {
 
     @Test
     fun `the shared bikes stand two to a dock and the e-scooters one to a corner, all on open ground to walk to`() {
-        assertEquals(8, Rides.shared.count { it.vehicle == Vehicle.BIKE })
+        assertEquals(16, Rides.shared.count { it.vehicle == Vehicle.BIKE })
         assertEquals(4, Rides.shared.count { it.vehicle == Vehicle.E_SCOOTER })
         val loops = Strolls.all().flatMap { it.stroll.legs }
         for ((index, parked) in Rides.shared.withIndex()) {
@@ -131,12 +131,16 @@ class RidesTest {
                 assertTrue(distanceToSegment(parked.spot, a, b) >= 1.5, "$index at ${parked.spot} is on a passerby's way")
             }
         }
-        // A dock near 내 방, 도서관, 카페 and the station, and an e-scooter near 내 방, the shop, 회사 and 코워킹.
+        // A dock near 내 방, 도서관, 카페 and the station; in Burnaby near 내 방 in zones 2 and 3 and the two stations of
+        // the town centre; and an e-scooter near 내 방, the shop, 회사 and 코워킹.
         val docks = Rides.shared.filter { it.vehicle == Vehicle.BIKE }.chunked(2).map { it.first().spot }
         val nearDocks = listOf(Place.HOME, Place.LIBRARY, Place.CAFE).map { Neighbourhood.venue(it).door }
         for ((dock, door) in docks.zip(nearDocks)) assertTrue(distanceBetween(dock, door) < 10.0, "$dock, $door")
         val station = Neighbourhood.guideway.points.first()
         assertTrue(distanceBetween(docks[3], station) < 16.0, "${docks[3]}")
+        val burnaby = listOf(Neighbourhood.home(2).door, Neighbourhood.home(3).door) +
+            TransitLines.stations.takeLast(2).map { it.door }
+        for ((dock, door) in docks.drop(4).zip(burnaby)) assertTrue(distanceBetween(dock, door) < 6.0, "$dock, $door")
         val scooters = Rides.shared.filter { it.vehicle == Vehicle.E_SCOOTER }.map { it.spot }
         val nearScooters = listOf(home, shop.door, Neighbourhood.venue(Place.OFFICE).door,
             Neighbourhood.venue(Place.COWORKING).door)

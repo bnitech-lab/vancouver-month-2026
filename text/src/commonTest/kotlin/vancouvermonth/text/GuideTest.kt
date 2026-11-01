@@ -25,7 +25,7 @@ class GuideTest {
         for (ride in listOf("자전거", "택시")) assertTrue(ride in Guide.LINES[4], ride)
         // The shop sells; shared bikes are rented on the street.
         assertTrue("길에서 빌리고" in Guide.LINES[4])
-        assertTrue("작은 지도" in Guide.LINES[5])
+        assertTrue("작은 지도" in Guide.LINES[5] && "지도 전체" in Guide.LINES[5])
         for (line in Guide.LINES) {
             assertTrue(line.length <= 40, "More than 40 characters: $line")
             assertFalse('\u2014' in line, "Em dash in: $line")
@@ -51,6 +51,9 @@ class GuideTest {
         assertEquals("City of Burnaby", Guide.BURNABY_MAP_SOURCE)
         assertEquals("Open Government Licence \u2013 Burnaby", Guide.BURNABY_MAP_LICENCE)
         assertEquals("https://data.burnaby.ca/pages/open-government-licence", Guide.BURNABY_MAP_LICENCE_URL)
+        // On the page: the statement, then the source and the licence's name, the name once, to link it.
+        assertEquals("$statement (City of Burnaby, Open Government Licence \u2013 Burnaby)", Guide.BURNABY_MAP_LINE)
+        assertEquals(1, Guide.BURNABY_MAP_LINE.split(Guide.BURNABY_MAP_LICENCE).size - 1)
     }
 
     @Test
@@ -63,5 +66,6 @@ class GuideTest {
     fun `the small map tells a screen reader which place the character is near`() {
         assertEquals("지도: 내 방 근처", minimapLabel("내 방"))
         assertEquals("지도: 회사 근처", minimapLabel("회사"))
+        assertEquals("지도: 큰 공원역 쪽", minimapLabel("큰 공원역", near = false))
     }
 }

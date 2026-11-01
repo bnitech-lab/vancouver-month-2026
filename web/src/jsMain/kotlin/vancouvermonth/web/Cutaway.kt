@@ -1,8 +1,11 @@
 package vancouvermonth.web
 
+import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
@@ -16,13 +19,24 @@ import kotlin.math.sqrt
  * A building already folded stays folded until it is [SLACK] farther out than that, so one at the edge does not
  * flicker. One the camera's eye is inside, or nearly, folds at once rather than over time, so the camera is never seen
  * inside a tower still standing. [buildings] are the boxes, each from the ground up, in the order the drawing knows
- * them by.
+ * them by; [shapes] are the buildings themselves, the same as [buildings] but for one turned on the ground, whose
+ * straight box would reach well past its walls: the ray is tried against such a building in its own frame.
  *
  * Nothing new is made while the camera moves: the buildings are kept in buckets of [BUCKET] units on the ground, and
  * [aim] looks only at those near the ray.
  */
-class Cutaway(buildings: List<Block>) {
+class Cutaway(buildings: List<Block>, shapes: List<Block> = buildings) {
     private val count = buildings.size
+
+    // A building turned on the ground ([Block.turn], as the wide map's are) is looked at in its own frame, not by the
+    // straight box round it: its middle, its turn's cosine and sine, and half its width and depth.
+    private val turned = BooleanArray(count) { shapes[it].turn != 0.0 }
+    private val middleX = DoubleArray(count) { shapes[it].x + shapes[it].width / 2 }
+    private val middleZ = DoubleArray(count) { shapes[it].z + shapes[it].depth / 2 }
+    private val cosine = DoubleArray(count) { cos(shapes[it].turn) }
+    private val sine = DoubleArray(count) { sin(shapes[it].turn) }
+    private val halfWidth = DoubleArray(count) { shapes[it].width / 2 }
+    private val halfDepth = DoubleArray(count) { shapes[it].depth / 2 }
     private val lowX = DoubleArray(count) { buildings[it].x }
     private val lowZ = DoubleArray(count) { buildings[it].z }
     private val highX = DoubleArray(count) { buildings[it].x + buildings[it].width }
@@ -183,9 +197,19 @@ class Cutaway(buildings: List<Block>) {
             val x = eyeX + dx * share
             val y = eyeY + dy * share
             val z = eyeZ + dz * share
-            val outX = max(0.0, max(lowX[index] - x, x - highX[index]))
             val outY = max(0.0, max(-y, y - tops[index]))
-            val outZ = max(0.0, max(lowZ[index] - z, z - highZ[index]))
+            val outX: Double
+            val outZ: Double
+            if (turned[index]) {
+                // In the building's own frame: along it, and across it.
+                val fromX = x - middleX[index]
+                val fromZ = z - middleZ[index]
+                outX = max(0.0, abs(fromX * cosine[index] - fromZ * sine[index]) - halfWidth[index])
+                outZ = max(0.0, abs(fromX * sine[index] + fromZ * cosine[index]) - halfDepth[index])
+            } else {
+                outX = max(0.0, max(lowX[index] - x, x - highX[index]))
+                outZ = max(0.0, max(lowZ[index] - z, z - highZ[index]))
+            }
             if (outX * outX + outY * outY + outZ * outZ <= radius * radius) return true
         }
         return false

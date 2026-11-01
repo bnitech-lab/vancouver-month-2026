@@ -75,9 +75,10 @@ class FirstRunGuideTest {
         val described = card.getAttribute("aria-describedby")!!.split(" ").map { document.getElementById(it)!!.textContent }
         assertEquals(listOf(Guide.LINES.joinToString(""), goalLine()), described)
         assertSame(root.button(Guide.CLOSE), document.activeElement)
-        // The map's credit, as its licence asks, at the card's foot, after its button, with the licence's name a link
-        // to the licence that opens in a new tab.
-        val credit = assertNotNull(card.lastElementChild)
+        // The map's credit, as the two cities' licences ask, at the card's foot, after its button: Vancouver's line, then
+        // Burnaby's right under it, each with its licence's name a link to the licence that opens in a new tab.
+        val burnaby = assertNotNull(card.lastElementChild)
+        val credit = assertNotNull(burnaby.previousElementSibling)
         assertEquals(Guide.MAP_CREDIT, credit.textContent)
         assertEquals("guide-credit", credit.className)
         val link = assertNotNull(credit.querySelector("a") as? HTMLAnchorElement, "No link to the licence")
@@ -85,6 +86,15 @@ class FirstRunGuideTest {
         assertEquals(Guide.MAP_LICENCE_URL, link.href)
         assertEquals("_blank", link.target)
         assertEquals("noopener", link.rel)
+        assertEquals("${Guide.MAP_LICENCE} (새 탭에서 열려요)", link.getAttribute("aria-label"))
+        assertEquals(Guide.BURNABY_MAP_LINE, burnaby.textContent)
+        assertEquals("guide-credit burnaby-credit", burnaby.className)
+        val burnabyLink = assertNotNull(burnaby.querySelector("a") as? HTMLAnchorElement, "No link to Burnaby's licence")
+        assertEquals(Guide.BURNABY_MAP_LICENCE, burnabyLink.textContent)
+        assertEquals(Guide.BURNABY_MAP_LICENCE_URL, burnabyLink.href)
+        assertEquals("_blank", burnabyLink.target)
+        assertEquals("noopener", burnabyLink.rel)
+        assertEquals("${Guide.BURNABY_MAP_LICENCE} (새 탭에서 열려요)", burnabyLink.getAttribute("aria-label"))
         // Over the town, its top card and its first-day hint.
         assertTrue(root.querySelector(".over-town") != null && root.querySelector(".guide") != null)
     }
@@ -144,12 +154,17 @@ class FirstRunGuideTest {
         helpButton().click()
         assertNotNull(card)
         assertSame(root.button(Guide.CLOSE), document.activeElement)
-        // Tab goes round the card's button and its link to the licence while it is open, either way.
+        // Tab goes round the card's button and its links to the two licences while it is open, either way.
         val link = assertNotNull(card!!.querySelector(".guide-credit a") as? HTMLElement)
+        val burnaby = assertNotNull(card!!.querySelector(".burnaby-credit a") as? HTMLElement)
         press("Tab")
         assertSame(link, document.activeElement)
         press("Tab")
+        assertSame(burnaby, document.activeElement)
+        press("Tab")
         assertSame(root.button(Guide.CLOSE), document.activeElement)
+        press("Tab", shift = true)
+        assertSame(burnaby, document.activeElement)
         press("Tab", shift = true)
         assertSame(link, document.activeElement)
         press("Tab", shift = true)

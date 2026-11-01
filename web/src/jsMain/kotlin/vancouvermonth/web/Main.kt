@@ -25,7 +25,7 @@ fun main() {
     // The towns are made when the month starts, not now, so the room screen does not wait for WebGL.
     // The town to walk in comes first; the picture of a town is for a phone that asks for less motion.
     val makeTown = { openTown() }
-    val makeWalkableTown = { openWalkableTown() }
+    val makeWalkableTown = { zone: Int -> openWalkableTown(homeZone = zone) }
     val game = if (today != null) {
         PhoneGame(root, today, playAgain, makeTown, makeWalkableTown)
     } else {

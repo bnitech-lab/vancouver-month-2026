@@ -4,6 +4,7 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.floor
 import kotlin.math.sqrt
 import org.khronos.webgl.Float32Array
 import org.khronos.webgl.set
@@ -25,6 +26,9 @@ data class Station(val along: Double, val entrance: Lot?, val door: Spot) {
 /** A bus stop or a water bus dock: where the vehicle stops on its way ([along] its loop), and where the character waits. */
 data class Halt(val along: Double, val wait: Spot)
 
+/** A bus line: the [loop] its bus runs round, and its [stops] in the order the bus comes to them. */
+class BusLine(val loop: RailLine, val stops: List<Halt>)
+
 /** A station, stop or dock a tap can land on: the [transport] and the stop's place in its list. */
 data class Stop(val transport: Transport, val index: Int)
 
@@ -35,16 +39,58 @@ data class Stop(val transport: Transport, val index: Int)
  */
 object TransitLines {
     /**
-     * The four stations, west to east: under downtown, by the tunnel's mouth (the station that was always there), past
-     * the head of False Creek, and out east. The two new ones up on the line stand where it runs straight for a whole
-     * train.
+     * The stations, west to east: under downtown, by the tunnel's mouth (the station that was always there), and the
+     * Expo Line's real stations from the wide map ([WideVancouver.stations]) out to the Burnaby town centre, each with
+     * its entrance under the line and its door to the south. The line goes on past the town centre, where the game
+     * stops nowhere and places nothing.
      */
     val stations: List<Station> = listOf(
         Station(-29.0, Lot(166, 60, 3, 3), Spot(167.5, 63.5)),
         Station(Neighbourhood.TRAIN_STOP + Neighbourhood.TRAIN_LENGTH / 2, null, Spot(200.8, 64.4)),
-        Station(31.8, Lot(224, 61, 3, 3), Spot(225.5, 64.5)),
-        Station(47.3, Lot(237, 61, 3, 3), Spot(238.5, 64.5)),
-    )
+    ) + (1..TOWN_CENTRE).map { stationAt(WideVancouver.stations[it].spot) }
+
+    /**
+     * The station the wide map has at [spot]: its entrance a lot under the line there, its door just south of it. Where
+     * the line bends at the station, it is moved along to the nearest stretch that runs straight for a whole train, as
+     * its platform does.
+     */
+    private fun stationAt(spot: Spot): Station {
+        // The guideway's own line, not the town's, so the stations can be laid out before the town is.
+        val line = expoLine
+        val found = alongOf(line, spot)
+        val half = Neighbourhood.TRAIN_LENGTH / 2 + 0.5
+        val along = (0..STRAIGHTEN_STEPS).flatMap { listOf(found + it * 0.5, found - it * 0.5) }
+            .firstOrNull { line.turnAt(it - half) == line.turnAt(it + half) } ?: found
+        val middle = line.spotAt(along)
+        val lot = Lot(floor(middle.x).toInt() - 1, floor(middle.z).toInt() - 2, 3, 3)
+        return Station(along, lot, Spot(lot.x + 1.5, lot.z + lot.depth + 0.5))
+    }
+
+    /** How far along [line] its nearest point to [spot] is. */
+    fun alongOf(line: RailLine, spot: Spot): Double {
+        var best = Double.MAX_VALUE
+        var bestAlong = 0.0
+        var gone = 0.0
+        for ((a, b) in line.points.zipWithNext()) {
+            val dx = b.x - a.x
+            val dz = b.z - a.z
+            val length = sqrt(dx * dx + dz * dz)
+            val share = (((spot.x - a.x) * dx + (spot.z - a.z) * dz) / (length * length)).coerceIn(0.0, 1.0)
+            val off = distanceBetween(spot, Spot(a.x + dx * share, a.z + dz * share))
+            if (off < best) {
+                best = off
+                bestAlong = gone + share * length
+            }
+            gone += length
+        }
+        return bestAlong
+    }
+
+    /** The last of [WideVancouver.stations] the train stops at: the Burnaby town centre's. */
+    const val TOWN_CENTRE = 7
+
+    /** How far a station may be moved along the line, in half squares, to stand on a straight stretch. */
+    private const val STRAIGHTEN_STEPS = 24
 
     /** How tall a station's entrance on the ground is. */
     const val ENTRANCE_HEIGHT = 3.0
@@ -57,14 +103,69 @@ object TransitLines {
         listOf(Spot(105.5, 103.5), Spot(105.5, 70.5), Spot(169.5, 70.5), Spot(169.5, 103.5), Spot(105.5, 103.5)),
     )
 
-    /** The bus stops in the order the bus comes to them: by the park, two downtown, south of downtown, by 내 방. */
-    val busStops: List<Halt> = listOf(
-        Halt(18.5, Spot(106.4, 85.5)),
-        Halt(57.5, Spot(130.5, 71.6)),
-        Halt(87.5, Spot(160.5, 71.6)),
-        Halt(149.5, Spot(150.5, 104.4)),
-        Halt(184.5, Spot(115.5, 104.4)),
+    /**
+     * The second line's way, out and back along the main streets: from East Vancouver by the station at the city line,
+     * past 내 방's corner for a room in zone 2 and the big Burnaby park, down the slope to 내 방's corner for zone 3.
+     * Every point is on a main street of the wide map.
+     */
+    private val burnabyWay = listOf(
+        Spot(486.4, 40.0), Spot(489.6, 54.7), Spot(501.9, 53.3), Spot(505.0, 52.3), Spot(507.9, 50.1),
+        Spot(520.5, 35.6), Spot(552.9, 68.0), Spot(588.1, 103.4),
     )
+    val burnabyLoop = RailLine(burnabyWay + burnabyWay.reversed().drop(1))
+
+    /**
+     * The bus lines: downtown's loop, with its stops by the park, two downtown, south of downtown and by the town's
+     * 내 방; and the line out to Burnaby, with its stops by the station at the city line, by 내 방 in zone 2, by the big
+     * park and by 내 방 in zone 3.
+     */
+    val busLines: List<BusLine> = listOf(
+        BusLine(
+            busLoop,
+            listOf(
+                Halt(18.5, Spot(106.4, 85.5)),
+                Halt(57.5, Spot(130.5, 71.6)),
+                Halt(87.5, Spot(160.5, 71.6)),
+                Halt(149.5, Spot(150.5, 104.4)),
+                Halt(184.5, Spot(115.5, 104.4)),
+            ),
+        ),
+        BusLine(
+            burnabyLoop,
+            listOf(
+                Halt(3.0, Spot(488.1, 42.7)),
+                Halt(50.5, Spot(517.7, 37.2)),
+                Halt(76.4, Spot(537.4, 51.0)),
+                Halt(146.3, Spot(586.8, 100.5)),
+            ),
+        ),
+    )
+
+    /** Every bus stop, line by line, each in the order its bus comes to them: a stop's number is its place here. */
+    val busStops: List<Halt> = busLines.flatMap { it.stops }
+
+    /** The line bus stop [index] is on. */
+    fun lineOf(index: Int): BusLine {
+        var left = index
+        for (line in busLines) {
+            if (left < line.stops.size) return line
+            left -= line.stops.size
+        }
+        error("No bus stop $index")
+    }
+
+    /** True when a ride on [transport] can go from stop [from] to stop [to]: a bus only along its own line. */
+    fun joins(transport: Transport, from: Int, to: Int): Boolean =
+        transport != Transport.BUS || from !in busStops.indices || to !in busStops.indices || lineOf(from) === lineOf(to)
+
+    /**
+     * The ground the wide map's buildings and trees keep clear round each bus stop, and round each station's door: room to
+     * wait, and the shelter's.
+     */
+    val keptForStops: List<Lot> by lazy {
+        busStops.map { Lot(floor(it.wait.x).toInt() - 2, floor(it.wait.z).toInt() - 2, 5, 5) } +
+            stations.map { Lot(floor(it.door.x).toInt() - 1, floor(it.door.z).toInt() - 1, 3, 3) }
+    }
 
     /**
      * The water bus's way over False Creek: from the dock by the café across to the far shore, up the creek to the
@@ -87,7 +188,7 @@ object TransitLines {
         )
     }
 
-    /** Where the character stands at [stop], to get on there and to step out there. */
+    /** Where the character stands at [stop], to get on there and to step out there; a taxi's places are zone 1's. */
     fun waitAt(stop: Stop): Spot = when (stop.transport) {
         Transport.SKYTRAIN -> stations[stop.index].door
         Transport.BUS -> busStops[stop.index].wait
@@ -107,11 +208,20 @@ object TransitLines {
     fun nameOf(stop: Stop): String =
         if (stop.transport == Transport.TAXI) taxiStops[stop.index].first else Transit.stopName(stop.transport, stop.index)
 
-    /** Where a taxi goes, by name: the five places, the bike shop and the four stations, each at its door. */
-    val taxiStops: List<Pair<String, Spot>> by lazy {
-        Neighbourhood.venues.map { it.place.label to it.door } + (Shop.NAME to Neighbourhood.shop.door) +
+    /** Where a taxi goes in zone 1's town ([taxiStopsFor]). */
+    val taxiStops: List<Pair<String, Spot>>
+        get() = taxiStopsFor(1)
+
+    /**
+     * Where a taxi goes for a room in [zone], by name: the five places (내 방 where that room is), the bike shop and the
+     * stations, each at its door. The same names in the same order in every zone.
+     */
+    fun taxiStopsFor(zone: Int): List<Pair<String, Spot>> = taxiStopsByZone.getOrPut(zone) {
+        HomeSite.of(zone).venues.map { it.place.label to it.door } + (Shop.NAME to Neighbourhood.shop.door) +
             stations.mapIndexed { index, station -> Transit.STATIONS[index] to station.door }
     }
+
+    private val taxiStopsByZone = mutableMapOf<Int, List<Pair<String, Spot>>>()
 
     /** How near its stop the character must stand to get on there. */
     const val STOP_REACH = 1.5
@@ -141,22 +251,40 @@ object TransitLines {
     }
 
     /** The stops' own boxes that stand still: each bus stop's shelter and sign, and each dock's pier and sign. */
-    val scenery: List<Block> by lazy { busStops.flatMap { shelter(it) } + docks.flatMap { pier(it) } }
+    val scenery: List<Block> by lazy {
+        busLines.flatMap { line -> line.stops.flatMap { shelter(line.loop, it) } } + docks.flatMap { pier(it) }
+    }
 
     /**
-     * A bus stop's shelter: a roof on two posts and a back wall, a bench, and a sign on a post. The street is on the
-     * side [Halt.wait] is from the shelter's back.
+     * A bus stop's shelter on [loop]: a roof on two posts and a back wall, a bench, and a sign on a post. The street is
+     * on the side [Halt.wait] is from the shelter's back. On a street that runs along x or z it stands straight on the
+     * grid; on the wide map's slanting streets it is turned along the street.
      */
-    private fun shelter(halt: Halt): List<Block> {
-        val on = busLoop.spotAt(halt.along)
+    private fun shelter(loop: RailLine, halt: Halt): List<Block> {
+        val on = loop.spotAt(halt.along)
         val (x, z) = halt.wait.x to halt.wait.z
         // Which way the street lies from the waiting spot, along x or z.
         val dx = on.x - x
         val dz = on.z - z
+        val turn = loop.turnAt(halt.along)
+        val slanting = abs(sin(2 * turn)) > 0.1
         val alongX = abs(dz) > abs(dx)
-        val back = if (alongX) -0.45 * (if (dz > 0) 1 else -1) else -0.45 * (if (dx > 0) 1 else -1)
+        val back = if (slanting) {
+            // Away from the street, on the side the waiting spot is from it.
+            val side = (x - on.x) * sin(turn) + (z - on.z) * cos(turn)
+            0.45 * (if (side > 0) 1 else -1)
+        } else if (alongX) {
+            -0.45 * (if (dz > 0) 1 else -1)
+        } else {
+            -0.45 * (if (dx > 0) 1 else -1)
+        }
         fun at(along: Double, out: Double, y: Double, length: Double, height: Double, deep: Double, colour: Int): Block =
-            if (alongX) {
+            if (slanting) {
+                // Along the street is the box's own x, out from it its own z, turned as the street runs.
+                val middleX = x + along * cos(turn) + out * sin(turn)
+                val middleZ = z - along * sin(turn) + out * cos(turn)
+                Block(middleX - length / 2, y, middleZ - deep / 2, length, height, deep, colour, turn)
+            } else if (alongX) {
                 Block(x + along - length / 2, y, z + out - deep / 2, length, height, deep, colour)
             } else {
                 Block(x + out - deep / 2, y, z + along - length / 2, deep, height, length, colour)
@@ -355,6 +483,30 @@ class Journey(
 
         /** How far a bus or a water bus goes on along its loop after the stop, and a taxi back down the street. */
         const val GOING_ON = 14.0
+
+        /**
+         * How fast the train goes at its quickest on a ride [length] units long, and how long it takes to get there: as
+         * on a short hop between neighbouring stations, or quicker on a long one, up to [TRAIN_TOP], so a ride out to
+         * Burnaby takes about [TRAIN_RIDE_SECONDS] at full speed rather than most of a minute.
+         */
+        fun trainCruise(length: Double): Double = (length / TRAIN_RIDE_SECONDS).coerceIn(TRAIN_SPEED, TRAIN_TOP)
+
+        fun trainRamp(cruise: Double): Double = TRAIN_RAMP * cruise / TRAIN_SPEED
+
+        const val TRAIN_TOP = 30.0
+        const val TRAIN_RIDE_SECONDS = 12.0
+
+        /**
+         * How fast a taxi goes at its quickest on a ride [length] units long, and how long it takes to get there: as
+         * always on a ride downtown, or quicker on a long one, up to [TAXI_TOP], so a ride from Burnaby to downtown takes
+         * about [TAXI_RIDE_SECONDS] at full speed rather than most of a minute.
+         */
+        fun taxiCruise(length: Double): Double = (length / TAXI_RIDE_SECONDS).coerceIn(TAXI_SPEED, TAXI_TOP)
+
+        fun taxiRamp(cruise: Double): Double = TAXI_RAMP * cruise / TAXI_SPEED
+
+        const val TAXI_TOP = 24.0
+        const val TAXI_RIDE_SECONDS = 20.0
 
         /**
          * The way along [line] from along [from] to along [to], carried on [beyond] past [to] the same way: the line's

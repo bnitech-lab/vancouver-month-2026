@@ -185,13 +185,17 @@ class CutawayTest {
     fun `only the city's buildings and the blocks past the edge fold, never the places, the train's or the garden`() {
         val foldables = Neighbourhood.foldables
         assertTrue(foldables.size > 300, "only ${foldables.size}")
-        // One for each building of the city, and the rest past the grid's edges.
+        // One for each building of the city, the wide map's turned ones among them, and the rest past the grid's edges.
         assertTrue(foldables.size >= Neighbourhood.cityLots.size)
         for (building in foldables) {
             val inside = building.box.x >= 0 && building.box.x < Neighbourhood.COLUMNS &&
                 building.box.z >= 0 && building.box.z < Neighbourhood.ROWS
             val corner = Spot(building.box.x + 0.2, building.box.z + 0.2)
-            if (inside) assertTrue(Neighbourhood.cityLots.any { it.isNear(corner.x, corner.z, 0.0) }, "${building.box}")
+            // The wide map's buildings stand east of the town's corner, turned as their blocks are; the corner keeps its own.
+            val wide = building.box.x + building.box.width / 2 > Neighbourhood.TOWN_COLUMNS
+            if (inside && !wide) {
+                assertTrue(Neighbourhood.cityLots.any { it.isNear(corner.x, corner.z, 0.0) }, "${building.box}")
+            }
         }
         // Nothing that matters is among them: none overlaps a wall the camera keeps out of, or a place's lot.
         val important = Neighbourhood.walls.filter { !it.folds }
@@ -206,11 +210,28 @@ class CutawayTest {
                 assertTrue(apart, "$box overlaps ${wall.place ?: other}")
             }
         }
-        // Each one's boxes are where it says, as tall as its walls.
+        // Each one's boxes are where it says, as tall as its walls: a turned one's box is the one round it, straight on
+        // the grid, with the same middle.
         for (building in foldables) {
             val body = Neighbourhood.blocks[building.body]
-            assertEquals(building.box.x, body.x)
-            assertEquals(building.box.z, body.z)
+            if (body.turn == 0.0) {
+                assertEquals(building.box.x, body.x)
+                assertEquals(building.box.z, body.z)
+            } else {
+                val middleX = body.x + body.width / 2
+                val middleZ = body.z + body.depth / 2
+                assertEquals(building.box.x + building.box.width / 2, middleX, 1e-9)
+                assertEquals(building.box.z + building.box.depth / 2, middleZ, 1e-9)
+                // Every corner of the turned building inside the box round it.
+                for ((along, across) in listOf(-1 to -1, -1 to 1, 1 to -1, 1 to 1)) {
+                    val lx = along * body.width / 2
+                    val lz = across * body.depth / 2
+                    val x = middleX + lx * cos(body.turn) + lz * sin(body.turn)
+                    val z = middleZ - lx * sin(body.turn) + lz * cos(body.turn)
+                    assertTrue(x >= building.box.x - 1e-9 && x <= building.box.x + building.box.width + 1e-9, "$body")
+                    assertTrue(z >= building.box.z - 1e-9 && z <= building.box.z + building.box.depth + 1e-9, "$body")
+                }
+            }
             val roof = if (building.roof < 0) 0.0 else Neighbourhood.blocks[building.roof].height
             assertEquals(building.box.height, body.height + roof, 1e-9)
             if (building.glassNorth < 0) continue
@@ -222,10 +243,15 @@ class CutawayTest {
     @Test
     fun `wherever the character stands and however the camera turns, no city building it looks through stands`() {
         val grid = Neighbourhood.grid
-        val spots = grid.freeCells().filterIndexed { index, _ -> index % 23 == 0 }.map { grid.centreOf(it) }
+        // Every 23rd square of the town's corner, as always, and every hundredth out on the wide map.
+        val (corner, wide) = grid.freeCells().partition { it.x < Neighbourhood.TOWN_COLUMNS }
+        val spots = (corner.filterIndexed { index, _ -> index % 23 == 0 } + wide.filterIndexed { index, _ -> index % 100 == 0 })
+            .map { grid.centreOf(it) }
         val boxes = Neighbourhood.foldables.map { it.box }
-        val cutaway = Cutaway(boxes)
+        val shapes = Neighbourhood.foldables.map { Neighbourhood.blocks[it.body] }
+        val cutaway = Cutaway(boxes, shapes)
         var folded = 0
+        var turnedFolds = 0
         for (spot in spots) {
             for (yaw in listOf(FollowCamera.START_YAW, 0.0, PI / 2, PI, -PI / 2)) {
                 for (pitch in listOf(FollowCamera.MIN_PITCH, FollowCamera.START_PITCH, FollowCamera.MAX_PITCH)) {
@@ -242,6 +268,15 @@ class CutawayTest {
                     val length = sqrt(toHead.x * toHead.x + toHead.y * toHead.y + toHead.z * toHead.z)
                     val way = Point(toHead.x / length, toHead.y / length, toHead.z / length)
                     for ((index, box) in boxes.withIndex()) {
+                        val shape = shapes[index]
+                        if (shape.turn != 0.0) {
+                            // A turned one of the wide map: in the way only when the ray comes near its walls.
+                            if (cutaway.isFolding(index)) {
+                                turnedFolds++
+                                assertTrue(nearRay(eye, head, shape, box.height), "$spot, turn $yaw: $shape folds clear of the way")
+                            }
+                            continue
+                        }
                         val hit = distanceToBox(eye, way, box) ?: continue
                         if (hit >= length) continue
                         folded++
@@ -251,6 +286,63 @@ class CutawayTest {
             }
         }
         assertTrue(folded > 1_000, "only $folded buildings were ever in the way")
+        assertTrue(turnedFolds > 0, "no turned building was ever in the way")
+    }
+
+    /**
+     * True when the ray from [eye] to [head], as thick as the cutaway makes it and with its slack, comes within reach of
+     * the turned building [shape], [height] tall, in the building's own frame.
+     */
+    private fun nearRay(eye: Point, head: Point, shape: Block, height: Double): Boolean {
+        val dx = head.x - eye.x
+        val dy = head.y - eye.y
+        val dz = head.z - eye.z
+        val length = sqrt(dx * dx + dy * dy + dz * dz)
+        val middleX = shape.x + shape.width / 2
+        val middleZ = shape.z + shape.depth / 2
+        val steps = kotlin.math.ceil(length / 0.2).toInt()
+        for (step in 0..steps) {
+            // The head itself is the last point looked at, as the cutaway looks at it.
+            val along = minOf(length, step * 0.2)
+            val share = along / length
+            val x = eye.x + dx * share - middleX
+            val y = eye.y + dy * share
+            val z = eye.z + dz * share - middleZ
+            val outX = maxOf(0.0, kotlin.math.abs(x * cos(shape.turn) - z * sin(shape.turn)) - shape.width / 2)
+            val outZ = maxOf(0.0, kotlin.math.abs(x * sin(shape.turn) + z * cos(shape.turn)) - shape.depth / 2)
+            val outY = maxOf(0.0, maxOf(-y, y - height))
+            val radius = Cutaway.radiusAt(along, length) + Cutaway.SLACK
+            if (outX * outX + outY * outY + outZ * outZ <= radius * radius) return true
+        }
+        return false
+    }
+
+    @Test
+    fun `on a slanting street, a turned house just beside the character stands, though its straight box holds the head`() {
+        // A house turned 45 degrees, as East Vancouver's and Burnaby's are, 3.5 long and 1.9 deep, and the character's
+        // head 1.6 out from its long side, inside the straight box round it.
+        val turn = PI / 4
+        val house = Block(10.0 - 1.75, 0.0, -0.95, 3.5, 2.6, 1.9, 0, turn)
+        val acrossX = sin(turn)
+        val acrossZ = cos(turn)
+        val head = Point(10.0 + acrossX * 2.55, 1.6, acrossZ * 2.55)
+        val bounds = TurnedBox(10.0, 0.0, 3.5, 1.9, turn).bounds(2.6, 0)
+        assertTrue(head.x in bounds.x..bounds.x + bounds.width && head.z in bounds.z..bounds.z + bounds.depth)
+        // The camera behind the character along the street, as it follows a walk.
+        val alongX = cos(turn)
+        val alongZ = -sin(turn)
+        val eye = Point(head.x - alongX * 18.0, 10.0, head.z - alongZ * 18.0)
+        val turned = Cutaway(listOf(bounds), listOf(house))
+        turned.aimAt(eye, head)
+        assertFalse(turned.isFolding(0), "the house beside the character folds")
+        // Told only its straight box, the cutaway would fold it: the box holds the head.
+        val straight = Cutaway(listOf(bounds))
+        straight.aimAt(eye, head)
+        assertTrue(straight.isFolding(0))
+        // Across the street in front of the camera, the same house folds as before.
+        val inTheWay = Point(10.0 - alongX * 6.0, 1.6, -alongZ * 6.0)
+        turned.aimAt(Point(10.0 + alongX * 12.0, 10.0, alongZ * 12.0), inTheWay)
+        assertTrue(turned.isFolding(0), "the house between the camera and the character stands")
     }
 
     @Test

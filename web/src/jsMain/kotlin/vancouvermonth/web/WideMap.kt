@@ -45,7 +45,7 @@ fun isInside(spot: Spot, edge: List<Spot>): Boolean {
  * The wide map, traced by `tools/vancouver_map` from City of Vancouver and City of Burnaby open data: the town's map
  * carried on through East Vancouver into south-west Burnaby, with the Expo Line and its stations, the main streets,
  * the city blocks, the three zones a room can be in and a room in each. The town's map ([RealVancouver]) is its
- * top-left corner, square for square. Nothing draws it yet: the town still stands on [RealVancouver].
+ * top-left corner, square for square, and the town ([Neighbourhood]) stands on it.
  */
 object WideVancouver {
     val map: TerrainMap by lazy { TerrainMap.parse(WideMapData.rows.map(::unpackRuns)) }

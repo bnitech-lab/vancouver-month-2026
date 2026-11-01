@@ -287,9 +287,10 @@ class PatchNotesCardTest {
         val link = assertNotNull(guideLink, "No 업데이트 소식 at the guide's foot")
         assertTrue(link.textContent.orEmpty().startsWith(PatchNotes.TITLE))
         assertTrue(hasNews(link))
-        // Next to the map's credit, which stays the card's last line.
-        assertEquals("guide-credit", guide.lastElementChild?.className)
-        assertSame(guide.lastElementChild, link.parentElement?.nextElementSibling)
+        // Next to the map's credit, whose two lines stay the card's last: Vancouver's, then Burnaby's.
+        assertEquals("guide-credit burnaby-credit", guide.lastElementChild?.className)
+        assertEquals("guide-credit", guide.lastElementChild?.previousElementSibling?.className)
+        assertSame(guide.lastElementChild?.previousElementSibling, link.parentElement?.nextElementSibling)
 
         link.click()
         val notes = assertNotNull(card, "The link opened nothing")

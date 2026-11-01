@@ -131,8 +131,9 @@ class NeighbourhoodTest {
 
     @Test
     fun `the longest walk across the town is found in a blink`() {
-        // From the park's western tip to the far corner across False Creek: the way goes round the creek's head.
-        val free = town.freeCells()
+        // From the park's western tip to the far corner across False Creek: the way goes round the creek's head. The
+        // town's own corner of the wide map, as always; the wide map's longest walk is WideMapTest's.
+        val free = town.freeCells().filter { it.x < Neighbourhood.TOWN_COLUMNS }
         val west = town.centreOf(free.minBy { it.x })
         val far = town.centreOf(free.maxBy { it.x + it.z })
         // The best of three, so a pause of the browser's own in one of them does not count against the search.
@@ -157,9 +158,11 @@ class NeighbourhoodTest {
         // A square in the garden, by the fire.
         val home = Neighbourhood.venue(Place.HOME)
         assertTrue(Cell(home.x - 1, home.z + 1) in reached)
-        // Squares the character could never reach are blocked; there must be only a few, or the layout cut off a part
-        // of the town.
-        assertTrue(Neighbourhood.pockets < 20, "${Neighbourhood.pockets} squares were walled in")
+        // Squares the character could never reach are blocked; there must be only a few, or the layout cut off a part of
+        // the town: under 20 in the town's own corner, as always, and under 1% over the whole wide map (the odd square
+        // between its turned blocks).
+        assertTrue(HomeSite.of(1).pocketsInCorner < 20, "${HomeSite.of(1).pocketsInCorner} squares were walled in downtown")
+        assertTrue(Neighbourhood.pockets < free.size / 100, "${Neighbourhood.pockets} squares were walled in")
     }
 
     @Test

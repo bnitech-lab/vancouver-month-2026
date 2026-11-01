@@ -145,17 +145,46 @@ data class Lot(val x: Int, val z: Int, val width: Int, val depth: Int) {
 }
 
 /**
- * The town the player walks in: real Vancouver, traced from the City's open data ([RealVancouver]), all drawn from
- * boxes. The peninsula's tip is the big park, a forest of round trees with the seawall round its shore; downtown and
- * the West End are the real city blocks, taller in the business district and the middle, low in the West End; False
- * Creek lies to the south with its south shore past it, and the inlet to the north with the mountains far across it.
- * The five places stand where they were proposed, 내 방 with its garden, bench and campfire, and the SkyTrain runs on
- * its guideway along False Creek, out of its tunnel by the station. The walkable part is the map's grid of [COLUMNS]
- * by [ROWS] squares, one square for 25 m of the city; the land goes on past it into the haze.
+ * The SkyTrain's guideway: the real Expo Line on the wide map ([WideVancouver.rail]) from where it comes out of its
+ * tunnel by the stadiums, its first leg laid straight along x for the station there, carried on [PAST_THE_EDGE] past
+ * the grid into the haze. Made on its own, so the town and its stations can each be laid out first.
+ */
+internal val expoLine: RailLine by lazy {
+    val rail = WideVancouver.rail
+    val level = (rail[0].z + rail[1].z) / 2
+    val line = listOf(Spot(rail[0].x, level), Spot(rail[1].x, level)) + rail.drop(2)
+    val a = line[line.size - 2]
+    val b = line.last()
+    val leg = distanceBetween(a, b)
+    val far = Spot(b.x + (b.x - a.x) / leg * PAST_THE_EDGE, b.z + (b.z - a.z) / leg * PAST_THE_EDGE)
+    RailLine(line + far)
+}
+
+/** How far the guideway carries on past the grid's edge. */
+private const val PAST_THE_EDGE = 170.0
+
+/**
+ * The town the player walks in: real Vancouver and south-west Burnaby, traced from the two cities' open data
+ * ([WideVancouver]), all drawn from boxes. The peninsula's tip is the big park, a forest of round trees with the
+ * seawall round its shore; downtown and the West End are the real city blocks, taller in the business district and the
+ * middle, low in the West End; False Creek lies to the south with its south shore past it, and the inlet to the north
+ * with the mountains far across it. East of downtown the city goes on through East Vancouver into Burnaby: a low,
+ * turned box on each real block, taller round the Burnaby town centre, and its parks as forest. The five places stand
+ * where they were proposed, and the SkyTrain runs on its guideway from its tunnel by the station out to Burnaby. 내 방,
+ * with its garden, bench and campfire, stands where the room is ([HomeSite]): in the West End for a room in zone 1, in
+ * Burnaby for the others. The walkable part is the map's grid of [COLUMNS] by [ROWS] squares, one square for 25 m of
+ * the city, the town's own corner of it ([TOWN_COLUMNS] wide) just as it was; the land goes on past it into the haze.
  */
 object Neighbourhood {
-    const val COLUMNS = VancouverMapData.COLUMNS
-    const val ROWS = VancouverMapData.ROWS
+    const val COLUMNS = WideMapData.COLUMNS
+    const val ROWS = WideMapData.ROWS
+
+    /** The town's own corner: columns 0 until this are downtown, the West End and the big park, as they always were. */
+    const val TOWN_COLUMNS = WideMapData.TOWN_COLUMNS
+
+    /** The ground the town stands on, square by square. */
+    val map: TerrainMap
+        get() = WideVancouver.map
 
     /** How close to a door or a person the character must stop for the place to open. */
     const val REACH = 0.9
@@ -181,6 +210,26 @@ object Neighbourhood {
     fun venue(place: Place): Venue = venues.first { it.place == place }
 
     /**
+     * 내 방 for a room in each zone (1 to 3): in zone 1 the town's own, in the West End; in zones 2 and 3 on the wide
+     * map's room square for the zone ([WideVancouver.homes]), the house just north of it with its door on it, its garden
+     * to the west, as the town's is.
+     */
+    val homes: Map<Int, Venue> = (1..3).associateWith { zone ->
+        val home = venue(Place.HOME)
+        if (zone == 1) {
+            home
+        } else {
+            val room = WideVancouver.homes.getValue(zone)
+            val x = room.x - home.width / 2
+            val z = room.z - home.depth
+            home.copy(x = x, z = z, person = Spot(x + home.person.x - home.x, z + home.person.z - home.z))
+        }
+    }
+
+    /** 내 방 for a room in [zone]; zone 1's for any other number. */
+    fun home(zone: Int): Venue = homes[zone] ?: homes.getValue(1)
+
+    /**
      * The bike shop, on the West End's wide street toward downtown, on the way from 내 방 to the business district: a
      * block of the city cleared for it, as for the five places. Not a real shop or address.
      */
@@ -189,21 +238,19 @@ object Neighbourhood {
     /** How much the shop's flat roof adds on top of its walls. */
     const val SHOP_ROOF = 0.3
 
-    /** A box around each place's person, and around the shop's keeper, so a tap on them talks to them. */
-    val people: List<Wall> = venues.map { venue ->
-        Wall(Block(venue.person.x - 0.4, 0.0, venue.person.z - 0.4, 0.8, 1.8, 0.8, 0), venue.place)
-    } + Wall(Block(shop.keeper.x - 0.4, 0.0, shop.keeper.z - 0.4, 0.8, 1.8, 0.8, 0), null, shop = true)
+    /** A box around each place's person, and around the shop's keeper, so a tap on them talks to them: zone 1's. */
+    val people: List<Wall>
+        get() = HomeSite.of(1).people
 
-    private val home = venue(Place.HOME)
-
-    /**
-     * The bench in 내 방's garden, where the character sits by the campfire on a day of rest, facing north across
-     * the fire.
-     */
-    val benchSeat = Spot(home.x - 2.7, home.z + home.depth - 1.1)
+    /** The bench in zone 1's garden, where the character sits by the campfire on a day of rest ([HomeSite.benchSeat]). */
+    val benchSeat: Spot
+        get() = HomeSite.of(1).benchSeat
     const val BENCH_FACING = PI
     const val SEAT_HEIGHT = 0.42
-    val campfire = Spot(home.x - 2.7, home.z + home.depth - 3.0)
+
+    /** Zone 1's campfire ([HomeSite.campfire]). */
+    val campfire: Spot
+        get() = HomeSite.of(1).campfire
 
     /** How high the logs lift the flames off the ground. */
     const val FLAME_BASE = 0.12
@@ -213,18 +260,11 @@ object Neighbourhood {
     const val DECK_WIDTH = 1.0
 
     /**
-     * The guideway's line: the real rail from where it comes out of its tunnel by the stadiums, east along False Creek
-     * and on past the grid into the haze. Its first leg is laid straight along x, for the station.
+     * The guideway's line: the real Expo Line from where it comes out of its tunnel by the stadiums, east along False
+     * Creek, through East Vancouver into Burnaby and on past the grid into the haze ([expoLine]).
      */
-    val guideway: RailLine = RealVancouver.rail.let { rail ->
-        val level = (rail[0].z + rail[1].z) / 2
-        val line = listOf(Spot(rail[0].x, level), Spot(rail[1].x, level)) + rail.drop(2)
-        val a = line[line.size - 2]
-        val b = line.last()
-        val leg = distanceBetween(a, b)
-        val far = Spot(b.x + (b.x - a.x) / leg * PAST_THE_EDGE, b.z + (b.z - a.z) / leg * PAST_THE_EDGE)
-        RailLine(line + far)
-    }
+    val guideway: RailLine
+        get() = expoLine
 
     /** How far along the guideway the train's west end stands at the station, and the train's length. */
     const val TRAIN_STOP = 1.2
@@ -242,21 +282,24 @@ object Neighbourhood {
     )
     val trainCarWindows: List<Block> = listOf(Block(-0.95, DECK_HEIGHT + 0.8, -0.49, 1.9, 0.35, 0.98, WINDOW))
 
-    /** The place whose door or person [spot] is within [REACH] of, or null when it is near none. */
-    fun placeAt(spot: Spot): Place? = venues.firstOrNull { venue ->
-        listOf(venue.door, venue.talkSpot).any { hypot(it.x - spot.x, it.z - spot.z) <= REACH }
-    }?.place
+    /** The place whose door or person [spot] is within [REACH] of in zone 1's town, or null ([HomeSite.placeAt]). */
+    fun placeAt(spot: Spot): Place? = HomeSite.of(1).placeAt(spot)
 
     /** True when [spot] is within [REACH] of the shop's door or of where to stand to talk to its keeper. */
     fun isAtShop(spot: Spot): Boolean =
         distanceBetween(spot, shop.door) <= REACH || distanceBetween(spot, shop.talkSpot) <= REACH
 
     /**
-     * Every box to draw that stands still, the people aside. [ground] holds what is too flat or too far to cast a
-     * shadow (the ground, the water and the mountains), [glowing] the windows and lamps, and [blocks] the rest.
+     * Every box to draw that stands still, the people and 내 방 with its garden aside ([HomeSite.blocks]). [ground] holds
+     * what is too flat or too far to cast a shadow (the ground, the water and the mountains), [glowing] the windows and
+     * lamps, and [blocks] the rest. [corner] is the ground of the town's own corner, as it always was, and [groundTiles]
+     * the ground of the rest of the wide map, a list for each [GROUND_TILE] by [GROUND_TILE] square of it, so the far
+     * ground need not be drawn.
      */
     val blocks: List<Block>
     val ground: List<Block>
+    val corner: List<Block>
+    val groundTiles: List<List<Block>>
     val glowing: List<Block>
 
     /** The campfire's flames, which flicker: measured from the middle of the fire, [FLAME_BASE] above the ground. */
@@ -265,18 +308,30 @@ object Neighbourhood {
     /** Where each blossom tree in the town stands; their petals drift down. */
     val blossoms: List<Spot>
 
-    /** The city's buildings as built: a lot each, after the five places and the station took their room. */
+    /** The town corner's buildings as built: a lot each, after the five places and the station took their room. */
     val cityLots: List<Lot>
 
-    /** What stands on the ground and blocks the way: a footprint for each building, trunk, fence, bench and lamp. */
-    private val footprints: List<Block>
+    /** True for each square of the grid a building of the city stands on, square by square from the north row. */
+    internal val built: BooleanArray
 
     /**
-     * What a tap stops at: the buildings (the five places among them), the SkyTrain deck, the station and its roof,
-     * the tunnel's mouth, the café's awning and the office's canopy. The camera stays out of all but the city's
-     * buildings, which fold down out of its way instead ([foldables]).
+     * The ground every zone's town shares, before 내 방 and its garden stand on it ([HomeSite.grid] adds them): blocked
+     * by the water, a footprint for each building, trunk, fence, bench and lamp but 내 방's, and the four other places'
+     * people and the shop's keeper. Only the grid is kept, not the list of every blocked square it was made from.
+     */
+    internal val open: Grid
+
+    /** What a tap stops at besides the five places, which [HomeSite.walls] adds: see [walls]. */
+    internal val sharedWalls: List<Wall>
+
+    /**
+     * What a tap stops at in zone 1's town: the buildings (the five places among them), the SkyTrain deck, the stations
+     * and their roofs, the tunnel's mouth, the café's awning and the office's canopy. The camera stays out of all but
+     * the city's buildings, which fold down out of its way instead ([foldables]). Another zone's are its
+     * [HomeSite.walls].
      */
     val walls: List<Wall>
+        get() = HomeSite.of(1).walls
 
     /**
      * The buildings that fold down out of the camera's way: the city's, and the low blocks past the grid's edges. The
@@ -284,10 +339,13 @@ object Neighbourhood {
      */
     val foldables: List<Foldable>
 
+    /** The ground zone 1's character walks on ([HomeSite.grid]). */
     val grid: Grid
+        get() = HomeSite.of(1).grid
 
-    /** How many free squares were blocked because the character could never walk to them: walled-in pockets. */
+    /** How many free squares zone 1's town blocked because the character could never walk to them ([HomeSite.pockets]). */
     val pockets: Int
+        get() = HomeSite.of(1).pockets
 
     // Set before the town is laid out, which picks from them.
     private val TOWER_COLOURS = listOf(0xA9C7E3, 0xBFD0DC, 0x9FB7C9, 0xC9D6DF, 0xB4C9D6)
@@ -301,58 +359,49 @@ object Neighbourhood {
         town.addWater()
         town.addGround()
         town.addMountains()
-        for (venue in venues) town.addVenue(venue)
+        for (venue in venues) if (venue.place != Place.HOME) town.addVenue(venue)
         town.addShop()
-        town.addHomeGarden()
         town.addSkyTrain()
         town.addStations()
         town.addCity()
         town.addTrees()
         town.addStreetLife()
         town.addStops()
+        town.addFlames()
         blocks = town.blocks
         ground = town.ground
+        corner = town.corner
+        groundTiles = town.groundTiles
         glowing = town.glowing
         flames = town.flames
         blossoms = town.blossoms
         cityLots = town.cityLots
-        footprints = town.footprints
+        built = town.built
         foldables = town.foldables
-        walls = venues.map { Wall(it.box, it.place) } + Wall(shop.box, null, shop = true) +
-            town.otherWalls.map { Wall(it, null) } + foldables.map { Wall(it.box, null, folds = true) }
+        sharedWalls = listOf(Wall(shop.box, null, shop = true)) + town.otherWalls.map { Wall(it, null) } +
+            foldables.map { Wall(it.box, null, folds = true) }
         // Each person stands on one square, which the character walks around; the water is never walked on.
-        val people = (venues.map { it.person } + shop.keeper).map { Cell(floor(it.x).toInt(), floor(it.z).toInt()) }
-        val water = RealVancouver.map.cellsOf(Terrain.WATER)
-        val blocked = water + footprints.flatMap { cellsUnder(it) } + people
-        // A pocket of ground walled in by buildings, trees and the water is no ground to walk on.
-        val open = Grid(COLUMNS, ROWS, blocked)
-        val reached = open.reachableFrom(open.cellAt(home.door))
-        val walledIn = open.freeCells().filter { it !in reached }
-        pockets = walledIn.size
-        grid = Grid(COLUMNS, ROWS, blocked + walledIn)
+        val people = (venues.filter { it.place != Place.HOME }.map { it.person } + shop.keeper).map {
+            Cell(floor(it.x).toInt(), floor(it.z).toInt())
+        }
+        val blocked = map.cellsOf(Terrain.WATER) + town.footprints.flatMap { cellsUnder(it) } + town.turnedFootprints + people
+        open = Grid(COLUMNS, ROWS, blocked)
+    }
+
+    /** 내 방, its garden, bench, campfire and lamps at [home], built as [HomeSite] keeps them. */
+    internal fun homeParts(home: Venue): HomeParts {
+        val parts = Builder()
+        parts.addVenue(home)
+        parts.addHomeGarden(home)
+        parts.addLamps(home)
+        return HomeParts(parts.blocks, parts.glowing, parts.footprints.flatMap { cellsUnder(it) })
     }
 
     /** The extra height a roof adds on top of the walls. */
     fun roofHeight(venue: Venue): Double = if (venue.pitched) PITCHED_ROOF else FLAT_ROOF
 
-    /**
-     * Where a tap at [tapped] sends a character standing at [from]: the spot itself on land, and on the water the last
-     * free square on the straight way from [from] toward it before the water, so a tap on False Creek stops on the near
-     * shore rather than leading all the way round the creek's head to the far one.
-     */
-    fun landing(from: Spot, tapped: Spot): Spot {
-        val map = RealVancouver.map
-        if (map.terrainAt(grid.cellAt(tapped)) != Terrain.WATER) return tapped
-        val steps = max(1, ceil(distanceBetween(from, tapped) / LANDING_STEP).toInt())
-        var last: Cell? = null
-        for (step in 0..steps) {
-            val spot = Spot(from.x + (tapped.x - from.x) * step / steps, from.z + (tapped.z - from.z) * step / steps)
-            val cell = grid.cellAt(spot)
-            if (map.terrainAt(cell) == Terrain.WATER) break
-            if (grid.isFree(cell)) last = cell
-        }
-        return last?.let { grid.centreOf(it) } ?: from
-    }
+    /** Where a tap at [tapped] sends a character standing at [from] in zone 1's town ([HomeSite.landing]). */
+    fun landing(from: Spot, tapped: Spot): Spot = HomeSite.of(1).landing(from, tapped)
 
     /** Where the line the mountains stand behind runs at the middle of each stretch of the north shore's forest. */
     private val northShoreLine = DoubleArray((NORTH_SHORE_TO - NORTH_SHORE_FROM) / NORTH_SHORE_STEP + 1) {
@@ -393,7 +442,7 @@ object Neighbourhood {
     }
 
     /** The room each place takes from the city: its building, a square or a pavement in front, 내 방's garden. */
-    private fun lotFor(venue: Venue): Lot {
+    internal fun lotFor(venue: Venue): Lot {
         val front = if (venue.doorFacesSouth) venue.z - 1 else venue.z - FORECOURT
         val lot = Lot(venue.x - 1, front, venue.width + 2, venue.depth + 1 + FORECOURT)
         return if (venue.place == Place.HOME) Lot(lot.x - GARDEN, lot.z, lot.width + GARDEN, lot.depth + 2) else lot
@@ -405,8 +454,7 @@ object Neighbourhood {
     /** How tall the plant room on a tall tower's roof is. */
     private const val PLANT_ROOM = 0.5
 
-    /** How far the guideway carries on past the grid's edge, and how deep a place's square is in front of it. */
-    private const val PAST_THE_EDGE = 170.0
+    /** How deep a place's square is in front of it. */
     private const val FORECOURT = 4
     private const val GARDEN = 5
 
@@ -429,22 +477,38 @@ object Neighbourhood {
     private const val NORTH_SHORE_FAR = MOUNTAINS_BACK - 4
     private const val NORTH_SHORE_NEAR = 14.0
 
-    /** How many trees of the park's forest are drawn in full, nearest 내 방; the rest are simpler. */
+    /**
+     * How many trees of the park's forest are drawn in full, nearest the town's 내 방; the rest are simpler, but for those
+     * within [FULL_TREES_WITHIN] of 내 방 in another zone.
+     */
     private const val FULL_TREES = 60
+    private const val FULL_TREES_WITHIN = 24.0
 
     /** Collects the boxes while the town is laid out. */
     private class Builder {
         val blocks = mutableListOf<Block>()
         val ground = mutableListOf<Block>()
+        val corner = mutableListOf<Block>()
+        val groundTiles = mutableListOf<List<Block>>()
         val glowing = mutableListOf<Block>()
         val flames = mutableListOf<Block>()
         val blossoms = mutableListOf<Spot>()
         val footprints = mutableListOf<Block>()
+
+        /** The squares the turned buildings of the wide map stand on, which [footprints] cannot say as boxes. */
+        val turnedFootprints = mutableListOf<Cell>()
         val otherWalls = mutableListOf<Block>()
         val foldables = mutableListOf<Foldable>()
         val cityLots = mutableListOf<Lot>()
-        private val map = RealVancouver.map
+        val built = BooleanArray(COLUMNS * ROWS)
+        private val map = WideVancouver.map
+
+        /**
+         * The town corner's chances, drawn in the order they always were, so downtown keeps every building's height and
+         * colour and every tree's place; the rest of the wide map draws from its own.
+         */
         private val random = Random(2026)
+        private val wideRandom = Random(2427)
 
         fun add(x: Double, y: Double, z: Double, width: Double, height: Double, depth: Double, colour: Int) {
             blocks.add(Block(x, y, z, width, height, depth, colour))
@@ -473,11 +537,12 @@ object Neighbourhood {
         /**
          * The ground of the grid, square by square as the map has it but drawn as few boxes as can cover it, each run
          * of the same ground one box: the streets, the small parks, the big park and the seawall round the shore. The
-         * land goes on past the grid's edges into the haze.
+         * town's own corner is merged as it always was, into [corner]; the rest of the wide map tile by tile, into
+         * [groundTiles], so a tile far off need not be drawn. The land goes on past the grid's edges into the haze.
          */
         fun addGround() {
             val kinds = IntArray(COLUMNS * ROWS) { index ->
-                when (map.terrainAt(Cell(index % COLUMNS, index / COLUMNS))) {
+                when (map.terrainAt(index % COLUMNS, index / COLUMNS)) {
                     Terrain.WATER -> NONE
                     Terrain.LAND -> STREET_GROUND
                     Terrain.PARK -> PARK_GROUND
@@ -489,41 +554,55 @@ object Neighbourhood {
                     for (z in green.z until green.z + green.depth) kinds[z * COLUMNS + x] = GREEN_GROUND
                 }
             }
-            for ((lot, kind) in mergedRuns(kinds)) {
-                val top = when (kind) {
-                    SHORE_GROUND -> 0.03
-                    STREET_GROUND -> 0.02
-                    else -> 0.0
+            for ((lot, kind) in mergedRuns(kinds, Lot(0, 0, TOWN_COLUMNS, ROWS))) corner.add(groundBox(lot, kind))
+            var west = TOWN_COLUMNS
+            while (west < COLUMNS) {
+                var north = 0
+                while (north < ROWS) {
+                    val tile = Lot(west, north, min(GROUND_TILE, COLUMNS - west), min(GROUND_TILE, ROWS - north))
+                    val boxes = mergedRuns(kinds, tile).map { (lot, kind) -> groundBox(lot, kind) }
+                    if (boxes.isNotEmpty()) groundTiles.add(boxes)
+                    north += GROUND_TILE
                 }
-                val colour = when (kind) {
-                    SHORE_GROUND -> SEAWALL
-                    STREET_GROUND -> STONE_STREET
-                    GREEN_GROUND -> GRASS_LIGHT
-                    else -> GRASS
-                }
-                val (x, z) = lot.x.toDouble() to lot.z.toDouble()
-                lay(x, -0.7, z, lot.width.toDouble(), 0.7 + top, lot.depth.toDouble(), colour)
+                west += GROUND_TILE
             }
             addLandBeyond()
         }
 
+        private fun groundBox(lot: Lot, kind: Int): Block {
+            val top = when (kind) {
+                SHORE_GROUND -> 0.03
+                STREET_GROUND -> 0.02
+                else -> 0.0
+            }
+            val colour = when (kind) {
+                SHORE_GROUND -> SEAWALL
+                STREET_GROUND -> STONE_STREET
+                GREEN_GROUND -> GRASS_LIGHT
+                else -> GRASS
+            }
+            return Block(lot.x.toDouble(), -0.7, lot.z.toDouble(), lot.width.toDouble(), 0.7 + top, lot.depth.toDouble(), colour)
+        }
+
         /**
-         * Each run of the same ground, grown first across and then down as far as it goes, so the whole grid is
-         * covered by a few hundred boxes instead of one a square.
+         * Each run of the same ground inside [area], grown first across and then down as far as it goes, so the whole
+         * grid is covered by a few thousand boxes instead of one a square.
          */
-        fun mergedRuns(kinds: IntArray): List<Pair<Lot, Int>> {
+        fun mergedRuns(kinds: IntArray, area: Lot): List<Pair<Lot, Int>> {
             val used = BooleanArray(kinds.size)
             val runs = mutableListOf<Pair<Lot, Int>>()
-            for (z in 0 until ROWS) {
-                for (x in 0 until COLUMNS) {
+            val right = area.x + area.width
+            val bottom = area.z + area.depth
+            for (z in area.z until bottom) {
+                for (x in area.x until right) {
                     val kind = kinds[z * COLUMNS + x]
                     if (kind == NONE || used[z * COLUMNS + x]) continue
                     var width = 1
-                    while (x + width < COLUMNS && kinds[z * COLUMNS + x + width] == kind &&
+                    while (x + width < right && kinds[z * COLUMNS + x + width] == kind &&
                         !used[z * COLUMNS + x + width]
                     ) width++
                     var depth = 1
-                    while (z + depth < ROWS && (0 until width).all { kinds[(z + depth) * COLUMNS + x + it] == kind &&
+                    while (z + depth < bottom && (0 until width).all { kinds[(z + depth) * COLUMNS + x + it] == kind &&
                             !used[(z + depth) * COLUMNS + x + it] }
                     ) depth++
                     for (dz in 0 until depth) for (dx in 0 until width) used[(z + dz) * COLUMNS + x + dx] = true
@@ -535,11 +614,12 @@ object Neighbourhood {
 
         /**
          * Land past the grid wherever the land reaches its edge, east, south and north, with low blocks of the city
-         * going on into the haze.
+         * going on into the haze: past the south edge of the town's corner as it always was, and past the wide map's
+         * edges turned as its streets are.
          */
         fun addLandBeyond() {
             val far = LAND_BEYOND
-            fun landAt(x: Int, z: Int) = map.terrainAt(Cell(x, z)) != Terrain.WATER
+            fun landAt(x: Int, z: Int) = map.terrainAt(x, z) != Terrain.WATER
             val east = (0 until ROWS).filter { landAt(COLUMNS - 1, it) }
             val south = (0 until COLUMNS).filter { landAt(it, ROWS - 1) }
             val north = (0 until COLUMNS).filter { landAt(it, 0) }
@@ -554,23 +634,48 @@ object Neighbourhood {
             }
             if (landAt(COLUMNS - 1, ROWS - 1)) lay(COLUMNS.toDouble(), -0.7, ROWS.toDouble(), far, 0.72, far, LAND_FAR)
             if (landAt(COLUMNS - 1, 0)) lay(COLUMNS.toDouble(), -0.7, -far, far, 0.72, far, LAND_FAR)
-            // Low blocks on the land past the east and south edges, as far as the eye goes before the haze.
+            // The town's corner once ended at its east edge, with low blocks past it; East Vancouver stands there now,
+            // but those blocks' chances are still drawn, so the rest of the corner comes out as it always did.
+            for (z in 2 until ROWS step BEYOND_STEP) {
+                if (!landAt(TOWN_COLUMNS - 1, z) || !landAt(TOWN_COLUMNS - 1, z + BEYOND_BLOCK)) continue
+                repeat(BEYOND_ROWS) {
+                    random.nextDouble()
+                    random.nextInt(LOW_COLOURS.size)
+                }
+            }
+            // Low blocks on the land past the south edge of the town's corner, as far as the eye goes before the haze;
+            // past the corner's east edge was water to the town, as it was then.
+            fun cornerLandAt(x: Int, z: Int) = x < TOWN_COLUMNS && landAt(x, z)
+            for (x in 2 until TOWN_COLUMNS step BEYOND_STEP) {
+                if (!cornerLandAt(x, ROWS - 1) || !cornerLandAt(x + BEYOND_BLOCK, ROWS - 1)) continue
+                for (gap in 0 until BEYOND_ROWS) addBeyond(x.toDouble(), ROWS + 2.0 + gap * BEYOND_STEP, random, 0.0)
+            }
+            // And past the wide map's edges: east, south and north, where the city goes on.
             for (z in 2 until ROWS step BEYOND_STEP) {
                 if (!landAt(COLUMNS - 1, z) || !landAt(COLUMNS - 1, z + BEYOND_BLOCK)) continue
-                for (gap in 0 until BEYOND_ROWS) addBeyond(COLUMNS + 2.0 + gap * BEYOND_STEP, z.toDouble())
+                for (gap in 0 until BEYOND_ROWS) addBeyond(COLUMNS + 2.0 + gap * BEYOND_STEP, z.toDouble(), wideRandom, TURNED)
             }
-            for (x in 2 until COLUMNS step BEYOND_STEP) {
-                if (!landAt(x, ROWS - 1) || !landAt(x + BEYOND_BLOCK, ROWS - 1)) continue
-                for (gap in 0 until BEYOND_ROWS) addBeyond(x.toDouble(), ROWS + 2.0 + gap * BEYOND_STEP)
+            for (x in TOWN_COLUMNS + 2 until COLUMNS step BEYOND_STEP) {
+                if (landAt(x, ROWS - 1) && landAt(x + BEYOND_BLOCK, ROWS - 1)) {
+                    for (gap in 0 until BEYOND_ROWS) addBeyond(x.toDouble(), ROWS + 2.0 + gap * BEYOND_STEP, wideRandom, TURNED)
+                }
+                if (landAt(x, 0) && landAt(x + BEYOND_BLOCK, 0)) {
+                    for (gap in 0 until BEYOND_ROWS) {
+                        addBeyond(x.toDouble(), -2.0 - BEYOND_BLOCK - gap * BEYOND_STEP, wideRandom, TURNED)
+                    }
+                }
             }
         }
 
-        private fun addBeyond(x: Double, z: Double) {
-            val height = 3.0 + random.nextDouble() * 3.5
-            val colour = LOW_COLOURS[random.nextInt(LOW_COLOURS.size)]
+        private fun addBeyond(x: Double, z: Double, chances: Random, turn: Double) {
+            val height = 3.0 + chances.nextDouble() * 3.5
+            val colour = LOW_COLOURS[chances.nextInt(LOW_COLOURS.size)]
             val body = blocks.size
-            add(x, 0.0, z, BEYOND_BLOCK.toDouble(), height, BEYOND_BLOCK.toDouble(), colour)
-            val box = Block(x, 0.0, z, BEYOND_BLOCK.toDouble(), height, BEYOND_BLOCK.toDouble(), colour)
+            val size = BEYOND_BLOCK.toDouble()
+            blocks.add(Block(x, 0.0, z, size, height, size, colour, turn))
+            // Turned, it reaches this much farther each way than it is wide.
+            val out = if (turn == 0.0) 0.0 else size * (SQRT_HALF - 0.5)
+            val box = Block(x - out, 0.0, z - out, size + 2 * out, height, size + 2 * out, colour)
             foldables.add(Foldable(box, body, roof = -1, glassNorth = -1, glassSouth = -1))
         }
 
@@ -724,7 +829,7 @@ object Neighbourhood {
          * 내 방's garden to the west of it, open to the street on the south: a fence on the other sides, a bench
          * facing a campfire, and flower beds.
          */
-        fun addHomeGarden() {
+        fun addHomeGarden(home: Venue) {
             val west = home.x - GARDEN.toDouble()
             val north = home.z - 1.0
             for (row in 0..5) addSolid(west, 0.0, north + row, 0.15, 0.7, 1.0, WOOD)
@@ -732,9 +837,10 @@ object Neighbourhood {
             add(west - 0.02, 0.45, north, 0.19, 0.08, 6.0, WOOD_DARK)
             add(west, 0.45, north - 0.02, 5.0, 0.08, 0.19, WOOD_DARK)
             // A short bench, so there is a way past it into the garden.
-            addBench(benchSeat.x, benchSeat.z, facingSouth = false, length = 1.3)
+            val seat = HomeSite.benchSeatAt(home)
+            addBench(seat.x, seat.z, facingSouth = false, length = 1.3)
             // Stones in a ring, two crossed logs, and the fire, which glows after dark.
-            val fire = campfire
+            val fire = HomeSite.campfireAt(home)
             val stones = listOf(
                 -0.5 to 0.0, 0.5 to 0.0, 0.0 to -0.5, 0.0 to 0.5,
                 -0.36 to -0.36, 0.36 to 0.36, -0.36 to 0.36, 0.36 to -0.36,
@@ -745,9 +851,13 @@ object Neighbourhood {
             footprints.add(Block(fire.x - 0.6, 0.0, fire.z - 0.6, 1.2, 0.2, 1.2, STONE))
             add(fire.x - 0.4, 0.05, fire.z - 0.07, 0.8, 0.14, 0.14, WOOD_DARK)
             add(fire.x - 0.07, 0.05, fire.z - 0.4, 0.14, 0.14, 0.8, WOOD_DARK)
+            for (x in listOf(0.6, 1.4, 3.6)) addFlowerBed(west + x, north + 1.4)
+        }
+
+        /** The campfire's flames, the same at every 내 방: measured from the middle of the fire. */
+        fun addFlames() {
             flames.add(Block(-0.18, 0.0, -0.18, 0.36, 0.34, 0.36, FLAME))
             flames.add(Block(-0.1, 0.28, -0.1, 0.2, 0.26, 0.2, FLAME_LIGHT))
-            for (x in listOf(0.6, 1.4, 3.6)) addFlowerBed(west + x, north + 1.4)
         }
 
         /**
@@ -764,11 +874,11 @@ object Neighbourhood {
                 val left = middle.x - length / 2
                 blocks.add(Block(left, deck, middle.z - DECK_WIDTH / 2, length, 0.4, DECK_WIDTH, CONCRETE, turn))
             }
-            // For the camera, the deck as short pieces along the line, each straight on the grid.
+            // For the camera, the deck as short pieces along the line, each straight on the grid, as far as it can go.
             var along = 0.0
             while (along < guideway.length) {
                 val spot = guideway.spotAt(along)
-                if (spot.x > COLUMNS + HAZE_NEAR) break
+                if (spot.x > COLUMNS + HAZE_NEAR || spot.z < -HAZE_NEAR) break
                 otherWalls.add(Block(spot.x - 0.5, deck, spot.z - 0.5, 1.0, 0.4, 1.0, CONCRETE))
                 along += 0.8
             }
@@ -788,18 +898,22 @@ object Neighbourhood {
             addSolid(mouth.x, mouth.y, mouth.z, mouth.width, mouth.height, mouth.depth, mouth.colour)
             otherWalls.add(mouth)
             add(start.x - 0.07, deck + 0.35, start.z - 0.6, 0.05, 1.5, 1.2, TUNNEL)
-            // Pillars from past the station all along, on into the haze; a station up on the line stands on its own.
+            // Pillars from past the station all along, on into the haze; a station up on the line stands on its own, and
+            // where a bus line passes under the deck, the deck spans it.
+            val busWays = Samples(TransitLines.busLines.map { it.loop.points })
             along = STATION_LENGTH + 4.0
             while (along < guideway.length) {
                 val spot = guideway.spotAt(along)
                 if (spot.x > COLUMNS + HAZE_FAR) break
-                if (TransitLines.stations.any { it.entrance != null && !it.underground && abs(it.along - along) < 5.0 }) {
+                if (TransitLines.stations.any { it.entrance != null && !it.underground && abs(it.along - along) < 5.0 } ||
+                    busWays.within(spot, PILLAR_CLEAR_OF_BUSES)
+                ) {
                     along += PILLAR_GAP
                     continue
                 }
                 val pillar = Block(spot.x - 0.3, 0.0, spot.z - 0.3, 0.6, deck, 0.6, PILLAR)
                 blocks.add(pillar)
-                if (spot.x < COLUMNS) footprints.add(pillar)
+                if (spot.x < COLUMNS && spot.z >= 0) footprints.add(pillar)
                 along += PILLAR_GAP
             }
         }
@@ -862,12 +976,13 @@ object Neighbourhood {
             val start = guideway.points.first()
             val entrances = TransitLines.stations.mapNotNull { it.entrance }.map { Lot(it.x - 1, it.z - 1, it.width + 2, it.depth + 2) }
             val kept = venues.map { lotFor(it) } + shop.lot + entrances +
-                Lot(floor(start.x).toInt() - 5, floor(start.z).toInt() - 4, STATION_LENGTH.toInt() + 8, 10)
+                Lot(floor(start.x).toInt() - 5, floor(start.z).toInt() - 4, STATION_LENGTH.toInt() + 8, 10) +
+                homes.values.filter { it != venue(Place.HOME) }.map { lotFor(it) }
             var lots = lotsOf(VancouverMapData.BLOCKS)
             for (hole in kept) lots = lots.flatMap { it.minus(hole) }
             val rail = mutableListOf<Spot>()
             var along = -3.0
-            while (along < guideway.length && guideway.spotAt(along).x < COLUMNS + 1) {
+            while (along < guideway.length && guideway.spotAt(along).x < TOWN_COLUMNS + 1) {
                 rail.add(guideway.spotAt(along))
                 along += 0.5
             }
@@ -875,12 +990,80 @@ object Neighbourhood {
                 if (lot.width * lot.depth < 2) continue
                 if (rail.any { lot.isNear(it.x, it.z, 1.0) }) continue
                 cityLots.add(lot)
+                for (x in lot.x until lot.x + lot.width) for (z in lot.z until lot.z + lot.depth) built[z * COLUMNS + x] = true
                 val middleX = lot.x + lot.width / 2.0
                 val middleZ = lot.z + lot.depth / 2.0
                 var (height, colour) = storeys(middleX, middleZ)
                 // Low beside the guideway, so the deck never runs into a wall.
                 if (rail.any { lot.isNear(it.x, it.z, 4.0) }) height = min(height, DECK_HEIGHT - 1.5)
                 addBuilding(lot, height, colour)
+            }
+            // The corner's own buildings are kept too, where a wide block reaches back over the corner's edge.
+            addWideCity(kept + cityLots + TransitLines.keptForStops + Rides.keptForDocks)
+        }
+
+        /**
+         * East Vancouver and Burnaby: a box on each real block of the wide map ([WideVancouver.blocks]), turned as the
+         * block is and a little smaller, so the streets between are wide enough to walk ([WIDE_SHRINK]). Low houses all
+         * over, a cluster of towers round the Burnaby town centre, and mid-rise round the stations. None on a park or the
+         * water, under or beside the guideway, on a main street, or where [kept] keeps the ground clear.
+         */
+        fun addWideCity(kept: List<Lot>) {
+            val streets = Samples(WideVancouver.streets + TransitLines.busLines.map { it.loop.points })
+            val rail = Samples(listOf(guideway.points))
+            val stations = WideVancouver.stations
+            val centre = stations[TransitLines.TOWN_CENTRE].spot
+            for (lot in WideVancouver.blocks) {
+                val width = max(min(lot.width, WIDE_SMALLEST), lot.width - 2 * WIDE_SHRINK)
+                val depth = max(min(lot.depth, WIDE_SMALLEST), lot.depth - 2 * WIDE_SHRINK)
+                if (width * depth < WIDE_LEAST_AREA) continue
+                val middle = lot.middle
+                val terrain = map.terrainAt(floor(middle.x).toInt(), floor(middle.z).toInt())
+                if (terrain == Terrain.WATER || terrain == Terrain.PARK) continue
+                val shape = TurnedBox(middle.x, middle.z, width, depth, lot.turn)
+                if (rail.anyWithin(shape, WIDE_RAIL_CLEAR) || streets.anyWithin(shape, WIDE_STREET_CLEAR)) continue
+                if (kept.any { shape.overlaps(it, 0.5) }) continue
+                val chance = wideRandom.nextDouble()
+                val pick = wideRandom.nextDouble()
+                val fromCentre = distanceBetween(middle, centre)
+                val nearStation = stations.minOf { distanceBetween(it.spot, middle) }
+                var (height, colours) = when {
+                    fromCentre < TOWN_CENTRE_REACH -> 8.0 + chance * 12.0 * (1 - fromCentre / TOWN_CENTRE_REACH / 2) to TOWER_COLOURS
+                    nearStation < STATION_REACH -> 3.2 + chance * 3.0 to MID_COLOURS
+                    else -> 1.6 + chance * 1.6 to (if (middle.x < BOUNDARY_X) WEST_END_COLOURS else LOW_COLOURS)
+                }
+                // Low right beside the guideway, so the deck never runs into a wall.
+                if (rail.anyWithin(shape, WIDE_RAIL_LOW)) height = min(height, DECK_HEIGHT - 1.5)
+                addTurnedBuilding(shape, height, colours.pick(pick))
+            }
+        }
+
+        /** A building on a turned block: its walls, and on a tower glass on its two long sides, which glows after dark. */
+        fun addTurnedBuilding(shape: TurnedBox, height: Double, colour: Int) {
+            val body = blocks.size
+            blocks.add(shape.block(0.0, height, colour))
+            var glass = -1
+            if (height >= 8.0 && shape.width > 1.5 && shape.depth > 1.5) {
+                glass = glowing.size
+                for (side in listOf(-1.0, 1.0)) {
+                    val out = side * (shape.depth / 2 + 0.025)
+                    val pane = TurnedBox(
+                        shape.x + out * kotlin.math.sin(shape.turn), shape.z + out * kotlin.math.cos(shape.turn),
+                        shape.width - 0.6, 0.05, shape.turn,
+                    )
+                    glowing.add(pane.block(1.0, height - 1.6, WINDOW))
+                }
+            }
+            val box = shape.bounds(height, colour)
+            foldables.add(Foldable(box, body, roof = -1, glassNorth = glass, glassSouth = if (glass < 0) -1 else glass + 1))
+            // It blocks every square whose middle it comes within the character's clearance of.
+            for (x in floor(box.x).toInt()..floor(box.x + box.width).toInt()) {
+                for (z in floor(box.z).toInt()..floor(box.z + box.depth).toInt()) {
+                    if (x !in 0 until COLUMNS || z !in 0 until ROWS) continue
+                    val gap = shape.distanceTo(x + 0.5, z + 0.5)
+                    if (gap < Grid.CLEARANCE) turnedFootprints.add(Cell(x, z))
+                    if (gap == 0.0) built[z * COLUMNS + x] = true
+                }
             }
         }
 
@@ -936,20 +1119,42 @@ object Neighbourhood {
          */
         fun addTrees() {
             val forest = mutableListOf<Spot>()
+            val wideForest = mutableListOf<Spot>()
+            // The town's corner first, with its own chances, as it always was; then the rest of the wide map.
             for (row in 2 until ROWS step TREE_GAP) {
-                for (column in 2 until COLUMNS step TREE_GAP) {
+                for (column in 2 until TOWN_COLUMNS step TREE_GAP) {
                     val x = column + random.nextInt(-1, 2)
                     val z = row + random.nextInt(-1, 2)
-                    if (map.terrainAt(Cell(x, z)) == Terrain.PARK) forest.add(Spot(x + 0.5, z + 0.5))
+                    if (map.terrainAt(x, z) == Terrain.PARK) forest.add(Spot(x + 0.5, z + 0.5))
                 }
             }
-            // No trunk beside a passerby's way, so nobody walks through the leaves.
+            val firstWide = 2 + (TOWN_COLUMNS - 2 + TREE_GAP - 1) / TREE_GAP * TREE_GAP
+            for (row in 2 until ROWS step TREE_GAP) {
+                for (column in firstWide until COLUMNS step TREE_GAP) {
+                    val x = column + wideRandom.nextInt(-1, 2)
+                    val z = row + wideRandom.nextInt(-1, 2)
+                    if (map.terrainAt(x, z) == Terrain.PARK) wideForest.add(Spot(x + 0.5, z + 0.5))
+                }
+            }
+            // No trunk beside a passerby's way, so nobody walks through the leaves; and out on the wide map, none on a
+            // main street, a stop, a dock or 내 방's garden.
             val ways = Strolls.all().flatMap { it.stroll.legs }
             forest.removeAll { tree -> ways.any { (a, b) -> distanceToLine(tree, a, b) < CLEAR_OF_WAYS } }
-            val door = home.door
+            val streets = Samples(WideVancouver.streets + TransitLines.busLines.map { it.loop.points })
+            val clear = TransitLines.keptForStops + Rides.keptForDocks + homes.values.map { lotFor(it) }
+            wideForest.removeAll { tree ->
+                ways.any { (a, b) -> distanceToLine(tree, a, b) < CLEAR_OF_WAYS } || streets.within(tree, CLEAR_OF_STREETS) ||
+                    clear.any { it.isNear(tree.x, tree.z, 1.0) }
+            }
+            val door = venue(Place.HOME).door
             val nearest = forest.sortedBy { distanceBetween(it, door) }
             for ((index, spot) in nearest.withIndex()) {
                 if (index < FULL_TREES) addTree(spot.x, spot.z, blossom = false) else addFarTree(spot.x, spot.z)
+            }
+            val otherDoors = homes.values.map { it.door }.filter { it != door }
+            for (spot in wideForest) {
+                if (otherDoors.any { distanceBetween(it, spot) < FULL_TREES_WITHIN }) addTree(spot.x, spot.z, blossom = false)
+                else addFarTree(spot.x, spot.z)
             }
             val doors = venues.map { it.door }
             for (green in lotsOf(VancouverMapData.GREENS)) {
@@ -963,14 +1168,17 @@ object Neighbourhood {
             }
         }
 
-        /** Lamps at the corners of each place's square, which light up after dark. */
+        /** Lamps at the corners of each place's square, which light up after dark; 내 방's go with it ([addLamps]). */
         fun addStreetLife() {
-            for (venue in venues) {
-                val lot = lotFor(venue)
-                val z = if (venue.doorFacesSouth) lot.z + lot.depth - 0.5 else lot.z + 0.5
-                addLamp(lot.x + 0.5, z)
-                addLamp(lot.x + lot.width - 0.5, z)
-            }
+            for (venue in venues) if (venue.place != Place.HOME) addLamps(venue)
+        }
+
+        /** The two lamps at the front corners of [venue]'s square. */
+        fun addLamps(venue: Venue) {
+            val lot = lotFor(venue)
+            val z = if (venue.doorFacesSouth) lot.z + lot.depth - 0.5 else lot.z + 0.5
+            addLamp(lot.x + 0.5, z)
+            addLamp(lot.x + lot.width - 0.5, z)
         }
 
         /** Small flowers over a small park, placed by a fixed seed so the town is the same every time. */
@@ -1055,8 +1263,38 @@ object Neighbourhood {
 
     private const val STATION_LENGTH = 8.0
     private const val PILLAR_GAP = 7.0
+    private const val PILLAR_CLEAR_OF_BUSES = 1.8
     private const val TREE_GAP = 6
     private const val CLEAR_OF_WAYS = 1.6
+
+    /** How far a tree of the wide map's parks keeps from a main street's middle, so the street is clear to walk and drive. */
+    private const val CLEAR_OF_STREETS = 1.6
+
+    /**
+     * How the wide map's blocks are built: each side brought in this much (but never below [WIDE_SMALLEST]), so a street
+     * between two turned blocks is wide enough to walk along; none smaller than [WIDE_LEAST_AREA]; none within
+     * [WIDE_STREET_CLEAR] of a main street's middle or [WIDE_RAIL_CLEAR] of the guideway's.
+     */
+    const val WIDE_SHRINK = 0.65
+    private const val WIDE_SMALLEST = 1.0
+    private const val WIDE_LEAST_AREA = 0.8
+    const val WIDE_STREET_CLEAR = 0.8
+    private const val WIDE_RAIL_CLEAR = 1.5
+    private const val WIDE_RAIL_LOW = 1.8
+
+    /** How far the Burnaby town centre's towers reach from its station, and the mid-rise round the other stations. */
+    private const val TOWN_CENTRE_REACH = 22.0
+    private const val STATION_REACH = 9.0
+
+    /** Roughly where Vancouver ends and Burnaby begins along the line: East Vancouver's houses are in livelier colours. */
+    private const val BOUNDARY_X = 505.0
+
+    /** The wide map's ground is merged in squares this many squares wide, so a far one need not be drawn. */
+    const val GROUND_TILE = 80
+
+    /** The turn of the wide map's streets, for the low blocks past its edges. */
+    private const val TURNED = PI / 4
+    private const val SQRT_HALF = 0.7071067811865476
     private const val GREEN_TREES_WITHIN = 45.0
     private const val FLOWERS_PER_GREEN = 12
     private const val BEYOND_STEP = 9

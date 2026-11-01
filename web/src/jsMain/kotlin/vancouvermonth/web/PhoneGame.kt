@@ -78,8 +78,8 @@ import vancouvermonth.text.whyTotalLines
  * Draws one run in [root]: the intro, the room and the guess on September 1st, then one action a day, then the ending.
  * The rules are in core and the wording in text; this only shows the state and passes each tap on.
  * Every tap redraws the whole screen from that state. A run comes from a seed or from today's date, never both.
- * The month is played in a town the player walks in, which [makeWalkableTown] makes on the first day: each day is
- * spent by talking to a place's person. Where it gives none, the month is played with buttons, under a town that
+ * The month is played in a town the player walks in, which [makeWalkableTown] makes on the first day for the room's
+ * zone, where 내 방 stands: each day is spent by talking to a place's person. Where it gives none, the month is played with buttons, under a town that
  * is a picture when [makeTown] gives one. Either town is closed at the ending. Given a [slot], the month in
  * progress is kept after every day, and the page opened again for the same run offers to go on with it.
  */
@@ -89,7 +89,7 @@ class PhoneGame private constructor(
     private val today: TodaysRun?,
     private val playAgain: () -> Unit,
     private val makeTown: () -> Town?,
-    private val makeWalkableTown: () -> WalkableTown?,
+    private val makeWalkableTown: (zone: Int) -> WalkableTown?,
 ) {
     /** A run from a seed, as in `?seed=1011`. */
     constructor(
@@ -97,7 +97,7 @@ class PhoneGame private constructor(
         seed: Int,
         playAgain: () -> Unit,
         makeTown: () -> Town? = { null },
-        makeWalkableTown: () -> WalkableTown? = { null },
+        makeWalkableTown: (zone: Int) -> WalkableTown? = { null },
     ) : this(root, seed, null, playAgain, makeTown, makeWalkableTown)
 
     /** Today's run: its date picks the seed, and its ending shows the result line to copy. */
@@ -106,7 +106,7 @@ class PhoneGame private constructor(
         today: TodaysRun,
         playAgain: () -> Unit,
         makeTown: () -> Town? = { null },
-        makeWalkableTown: () -> WalkableTown? = { null },
+        makeWalkableTown: (zone: Int) -> WalkableTown? = { null },
     ) : this(root, today.seed, today, playAgain, makeTown, makeWalkableTown)
 
     private val game = FirstMinute(seed)
@@ -284,8 +284,9 @@ class PhoneGame private constructor(
                     }
                 }
             }
-            // The town is traced from the City's open data, whose licence asks for its statement where the data shows.
+            // The town is traced from the two cities' open data, whose licences ask for their statements where it shows.
             mapCredit(this, "intro-credit")
+            burnabyCredit(this, "intro-credit")
         }
     }
 
@@ -426,7 +427,8 @@ class PhoneGame private constructor(
         month = started
         record = keeping
         slot?.keep(keeping)
-        walkable = makeWalkableTown()?.also { listenTo(it) }
+        // 내 방 stands where the room is: the room's zone decides where it is and where each morning starts.
+        walkable = makeWalkableTown(started.room.zone.number)?.also { listenTo(it) }
         if (walkable == null) town = makeTown()
         guide?.onOpenChange = { walkable?.isCovered = isTownCovered() }
         // In the town the update news open from the guide's foot, never over a talk or the change of day.
@@ -1027,7 +1029,9 @@ class PhoneGame private constructor(
         choosing = transport
         choosingFrom = from
         taxiFares = if (transport == Transport.TAXI) {
-            TransitLines.taxiStops.map { (_, spot) -> town.taxiDistance(spot)?.let { TaxiFare.forDistance(it) } }
+            TransitLines.taxiStopsFor(town.homeZone).map { (_, spot) ->
+                town.taxiDistance(spot)?.let { TaxiFare.forDistance(it) }
+            }
         } else {
             emptyList()
         }
@@ -1063,7 +1067,8 @@ class PhoneGame private constructor(
             if (transport == Transport.TAXI && taxiFares.all { it == null }) child("p", "chooser-empty", Transit.NOWHERE)
             child("div", "keywords chooser-list") {
                 for (index in 0 until TransitLines.count(transport)) {
-                    if (index == from) continue
+                    // A bus goes only along its own line.
+                    if (index == from || !TransitLines.joins(transport, from, index)) continue
                     val fare = if (transport == Transport.TAXI) taxiFares.getOrNull(index) ?: continue else 0
                     val kind = transport.fare
                     val amount = if (kind == null) 0 else if (transport == Transport.TAXI) fare else kind.price

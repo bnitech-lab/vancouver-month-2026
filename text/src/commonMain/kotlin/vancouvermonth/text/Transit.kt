@@ -24,11 +24,22 @@ enum class Transport(val label: String, val fare: Spending?) {
  * part of town; none is a real station's name, and no line names a real transit or taxi company.
  */
 object Transit {
-    /** The SkyTrain's stations, west to east along the line: the first is under downtown, the rest up on the line. */
-    val STATIONS = listOf("다운타운역", "터널 입구역", "크릭 끝역", "동쪽역")
+    /**
+     * The SkyTrain's stations, west to east along the line: the first under downtown, the rest up on the line, out
+     * through East Vancouver to the Burnaby town centre. Each is named for what is round it.
+     */
+    val STATIONS = listOf(
+        "다운타운역", "터널 입구역", "크릭 끝역", "갈림길역", "동쪽 마을역", "작은 공원역", "경계역", "큰 공원역", "중심가역",
+    )
 
-    /** The bus stops, in the order the bus comes to them on its loop. */
-    val BUS_STOPS = listOf("공원 입구", "쇼핑 거리", "다운타운", "다운타운 남쪽", "웨스트엔드")
+    /**
+     * The bus stops, line by line, each in the order its bus comes to them: downtown's loop, then the line out from
+     * the city line into Burnaby.
+     */
+    val BUS_STOPS = listOf(
+        "공원 입구", "쇼핑 거리", "다운타운", "다운타운 남쪽", "웨스트엔드",
+        "경계역 앞", "버나비 큰길", "큰 공원 옆", "비탈 마을",
+    )
 
     /** The water bus's docks on False Creek. */
     val DOCKS = listOf("카페 앞", "남쪽 기슭", "크릭 끝")

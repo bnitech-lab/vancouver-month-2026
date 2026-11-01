@@ -1218,22 +1218,22 @@ class WalkableTownTest {
                 assertTrue(frame.top >= hud.bottom, "the map's top ${frame.top} is over the card, which ends at ${hud.bottom}")
                 assertEquals(375.0 - 8.0, frame.right, 1.0)
                 assertTrue(frame.width in 80.0..102.0, "${frame.width} wide")
-                // A little taller than wide, as the area round the coast is with real north up.
+                // A little taller than wide, as the small map always was.
                 assertTrue(frame.height > frame.width, "${frame.width} by ${frame.height}")
-                // The arrow is where the character stands, on the map turned north up.
-                val projection = MinimapProjection(map.clientWidth.toDouble(), map.clientHeight.toDouble())
+                // It shows the ground round the character: the arrow in its middle.
                 before = town.minimapDot
-                assertEquals(projection.left(start.x, start.z), before.first, 1e-6)
-                assertEquals(projection.top(start.x, start.z), before.second, 1e-6)
+                assertEquals(map.clientWidth / 2.0, before.first, 1e-6)
+                assertEquals(map.clientHeight / 2.0, before.second, 1e-6)
                 tapScreen(town, onScreen(town, Point(target.x, 0.0, target.z)))
             },
             Step("walked there", { town.isStill }) {
+                // The arrow is still in the middle: the map moved with the character, east and a little south on the
+                // game map, east and south in the real city too, so where it started now lies up and to the left.
                 val after = town.minimapDot
-                val projection = MinimapProjection(map.clientWidth.toDouble(), map.clientHeight.toDouble())
-                assertEquals(projection.left(target.x, target.z), after.first, 1e-6)
-                assertEquals(projection.top(target.x, target.z), after.second, 1e-6)
-                // East and a little south on the game map is east and south in the real city too: right and down.
-                assertTrue(after.first > before.first && after.second > before.second, "$before to $after")
+                assertEquals(before, after)
+                val window = MinimapProjection(map.clientWidth.toDouble(), map.clientHeight.toDouble(), Minimap.WINDOW_ACROSS)
+                window.centreOn(town.characterSpot.x, town.characterSpot.z)
+                assertTrue(window.left(start.x, start.z) < after.first && window.top(start.x, start.z) < after.second)
             },
         )
     }
@@ -1421,7 +1421,8 @@ class WalkableTownTest {
 
     /** The five places' own walls, by where they are among the town's still boxes. */
     private fun placeBodies(): List<Pair<Venue, Int>> = Neighbourhood.venues.map { venue ->
-        venue to Neighbourhood.blocks.indexOfFirst {
+        // The town's still boxes as drawn: the shared ones, then 내 방's in zone 1.
+        venue to (Neighbourhood.blocks + HomeSite.of(1).blocks).indexOfFirst {
             it.x == venue.x.toDouble() && it.z == venue.z.toDouble() && it.height == venue.height && it.y == 0.0
         }
     }
