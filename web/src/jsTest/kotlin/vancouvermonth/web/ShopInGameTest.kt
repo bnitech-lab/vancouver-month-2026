@@ -370,7 +370,7 @@ class ShopInGameTest {
     }
 
     @Test
-    fun `a busy day's spends take two lines of the next day's log`() {
+    fun `four shared rides take two lines of the log, ahead of what the action at 내 방 brings`() {
         val town = QuietTown()
         open(town)
         startSeed1011(root)
@@ -379,11 +379,14 @@ class ShopInGameTest {
             root.button(Riding.GET_OFF).click()
         }
         town.onPlace(Place.HOME)
+        // The neighbour's first answer is the night's sleep, which brings the rest and the day's living cost.
         (root.querySelector(".talk .spend") as HTMLButtonElement).click()
+        assertTrue("방금 있었던 일" in root.querySelector(".log")?.textContent.orEmpty())
         val log = root.querySelectorAll(".log li").asList().map { it.textContent }
         // 30 squares each: $2 a bike, $3 an e-scooter.
         assertEquals(listOf("공유 자전거를 빌렸어요. -\$2", "그 밖에 3건 -\$7"), log.take(2))
         assertEquals(4, log.size, "$log")
+        assertTrue(money(Month.DAILY_LIVING_COST) in log[3].orEmpty(), "$log")
     }
 
     @Test
