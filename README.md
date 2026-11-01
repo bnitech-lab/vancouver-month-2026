@@ -169,7 +169,12 @@ everything up to its sleep, so the days need no
 mark of their own. Nothing more is needed, since the same seed and the same choices always play out the same way. The
 record is written when the month starts, after every action, interview, sleep and spend, and emptied at any ending.
 Continued, a month keeps what was bought, the day's time and stamina, and what was spent since the last action still
-heads the next one's log; the character starts at 내 방's door, at the time the day had reached.
+heads the next one's log; the character stands where it was left, at the time the day had reached, or at 내 방's door
+where nothing says otherwise. Where it stands is not in the record: a second key beside it holds the spot and how many
+moves the record held then, written when a walk or a ride ends, a fare is paid or an action is taken, and read only
+while that count still matches. As a ride sets off it holds where the ride will leave the character, as the fare is paid
+by then, so a page discarded on the way loses neither. A night's sleep moves the record on, so each morning starts at
+내 방's door. A month kept before there was such a key, or a spot that is no ground to stand on, starts at the door too.
 
 Opened again for the same run, the intro first offers that month: at its top, the day (with the time, once the day is
 past its morning) and the balance it goes on from, and at its foot 이어하기 and 새로 시작 in place of 시작하기. 이어하기
@@ -244,12 +249,12 @@ nearest, as in "지도: 내 방 근처", or, more than 40 squares from any of th
 | Tap twice quickly | It dashes there instead |
 | Drag | The camera turns around the character, and tilts within limits that keep the ground in view |
 | Pinch, or the mouse wheel | The camera comes nearer or goes farther |
-| Tap a person, a building or its name, or walk up to a door or a person | The character goes to that place's person, and a talk opens (a second quick tap only hurries it there) |
-| Tap the bike shop, its name or its keeper | The character goes to 벤, and his talk opens |
+| Tap a person, a building or its name, or walk up to a door or a person | The character goes to that place's person and a talk opens: at once when it is already at the place, on arrival from afar, with "비탈 카페로 가는 중" on the top card on the way (a second quick tap only hurries it there) |
+| Tap the bike shop, its name or its keeper | The character goes to 벤, and his talk opens, as at a place |
 | Tap a shared bike or e-scooter | The character walks up to it, and a card offers where to ride it, each place with its fare; it rides to the one chosen |
 | Tap 자전거 타기 or 퀵보드 타기 on the top card, once bought | The character gets on; 내리기 gets off |
 | Tap a SkyTrain station, a bus stop or a water bus dock | The character walks there, and a card offers where to go from it |
-| Tap 택시 부르기 on the top card | A card offers every place a taxi goes, each with its fare, before anything is paid |
+| Tap 택시 부르기 on the top card | A card offers every place a taxi goes, each with its fare, before anything is paid; at a place or the bike shop the talk opens on getting out |
 | Tap the small map | It shows the whole map larger; a tap or Escape brings the small one back |
 
 The city's buildings never get in the way. One that stands between the camera and the character, or fills the view
@@ -261,8 +266,12 @@ them stands right behind the character, it first looks along the nearest street.
 inside folds at once, and the near view widens with the view, so nothing out of sight folds. As the character reaches a place the camera comes round to the street side of
 the door, unless the player turned it on the way.
 A tap on the water walks to the near shore. A talk ignores taps for a moment after it opens, so the finger that opened
-it cannot also answer it. While a day changes into the next, the town takes no taps, drags, pinches or names, and no
-talk opens, until the morning.
+it cannot also answer it. A job is done at its place, not from afar: at a place means within reach of its door or its
+person (0.9 of a square, the test a night's sleep has always had). From afar a tap on a place's name only starts the
+walk, which the taxi button, a stop, a dock, a shared one or another tap can still cut short or change; the month's
+first walk over 60 squares says so once ("멀어요. 택시나 스카이트레인을 타면 빨라요."). A talk that is somehow open away from its
+place holds back its answer and 이야기, saying "도착하면 할 수 있어요." until the character has come. While a day changes
+into the next, the town takes no taps, drags, pinches or names, and no talk opens, until the morning.
 
 Each place has its own person, all invented: downtown 하나 at the 카페, 레오 at the 도서관, 수진 at 코워킹 and 마커스 at
 the 회사 desk; out past it 아이샤, 켄지 at the other offices' desks, 로사 and 준호 at the libraries, 소피 and 마테오 at the
@@ -273,9 +282,9 @@ line typed one letter at a time (a tap shows all of it) that fits the day: a fir
 short, an interview booked or failed, the night, the first or the last week, and so on. The answers are the place's
 action with its effect and its stamina (알바하기, 영어 공부, 코딩 연습, 지원서 넣기, and at 내 방 자기, which is there
 any time) or the reason it cannot be done now (too little stamina, an application already in today, and so on),
-이야기 for small talk, and 그만. On an interview day only the 회사 applied at offers 면접 보기, first thing, its name is
-marked and the top card names it ("오늘은 면접 날이에요. 중심가 회사로 가세요."); at the other offices the desk sends the
-player on there.
+이야기 for small talk, and 그만. On an interview day only the 회사 applied at offers 면접 보기, first thing, once the
+character is there, its name is marked and the top card names it ("오늘은 면접 날이에요. 중심가 회사로 가세요."); at the
+other offices the desk sends the player on there.
 
 Money can be spent in the town without spending stamina or time. On the West End's wide street toward downtown, on the way from
 내 방 to the business district, stands a bike shop (자전거 가게), kept by 벤, invented like everyone else, with a bike on
@@ -336,7 +345,9 @@ each fare: $4 and $1.50 for every ten squares
 along the streets up to 160 squares and $0.70 for every ten past that, to the dollar (downtown to Burnaby is about $45;
 the meter stops at $60); a taxi appears where the
 character stands and drives there fast, faster still on a long ride (up to 24 squares a second, so Burnaby to downtown
-takes about 20 seconds), and its 내리기 lets the character out on the way. A fare is paid through core
+takes about 20 seconds), and its 내리기 lets the character out on the way. Out at the door of a place or the bike shop,
+the character turns to the person there and the talk opens, as off a shared ride; out early or at a station, nothing
+opens. A fare is paid through core
 when the ride sets off and only then, heads the next action's log ("수상버스를 탔어요. -$4", "택시를 탔어요. -$12"), is kept
 in the record (w and t: letters of their own, which needed no new version; a month kept before version 4, v0.17, does
 not go on), and is refused with the
@@ -375,8 +386,9 @@ a soft morning (8:00) through a bright day (14:00) and a warm late afternoon (17
 night (23:00), with the lamps and windows coming on toward evening and the passersby going home; a rainy day greys every
 one of those hours. What happened goes over the top of the screen, and the top card shows the time and the stamina left.
 With nothing but sleep left (no stamina, or too little for anything still open), a line there says to go home to sleep;
-the character walks, rides or takes a taxi home as by day. Sleep starts only with the character at 내 방: in a talk
-with the neighbour opened from afar, 자기 waits with "내 방에 도착하면 잘 수 있어요." until it arrives. Sleep ends the day: from the
+the character walks, rides or takes a taxi home as by day. Sleep starts only with the character at 내 방: a tap on its
+name from afar walks home first, and were its talk open before then, 자기 would wait with "내 방에 도착하면 잘 수 있어요."
+until it arrives. Sleep ends the day: from the
 time it is, on to a
 night with the windows, lamps and campfire lit, then the morning, in 1.5 seconds; the character spends the night sitting
 on the bench by the campfire, with the camera come round to the far side of the fire, and in the morning it stands at
@@ -426,8 +438,8 @@ rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, al
 `Passersby.kt` for the passersby's), and so are each day's weather (`Weather.kt`) and the bike shop's and riding's
 words (`Shop.kt`), and the SkyTrain's, the bus's, the water bus's and the taxi's (`Transit.kt`). `WalkableTown` draws
 all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about 942 KB
-(about 283 KB gzipped), under the 1 MiB aim: the maps' rows, long lines and the wide map's blocks are packed small (the map tool's README
+`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about 946 KB
+(about 284 KB gzipped), under the 1 MiB aim: the maps' rows, long lines and the wide map's blocks are packed small (the map tool's README
 says how), and Kotlin writes the page as ES2015, with JavaScript classes. `TownBudgetTest` measures what a frame costs downtown (by day and at night),
 in East Vancouver, in Burnaby (by day and at night), on a walk, on the train, under downtown and with the camera turning
 (so the near houses are written again each frame), the sun's shadows counted too, and keeps it within a phone's budget.
@@ -460,9 +472,9 @@ remembered.
 
 How to play is said on the intro (see below) and again on a card the "?" in the town's top card opens: tap the ground
 to walk and twice to dash, drag to look around and pinch to zoom, tap a person or a building to talk (an action takes
-stamina and time), sleep at 내 방 once the stamina is spent, tap a station, stop or dock to ride, buy or rent a bike or
-call a taxi, find yourself on the small map, and that the cafés, libraries, coworking spaces and offices stand in
-several neighbourhoods, the same work at any of a kind. The
+stamina and time, and is done only on arrival), sleep at 내 방 once the stamina is spent, tap a station, stop or dock
+to ride, buy or rent a bike or call a taxi, find yourself on the small map, and that the cafés, libraries, coworking
+spaces and offices stand in several neighbourhoods, the same work at any of a kind. The
 card ends with the month's goal, in the words the month's start uses; 닫기 or Escape closes it. It never opens by
 itself, since the intro has just said the same. The button screen has no card, since its buttons say what they do.
 

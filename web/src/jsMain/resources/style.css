@@ -983,6 +983,12 @@ html:has(.walk-town) {
   color: var(--warn);
 }
 
+/* Where a tap from afar sent the character: the tap's answer, so it reads over the notes round it. */
+.hud-note.hud-going {
+  font-weight: 600;
+  color: var(--text);
+}
+
 /* The day's skills on the left, the sound switch and the "?" on the right. */
 .hud-line {
   display: flex;

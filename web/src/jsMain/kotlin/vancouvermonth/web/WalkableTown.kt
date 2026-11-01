@@ -26,6 +26,7 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.RenderingContext
 import org.w3c.dom.events.Event
 import org.w3c.dom.events.KeyboardEvent
+import org.w3c.dom.events.MouseEvent
 import org.w3c.dom.events.WheelEvent
 import org.w3c.dom.pointerevents.PointerEvent
 import vancouvermonth.text.Passer
@@ -59,8 +60,9 @@ interface WalkableTown {
     val element: HTMLElement
 
     /**
-     * Called with the place the player turns to: they tapped its building, its name or its person, or walked up to
-     * its door or its person. Called with null when they walk off somewhere else.
+     * Called with the place the player turns to: they tapped its building, its name or its person while at it, or the
+     * character came to its door or its person on a walk that opens it. Called with null when they walk off somewhere
+     * else. A tap on a place from afar only sends the character there ([onSentTo]).
      */
     var onPlace: (Place?) -> Unit
 
@@ -70,8 +72,19 @@ interface WalkableTown {
      */
     var onPasserby: (Passer) -> Unit
 
-    /** Called when the player turns to the bike shop's keeper: they tapped the shop, its name or the keeper. */
+    /**
+     * Called when the player turns to the bike shop's keeper: they tapped the shop, its name or the keeper while at it,
+     * or the character came to him on a walk that opens it. A tap from afar only sends the character there ([onSentTo]).
+     */
     var onShop: () -> Unit
+
+    /**
+     * Called when a tap on a far place or on the far bike shop sends the character off, with the [name] of where it
+     * goes and how many [squares] the way is: the talk there opens on arrival. Called with null when no such walk is
+     * under way any more: it got there, stopped, or was sent somewhere else. A walk of a few squares is not told, as
+     * a line about it would only come and go.
+     */
+    var onSentTo: (name: String?, squares: Double) -> Unit
 
     /**
      * Called when the character reaches a shared bike or e-scooter the player tapped, with the ride it would be. The
@@ -151,14 +164,30 @@ interface WalkableTown {
     /**
      * Sets off on [transport] from stop [from] to stop [to] (for a taxi, from where the character stands to the place
      * [to]): off whatever the character rode, into the vehicle, and out at [to]'s stop, where [onTravelled] is called.
+     * Out of a taxi at one of the places or the bike shop, the talk there then opens, as at the end of a walk there.
      */
     fun travel(transport: Transport, from: Int, to: Int)
 
     /** Stops the walk under way where the character is, as for calling a taxi. */
     fun standStill()
 
-    /** Gets out of the taxi where it is now: the character stands there on foot, and the taxi drives on. */
+    /** Gets out of the taxi where it is now: the character stands there on foot, the taxi drives on, nothing opens. */
     fun leaveTaxi()
+
+    /** Where the character is now. */
+    val characterSpot: Spot
+
+    /**
+     * Called with where the character is to be found should the page open again now: where a walk, a ride or getting
+     * out has left it; and, as a ride sets off, where that ride will leave it, its fare being paid by then.
+     */
+    var onSettled: (Spot) -> Unit
+
+    /**
+     * Stands the character at [spot], the camera with it, as for a month taken up again where it was left; at 내 방's door
+     * still, should [spot] not be ground to stand on.
+     */
+    fun standAgain(spot: Spot)
 
     /** Called once if the town stops drawing, so the game can go on with buttons. */
     var onFail: () -> Unit
@@ -170,16 +199,20 @@ interface WalkableTown {
     var onMorning: () -> Unit
 
     /**
-     * Called when a walk the player sent by a place's name or person ends there, with that place: the talk opened at
-     * once, and what it offers may change now that the character has come.
+     * Called when a walk that opens nothing itself ends at a place, with that place: a talk already open with it may
+     * offer more now that the character has come.
      */
     var onArrived: (Place) -> Unit
 
     /**
-     * True when the character stands at 내 방, by its door or its neighbour: a night's sleep starts only there, so
-     * nothing ever takes the character home.
+     * True when the character is at [place]: within reach of its door or its person, on the few steps between them, or,
+     * at 내 방, by its fire at night. What is done at a place is done only there, and a night's sleep too, so nothing is
+     * ever done from afar and nothing ever takes the character home.
      */
-    val isHome: Boolean
+    fun isAt(place: Place): Boolean
+
+    /** True when the character is at the bike shop, as [isAt] says of a place. What is bought there is bought only there. */
+    val isAtShop: Boolean
 
     /**
      * True while a card covers most of the town, as a talk does. The town's own life then moves at a slower beat,
@@ -295,15 +328,28 @@ internal class NeighbourhoodScene(
     override var onPlace: (Place?) -> Unit = {}
     override var onPasserby: (Passer) -> Unit = {}
     override var onShop: () -> Unit = {}
+    override var onSentTo: (String?, Double) -> Unit = { _, _ -> }
     override var onRent: (Ride) -> Unit = {}
     override var onStop: (Stop) -> Unit = {}
     override var onTravelled: () -> Unit = {}
+    override var onSettled: (Spot) -> Unit = {}
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
     override var onArrived: (Place) -> Unit = {}
 
-    override val isHome: Boolean
-        get() = sitting || site.placeAt(spot) == Place.HOME
+    override fun isAt(place: Place): Boolean =
+        (place == Place.HOME && sitting) || standsWhere { site.placeAt(it) == place }
+
+    override val isAtShop: Boolean
+        get() = standsWhere { Neighbourhood.isAtShop(it) }
+
+    /** True when [there] holds where the character stands, or at both ends of its walk: stepping up from a door to a person. */
+    private fun standsWhere(there: (Spot) -> Boolean): Boolean {
+        if (there(spot)) return true
+        val steps = trip?.route ?: return false
+        return there(steps.first()) && there(steps.last())
+    }
+
     override var onSounds: (Double, Double, Double) -> Unit = { _, _, _ -> }
 
     private val renderer = WebGLRenderer(json("canvas" to canvas, "context" to context))
@@ -656,7 +702,25 @@ internal class NeighbourhoodScene(
     private var spot = home.door
     private var heading = home.facing
     private var trip: Trip? = null
+        set(value) {
+            val ended = field != null && value == null
+            field = value
+            if (value == null) sentTo = null
+            if (ended) onSettled(spot)
+        }
     private var tripStarted = 0.0
+
+    /**
+     * The name of where a tap from afar sent the walk under way, whose talk opens on arrival; null for any other walk.
+     * The game hears each change ([onSentTo]).
+     */
+    private var sentTo: String? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            val squares = trip?.length ?: 0.0
+            onSentTo(value?.takeIf { squares > TOLD_WALK_SQUARES }, squares)
+        }
 
     /** True when the trip under way is a dash, after a double tap. */
     private var tripDash = false
@@ -1185,7 +1249,7 @@ internal class NeighbourhoodScene(
         scene.add(marker)
     }
 
-    /** Each building's name, floating over it; a tap on the name talks to the place's person, as a tap on them does. */
+    /** Each building's name, floating over it; a tap on the name turns to the place's person, as a tap on them does. */
     private fun addLabels() {
         for (venue in site.venues) {
             val label = document.createElement("button") as HTMLButtonElement
@@ -1195,9 +1259,10 @@ internal class NeighbourhoodScene(
             label.style.position = "absolute"
             label.style.left = "0"
             label.style.top = "0"
-            label.onclick = {
+            label.onclick = { event ->
                 touched()
-                if (nightFell == null && journey == null && rideTo == null) goTalk(venue.place, dash = false)
+                val dash = isDoubleTap(event)
+                if (nightFell == null && journey == null && rideTo == null) goTalk(venue.place, dash)
             }
             element.appendChild(label)
             labels[venue.place] = label
@@ -1208,12 +1273,20 @@ internal class NeighbourhoodScene(
         shopLabel.style.position = "absolute"
         shopLabel.style.left = "0"
         shopLabel.style.top = "0"
-        shopLabel.onclick = {
+        shopLabel.onclick = { event ->
             touched()
-            if (nightFell == null && journey == null && rideTo == null) goToShop(dash = false)
+            val dash = isDoubleTap(event)
+            if (nightFell == null && journey == null && rideTo == null) goToShop(dash)
         }
         element.appendChild(shopLabel)
     }
+
+    /**
+     * True when the click on a name is the second tap of a double tap, as a tap on the canvas may be ([tap]). A click from
+     * a key or a script (its detail is 0) has no finger behind it, so it is never one.
+     */
+    private fun isDoubleTap(click: MouseEvent): Boolean =
+        click.detail != 0 && taps.isDouble(window.performance.now(), click.x, click.y)
 
     /** One draw for boxes that move, placed again on every beat of the town's life, as the train's are. */
     private fun movingBoxes(blocks: List<Block>, material: Material): InstancedMesh {
@@ -1365,6 +1438,7 @@ internal class NeighbourhoodScene(
         cameraMovedOnWalk = false
         marker.position.set(to.x, 0.0, to.z)
         marker.visible = true
+        onSettled(to)
         askForFrame()
     }
 
@@ -1453,6 +1527,7 @@ internal class NeighbourhoodScene(
         val now = window.performance.now()
         journey = made
         journeyStarted = now
+        cameraMovedOnWalk = false
         if (transport == Transport.SKYTRAIN) {
             val scheduled = SkyTrainRun.shiftAt(lifeNow) + runStand
             // The line's own train already standing at the station is the one boarded; elsewhere it comes in faded.
@@ -1461,6 +1536,7 @@ internal class NeighbourhoodScene(
             trainRide = made
             trainRideStarted = now
         }
+        onSettled(made.out)
         touched()
         askForFrame()
     }
@@ -1539,6 +1615,7 @@ internal class NeighbourhoodScene(
         character.visible = true
         touched()
         askForFrame()
+        onSettled(at)
         onTravelled()
     }
 
@@ -1569,6 +1646,11 @@ internal class NeighbourhoodScene(
                 leavingStarted = journeyStarted
                 heading = (going.way.turnAt(going.stopAt) + PI / 2)
                 stepOut(going.out)
+                // A taxi drops the character at the door it was paid to: the talk there opens, as off a shared ride.
+                if (going.transport == Transport.TAXI) {
+                    opensOnArrival = true
+                    reach(going.out, rode = true)
+                }
             } else {
                 followRide(going, elapsed)
             }
@@ -1815,8 +1897,7 @@ internal class NeighbourhoodScene(
         if (!soundsQuiet) tellSounds(0.0, 0.0, 0.0)
     }
 
-    /** Where the character is now, for tests. */
-    internal val characterSpot: Spot
+    override val characterSpot: Spot
         get() = spot
 
     /** Which way the character faces, as [Trip] counts it (0 faces south). For tests. */
@@ -1842,6 +1923,12 @@ internal class NeighbourhoodScene(
     /** Sends the character walking to [target], as a tap on the ground there would. For tests. */
     internal fun walkFor(target: Spot) {
         walkTo(target, dash = false, opensOnArrival = false)
+    }
+
+    override fun standAgain(spot: Spot) {
+        if (!site.grid.isFree(site.grid.cellAt(spot))) return
+        standAt(spot)
+        labelsStale = true
     }
 
     /** Puts the character at [spot] at once, the camera with it, for tests that start somewhere on purpose. */
@@ -2159,8 +2246,8 @@ internal class NeighbourhoodScene(
     }
 
     /**
-     * A tap at [x], [y] on the page: talk to a place or a passerby, or walk to a spot on the ground. The second tap of
-     * a double tap dashes; on a place or a passerby it only dashes there, since the first tap already opened the talk.
+     * A tap at [x], [y] on the page: turn to a place or a passerby, or walk to a spot on the ground. The second tap of
+     * a double tap dashes; on a place or a passerby it only dashes there, as the first tap saw to the talk.
      */
     private fun tap(x: Double, y: Double) {
         val frame = canvas.getBoundingClientRect()
@@ -2179,20 +2266,8 @@ internal class NeighbourhoodScene(
             is Picked.AtPasserby -> stopFor(passersby[picked.index], dash)
             is Picked.AtVehicle -> goRent(picked.index, dash)
             is Picked.AtStop -> goToStop(picked.index, dash)
-            Picked.AtShop -> {
-                if (dash) {
-                    walkTo(Neighbourhood.shop.talkSpot, dash = true, opensOnArrival = false)
-                } else {
-                    goToShop(dash = false)
-                }
-            }
-            is Picked.AtPlace -> {
-                if (dash) {
-                    walkTo(site.venue(picked.place).talkSpot, dash = true, opensOnArrival = false)
-                } else {
-                    goTalk(picked.place, dash = false)
-                }
-            }
+            Picked.AtShop -> goToShop(dash)
+            is Picked.AtPlace -> goTalk(picked.place, dash)
             is Picked.OnGround -> {
                 onPlace(null)
                 walkTo(site.landing(spot, picked.spot), dash, opensOnArrival = true)
@@ -2234,16 +2309,29 @@ internal class NeighbourhoodScene(
         chatting = null
     }
 
-    /** Sends the character to [place]'s person, and opens the place at once. */
-    private fun goTalk(place: Place, dash: Boolean) {
-        walkTo(site.venue(place).talkSpot, dash, opensOnArrival = false)
-        onPlace(place)
-    }
+    /** Turns to [place]'s person, as [goUpTo] does. */
+    private fun goTalk(place: Place, dash: Boolean) =
+        goUpTo(place.label, site.venue(place).talkSpot, isAt(place), dash) { onPlace(place) }
 
-    /** Sends the character to the bike shop's keeper, and opens the talk with him at once. */
-    private fun goToShop(dash: Boolean) {
-        walkTo(Neighbourhood.shop.talkSpot, dash, opensOnArrival = false)
-        onShop()
+    /** Turns to the bike shop's keeper, as [goUpTo] does. */
+    private fun goToShop(dash: Boolean) =
+        goUpTo(Shop.NAME, Neighbourhood.shop.talkSpot, isAtShop, dash) { onShop() }
+
+    /**
+     * Sends the character to [talkSpot], where the person of [name] is talked to. Already [there], it steps up to them
+     * and [opens] the talk at once, unless this is a double tap's second, which only hurries it. From afar it sets off,
+     * away from any talk, and the talk opens on arrival: nobody is talked to, and nothing done, from afar.
+     */
+    private fun goUpTo(name: String, talkSpot: Spot, there: Boolean, dash: Boolean, opens: () -> Unit) {
+        // A walk already sent here keeps its talk for its end, even once within reach of the door.
+        if (there && sentTo != name) {
+            walkTo(talkSpot, dash, opensOnArrival = false)
+            if (!dash) opens()
+        } else {
+            onPlace(null)
+            // Another tap on where it is going keeps a dash already under way.
+            walkTo(talkSpot, dash || (sentTo == name && tripDash), opensOnArrival = true, sentTo = name)
+        }
     }
 
     /**
@@ -2291,8 +2379,11 @@ internal class NeighbourhoodScene(
         onRent(Ride.shared(Rides.shared[index].vehicle))
     }
 
-    /** Starts a trip to [target] at the pace the character goes now, unless it is there. True when it set off. */
-    private fun walkTo(target: Spot, dash: Boolean, opensOnArrival: Boolean): Boolean {
+    /**
+     * Starts a trip to [target] at the pace the character goes now, unless it is there, sent there from afar by a tap on
+     * [sentTo] if any. True when it set off.
+     */
+    private fun walkTo(target: Spot, dash: Boolean, opensOnArrival: Boolean, sentTo: String? = null): Boolean {
         if (sitting) return false
         rentAt = -1
         renting = -1
@@ -2307,6 +2398,7 @@ internal class NeighbourhoodScene(
         val end = route.last()
         marker.position.set(end.x, 0.0, end.z)
         marker.visible = true
+        this.sentTo = sentTo
         askForFrame()
         return true
     }
@@ -2725,9 +2817,8 @@ internal class NeighbourhoodScene(
     }
 
     /**
-     * At a place's person the character turns to them; at the end of a walk the player sent, the place opens. Unless
-     * the player moved the camera on the way, it comes round to the street side of the place's door, looking at its
-     * front along the street rather than down between the towers.
+     * The end of a walk or a shared ride at [end]: a rental or a stop the player was on the way to is offered; otherwise
+     * the character has reached whatever is there ([reach]).
      */
     private fun arrive(end: Spot) {
         val rode = rideTo != null
@@ -2746,6 +2837,16 @@ internal class NeighbourhoodScene(
             onStop(stop)
             return
         }
+        reach(end, rode)
+    }
+
+    /**
+     * At a place's person the character turns to them, and so it does at the door of a place it [rode] to; at the end of
+     * a walk the player sent, or a ride, the place opens. Unless the player moved the camera on the way, it comes round
+     * to the street side of the place's door, looking at its front along the street rather than down between the towers.
+     * Nothing happens where there is no place: at a station, or on an open street.
+     */
+    private fun reach(end: Spot, rode: Boolean) {
         if (Neighbourhood.isAtShop(end)) {
             val shop = Neighbourhood.shop
             if (rode || distanceBetween(end, shop.talkSpot) <= Neighbourhood.REACH) {
@@ -3114,6 +3215,9 @@ internal class NeighbourhoodScene(
         /** How far the budget test turns the camera before each moving frame it measures, and how long a frame lasts. */
         const val TURN_PIXELS = 6.0
         const val FRAME_MILLIS = 1000.0 / 60
+
+        /** A walk sent by a tap from afar is told to the game over this many squares, about a second on foot. */
+        const val TOLD_WALK_SQUARES = 4.0
 
         /** A place's name farther than this from the camera's eye is hidden, its place deep in the haze. */
         const val NAMES_REACH = 170.0

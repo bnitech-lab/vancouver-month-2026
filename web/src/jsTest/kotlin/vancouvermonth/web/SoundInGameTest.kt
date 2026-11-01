@@ -25,6 +25,7 @@ internal class QuietTown : WalkableTown {
     override var onPlace: (Place?) -> Unit = {}
     override var onPasserby: (Passer) -> Unit = {}
     override var onShop: () -> Unit = {}
+    override var onSentTo: (String?, Double) -> Unit = { _, _ -> }
     override var onRent: (Ride) -> Unit = {}
     override var onStop: (Stop) -> Unit = {}
     override var onTravelled: () -> Unit = {}
@@ -42,7 +43,12 @@ internal class QuietTown : WalkableTown {
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
     override var onArrived: (Place) -> Unit = {}
-    override val isHome = true
+    override fun isAt(place: Place) = true
+    override val isAtShop = true
+    override val characterSpot = Spot(0.0, 0.0)
+    override var onSettled: (Spot) -> Unit = {}
+
+    override fun standAgain(spot: Spot) {}
 
     override fun passTime(share: Double) {}
 
