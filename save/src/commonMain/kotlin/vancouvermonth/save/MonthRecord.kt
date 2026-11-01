@@ -16,7 +16,9 @@ sealed interface Choice : Move {
     /**
      * [action], taken [at] one of the places of its kind, counted from 0: the town has several cafés, libraries,
      * coworking spaces and offices, the first of each downtown, and a game with one of each takes them all at 0. An
-     * application's [at] is the office its interview is held at. Sleep is always at 0, at 내 방.
+     * application's [at] is the office its interview is held at. Sleep is always at 0, at 내 방. A record cannot know
+     * how many places of a kind the game has, so any digit reads: the game takes a number it has no place for as the
+     * first of the kind, downtown's, and the rules never depend on it.
      */
     data class Take(val action: Action, val at: Int = 0) : Choice {
         init {

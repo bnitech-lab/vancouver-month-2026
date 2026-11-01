@@ -180,6 +180,23 @@ class PlacesInGameTest {
     }
 
     @Test
+    fun `a kept number past a kind's places is that kind's first, downtown's`() {
+        // A line can say A7 though there are three offices: the interview it books is at downtown's.
+        val game = FirstMinute(1011)
+        val applied = listOf(Choice.Take(Action.APPLY, 7))
+        var record = MonthRecord(1011, null, game.cheapestRoomIndex, game.lowestTotal, applied)
+        fun replayed(): Month = assertNotNull(record.replay()).month
+        assertTrue(replayed().interview != null, "seed 1011's first application books no interview")
+        while (!replayed().hasInterviewToday) record = record.after(Choice.Take(Action.REST))
+        SaveSlot(Memory { store }).keep(record)
+        open()
+        root.button(Continue.CONTINUE).click()
+        assertTrue(interviewDayLine(Place.OFFICE.label) in root.querySelector(".hud")?.textContent.orEmpty())
+        assertEquals(Place.OFFICE, town.marked)
+        assertEquals(Place.OFFICE, placeFor(Action.APPLY, 7))
+    }
+
+    @Test
     fun `the taxi's card lists every place and station, nearest first`() {
         open()
         startSeed1011(root)
