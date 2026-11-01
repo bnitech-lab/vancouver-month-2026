@@ -172,15 +172,18 @@ object Campfire {
 }
 
 /**
- * Light glinting on the water: short pale streaks on the sea off the seawall near the five places, each coming and
- * going on its own beat and drifting a little. They fade away in the night, when [night] is 1.0.
+ * Light glinting on the water: short pale streaks on the sea off the seawall near the places of [zone]'s town, each
+ * coming and going on its own beat and drifting a little. They fade away in the night, when [night] is 1.0.
  */
-object Shimmer {
+class Shimmer private constructor(zone: Int) {
     private class Glint(val x: Double, val z: Double, val y: Double, val width: Double, val beat: Double, val phase: Double)
 
-    /** The water squares the glints may be on: off the shore, past the seawall, near the places' doors. */
-    val seaSquares: List<Cell> = RealVancouver.map.let { map ->
-        val doors = Neighbourhood.venues.map { it.door }
+    /**
+     * The water squares the glints may be on: off the shore, past the seawall, near the places' doors downtown. In
+     * zones 2 and 3, 내 방 is in Burnaby, so its old spot in the West End is no longer one of them.
+     */
+    private val seaSquares: List<Cell> = RealVancouver.map.let { map ->
+        val doors = Neighbourhood.venues.filter { zone == 1 || it.place != Place.HOME }.map { it.door }
         fun around(cell: Cell, reach: Int, terrain: Terrain): List<Boolean> =
             (-reach..reach).flatMap { dx ->
                 (-reach..reach).map { dz -> map.terrainAt(Cell(cell.x + dx, cell.z + dz)) == terrain }
@@ -216,17 +219,24 @@ object Shimmer {
         Block(glint.x + drift - width / 2, glint.y, glint.z - 0.04, width, 0.012, 0.08, GLINT)
     }
 
-    const val MAX_WIDTH = 1.4
-    private const val MIN_WIDTH = 0.001
-    private const val SEA_GLINTS = 32
+    companion object {
+        private val made = mutableMapOf<Int, Shimmer>()
 
-    /** How near the shore and the places' doors the glints keep, so they are where the player looks. */
-    private const val SHORE_REACH = 6
-    private const val NEAR_DOORS = 40.0
+        /** The glints of the town for a room in [zone], made once; zone 1's for any number but 1 to 3, as [HomeSite]. */
+        fun of(zone: Int): Shimmer = HomeSite.of(zone).zone.let { known -> made.getOrPut(known) { Shimmer(known) } }
 
-    /** The sea's surface. */
-    const val SEA_TOP = -0.39
-    private const val GLINT = 0xF4FBFF
+        const val MAX_WIDTH = 1.4
+        private const val MIN_WIDTH = 0.001
+        private const val SEA_GLINTS = 32
+
+        /** How near the shore and the places' doors the glints keep, so they are where the player looks. */
+        private const val SHORE_REACH = 6
+        private const val NEAR_DOORS = 40.0
+
+        /** The sea's surface. */
+        const val SEA_TOP = -0.39
+        private const val GLINT = 0xF4FBFF
+    }
 }
 
 /** Petals drifting down from the blossom trees, a few from each, all the time, round and round. */

@@ -228,6 +228,9 @@ internal class NeighbourhoodScene(
     private val stillBlocks = Neighbourhood.blocks + site.blocks
     private val glowingBlocks = Neighbourhood.glowing + site.glowing
 
+    /** The light glinting on the sea downtown, off this zone's places. */
+    private val shimmer = Shimmer.of(homeZone)
+
     override val element = document.createElement("div") as HTMLElement
     override var onPlace: (Place?) -> Unit = {}
     override var onPasserby: (Passer) -> Unit = {}
@@ -867,7 +870,7 @@ internal class NeighbourhoodScene(
         scene.add(flames)
         fireLight.position.set(fire.x, FIRE_LIGHT_HEIGHT, fire.z)
         scene.add(fireLight)
-        drifting = boxes(Shimmer.at(0.0, 0.0) + Petals.at(0.0) + Clouds.at(0.0), material)
+        drifting = boxes(shimmer.at(0.0, 0.0) + Petals.at(0.0) + Clouds.at(0.0), material)
         drifting.castShadow = false
         drifting.receiveShadow = false
         drifting.frustumCulled = false
@@ -2163,7 +2166,7 @@ internal class NeighbourhoodScene(
         fireLight.intensity = FIRE_LIGHT * glowLevel * flicker
         // Grey skies dull the glints on the water, as the night does.
         val dull = max(glowLevel, DayLight.dullness(shownWeather))
-        placeBlocks(drifting, Shimmer.at(now, dull) + Petals.at(now) + Clouds.at(now))
+        placeBlocks(drifting, shimmer.at(now, dull) + Petals.at(now) + Clouds.at(now))
         if (rain.visible) placeRain(now)
         // How loud the train and the fire are where the player is: the train at the camera, the fire at the character.
         val night = if (nightFell == null) 0.0 else DayLight.at(nightProgress).glow
@@ -2244,7 +2247,7 @@ internal class NeighbourhoodScene(
         val colour = Color(0)
         sea.setColorAt(0, colour.setHex(DayLight.sea(weather)))
         sea.instanceColor?.needsUpdate = true
-        val clouds = Shimmer.count + Petals.count
+        val clouds = shimmer.count + Petals.count
         for (index in clouds until clouds + Clouds.count) {
             drifting.setColorAt(index, colour.setHex(Clouds.colour(weather)))
         }
