@@ -278,6 +278,12 @@ internal class NeighbourhoodScene(
     private val glowMaterial = MeshToonMaterial(json("gradientMap" to shades, "emissive" to GLOW))
     private val meshes = mutableListOf<InstancedMesh>()
 
+    /** The platform under downtown and its tunnel, drawn instead of the town while a ride is down there. */
+    private val underground = UndergroundScene(cube, shades)
+
+    /** True once the underground's shaders are ready, readied as the first ride that goes under sets off. */
+    private var undergroundReady = false
+
     /**
      * The still boxes in their tiles, and for each of [Neighbourhood.blocks] which tile it is drawn in and where in it;
      * the glowing windows and glass in two draws, the town's corner's and the wide map's, and for each glowing box which
@@ -392,8 +398,9 @@ internal class NeighbourhoodScene(
     private var shownWeather = Weather.SUNNY
     private var comingWeather: Weather? = null
 
-    /** The light as the time of day has it, before the weather greys it. */
+    /** The light as the time of day has it, before the weather greys it; and the sky's colour as drawn. */
     private var lighting = DayLight.MORNING
+    private var skyColour = DayLight.MORNING.sky
 
     /** The sea, one plane under the whole town, which darkens in the rain. */
     private lateinit var sea: InstancedMesh
@@ -420,6 +427,10 @@ internal class NeighbourhoodScene(
     /** True when the page is not on screen. A test may set it. */
     internal var pageHidden: () -> Boolean = { document.asDynamic().hidden == true }
     private val lessMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
+
+    /** True when the phone asks for less motion now. A test may set it. */
+    internal var asksLessMotion: () -> Boolean = { lessMotion.matches }
+
     private val pace = FramePace(openedAt = window.performance.now())
 
     private val character = Group()
@@ -507,7 +518,10 @@ internal class NeighbourhoodScene(
     /** How high the camera looks: at the character, or up at the train on its guideway. */
     private var focusHeight = FOCUS_HEIGHT
 
-    /** True while the camera follows the train under downtown, at the station there, rather than on the line. */
+    /**
+     * True while the ride's train is under downtown: the platform there and the tunnel are drawn instead of the town
+     * ([UndergroundScene]), and the character stands for the train on the small map.
+     */
     private var focusUnderground = false
 
     /**
@@ -1180,6 +1194,11 @@ internal class NeighbourhoodScene(
             hideRideVehicle()
         }
         val now = window.performance.now()
+        if (!undergroundReady && (UndergroundRide.startsUnder(made) || UndergroundRide.endsUnder(made))) {
+            // Its shaders are made now, as the ride sets off, rather than on the frame the platform first shows.
+            undergroundReady = true
+            renderer.compile(underground.scene, camera)
+        }
         journey = made
         journeyStarted = now
         if (transport == Transport.SKYTRAIN) {
@@ -1196,17 +1215,7 @@ internal class NeighbourhoodScene(
 
     /** The ride on [transport] from stop [from] to stop [to], or for a taxi from here to place [to]. */
     private fun journeyFor(transport: Transport, from: Int, to: Int): Journey? = when (transport) {
-        Transport.SKYTRAIN -> {
-            val start = TransitLines.stations[from].along
-            val end = TransitLines.stations[to].along
-            val way = Journey.wayOn(Neighbourhood.guideway, start, end, TRAIN_GOING_ON)
-            // A long ride goes faster at its quickest, as a train between far stations does.
-            val cruise = Journey.trainCruise(abs(end - start))
-            Journey(
-                transport, way, abs(end - start), TransitLines.stations[to].door, cruise,
-                Journey.trainRamp(cruise), start, if (end >= start) 1.0 else -1.0,
-            )
-        }
+        Transport.SKYTRAIN -> Journey.train(TransitLines.stations[from], TransitLines.stations[to])
         Transport.BUS -> {
             val stops = TransitLines.busStops
             val loop = TransitLines.lineOf(from).loop
@@ -1270,7 +1279,10 @@ internal class NeighbourhoodScene(
     private fun stepOut(at: Spot) {
         spot = at
         focusHeight = FOCUS_HEIGHT
-        if (focusUnderground) view.jumpTo(Point(at.x, FOCUS_HEIGHT, at.z))
+        if (focusUnderground) {
+            view.jumpTo(Point(at.x, FOCUS_HEIGHT, at.z))
+            labelsStale = true
+        }
         focusUnderground = false
         character.visible = true
         touched()
@@ -1327,21 +1339,17 @@ internal class NeighbourhoodScene(
     private fun followRide(going: Journey, elapsed: Double) {
         val place = ridePlace
         if (going.transport == Transport.SKYTRAIN) {
-            val along = going.alongAt(elapsed)
-            val underground = along < UNDER_DOWNTOWN
-            if (underground) {
-                spot = DOWNTOWN_DOOR
-                focusHeight = FOCUS_HEIGHT
-            } else {
-                Neighbourhood.guideway.placeAt(along, place)
-                spot = Spot(place[0], place[1])
-                heading = place[2] + PI / 2
-                focusHeight = Neighbourhood.DECK_HEIGHT + TRAIN_FOCUS
-            }
+            // Under downtown too, the character goes with the train, so the small map shows it under the streets.
+            Neighbourhood.guideway.placeAt(going.alongAt(elapsed), place)
+            spot = Spot(place[0], place[1])
+            heading = place[2] + PI / 2
+            val underground = UndergroundRide.isUnder(going, elapsed)
+            focusHeight = if (underground) FOCUS_HEIGHT else Neighbourhood.DECK_HEIGHT + TRAIN_FOCUS
             if (underground != focusUnderground) {
                 focusUnderground = underground
-                // Into or out of the tunnel the camera cuts to the other end, as a ride underground does.
-                if (elapsed > Journey.BOARD_MILLIS) view.jumpTo(Point(spot.x, focusHeight, spot.z))
+                labelsStale = true
+                // Out of the tunnel the camera cuts to the train at its mouth, as a ride underground does.
+                if (elapsed > going.boardMillis) view.jumpTo(Point(spot.x, focusHeight, spot.z))
             }
             return
         }
@@ -1448,7 +1456,8 @@ internal class NeighbourhoodScene(
             trainBackAt = now
             return
         }
-        trainShift = ride.alongAt(elapsed) - runStand
+        // Getting on under downtown, the train is still coming in to the platform.
+        trainShift = UndergroundRide.trainAlong(ride, elapsed) - runStand
         placeTrain(trainShift)
         val fadeIn = if (trainFadesIn) (elapsed / Journey.BOARD_MILLIS).coerceIn(0.0, 1.0) else 1.0
         val fadeOut = ((ride.goneMillis - elapsed) / TRAIN_FADE).coerceIn(0.0, 1.0)
@@ -1457,7 +1466,7 @@ internal class NeighbourhoodScene(
         trainGlowMaterial.opacity = shown
         trainCars.visible = shown > 0.0
         trainWindows.visible = shown > 0.0
-        trainRideSpeed = ride.speedAt(elapsed)
+        trainRideSpeed = UndergroundRide.trainSpeed(ride, elapsed)
     }
 
     /** How fast the ridden train goes now, for its rumble. */
@@ -1530,6 +1539,7 @@ internal class NeighbourhoodScene(
         passerbyMaterial.dispose()
         flameMaterial.dispose()
         rainMaterial.dispose()
+        underground.dispose()
         shades.dispose()
         // The town's sounds go quiet with it, last, so nothing the sound does can stop the town letting go.
         tellSounds(0.0, 0.0, 0.0)
@@ -1631,6 +1641,12 @@ internal class NeighbourhoodScene(
         val subject = if (sitting) site.benchSeat else spot
         view.follow(Point(subject.x, focusHeight, subject.z), 0.0)
         placeCamera()
+        // Under downtown, the platform and the tunnel as they are drawn there.
+        val going = journey
+        val drawn = if (focusUnderground && going != null) underground.scene else scene
+        if (drawn !== scene && going != null) {
+            underground.place(going, window.performance.now() - journeyStarted, false, skyColour, camera)
+        }
         val info = renderer.asDynamic().info.render
         val gl = renderer.asDynamic().getContext()
         // Reading a pixel back waits for the frame to be drawn, which a finish alone does not in every browser.
@@ -1638,7 +1654,7 @@ internal class NeighbourhoodScene(
         val started = window.performance.now()
         for (frame in 0 until frames) {
             renderer.shadowMap.needsUpdate = true
-            renderer.render(scene, camera)
+            renderer.render(drawn, camera)
             gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel)
         }
         val millis = (window.performance.now() - started) / frames
@@ -1649,6 +1665,14 @@ internal class NeighbourhoodScene(
     /** True while the train is a ride's, not the line's own. For tests. */
     internal val isTrainRidden: Boolean
         get() = trainRide != null
+
+    /** True while a ride is shown under downtown, the platform and the tunnel drawn instead of the town. For tests. */
+    internal val isUnderground: Boolean
+        get() = focusUnderground && journey != null
+
+    /** The platform and the tunnel as last drawn: the camera's eye there, the character, the doors. For tests. */
+    internal val undergroundShown: UndergroundScene
+        get() = underground
 
     /** The bike shop's name, floating over it. For tests. */
     internal val shopName: HTMLButtonElement
@@ -2036,7 +2060,7 @@ internal class NeighbourhoodScene(
         lastFrame = now
         // A phone that asks for less motion keeps the town's own life still, and draws only for the player. The life
         // moves on the beat only, even on frames drawn at the screen's full rate for the player.
-        val still = lessMotion.matches
+        val still = asksLessMotion()
         var walking = false
         var travelled = false
         var night = false
@@ -2055,8 +2079,15 @@ internal class NeighbourhoodScene(
             if (!still && pace.stepsLife) stepLife()
             // A town whose life stands still has no train passing and no fire to hear.
             if (still) quietSounds()
-            renderer.shadowMap.needsUpdate = pace.drawsShadows
-            renderer.render(scene, camera)
+            // Under the ground no shadow is drawn; the town's are drawn afresh on its first frame back.
+            renderer.shadowMap.needsUpdate = pace.drawsShadows || focusUnderground
+            val going = journey
+            if (focusUnderground && going != null) {
+                underground.place(going, now - journeyStarted, still, skyColour, camera)
+                renderer.render(underground.scene, camera)
+            } else {
+                renderer.render(scene, camera)
+            }
         } catch (error: Throwable) {
             fail(error)
             return
@@ -2231,7 +2262,9 @@ internal class NeighbourhoodScene(
         val rumble = if (trainRide == null) {
             SkyTrainRun.rumbleAround(runStand + trainShift, SkyTrainRun.speedAt(now), SkyTrainRun.opacityAt(now), view.eye)
         } else {
-            SkyTrainRun.rumbleAround(runStand + trainShift, trainRideSpeed, trainMaterial.opacity, view.eye)
+            // Under the ground, heard where the camera rides with the train.
+            val ear = if (focusUnderground) underground.eye else view.eye
+            SkyTrainRun.rumbleAround(runStand + trainShift, trainRideSpeed, trainMaterial.opacity, ear)
         }
         tellSounds(rumble, fire, night)
     }
@@ -2447,6 +2480,7 @@ internal class NeighbourhoodScene(
         this.lighting = lighting
         val lit = DayLight.weathered(lighting, shownWeather)
         sky.setHex(lit.sky)
+        skyColour = lit.sky
         haze.color.setHex(lit.sky)
         ambient.intensity = lit.ambient
         ambient.color.setHex(lit.ambientColour)
@@ -2576,7 +2610,8 @@ internal class NeighbourhoodScene(
         // A place far off, as downtown's are from Burnaby, is lost in the haze, and so is its name.
         val eye = view.eye
         val near = hypot(anchor.x - eye.x, anchor.z - eye.z) < NAMES_REACH
-        val shown = near && point != null && point.left in 0.0..1.0 && point.top in 0.0..1.0
+        // Under the ground no name floats over the platform.
+        val shown = !focusUnderground && near && point != null && point.left in 0.0..1.0 && point.top in 0.0..1.0
         label.classList.toggle("behind", !shown)
         // A name that would reach up under the top card or the day's log is hidden there, and out of the finger's
         // way; it stays for the keyboard and a screen reader, as its person is still there to talk to.
@@ -2659,23 +2694,11 @@ internal class NeighbourhoodScene(
         const val BUS_DWELL = 2_500.0
         const val BOAT_DWELL = 3_000.0
 
-        /** How far the train goes on along the line after a ride, out of the station, before it fades away. */
-        const val TRAIN_GOING_ON = 24.0
-
         /** How long the train of a ride fades out at the end, and the line's own train back in after it. */
         const val TRAIN_FADE = 700.0
 
         /** How far above the guideway's deck the camera looks while it follows the train. */
         const val TRAIN_FOCUS = 3.2
-
-        /**
-         * Below this far along the guideway the whole train is in the tunnel under downtown, and the camera waits at the
-         * station there.
-         */
-        val UNDER_DOWNTOWN = -(Neighbourhood.TRAIN_LENGTH / 2 + 1.0)
-
-        /** The door of the station under downtown, where the camera waits while the train is in the tunnel. */
-        val DOWNTOWN_DOOR = TransitLines.stations.first { it.underground }.door
 
         /** A place this near needs no taxi. */
         const val TAXI_NOT_NEEDED = 2.0

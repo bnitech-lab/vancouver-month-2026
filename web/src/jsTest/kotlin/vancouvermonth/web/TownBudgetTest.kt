@@ -155,7 +155,32 @@ class TownBudgetTest {
         }.then { }
     }
 
+    @Test
+    fun `under downtown, on the platform and in the tunnel, a few draws and no town`(): Promise<Unit> {
+        val town = open(1)
+        town.standAt(TransitLines.stations[0].door)
+        return whenReady({ town.isStill }) {
+            town.travel(Transport.SKYTRAIN, 0, 1)
+        }.then {
+            whenReady({ town.isUnderground && town.undergroundShown.isRiderShown }) {
+                val cost = town.measureFrames(FRAMES)
+                report("under downtown, on the platform", cost)
+                withinBudget(cost)
+                assertTrue(cost.draws <= UNDERGROUND_DRAWS, "${cost.draws} draws")
+            }
+        }.then {
+            whenReady({ town.isUnderground && town.undergroundShown.eye.x > UndergroundRide.HALL_EAST }) {
+                val cost = town.measureFrames(FRAMES)
+                report("under downtown, in the tunnel", cost)
+                withinBudget(cost)
+                assertTrue(cost.draws <= UNDERGROUND_DRAWS, "${cost.draws} draws")
+            }
+        }.then { }
+    }
+
     private companion object {
+        /** Under downtown only the platform and the tunnel are drawn: a handful of draws, the town none. */
+        const val UNDERGROUND_DRAWS = 10
         const val FRAMES = 4
         const val RIDE_MILLIS = 7_000.0
         /**
