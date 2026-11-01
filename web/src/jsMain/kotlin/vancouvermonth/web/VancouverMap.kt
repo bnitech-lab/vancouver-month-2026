@@ -31,7 +31,7 @@ class TerrainMap(val columns: Int, val rows: Int, private val squares: List<Terr
     val grid: Grid by lazy { Grid(columns, rows, cellsOf(Terrain.WATER)) }
 
     companion object {
-        /** The map [lines] draw, one line per row and one character per square, as in [VancouverMapData.rows]. */
+        /** The map [lines] draw, one line per row and one character per square, as [unpackRuns] spells out a row. */
         fun parse(lines: List<String>): TerrainMap {
             require(lines.isNotEmpty()) { "A map needs at least one row" }
             val columns = lines.first().length
@@ -47,7 +47,7 @@ class TerrainMap(val columns: Int, val rows: Int, private val squares: List<Terr
     }
 }
 
-/** The points of a line written as "x,z x,z ...", as [VancouverMapData] keeps its lines. */
+/** The points of a line written as "x,z x,z ...", as [VancouverMapData.RAIL] keeps them. */
 fun pointsOf(text: String): List<Spot> = text.split(' ').filter { it.isNotEmpty() }.map { pair ->
     val (x, z) = pair.split(',')
     Spot(x.toDouble(), z.toDouble())
@@ -91,13 +91,13 @@ fun unpackPoints(text: String): List<Spot> = unpackNumbers(text, 2).map { (x, z)
  * places. [Neighbourhood] builds the town on it.
  */
 object RealVancouver {
-    val map: TerrainMap by lazy { TerrainMap.parse(VancouverMapData.rows) }
+    val map: TerrainMap by lazy { TerrainMap.parse(VancouverMapData.rows.map(::unpackRuns)) }
 
     /** How many metres of the real city one square stands for. */
     const val METRES_PER_UNIT = VancouverMapData.METRES_PER_UNIT
 
-    val shoreLines: List<List<Spot>> by lazy { VancouverMapData.shoreLines.map(::pointsOf) }
-    val park: List<Spot> by lazy { pointsOf(VancouverMapData.PARK) }
+    val shoreLines: List<List<Spot>> by lazy { VancouverMapData.shoreLines.map(::unpackPoints) }
+    val park: List<Spot> by lazy { unpackPoints(VancouverMapData.PARK) }
     val rail: List<Spot> by lazy { pointsOf(VancouverMapData.RAIL) }
     val mountains: List<Spot> by lazy { pointsOf(VancouverMapData.MOUNTAINS) }
     val spots: Map<Place, Cell> get() = VancouverMapData.spots
