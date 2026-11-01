@@ -20,8 +20,8 @@ class DayLightTest {
         assertEquals(DayLight.EVENING, evening)
         assertTrue(red(evening.sky) > blue(evening.sky), "a golden sky")
         assertEquals(DayLight.NIGHT, DayLight.during(1.0))
-        assertEquals(1.0, DayLight.at(DayLight.HOME_AT).glow)
-        assertTrue(DayLight.at(DayLight.HOME_AT).ambient < DayLight.MORNING.ambient / 2)
+        assertEquals(1.0, DayLight.at(DayLight.DARK_AT).glow)
+        assertTrue(DayLight.at(DayLight.DARK_AT).ambient < DayLight.MORNING.ambient / 2)
     }
 
     @Test
@@ -48,7 +48,7 @@ class DayLightTest {
         for (from in listOf(0.0, 0.2, 0.6, 0.8, 1.0)) {
             assertEquals(DayLight.during(from), DayLight.at(0.0, from), "from $from")
             assertEquals(DayLight.NIGHT, DayLight.at(DayLight.NIGHT_FALLS, from), "from $from")
-            assertEquals(DayLight.NIGHT, DayLight.at(DayLight.HOME_AT, from), "from $from")
+            assertEquals(DayLight.NIGHT, DayLight.at(DayLight.DARK_AT, from), "from $from")
             assertEquals(DayLight.MORNING, DayLight.at(1.0, from), "from $from")
         }
         // Going to bed at night, the night simply goes on.
@@ -76,7 +76,7 @@ class DayLightTest {
         assertTrue(DayLight.outdoorsAt(0.8) in 0.1..0.9, "all gone at once")
         assertEquals(1.0, DayLight.outdoors(0.0))
         assertEquals(1.0, DayLight.outdoors(1.0))
-        for (progress in listOf(0.42, 0.5, DayLight.HOME_AT, 0.6, 0.7)) assertEquals(0.0, DayLight.outdoors(progress))
+        for (progress in listOf(0.42, 0.5, DayLight.DARK_AT, 0.6, 0.7)) assertEquals(0.0, DayLight.outdoors(progress))
         for (from in listOf(0.0, 0.85, 1.0)) {
             assertEquals(DayLight.outdoorsAt(from), DayLight.outdoors(0.0, from), "from $from")
             val samples = (0..300).map { DayLight.outdoors(it / 300.0, from) }

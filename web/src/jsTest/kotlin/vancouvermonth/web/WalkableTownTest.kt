@@ -104,7 +104,7 @@ private class SilentTown : WalkableTown {
         onTravelled()
     }
 
-    override fun endDay(place: Place) = onMorning()
+    override fun endDay() = onMorning()
 
     override fun close() {}
 }

@@ -164,11 +164,10 @@ interface WalkableTown {
     fun endChat()
 
     /**
-     * Ends the day with a night's sleep at [place], 내 방: from the time it is, on through the evening to a night with
-     * the lights on, then morning, with the character at 내 방's door and [onMorning] called. The night is spent on the
-     * bench by the campfire.
+     * Ends the day with a night's sleep at 내 방: from the time it is, on through the evening to a night with the lights
+     * on, spent on the bench by the campfire, then morning, with the character at 내 방's door and [onMorning] called.
      */
-    fun endDay(place: Place)
+    fun endDay()
 
     /**
      * Moves the time of day on to [share] of the day (from 0.0 in the morning to 1.0 at night), from the time shown
@@ -550,7 +549,6 @@ internal class NeighbourhoodScene(
     private var nightFell: Double? = null
     private var nightProgress = 0.0
     private var sitting = false
-    private var wentHome = false
 
     /** How much of the day had gone when the night's sleep began: the light carries on from there. */
     private var nightFrom = 0.0
@@ -1042,7 +1040,7 @@ internal class NeighbourhoodScene(
         }
     }
 
-    override fun endDay(place: Place) {
+    override fun endDay() {
         touched()
         // The ride ends with the day: a shared one goes back, and the next morning starts on foot.
         getOff()
@@ -1053,17 +1051,15 @@ internal class NeighbourhoodScene(
         marker.visible = false
         pointers.clear()
         stopChatting()
-        sitting = place == Place.HOME
+        // The night is spent by the campfire at 내 방, where the sleep is.
+        sitting = true
         // The night falls from the time it is, even halfway through the time an action took.
         timePassed = null
         nightFrom = shownShare
-        if (sitting) {
-            // The camera comes round to the far side of the fire, near and low, to see the character's face in its
-            // light. The player's own view comes back in the morning.
-            if (viewBeforeRest == null) viewBeforeRest = Triple(view.yaw, view.pitch, view.distance)
-            view.aim(FIRESIDE_TURN, FIRESIDE_TILT, FIRESIDE_DISTANCE)
-        }
-        wentHome = false
+        // The camera comes round to the far side of the fire, near and low, to see the character's face in its light.
+        // The player's own view comes back in the morning.
+        if (viewBeforeRest == null) viewBeforeRest = Triple(view.yaw, view.pitch, view.distance)
+        view.aim(FIRESIDE_TURN, FIRESIDE_TILT, FIRESIDE_DISTANCE)
         if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
             // The phone asks for less motion, so the night passes at once.
             goHome(jump = true)
@@ -2406,17 +2402,12 @@ internal class NeighbourhoodScene(
         val progress = ((now - start) / nightMillis).coerceIn(0.0, 1.0)
         nightProgress = progress
         light(DayLight.at(progress, nightFrom))
-        // In the dark the next day's weather comes, and the character goes home, unless it spends the night by the
-        // fire.
+        // In the dark the next day's weather comes.
         val coming = comingWeather
-        if (progress >= DayLight.HOME_AT && coming != null) {
+        if (progress >= DayLight.DARK_AT && coming != null) {
             comingWeather = null
             // The same sky as today needs nothing redone.
             if (coming != shownWeather) showWeather(coming)
-        }
-        if (progress >= DayLight.HOME_AT && !wentHome && !sitting) {
-            wentHome = true
-            goHome(jump = true)
         }
         if (progress < 1.0) return true
         nightFell = null

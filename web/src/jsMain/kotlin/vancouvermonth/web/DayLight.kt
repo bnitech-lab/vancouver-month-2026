@@ -22,8 +22,8 @@ data class Lighting(
  * day has gone ([during], from the morning at 0.0 to the night at 1.0, as the month's stamina spent says): a soft
  * morning, a bright day, a warm late afternoon, a golden evening and a night with the windows, the lamps and the
  * campfire lit. A night's sleep ([at]) carries the light on from the time it is to the night, holds the night, then
- * brings dawn and a soft morning again, over [MILLIS]; progress runs from 0.0 to 1.0, and the character is home by
- * [HOME_AT], in the dark.
+ * brings dawn and a soft morning again, over [MILLIS]; progress runs from 0.0 to 1.0, and by [DARK_AT] it is deep night,
+ * when the next day's weather comes in.
  */
 object DayLight {
     /** How long a night's sleep takes on screen. */
@@ -32,7 +32,7 @@ object DayLight {
     /** How long the time an action takes passes on screen, the light moving all the way. */
     const val PASS_MILLIS = 2_000.0
 
-    const val HOME_AT = 0.55
+    const val DARK_AT = 0.55
 
     /** How far into a night's sleep the night has fallen, whatever the time it started from. */
     const val NIGHT_FALLS = 0.42

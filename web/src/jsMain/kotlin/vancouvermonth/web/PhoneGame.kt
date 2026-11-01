@@ -727,7 +727,7 @@ class PhoneGame private constructor(
                 if (walking != null) {
                     // Until the morning, the town takes no input and no talk opens.
                     dayChanging = true
-                    walking.endDay(place)
+                    walking.endDay()
                 }
             } else {
                 walking?.passTime(month.dayShare)

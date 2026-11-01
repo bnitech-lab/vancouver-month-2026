@@ -23,7 +23,7 @@ import vancouvermonth.text.PatchNotes
 
 /** A town to walk in whose nights last until the test says it is morning. */
 private class NightLongTown(val quiet: QuietTown = QuietTown()) : WalkableTown by quiet {
-    override fun endDay(place: Place) {}
+    override fun endDay() {}
 
     fun morning() = quiet.onMorning()
 }

@@ -80,7 +80,7 @@ internal class QuietTown : WalkableTown {
         onTravelled()
     }
 
-    override fun endDay(place: Place) {
+    override fun endDay() {
         riding = null
         onMorning()
     }

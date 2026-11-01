@@ -35,10 +35,10 @@ import vancouvermonth.text.weatherWord
  * [QuietTown]'s.
  */
 private class EveningTown(private val quiet: QuietTown = QuietTown()) : WalkableTown by quiet {
-    var evening: Place? = null
+    var evening = false
 
-    override fun endDay(place: Place) {
-        evening = place
+    override fun endDay() {
+        evening = true
     }
 }
 
@@ -291,10 +291,10 @@ class ContinueMonthTest {
         startSeed1011(root)
         town.onPlace(Place.LIBRARY)
         (root.querySelector(".talk .spend") as HTMLButtonElement).click()
-        assertNull(town.evening, "An action changed the day")
+        assertFalse(town.evening, "An action changed the day")
         town.onPlace(Place.HOME)
         (root.querySelector(".talk .spend") as HTMLButtonElement).click()
-        assertEquals(Place.HOME, town.evening, "The day did not start to change")
+        assertTrue(town.evening, "The day did not start to change")
 
         val again = QuietTown()
         open(town = again)
