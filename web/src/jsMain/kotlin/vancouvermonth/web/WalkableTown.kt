@@ -248,13 +248,15 @@ internal class NeighbourhoodScene(
 
     /**
      * The still boxes in their tiles, and for each of [Neighbourhood.blocks] which tile it is drawn in and where in it;
-     * the glowing windows and glass in one draw. A building that folds is put again where it is drawn, and nowhere
-     * else.
+     * the glowing windows and glass in two draws, the town's corner's and the wide map's, and for each glowing box which
+     * of them and where in it. A building that folds is put again where it is drawn, and nowhere else.
      */
     private val tiles = mutableListOf<InstancedMesh>()
     private val tileOf = IntArray(stillBlocks.size)
     private val slotOf = IntArray(stillBlocks.size)
-    private lateinit var glowing: InstancedMesh
+    private val glowDraws = mutableListOf<InstancedMesh>()
+    private val glowDrawOf = IntArray(glowingBlocks.size)
+    private val glowSlotOf = IntArray(glowingBlocks.size)
 
     /**
      * Each draw of the town that may be left out when far from the camera: where its middle is, how far its boxes reach
@@ -677,6 +679,9 @@ internal class NeighbourhoodScene(
         scene.add(sea)
         scene.add(boxes(ground, material).also { it.castShadow = false })
         scene.add(boxes(Neighbourhood.corner, material).also { it.castShadow = false })
+        val ridge = boxes(Neighbourhood.ridge, material).also { it.castShadow = false }
+        scene.add(ridge)
+        far(ridge, Neighbourhood.ridge)
         for (tile in Neighbourhood.groundTiles) {
             val mesh = boxes(tile, material)
             mesh.castShadow = false
@@ -684,8 +689,20 @@ internal class NeighbourhoodScene(
             far(mesh, tile)
         }
         tiled(stillBlocks, material)
-        glowing = boxes(glowingBlocks, glowMaterial)
-        scene.add(glowing)
+        // The glass of the wide map's towers and 내 방 out there in a draw of their own, left out from far off.
+        val (corner, wide) = glowingBlocks.indices.partition { glowingBlocks[it].x < Neighbourhood.TOWN_COLUMNS }
+        for ((draw, members) in listOf(corner, wide).withIndex()) {
+            if (members.isEmpty()) continue
+            for ((slot, index) in members.withIndex()) {
+                glowDrawOf[index] = glowDraws.size
+                glowSlotOf[index] = slot
+            }
+            val panes = members.map { glowingBlocks[it] }
+            val mesh = boxes(panes, glowMaterial)
+            scene.add(mesh)
+            glowDraws.add(mesh)
+            if (draw == 1) far(mesh, panes)
+        }
     }
 
     /** Notes [mesh], drawing [blocks], as one to leave out when it is far from the camera ([leaveOutFar]). */
@@ -2043,12 +2060,14 @@ internal class NeighbourhoodScene(
     /** Draws pane [index] of the glowing glass [shrink] times as tall and as high up, to fit its folding building. */
     private fun shrinkPane(index: Int, shrink: Double) {
         val box = glowingBlocks[index]
-        val numbers = glowing.instanceMatrix.array
-        numbers[index * 16 + 5] = (box.height * shrink).toFloat()
-        numbers[index * 16 + 13] = ((box.y + box.height / 2) * shrink).toFloat()
+        val mesh = glowDraws[glowDrawOf[index]]
+        val at = glowSlotOf[index] * 16
+        val numbers = mesh.instanceMatrix.array
+        numbers[at + 5] = (box.height * shrink).toFloat()
+        numbers[at + 13] = ((box.y + box.height / 2) * shrink).toFloat()
         // Only this box's numbers go to the graphics card again, not all the glass.
-        glowing.instanceMatrix.addUpdateRange(index * 16, 16)
-        glowing.instanceMatrix.needsUpdate = true
+        mesh.instanceMatrix.addUpdateRange(at, 16)
+        mesh.instanceMatrix.needsUpdate = true
     }
 
     /** Puts box [index] of the still boxes [height] tall from [bottom] up, its footprint as it was. */
@@ -2590,7 +2609,7 @@ internal class NeighbourhoodScene(
 
         /** A draw with nothing taller than this is left out [LOW_REACH] from the camera, deep in the haze. */
         const val TALL = 6.5
-        const val LOW_REACH = 175.0
+        const val LOW_REACH = 130.0
 
         /** How far a bike goes for one turn of its pedals, and how far the legs swing with them, in radians. */
         const val PEDAL_LENGTH = 1.8
