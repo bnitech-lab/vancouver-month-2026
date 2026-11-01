@@ -27,6 +27,7 @@ import heapq
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -1467,6 +1468,106 @@ def wrap_points(points, indent, width=112):
     return (" +\n" + pad).join(f'"{p}"' for p in pieces)
 
 
+VLQ_DIGITS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+
+def vlq(n):
+    """A whole number as a base-64 VLQ, as source maps write them: the sign in the lowest bit, then five bits to a
+    character, lowest first, the sixth bit set while more follow. Six characters at most, as the game reads no more."""
+    assert abs(n) < 2 ** 29, f"{n} is too big to pack"
+    value = (-n << 1) | 1 if n < 0 else n << 1
+    out = []
+    while True:
+        digit = value & 31
+        value >>= 5
+        out.append(VLQ_DIGITS[digit | (32 if value else 0)])
+        if not value:
+            return "".join(out)
+
+
+def packed(items):
+    """Items of whole numbers, all of one length, packed as the game's unpackNumbers reads them: each number as the
+    change from the same number of the item before (the first item's from 0), as a base-64 VLQ."""
+    out, before = [], None
+    for item in items:
+        if before is None:
+            before = [0] * len(item)
+        # strict: an item of another length stops the build instead of being packed short.
+        out.extend(vlq(v - b) for v, b in zip(item, before, strict=True))
+        before = item
+    text = "".join(out)
+    # Every packing is read back as the game reads it, so a slip in the packing stops the build, not the page.
+    if items and unpack_numbers(text, len(items[0])) != [tuple(item) for item in items]:
+        sys.exit("packed numbers do not read back to the numbers packed")
+    return text
+
+
+def unpack_numbers(text, fields):
+    """Numbers packed by [packed] read back, as the game's unpackNumbers reads them: the items, each a tuple."""
+    numbers, value, shift = [], 0, 0
+    for char in text:
+        digit = VLQ_DIGITS.index(char)
+        value += (digit & 31) << shift
+        if digit & 32:
+            shift += 5
+        else:
+            numbers.append(-(value >> 1) if value & 1 else value >> 1)
+            value, shift = 0, 0
+    if shift or len(numbers) % fields:
+        sys.exit(f"{len(numbers)} packed numbers do not make items of {fields}")
+    sums, items = [0] * fields, []
+    for start in range(0, len(numbers), fields):
+        for k in range(fields):
+            sums[k] += numbers[start + k]
+        items.append(tuple(sums))
+    return items
+
+
+def tenths(v):
+    """[v] in tenths of a square, exactly as [fmt] writes it, so the game reads back the same number."""
+    text = fmt(v)
+    # One decimal, or this would be hundredths and the game would read every number ten times too far.
+    assert re.fullmatch(r"-?\d+\.\d", text), f"{text} is not written to one decimal"
+    return int(text.replace(".", ""))
+
+
+def packed_points(points):
+    """A line's points packed, x and z in tenths of a square, as the game's unpackPoints reads them."""
+    return packed([(tenths(x), tenths(z)) for x, z in points])
+
+
+def block_items(blocks):
+    """The wide map's blocks as the five whole numbers each that are packed: x, z, width and depth in tenths of a
+    square, and the turn in degrees in the sense of the game's Block.turn."""
+    return [(tenths(cx), tenths(cz), tenths(w), tenths(d), round(-turn)) for cx, cz, w, d, turn in blocks]
+
+
+def packed_summary(name, texts, fields=2):
+    """What the game reads from packed [texts]: how many, and the first and last item, in squares (a block's turn in
+    degrees), to copy into the tests that pin them when the map is made again."""
+    lines = [unpack_numbers(text, fields) for text in texts]
+    items = [item for line in lines for item in line]
+
+    def shown(item):
+        return ",".join([fmt(v / 10) for v in item[:4]] + [str(v) for v in item[4:]])
+
+    if fields != 2:
+        count = f"{len(items)} items"
+    else:
+        count = f"{len(lines)} {'line' if len(lines) == 1 else 'lines'}, {len(items)} points"
+        if 1 < len(lines) <= 5:
+            count += f" ({', '.join(str(len(line)) for line in lines)})"
+    return f"packed {name}: {count}, first {shown(items[0])}, last {shown(items[-1])}"
+
+
+def wrap_packed(text, indent, width=112):
+    """A long packed string split into Kotlin string pieces joined with +."""
+    room = width - indent - 4
+    pieces = [text[i:i + room] for i in range(0, len(text), room)] or [""]
+    pad = " " * indent
+    return (" +\n" + pad).join(f'"{p}"' for p in pieces)
+
+
 def wrap_rects(rects, indent, width=112):
     """Rectangles as "x,z,w,d" groups in Kotlin string pieces joined with +."""
     text = " ".join(f"{x},{z},{w},{d}" for x, z, w, d in rects)
@@ -1507,7 +1608,8 @@ def write_kotlin(built, sources, fetched, hashes):
     out.append(" * and shrunk so the farthest walk between two of the five places takes about 25 seconds on "
                "bare ground (along")
     out.append(" * the streets between the blocks, a little more).")
-    out.append(" * Points are \"x,z\" pairs in grid units, with x east along the columns and z south down the rows.")
+    out.append(" * Points are in grid units, with x east along the columns and z south down the rows; short lines are written")
+    out.append(" * \"x,z x,z\", long ones packed as [unpackPoints] reads them.")
     out.append(" */")
     out.append("internal object VancouverMapData {")
     out.append(f"    const val COLUMNS = {built.columns}")
@@ -1520,34 +1622,37 @@ def write_kotlin(built, sources, fetched, hashes):
     out.append(f"    const val TURN_DEGREES = {fmt(f.turn)}")
     out.append("")
     out.append("    /**")
-    out.append("     * One string per row, north to south; one character per square, west to east:")
-    out.append("     * ~ water, . land, p park, s shore (land beside the water, where the seawall runs).")
-    out.append("     * Each row stays on one line, past the usual width, so the map reads as a picture.")
+    out.append("     * One string per row, north to south, west to east, as runs: a square's symbol, then how many of it come")
+    out.append("     * in a row, the count left out when it is one (\"~3.2s\" is \"~~~..s\"): ~ water, . land, p park, s shore")
+    out.append("     * (land beside the water, where the seawall runs).")
     out.append("     */")
     out.append("    val rows: List<String> = listOf(")
     for row in built.squares:
-        out.append(f'        "{"".join(row)}",')
+        out.append(f'        "{runs_text("".join(row))}",')
     out.append("    )")
     out.append("")
-    out.append("    /** The real shoreline, simplified, where it crosses the grid: "
-               "one string of points per stretch. */")
+    out.append("    /**")
+    out.append("     * The real shoreline, simplified, where it crosses the grid: one string of points per stretch, packed as")
+    out.append("     * [unpackPoints] reads them.")
+    out.append("     */")
     out.append("    val shoreLines: List<String> = listOf(")
     for part in shore_parts:
-        out.append("        " + wrap_points(part, 8) + ",")
+        out.append("        " + wrap_packed(packed_points(part), 8) + ",")
     out.append("    )")
     out.append("")
-    out.append("    /** The big park's outline, simplified. */")
-    out.append("    const val PARK = " + wrap_points(park, 8))
+    out.append("    /** The big park's outline, simplified, packed as [unpackPoints] reads it. */")
+    out.append("    val PARK =")
+    out.append("        " + wrap_packed(packed_points(park), 8))
     out.append("")
     out.append("    /** The rail on its guideway: from where it leaves its tunnel, east along False Creek. */")
-    out.append("    const val RAIL = " + wrap_points(rail, 8))
+    out.append("    val RAIL = " + wrap_points(rail, 8))
     out.append("")
     out.append("    /**")
     out.append("     * A line out along the middle of Burrard Inlet (the city's boundary there): "
                "the north shore and its mountains")
     out.append("     * stand past it, to the north.")
     out.append("     */")
-    out.append("    const val MOUNTAINS = " + wrap_points(mountains, 8))
+    out.append("    val MOUNTAINS = " + wrap_points(mountains, 8))
     out.append("")
     built_blocks, greens = built.city_blocks()
     out.append("    /**")
@@ -1555,10 +1660,10 @@ def write_kotlin(built, sources, fetched, hashes):
                "\"x,z,width,depth\"")
     out.append("     * in squares, west and north sides first. Buildings stand on these.")
     out.append("     */")
-    out.append("    const val BLOCKS = " + wrap_rects(built_blocks, 8))
+    out.append("    val BLOCKS = " + wrap_rects(built_blocks, 8))
     out.append("")
     out.append("    /** The city blocks that are small parks, as [BLOCKS]: grass and a few trees. */")
-    out.append("    const val GREENS = " + wrap_rects(greens, 8))
+    out.append("    val GREENS = " + wrap_rects(greens, 8))
     out.append("")
     out.append("    /** The square proposed for each of the five places; each stands within a few squares of it. */")
     out.append("    val spots: Map<Place, Cell> = mapOf(")
@@ -1584,6 +1689,20 @@ def runs_text(row):
             end += 1
         out.append(row[x] + (str(end - x) if end - x > 1 else ""))
         x = end
+    return "".join(out)
+
+
+def unpack_runs(text):
+    """Runs spelt out square by square, as the game's unpackRuns does: "~3.2s" is "~~~..s"."""
+    out, i = [], 0
+    while i < len(text):
+        symbol = text[i]
+        i += 1
+        digits = ""
+        while i < len(text) and text[i].isdigit():
+            digits += text[i]
+            i += 1
+        out.append(symbol * (int(digits) if digits else 1))
     return "".join(out)
 
 
@@ -1664,7 +1783,8 @@ def write_wide_kotlin(wide, fetched, van_hashes, bby_hashes):
     out.append(" * south-west Burnaby, to past the Burnaby town centre and its big park. The same turn and scale as")
     out.append(" * [VancouverMapData]: the town's map is this map's top-left corner, square for square, so every square of the")
     out.append(" * town has the same column and row in both. Real north points up and to the left, so the map's right is real")
-    out.append(" * south-east, the way the Expo Line runs. Points are \"x,z\" pairs in grid units, as in [VancouverMapData].")
+    out.append(" * south-east, the way the Expo Line runs. Points are in grid units, written \"x,z\" or packed, as in")
+    out.append(" * [VancouverMapData].")
     out.append(" */")
     out.append("internal object WideMapData {")
     out.append(f"    const val COLUMNS = {wide.columns}")
@@ -1694,7 +1814,7 @@ def write_wide_kotlin(wide, fetched, van_hashes, bby_hashes):
     out.append("     * through East Vancouver into Burnaby, to where it leaves the grid past the last station. Each of")
     out.append("     * [STATIONS] is one of its points.")
     out.append("     */")
-    out.append("    const val RAIL =")
+    out.append("    val RAIL =")
     out.append("        " + wrap_points(rail, 8))
     out.append("")
     out.append("    /**")
@@ -1702,26 +1822,28 @@ def write_wide_kotlin(wide, fetched, van_hashes, bby_hashes):
     out.append("     * far along it that is, in squares. The game gives them made-up names.")
     out.append("     */")
     items = [f"{fmt(p[0])},{fmt(p[1])},{fmt(along)}" for p, along in stops]
-    out.append("    const val STATIONS =")
+    out.append("    val STATIONS =")
     out.append("        " + " +\n        ".join(f'"{line} "' for line in wrap_list(items, 8))[:-2] + '"')
     out.append("")
-    out.append("    /** The main streets (arterials), one string of points per street, simplified to within half a square. */")
+    out.append("    /**")
+    out.append("     * The main streets (arterials), simplified to within half a square: one string of points per street,")
+    out.append("     * packed as [unpackPoints] reads them.")
+    out.append("     */")
     out.append("    val streets: List<String> = listOf(")
     for street in streets:
-        out.append("        " + wrap_points(street, 8) + ",")
+        out.append("        " + wrap_packed(packed_points(street), 8) + ",")
     out.append("    )")
     out.append("")
     out.append("    /**")
     out.append("     * The city blocks right of the town's corner (the town's own are [VancouverMapData.BLOCKS]), each the")
-    out.append("     * smallest turned rectangle round the real block: \"x,z,width,depth,turn\", its middle, its size along and")
-    out.append("     * across the turn, and the turn in degrees in the same sense as [Block.turn]. Blocks on parks or water, and")
-    out.append("     * the few over 25 ha (yards, works, a cemetery), are left out. Rows of them, north to south.")
+    out.append("     * smallest turned rectangle round the real block, as five numbers packed as [unpackNumbers] reads them: its")
+    out.append("     * middle's x and z, its size along and across the turn, all in tenths of a square, and the turn in degrees")
+    out.append("     * in the same sense as [Block.turn]. Blocks on parks or water, and the few over 25 ha (yards, works, a")
+    out.append("     * cemetery), are left out. Rows of them, north to south.")
     out.append("     */")
-    out.append("    val blocks: List<String> = listOf(")
-    items = [f"{fmt(cx)},{fmt(cz)},{fmt(w)},{fmt(d)},{round(-turn)}" for cx, cz, w, d, turn in blocks]
-    for line in wrap_list(items, 8):
-        out.append(f'        "{line}",')
-    out.append("    )")
+    items = block_items(blocks)
+    out.append("    val blocks =")
+    out.append("        " + wrap_packed(packed(items), 8))
     out.append("")
     out.append("    /**")
     out.append("     * Where each transit zone a room can be in lies: 1 downtown and the West End (the town's corner), 2 the")
@@ -2016,7 +2138,7 @@ def town_rows_committed():
             elif inside and line.startswith("    )"):
                 break
             elif inside:
-                rows.append(line.strip().rstrip(",").strip('"'))
+                rows.append(unpack_runs(line.strip().rstrip(",").strip('"')))
     return rows
 
 
@@ -2414,6 +2536,12 @@ def main():
     streets = wide.streets()
     print(f"main streets: {len(streets)} lines, {sum(len(s) for s in streets)} points")
     print(f"blocks right of the town: {len(wide.blocks())}")
+    # What the game reads from the packed lines and blocks; WideMapTest and VancouverMapTest pin these numbers.
+    shore_parts, park, _, _ = built.lines()
+    print(packed_summary("town shoreline", [packed_points(part) for part in shore_parts]))
+    print(packed_summary("town park", [packed_points(park)]))
+    print(packed_summary("wide streets", [packed_points(street) for street in streets]))
+    print(packed_summary("wide blocks", [packed(block_items(wide.blocks()))], fields=5))
     print("zones:", {zone: len(shapes) for zone, shapes in wide.zones().items()})
     print("homes:", wide.homes())
     wide_walks = wide.walks()

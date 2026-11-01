@@ -1164,12 +1164,19 @@ object Neighbourhood {
         fun plantYards() {
             for ((index, yard) in yards.withIndex()) {
                 if (yard.trees.isEmpty()) continue
-                val trees = yard.trees.chunked(2).filter { (_, crown) ->
+                // Trunk and crown in pairs, taken by index: chunked(2) would bring Kotlin's sequence code, about 8 KB,
+                // into the page.
+                val trees = mutableListOf<Block>()
+                for (i in yard.trees.indices step 2) {
+                    val crown = yard.trees[i + 1]
                     val spot = TurnedBox(crown.x + crown.width / 2, crown.z + crown.depth / 2, crown.width, crown.depth, 0.0)
-                    nearHouses(spot).none { it.overlaps(spot, 0.0) }
+                    if (nearHouses(spot).none { it.overlaps(spot, 0.0) }) {
+                        trees.add(yard.trees[i])
+                        trees.add(crown)
+                    }
                 }
-                for ((trunk, _) in trees) footprints.add(trunk)
-                yards[index] = Yard(yard.block, yard.lawn, trees.flatten(), yard.houses, yard.firstRow, yard.rows)
+                for (i in trees.indices step 2) footprints.add(trees[i])
+                yards[index] = Yard(yard.block, yard.lawn, trees, yard.houses, yard.firstRow, yard.rows)
             }
         }
 

@@ -99,6 +99,22 @@ mountains line is the city's boundary where it runs along the middle of Burrard 
    The rooms are stored as grid squares, not as points, and the build checks again that neither lies on a lot.
 10. A guard: the build stops if water lies along the city line inland, where the two cities' outlines meet.
 
+## How the data is written
+
+The two files ship inside the page's script, so the long parts are written small. Both maps keep each row as runs
+("~3.2s" for "~~~..s"; the town's 38,130 squares take 3,470 characters). The town's shoreline and big park, the wide
+map's main streets and its blocks are packed: each number in tenths of a square (a block's turn in whole degrees),
+written as the change from the same number of the point or block before, as a base-64 VLQ, the way source maps write
+numbers. `unpackNumbers` and `unpackPoints` in `VancouverMap.kt` read them back to exactly the numbers the plain form
+gave (the 1,703 blocks take 13,991 characters instead of 37,780). The short lines (the rails, the stations, the
+mountains line, the zones) and the town's blocks stay as plain "x,z" numbers.
+
+The script reads every packed string back before writing it and stops if it does not give the same numbers. It then
+prints what the game will read from them ("packed town shoreline", "packed town park", "packed wide streets", "packed
+wide blocks": how many, and the first and last item). `VancouverMapTest` and `WideMapTest` pin those numbers, and as
+each packed number is the change from the one before, the last item stands for the whole string; when the map is made
+again, copy the printed numbers into those two tests.
+
 ## Data and licence
 
 Every input is from the [City of Vancouver Open Data Portal](https://opendata.vancouver.ca), under the

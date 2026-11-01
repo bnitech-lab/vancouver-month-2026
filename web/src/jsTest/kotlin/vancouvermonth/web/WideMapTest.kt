@@ -250,4 +250,22 @@ class WideMapTest {
         assertNotNull(WideVancouver.zoneAt(centre(RealVancouver.spots.getValue(Place.LIBRARY))))
         assertEquals(null, WideVancouver.zoneAt(Spot(400.0, 100.0)))
     }
+
+    /**
+     * Each packed number is the change from the one before, so the last block and the last street point stand for
+     * every character before them. The numbers are the ones `tools/vancouver_map/build_map.py` prints ("packed wide
+     * blocks", "packed wide streets"); they change only when the map is made again.
+     */
+    @Test
+    fun `the packed blocks and streets read back to the numbers the map script printed`() {
+        val blocks = WideVancouver.blocks
+        assertEquals(1_703, blocks.size)
+        assertEquals(TurnedLot(Spot(493.5, 0.0), 6.2, 1.5, 44 * PI / 180), blocks.first())
+        assertEquals(TurnedLot(Spot(318.7, 154.8), 2.8, 5.8, 43 * PI / 180), blocks.last())
+        val streets = WideVancouver.streets
+        assertEquals(131, streets.size)
+        assertEquals(472, streets.sumOf { it.size })
+        assertEquals(Spot(553.4, 155.0), streets.first().first())
+        assertEquals(Spot(648.7, 108.8), streets.last().last())
+    }
 }
