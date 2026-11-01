@@ -272,7 +272,8 @@ September's living cost is greyed out and says why; when even the cheapest one i
 card. The fare shown is the fare paid, through core, as the ride sets off and only then; it is kept in the record (s and
 q with the amount). The character rides there along the very way priced and gets off; on the way the town takes no taps, and 내리기 gets off
 where it is. Across downtown it goes at its everyday speed; a long ride goes faster, up to 16 squares a second on a bike
-and 20 on an e-scooter (a taxi's top is 24), so the West End to the town centre's station is about half a minute. At a
+and 20 on an e-scooter (a taxi's top is 24), so the West End to the town centre's station is about half a minute; like
+every ride, however long, it takes no stamina and leaves the day's clock where it was. At a
 place's door, 내 방's or the bike shop's, the character turns to the person there and the talk opens, as at the end of
 a walk there. The shared one goes back to its dock or corner when the character gets off, a talk opens or the day ends.
 Any talk gets the character off first, and the day's end too, so each morning starts on foot; a fare is only ever paid
