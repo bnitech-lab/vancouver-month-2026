@@ -281,7 +281,7 @@ internal class NeighbourhoodScene(
      * of them and where in it. A building that folds is put again where it is drawn, and nowhere else.
      */
     private val tiles = mutableListOf<InstancedMesh>()
-    private val tileOf = IntArray(stillBlocks.size)
+    private val tileOf = IntArray(stillBlocks.size) { NOT_TILED }
     private val slotOf = IntArray(stillBlocks.size)
     private val glowDraws = mutableListOf<InstancedMesh>()
     private val glowDrawOf = IntArray(glowingBlocks.size)
@@ -843,6 +843,7 @@ internal class NeighbourhoodScene(
 
     /** Draws still box [index] where it stands, turned as it is, or [shown] false, puts it away at no size at all. */
     private fun showStill(index: Int, shown: Boolean) {
+        requireTiled(index)
         val block = stillBlocks[index]
         val mesh = tiles[tileOf[index]]
         val at = slotOf[index] * 16
@@ -1787,8 +1788,15 @@ internal class NeighbourhoodScene(
     internal fun isFolded(index: Int): Boolean = cutaway.isFolding(index)
 
     /** How tall box [index] of [Neighbourhood.blocks] is drawn now, read from where the drawing keeps it. For tests. */
-    internal fun drawnHeight(index: Int): Double =
-        tiles[tileOf[index]].instanceMatrix.array[slotOf[index] * 16 + 5].toDouble()
+    internal fun drawnHeight(index: Int): Double {
+        requireTiled(index)
+        return tiles[tileOf[index]].instanceMatrix.array[slotOf[index] * 16 + 5].toDouble()
+    }
+
+    /** Fails loudly for a box the still tiles do not draw, a suburban house's walls, rather than read another's. */
+    private fun requireTiled(index: Int) {
+        require(tileOf[index] != NOT_TILED) { "Box $index is drawn near the camera, not in the still tiles" }
+    }
 
     /** How far the camera's eye is from the point it looks at, for tests. */
     internal val cameraReach: Double
@@ -2263,6 +2271,7 @@ internal class NeighbourhoodScene(
 
     /** Puts box [index] of the still boxes [height] tall from [bottom] up, its footprint as it was. */
     private fun standBox(index: Int, bottom: Double, height: Double) {
+        requireTiled(index)
         val mesh = tiles[tileOf[index]]
         val at = slotOf[index] * 16
         val numbers = mesh.instanceMatrix.array
@@ -2753,6 +2762,9 @@ internal class NeighbourhoodScene(
 
         /** How wide a tile of the town's still boxes is: each tile is one draw, left out when out of sight. */
         const val TILE = 40.0
+
+        /** The tile of a still box no tile draws: a suburban house's walls, drawn near the camera instead. */
+        const val NOT_TILED = -1
 
         /** The camera for a night by the campfire: north of it, near and low, looking south at the bench. */
         const val FIRESIDE_TURN = PI + 0.15
