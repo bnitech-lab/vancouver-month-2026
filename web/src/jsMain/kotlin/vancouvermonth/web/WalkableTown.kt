@@ -272,7 +272,8 @@ internal class NeighbourhoodScene(
     private var farReach = DoubleArray(0)
 
     /** The city's buildings that fold down out of the camera's way, and where the camera and character last were. */
-    private val cutaway = Cutaway(Neighbourhood.foldables.map { it.box })
+    private val cutaway =
+        Cutaway(Neighbourhood.foldables.map { it.box }, Neighbourhood.foldables.map { Neighbourhood.blocks[it.body] })
     private var aimedEyeX = Double.NaN
     private var aimedEyeY = Double.NaN
     private var aimedEyeZ = Double.NaN
