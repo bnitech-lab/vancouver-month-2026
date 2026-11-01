@@ -286,6 +286,28 @@ internal class NeighbourhoodScene(
     /** The city's buildings that fold down out of the camera's way, and where the camera and character last were. */
     private val cutaway =
         Cutaway(Neighbourhood.foldables.map { it.box }, Neighbourhood.foldables.map { Neighbourhood.blocks[it.body] })
+
+    /**
+     * The suburbs' houses near the camera, walls, roofs and doors, with their lawns and yard trees ([HouseDetail]), in
+     * one draw written again whenever the camera moves or a building folds, and where the camera was when it was last
+     * written. The houses' own walls among the still boxes are not drawn there ([isHouse]); a block whose houses are
+     * drawn near the camera has its rows' low boxes put away while they are.
+     */
+    private lateinit var details: InstancedMesh
+    private val isHouse = BooleanArray(stillBlocks.size).also { house ->
+        for (each in Neighbourhood.houses) house[each.body] = true
+    }
+    private lateinit var houseDetail: HouseDetail
+    private val foldOf: (Int) -> Double = { cutaway.foldOf(it) }
+    private val detailColour = Color(0)
+    private var detailEyeX = Double.NaN
+    private var detailEyeY = Double.NaN
+    private var detailEyeZ = Double.NaN
+    private var detailFocusX = Double.NaN
+    private var detailFocusY = Double.NaN
+    private var detailFocusZ = Double.NaN
+    private var detailAcross = Double.NaN
+    private var detailStale = true
     private var aimedEyeX = Double.NaN
     private var aimedEyeY = Double.NaN
     private var aimedEyeZ = Double.NaN
@@ -706,6 +728,7 @@ internal class NeighbourhoodScene(
             far(mesh, tile)
         }
         tiled(stillBlocks, material)
+        addHouseDetail()
         // The glass of the wide map's towers and 내 방 out there in a draw of their own, left out from far off.
         val (corner, wide) = glowingBlocks.indices.partition { glowingBlocks[it].x < Neighbourhood.TOWN_COLUMNS }
         for ((draw, members) in listOf(corner, wide).withIndex()) {
@@ -720,6 +743,81 @@ internal class NeighbourhoodScene(
             glowDraws.add(mesh)
             if (draw == 1) far(mesh, panes)
         }
+    }
+
+    /**
+     * The draw of the suburbs' houses near the camera, their lawns and yard trees: as many boxes as it may ever hold,
+     * each with a colour from the start, none drawn until the camera is placed ([placeHouseDetail]). They cast the sun's
+     * shadows as the town's other boxes do.
+     */
+    private fun addHouseDetail() {
+        details = InstancedMesh(cube, material, HouseDetail.CAPACITY)
+        details.castShadow = true
+        details.receiveShadow = true
+        details.frustumCulled = false
+        details.instanceMatrix.setUsage(DynamicDrawUsage)
+        for (index in 0 until HouseDetail.CAPACITY) details.setColorAt(index, detailColour)
+        details.count = 0
+        houseDetail = HouseDetail(Neighbourhood.yards, details.instanceMatrix.array)
+        meshes.add(details)
+        scene.add(details)
+    }
+
+    /**
+     * Writes the suburbs' houses, lawns and yard trees for the camera as it is now, when it moved or a building folded
+     * since they were last written.
+     */
+    private fun placeHouseDetail() {
+        val eye = view.eye
+        val focus = view.focus
+        if (!detailStale && eye.x == detailEyeX && eye.y == detailEyeY && eye.z == detailEyeZ && focus.x == detailFocusX &&
+            focus.y == detailFocusY && focus.z == detailFocusZ && across == detailAcross
+        ) return
+        detailStale = false
+        detailEyeX = eye.x
+        detailEyeY = eye.y
+        detailEyeZ = eye.z
+        detailFocusX = focus.x
+        detailFocusY = focus.y
+        detailFocusZ = focus.z
+        detailAcross = across
+        houseDetail.fill(
+            eye.x, eye.y, eye.z, focus.x, focus.y, focus.z, tan(across / 2), tan(view.fov * PI / 360), foldOf,
+        )
+        // The rows' low boxes of each block that came near, or went off, put away or back.
+        for (at in 0 until houseDetail.changedCount) {
+            val index = houseDetail.changed[at]
+            val yard = Neighbourhood.yards[index]
+            for (row in yard.firstRow until yard.firstRow + yard.rows) showStill(row, !houseDetail.shown[index])
+        }
+        val count = houseDetail.count
+        for (index in 0 until count) details.setColorAt(index, detailColour.setHex(houseDetail.colours[index]))
+        details.count = count
+        if (count == 0) return
+        // Only the boxes drawn go to the graphics card again.
+        details.instanceMatrix.addUpdateRange(0, count * 16)
+        details.instanceMatrix.needsUpdate = true
+        val colours = details.instanceColor ?: return
+        colours.addUpdateRange(0, count * 3)
+        colours.needsUpdate = true
+    }
+
+    /** Draws still box [index] where it stands, turned as it is, or [shown] false, puts it away at no size at all. */
+    private fun showStill(index: Int, shown: Boolean) {
+        val block = stillBlocks[index]
+        val mesh = tiles[tileOf[index]]
+        val at = slotOf[index] * 16
+        val numbers = mesh.instanceMatrix.array
+        val size = if (shown) 1.0 else 0.0
+        val cosine = cos(block.turn) * size
+        val sine = sin(block.turn) * size
+        numbers[at] = (cosine * block.width).toFloat()
+        numbers[at + 2] = (-sine * block.width).toFloat()
+        numbers[at + 5] = (block.height * size).toFloat()
+        numbers[at + 8] = (sine * block.depth).toFloat()
+        numbers[at + 10] = (cosine * block.depth).toFloat()
+        mesh.instanceMatrix.addUpdateRange(at, 11)
+        mesh.instanceMatrix.needsUpdate = true
     }
 
     /** Notes [mesh], drawing [blocks], as one to leave out when it is far from the camera ([leaveOutFar]). */
@@ -772,6 +870,8 @@ internal class NeighbourhoodScene(
     private fun tiled(blocks: List<Block>, material: Material) {
         val groups = LinkedHashMap<Pair<Int, Int>, MutableList<Int>>()
         for ((index, block) in blocks.withIndex()) {
+            // A suburban house is drawn only near the camera, with its roof and door ([details]).
+            if (isHouse[index]) continue
             val column = floor((block.x + block.width / 2) / TILE).toInt()
             val key = column to floor((block.z + block.depth / 2) / TILE).toInt()
             groups.getOrPut(key) { mutableListOf() }.add(index)
@@ -1594,6 +1694,13 @@ internal class NeighbourhoodScene(
         return FrameCost((info.calls as Number).toInt(), triangles, triangles / 12, millis)
     }
 
+    /** How many of the suburbs' houses, roofs, doors, lawns and yard trees are drawn near the camera now. For tests. */
+    internal val houseDetailBoxes: Int
+        get() = details.count
+
+    /** True when block [yard] of [Neighbourhood.yards] has its houses drawn one by one now. For tests. */
+    internal fun isHouseDrawn(yard: Int): Boolean = houseDetail.shown[yard]
+
     /** True while the train is a ride's, not the line's own. For tests. */
     internal val isTrainRidden: Boolean
         get() = trainRide != null
@@ -2062,6 +2169,8 @@ internal class NeighbourhoodScene(
         for (at in 0 until cutaway.changedCount) {
             val index = cutaway.changed[at]
             val building = Neighbourhood.foldables[index]
+            // A suburban house folds where it is drawn, near the camera ([placeHouseDetail]), below.
+            if (isHouse[building.body]) continue
             val fold = cutaway.foldOf(index)
             val body = blocks[building.body]
             val full = body.height
@@ -2072,6 +2181,9 @@ internal class NeighbourhoodScene(
             if (building.glassNorth >= 0) shrinkPane(building.glassNorth, shrink)
             if (building.glassSouth >= 0) shrinkPane(building.glassSouth, shrink)
         }
+        // A house's roof and door sink with its walls.
+        detailStale = true
+        placeHouseDetail()
     }
 
     /** Draws pane [index] of the glowing glass [shrink] times as tall and as high up, to fit its folding building. */
@@ -2468,6 +2580,7 @@ internal class NeighbourhoodScene(
         val eye = view.eye
         val focus = view.focus
         leaveOutFar(eye.x, eye.z)
+        placeHouseDetail()
         camera.position.set(eye.x, eye.y, eye.z)
         camera.lookAt(focus.x, focus.y, focus.z)
         // The sun's shadows are worked out around the character, where they matter, so they stay sharp.

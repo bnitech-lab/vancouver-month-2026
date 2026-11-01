@@ -190,13 +190,20 @@ external class InstancedMesh(geometry: BufferGeometry, material: Material, count
     /** Every copy's place, size and turn, sixteen numbers each, column by column, to change while it moves. */
     val instanceMatrix: InstanceMatrices
 
+    /** How many of the copies are drawn, the first ones, up to as many as it was made for. */
+    var count: Int
+
     /** Every copy's colour, once [setColorAt] has given one; after a change, its `needsUpdate` sends them again. */
     val instanceColor: InstanceColours?
 }
 
-/** The numbers behind [InstancedMesh.instanceColor]: [needsUpdate] sends changed colours to the graphics card. */
+/**
+ * The numbers behind [InstancedMesh.instanceColor]: [needsUpdate] sends changed colours to the graphics card, and
+ * [addUpdateRange] narrows the next send to [count] numbers from [start].
+ */
 external interface InstanceColours {
     var needsUpdate: Boolean
+    fun addUpdateRange(start: Int, count: Int)
 }
 
 /**
