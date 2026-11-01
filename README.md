@@ -249,7 +249,7 @@ nearest, as in "지도: 내 방 근처", or, more than 40 squares from any of th
 | Tap a shared bike or e-scooter | The character walks up to it, and a card offers where to ride it, each place with its fare; it rides to the one chosen |
 | Tap 자전거 타기 or 퀵보드 타기 on the top card, once bought | The character gets on; 내리기 gets off |
 | Tap a SkyTrain station, a bus stop or a water bus dock | The character walks there, and a card offers where to go from it |
-| Tap 택시 부르기 on the top card | A card offers every place a taxi goes, each with its fare, before anything is paid |
+| Tap 택시 부르기 on the top card | A card offers every place a taxi goes, each with its fare, before anything is paid; at a place or the bike shop the talk opens on getting out |
 | Tap the small map | It shows the whole map larger; a tap or Escape brings the small one back |
 
 The city's buildings never get in the way. One that stands between the camera and the character, or fills the view
@@ -340,7 +340,9 @@ each fare: $4 and $1.50 for every ten squares
 along the streets up to 160 squares and $0.70 for every ten past that, to the dollar (downtown to Burnaby is about $45;
 the meter stops at $60); a taxi appears where the
 character stands and drives there fast, faster still on a long ride (up to 24 squares a second, so Burnaby to downtown
-takes about 20 seconds), and its 내리기 lets the character out on the way. A fare is paid through core
+takes about 20 seconds), and its 내리기 lets the character out on the way. Out at the door of a place or the bike shop,
+the character turns to the person there and the talk opens, as off a shared ride; out early or at a station, nothing
+opens. A fare is paid through core
 when the ride sets off and only then, heads the next action's log ("수상버스를 탔어요. -$4", "택시를 탔어요. -$12"), is kept
 in the record (w and t: letters of their own, which needed no new version; a month kept before version 4, v0.17, does
 not go on), and is refused with the

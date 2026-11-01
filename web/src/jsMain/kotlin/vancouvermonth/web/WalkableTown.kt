@@ -163,13 +163,14 @@ interface WalkableTown {
     /**
      * Sets off on [transport] from stop [from] to stop [to] (for a taxi, from where the character stands to the place
      * [to]): off whatever the character rode, into the vehicle, and out at [to]'s stop, where [onTravelled] is called.
+     * Out of a taxi at one of the places or the bike shop, the talk there then opens, as at the end of a walk there.
      */
     fun travel(transport: Transport, from: Int, to: Int)
 
     /** Stops the walk under way where the character is, as for calling a taxi. */
     fun standStill()
 
-    /** Gets out of the taxi where it is now: the character stands there on foot, and the taxi drives on. */
+    /** Gets out of the taxi where it is now: the character stands there on foot, the taxi drives on, nothing opens. */
     fun leaveTaxi()
 
     /** Called once if the town stops drawing, so the game can go on with buttons. */
@@ -1497,6 +1498,7 @@ internal class NeighbourhoodScene(
         val now = window.performance.now()
         journey = made
         journeyStarted = now
+        cameraMovedOnWalk = false
         if (transport == Transport.SKYTRAIN) {
             val scheduled = SkyTrainRun.shiftAt(lifeNow) + runStand
             // The line's own train already standing at the station is the one boarded; elsewhere it comes in faded.
@@ -1613,6 +1615,11 @@ internal class NeighbourhoodScene(
                 leavingStarted = journeyStarted
                 heading = (going.way.turnAt(going.stopAt) + PI / 2)
                 stepOut(going.out)
+                // A taxi drops the character at the door it was paid to: the talk there opens, as off a shared ride.
+                if (going.transport == Transport.TAXI) {
+                    opensOnArrival = true
+                    reach(going.out, rode = true)
+                }
             } else {
                 followRide(going, elapsed)
             }
@@ -2774,9 +2781,8 @@ internal class NeighbourhoodScene(
     }
 
     /**
-     * At a place's person the character turns to them; at the end of a walk the player sent, the place opens. Unless
-     * the player moved the camera on the way, it comes round to the street side of the place's door, looking at its
-     * front along the street rather than down between the towers.
+     * The end of a walk or a shared ride at [end]: a rental or a stop the player was on the way to is offered; otherwise
+     * the character has reached whatever is there ([reach]).
      */
     private fun arrive(end: Spot) {
         val rode = rideTo != null
@@ -2795,6 +2801,16 @@ internal class NeighbourhoodScene(
             onStop(stop)
             return
         }
+        reach(end, rode)
+    }
+
+    /**
+     * At a place's person the character turns to them, and so it does at the door of a place it [rode] to; at the end of
+     * a walk the player sent, or a ride, the place opens. Unless the player moved the camera on the way, it comes round
+     * to the street side of the place's door, looking at its front along the street rather than down between the towers.
+     * Nothing happens where there is no place: at a station, or on an open street.
+     */
+    private fun reach(end: Spot, rode: Boolean) {
         if (Neighbourhood.isAtShop(end)) {
             val shop = Neighbourhood.shop
             if (rode || distanceBetween(end, shop.talkSpot) <= Neighbourhood.REACH) {

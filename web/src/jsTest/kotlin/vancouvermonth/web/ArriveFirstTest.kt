@@ -3,6 +3,7 @@ package vancouvermonth.web
 import kotlin.js.Date
 import kotlin.js.Promise
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -444,7 +445,7 @@ class ArriveFirstTest {
     }
 
     @Test
-    fun `a taxi to the place stands the character at its door, and then the name opens the talk and the action works`():
+    fun `a taxi to the place opens its talk as it lets the character out, turned to the door, and the action works`():
         Promise<Unit> {
         val town = open(zone = 3)
         val cafe = HomeSite.of(3).venue(Place.SLOPE_CAFE)
@@ -456,15 +457,46 @@ class ArriveFirstTest {
                 goButton(Place.SLOPE_CAFE.label).click()
                 assertEquals(Transport.TAXI, town.travelling)
                 assertNull(going(), "still on the way on foot: $screen")
+                assertNull(talk(), "a talk from the taxi: $screen")
             },
-            Step("out at its door: no talk yet, as ever", { town.travelling == null && town.isStill }) {
+            Step("out at its door: 마테오 talks, the camera on its street side", { town.travelling == null && town.isStill }) {
                 assertEquals(cafe.door, town.characterSpot)
                 assertTrue(town.isAt(Place.SLOPE_CAFE))
-                assertNull(talk(), "a talk from the taxi: $screen")
-                tapName(Place.SLOPE_CAFE)
+                assertEquals("마테오", talk()?.getAttribute("aria-label"), screen)
+                assertSame(talk(), document.activeElement)
+                assertEquals(PI, abs(town.cameraTurn), 1e-9)
+                assertEquals(FollowCamera.ARRIVAL_TILT, town.cameraTilt, 1e-9)
                 assertFalse(answer().disabled, answer().textContent)
                 answer().click()
                 assertTrue("체력 2/5" in hud(), hud())
+            },
+        )
+    }
+
+    @Test
+    fun `getting out of the taxi early opens nothing, nor does a taxi to a station`(): Promise<Unit> {
+        val town = open(zone = 3)
+        val home = HomeSite.of(3).venue(Place.HOME)
+        val station = TransitLines.taxiStopsFor(3).first { it.first == Transit.STATIONS[7] }
+        return play(
+            Step("a taxi toward a far office", { town.isStill }) {
+                root.button(Transit.CALL_TAXI).click()
+                goButton(Place.OFFICE.label).click()
+                assertEquals(Transport.TAXI, town.travelling)
+            },
+            Step("내리기 on the way", { distanceBetween(town.characterSpot, home.door) > 5.0 }) {
+                root.button(Riding.GET_OFF).click()
+                assertNull(town.travelling)
+                assertNull(talk(), "a talk on the street: $screen")
+            },
+            Step("a taxi to a station", { town.isStill }) {
+                root.button(Transit.CALL_TAXI).click()
+                goButton(station.first).click()
+                assertEquals(Transport.TAXI, town.travelling)
+            },
+            Step("out at the station: nobody to talk to", { town.travelling == null && town.isStill }) {
+                assertEquals(station.second, town.characterSpot)
+                assertNull(talk(), "a talk at the station: $screen")
             },
         )
     }
