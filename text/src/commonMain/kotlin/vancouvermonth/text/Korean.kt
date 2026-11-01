@@ -45,9 +45,11 @@ fun cheapestLine(game: FirstMinute, reveal: Reveal): String =
 fun guessLine(reveal: Reveal): String =
     if (reveal.guessGap == 0) "짐작이 정확해요." else "내 짐작과 차이 ${money(reveal.guessGap)}"
 
-/** How the guess pays, in Dawn's words: "맞힐수록 최대 $100을 더 받고, 틀린 만큼 잃어요(최대 $300)." */
-fun guessRuleLine(): String =
-    "맞힐수록 최대 ${money(FirstMinute.GUESS_REWARD)}을 더 받고, 틀린 만큼 잃어요(최대 ${money(FirstMinute.GUESS_PENALTY)})."
+/** How the guess pays, in one line: "맞힐수록 최대 $100을 더 받고, $100보다 더 틀리면 그만큼 잃어요(최대 $300)." */
+fun guessRuleLine(): String {
+    val reward = money(FirstMinute.GUESS_REWARD)
+    return "맞힐수록 최대 ${reward}을 더 받고, ${reward}보다 더 틀리면 그만큼 잃어요(최대 ${money(FirstMinute.GUESS_PENALTY)})."
+}
 
 /** The rule worked out for three guesses, from core: "딱 맞히면 +$100, $100 틀리면 $0, $250 틀리면 -$150". */
 fun guessExamplesLine(): String = listOf(0, 100, 250).joinToString(", ") { gap ->

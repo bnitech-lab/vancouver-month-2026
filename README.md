@@ -61,8 +61,8 @@ BNI Tech
   2) 월세   $970   교통 3구역   공과금 별도
   3) 월세 $1,020   교통 2구역   공과금 포함
 
-방값 짐작: 방을 고른 뒤 그 방의 한 달 총비용을 짐작해 적어요.
-           맞힐수록 최대 $100을 더 받고, 틀린 만큼 잃어요(최대 $300).
+총비용 짐작: 방을 고른 뒤 그 방의 한 달 총비용을 짐작해 적어요.
+             맞힐수록 최대 $100을 더 받고, $100보다 더 틀리면 그만큼 잃어요(최대 $300).
 
 어느 방? (1-3) > 2
 이 방의 한 달 총비용은 얼마일까요? ($) > 1300
@@ -361,8 +361,9 @@ itself, since the intro has just said the same. The button screen has no card, s
 ### The intro
 
 The page opens on an intro: the title with the version, 업데이트 소식 and the sound switch; the arrival story (September
-1st, $3,000, the goal, a room first); how to play, in the same six lines as the "?" card; how the guess pays, in Dawn's
-words ("맞힐수록 최대 $100을 더 받고, 틀린 만큼 잃어요(최대 $300).") with three worked examples; and the map's credit.
+1st, $3,000, the goal, a room first); how to play, in the same six lines as the "?" card; how the guess pays, in one
+line ("맞힐수록 최대 $100을 더 받고, $100보다 더 틀리면 그만큼 잃어요(최대 $300).") with three worked examples; and the
+map's credit.
 시작하기 sits in a bar held at the foot of the screen, so it is in sight on a 375 x 812 or 320 x 568 phone and on one
 turned on its side, however long the rest; it leads to the rooms. With a month kept for the run, the intro opens with it
 and offers 이어하기 and 새로 시작 instead (see Continuing a month). 다시 하기 on the ending goes straight to a new run's

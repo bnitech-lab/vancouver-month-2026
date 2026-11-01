@@ -197,9 +197,9 @@ class TerminalGameTest {
     fun `the first screen says how the guess pays before asking for it`() {
         val (_, screen) = playWith(4821)
         val lines = screen.lines()
-        val rule = lines.indexOf("           맞힐수록 최대 \$100을 더 받고, 틀린 만큼 잃어요(최대 \$300).")
+        val rule = lines.indexOf("             맞힐수록 최대 \$100을 더 받고, \$100보다 더 틀리면 그만큼 잃어요(최대 \$300).")
         assertTrue(rule > lines.indexOfFirst { it.startsWith("  3) ") }, screen)
-        assertEquals("방값 짐작: 방을 고른 뒤 그 방의 한 달 총비용을 짐작해 적어요.", lines[rule - 1])
+        assertEquals("총비용 짐작: 방을 고른 뒤 그 방의 한 달 총비용을 짐작해 적어요.", lines[rule - 1])
         assertTrue(rule < lines.indexOfFirst { it.startsWith("어느 방?") }, screen)
     }
 

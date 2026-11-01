@@ -95,7 +95,7 @@ class IntroTest {
         assertEquals(Guide.TITLE, text(".intro .how-to h2"))
         assertEquals(Intro.GUESS, text(".intro .guess-pays h2"))
         assertTrue(Intro.GUESS_WHAT in text(".intro .guess-pays"))
-        assertEquals("맞힐수록 최대 \$100을 더 받고, 틀린 만큼 잃어요(최대 \$300).", text(".intro .guess-rule-line"))
+        assertEquals("맞힐수록 최대 \$100을 더 받고, \$100보다 더 틀리면 그만큼 잃어요(최대 \$300).", text(".intro .guess-rule-line"))
         assertEquals(guessRuleLine(), text(".intro .guess-rule-line"))
         assertEquals(guessExamplesLine(), text(".intro .guess-examples"))
         val intro = assertNotNull(root.querySelector(".intro"))

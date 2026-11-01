@@ -99,9 +99,9 @@ class TerminalGame(
         line()
         game.rooms.forEachIndexed { index, room -> line("  ${index + 1}) ${describe(room)}") }
         line()
-        // "방값 짐작: " takes 11 columns.
-        line("방값 짐작: ${Intro.GUESS_WHAT}")
-        line("           ${guessRuleLine()}")
+        // "총비용 짐작: " takes 13 columns.
+        line("총비용 짐작: ${Intro.GUESS_WHAT}")
+        line("             ${guessRuleLine()}")
         line()
     }
 

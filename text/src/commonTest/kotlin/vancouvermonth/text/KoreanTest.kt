@@ -261,8 +261,8 @@ class KoreanTest {
     }
 
     @Test
-    fun `how the guess pays is said in Dawn's words, and worked out from core for three guesses`() {
-        assertEquals("맞힐수록 최대 \$100을 더 받고, 틀린 만큼 잃어요(최대 \$300).", guessRuleLine())
+    fun `how the guess pays is said in one line, and worked out from core for three guesses`() {
+        assertEquals("맞힐수록 최대 \$100을 더 받고, \$100보다 더 틀리면 그만큼 잃어요(최대 \$300).", guessRuleLine())
         assertEquals("딱 맞히면 +\$100, \$100 틀리면 \$0, \$250 틀리면 -\$150", guessExamplesLine())
         assertEquals(Intro.GUESS_WHAT, "방을 고른 뒤 그 방의 한 달 총비용을 짐작해 적어요.")
         for (line in listOf(guessRuleLine(), guessExamplesLine(), Intro.GUESS_WHAT, Intro.GUESS, Intro.START)) {

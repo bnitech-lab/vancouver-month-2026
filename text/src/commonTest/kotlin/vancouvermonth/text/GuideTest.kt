@@ -19,13 +19,15 @@ class GuideTest {
     fun `how to play says how to walk, dash, look about, talk, ride and find the way, in six short lines`() {
         assertEquals(6, Guide.LINES.size)
         assertTrue("땅을 누르면" in Guide.LINES[0] && "두 번 누르면" in Guide.LINES[0])
-        assertTrue("끌면" in Guide.LINES[1] && "두 손가락" in Guide.LINES[1])
+        assertTrue("끌면" in Guide.LINES[1] && "벌리면" in Guide.LINES[1] && "모으면" in Guide.LINES[1])
         assertTrue("말을 걸어요" in Guide.LINES[2] && "하루가 끝나요" in Guide.LINES[2])
         for (ride in listOf("스카이트레인", "버스", "수상버스")) assertTrue(ride in Guide.LINES[3], ride)
         for (ride in listOf("자전거", "택시")) assertTrue(ride in Guide.LINES[4], ride)
+        // The shop sells; shared bikes are rented on the street.
+        assertTrue("길에서 빌리고" in Guide.LINES[4])
         assertTrue("작은 지도" in Guide.LINES[5])
         for (line in Guide.LINES) {
-            assertTrue(line.length <= 40, "Too long for a phone: $line")
+            assertTrue(line.length <= 40, "More than 40 characters: $line")
             assertFalse('\u2014' in line, "Em dash in: $line")
         }
     }

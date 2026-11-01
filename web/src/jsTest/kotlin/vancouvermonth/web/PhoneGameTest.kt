@@ -228,7 +228,7 @@ class PhoneGameTest {
     @Test
     fun `the guess's form says how the guess pays, and the field is described by it`() {
         open(1011)
-        assertEquals("맞힐수록 최대 \$100을 더 받고, 틀린 만큼 잃어요(최대 \$300).", text(".guess .guess-rule"))
+        assertEquals("맞힐수록 최대 \$100을 더 받고, \$100보다 더 틀리면 그만큼 잃어요(최대 \$300).", text(".guess .guess-rule"))
         assertEquals("guess-rule", root.querySelector("#guess")?.getAttribute("aria-describedby"))
     }
 
