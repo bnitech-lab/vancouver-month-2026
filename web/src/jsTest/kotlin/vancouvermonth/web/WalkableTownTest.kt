@@ -31,6 +31,7 @@ import org.w3c.dom.pointerevents.PointerEventInit
 import vancouvermonth.core.Action
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.Month
+import vancouvermonth.core.SharedFare
 import vancouvermonth.core.Spending
 import vancouvermonth.save.Choice
 import vancouvermonth.save.MonthRecord
@@ -39,6 +40,7 @@ import vancouvermonth.text.Continue
 import vancouvermonth.text.actionName
 import vancouvermonth.text.money
 import vancouvermonth.text.Passer
+import vancouvermonth.text.Shop
 import vancouvermonth.text.Transit
 import vancouvermonth.text.Transport
 import vancouvermonth.text.Weather
@@ -1648,12 +1650,19 @@ class WalkableTownTest {
         )
     }
 
+    /** The button on the open card asking where to go that goes to [name]. */
+    private fun goButton(name: String): HTMLButtonElement =
+        root.querySelectorAll(".chooser .go").asList().map { it as HTMLButtonElement }
+            .firstOrNull { it.querySelector(".action-name")?.textContent == name } ?: error("No $name: $screen")
+
     @Test
-    fun `a tap on a shared e-scooter walks up to it, pays its fare once there, and a talk puts it back`():
+    fun `a tap on a shared e-scooter walks up to it and asks where to, and the place chosen is ridden to, paid once`():
         Promise<Unit> {
         val town = startInTown()
         val index = Rides.shared.indexOfFirst { it.vehicle == Vehicle.E_SCOOTER }
         val scooter = Rides.shared[index]
+        val shop = TransitLines.taxiStopsFor(1).first { it.first == Shop.NAME }.second
+        var fare = 0
         return play(
             Step("stand a few steps east of it, looking west at it", { town.isStill }) {
                 town.standAt(Spot(scooter.spot.x + 3.5, scooter.spot.z + 0.4))
@@ -1666,21 +1675,78 @@ class WalkableTownTest {
                 assertNull(town.riding)
                 assertTrue(money(firstBalance) in hud(), hud())
             },
-            Step("reached it", { town.riding != null }) {
-                assertEquals(Ride.SHARED_E_SCOOTER, town.riding)
+            Step("reached it: where to?", { root.querySelector(".chooser") != null }) {
+                assertNull(town.riding, "on it before a place was chosen")
                 assertTrue(distanceBetween(town.characterSpot, scooter.spot) < 0.05, "${town.characterSpot}")
+                assertTrue(town.isParkedShown(index))
+                assertTrue(money(firstBalance) in hud(), "paid before choosing: ${hud()}")
+                // Every place on the card at its way's fare from here.
+                for ((name, door) in TransitLines.taxiStopsFor(1)) {
+                    val squares = town.taxiDistance(door) ?: continue
+                    val shown = goButton(name).querySelector(".action-effect")?.textContent
+                    assertEquals(money(SharedFare.E_SCOOTER.forDistance(squares)), shown, name)
+                }
+                fare = SharedFare.E_SCOOTER.forDistance(assertNotNull(town.taxiDistance(shop)))
+                goButton(Shop.NAME).click()
+                assertEquals(Ride.SHARED_E_SCOOTER, town.riding)
                 assertFalse(town.isParkedShown(index), "the rented one still stands on its corner")
                 assertTrue(town.isRideDrawn(Ride.SHARED_E_SCOOTER))
-                assertTrue(money(firstBalance - 4) in hud(), hud())
-                assertEquals("공유 퀵보드 타는 중 · -\$4", root.querySelector(".hud-riding")?.textContent)
+                assertTrue(money(firstBalance - fare) in hud(), hud())
+                assertEquals("공유 퀵보드 타는 중 · -${money(fare)}", root.querySelector(".hud-riding")?.textContent)
+                assertEquals(shop, town.markerSpot)
             },
-            Step("talk to the neighbour", { town.isStill }) {
-                talkTo(Place.HOME)
-                assertNull(town.riding)
+            Step("on the way, a tap goes nowhere else", {
+                town.riding != null && distanceBetween(town.characterSpot, scooter.spot) > 5.0
+            }) {
+                tapScreen(town, FramePoint(0.5, 0.45))
+                assertEquals(shop, town.markerSpot)
+                assertEquals(Ride.SHARED_E_SCOOTER, town.riding)
+            },
+            Step("there: off it, and it is back on its corner", { town.riding == null && town.isStill }) {
+                assertEquals(shop, town.characterSpot)
                 assertTrue(town.isParkedShown(index), "it did not go back")
                 assertFalse(town.isRideDrawn(Ride.SHARED_E_SCOOTER))
-                assertTrue(money(firstBalance - 4) in hud(), "paid more than once: ${hud()}")
-                assertNotNull(root.querySelector(".talk"))
+                assertTrue(money(firstBalance - fare) in hud(), "paid more than once: ${hud()}")
+                assertNull(root.querySelector(".hud-riding"))
+                assertTrue(fare in SharedFare.E_SCOOTER.base..SharedFare.E_SCOOTER.most, "$fare")
+            },
+        )
+    }
+
+    @Test
+    fun `내리기 on the way to a place gets off where the shared one is, and nothing more is paid`(): Promise<Unit> {
+        val town = startInTown()
+        val index = Rides.shared.indexOfFirst { it.vehicle == Vehicle.E_SCOOTER }
+        val scooter = Rides.shared[index]
+        val cafe = TransitLines.taxiStopsFor(1).first { it.first == Place.CAFE.label }.second
+        var fare = 0
+        var left: Spot? = null
+        return play(
+            Step("stand a few steps east of the e-scooter", { town.isStill }) {
+                town.standAt(Spot(scooter.spot.x + 3.5, scooter.spot.z + 0.4))
+                town.aimCamera(PI / 2, 0.6, 10.0)
+            },
+            Step("tap it", { town.isStill }) {
+                tapScreen(town, onScreen(town, Point(scooter.spot.x, 0.5, scooter.spot.z)))
+            },
+            Step("reached it: ride to the café", { root.querySelector(".chooser") != null }) {
+                fare = SharedFare.E_SCOOTER.forDistance(assertNotNull(town.taxiDistance(cafe)))
+                goButton(Place.CAFE.label).click()
+                assertEquals(Ride.SHARED_E_SCOOTER, town.riding)
+                assertTrue(money(firstBalance - fare) in hud(), hud())
+            },
+            Step("on the way, 내리기", { distanceBetween(town.characterSpot, scooter.spot) > 4.0 }) {
+                tap("내리기")
+                left = town.characterSpot
+                assertNull(town.riding)
+                assertNull(town.markerSpot, "it rode on")
+                assertTrue(town.isParkedShown(index))
+                assertTrue(money(firstBalance - fare) in hud(), hud())
+            },
+            Step("stands where it got off", after(300)) {
+                assertEquals(left, town.characterSpot)
+                assertTrue(distanceBetween(town.characterSpot, cafe) > 4.0)
+                assertTrue(money(firstBalance - fare) in hud(), "paid again: ${hud()}")
             },
         )
     }

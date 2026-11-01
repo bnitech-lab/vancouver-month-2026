@@ -17,6 +17,7 @@ import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.Item
 import vancouvermonth.core.Month
 import vancouvermonth.core.Reveal
+import vancouvermonth.core.SharedFare
 import vancouvermonth.core.Spending
 import vancouvermonth.core.TaxiFare
 import vancouvermonth.core.TodaysRun
@@ -155,6 +156,15 @@ class PhoneGame private constructor(
 
     /** What the ride under way cost, for the top card; null on the month's pass. */
     private var travelPaid: Int? = null
+
+    /**
+     * The shared bike or e-scooter the character stands by, while the card asking where to ride it is open, with the
+     * fare to each place a taxi goes ([TransitLines.taxiStopsFor]) worked out as it opened (null where it cannot go);
+     * and what the shared ride under way cost, for the top card.
+     */
+    private var renting: Ride? = null
+    private var rideFares: List<Int?> = emptyList()
+    private var ridePaid: Int? = null
 
     /** How many words each passerby has had on [chatsDay], so the same person says something new each time. */
     private val chats = mutableMapOf<Passer, Int>()
@@ -699,6 +709,7 @@ class PhoneGame private constructor(
         talkingAt = null
         atShop = false
         choosing = null
+        renting = null
         record = record?.after(choice)
         if (month.isOver) {
             slot?.clear()
@@ -731,7 +742,7 @@ class PhoneGame private constructor(
     private fun listenTo(town: WalkableTown) {
         playedInTown = true
         town.onPlace = { place ->
-            val open = place != talkingAt || chattingWith != null || atShop || choosing != null
+            val open = place != talkingAt || chattingWith != null || atShop || choosing != null || renting != null
             if (!dayChanging && town.travelling == null && open) talkTo(place)
         }
         town.onPasserby = { passer -> if (!dayChanging && town.travelling == null) chatWith(passer) }
@@ -751,6 +762,7 @@ class PhoneGame private constructor(
             talkingAt = null
             atShop = false
             choosing = null
+            renting = null
             travelPaid = null
             dayChanging = false
             show()
@@ -763,6 +775,7 @@ class PhoneGame private constructor(
         talkingAt = place
         atShop = false
         choosing = null
+        renting = null
         if (chattingWith != null) walkable?.endChat()
         chattingWith = null
         smallTalks = 0
@@ -781,7 +794,8 @@ class PhoneGame private constructor(
 
     /** True while a card lies over most of the town: a talk, a small talk or the guide on how to play. */
     private fun isTownCovered(): Boolean =
-        talkingAt != null || chattingWith != null || atShop || choosing != null || guide?.isOpen == true
+        talkingAt != null || chattingWith != null || atShop || choosing != null || renting != null ||
+            guide?.isOpen == true
 
     /**
      * A day in the town: the town fills the screen, the day's figures sit over its top, and a talk with a place's
@@ -837,8 +851,11 @@ class PhoneGame private constructor(
             val talking = talkingAt
             val chatting = chattingWith
             val where = choosing
+            val rentable = renting
             if (where != null) {
                 chooser(month, town, where)
+            } else if (rentable != null) {
+                rideChooser(month, town, rentable)
             } else if (atShop) {
                 shopTalk(month)
             } else if (talking != null) {
@@ -960,6 +977,7 @@ class PhoneGame private constructor(
         talkingAt = null
         atShop = false
         choosing = null
+        renting = null
         walkable?.getOff()
         if (current.day != chatsDay) {
             chats.clear()
@@ -1053,7 +1071,7 @@ class PhoneGame private constructor(
                 val now = if (fare == null) {
                     Riding.now(riding.vehicle.item, shared = false)
                 } else {
-                    Riding.rented(riding.vehicle.item, fare.price)
+                    Riding.rented(riding.vehicle.item, ridePaid ?: fare.price)
                 }
                 child("span", "hud-riding", now)
                 button("hud-ride-button", text = Riding.GET_OFF) {
@@ -1123,7 +1141,62 @@ class PhoneGame private constructor(
     private fun HTMLElement.chooser(month: Month, town: WalkableTown, transport: Transport) {
         val from = choosingFrom
         val fromName = if (from >= 0) TransitLines.nameOf(Stop(transport, from)) else null
-        val title = Transit.title(transport, fromName)
+        val empty = if (transport == Transport.TAXI && taxiFares.all { it == null }) Transit.NOWHERE else null
+        val stop = { choosing = null }
+        whereTo(Transit.title(transport, fromName), Transit.where(transport), empty, stop) {
+            for (index in 0 until TransitLines.count(transport)) {
+                // A bus goes only along its own line.
+                if (index == from || !TransitLines.joins(transport, from, index)) continue
+                val fare = if (transport == Transport.TAXI) taxiFares.getOrNull(index) ?: continue else 0
+                val kind = transport.fare
+                val amount = if (kind == null) 0 else if (transport == Transport.TAXI) fare else kind.price
+                val blocked = kind?.let { month.spendBlockedBy(it, amount) }
+                button("keyword go") {
+                    disabled = blocked != null
+                    child("span", "action-name", TransitLines.nameOf(Stop(transport, index)))
+                    child("span", "action-effect", Transit.fare(transport, amount))
+                    if (blocked != null) child("span", "action-why", Transit.cannotPay(blocked))
+                    onclick = { go(month, town, transport, from, index, amount) }
+                }
+            }
+        }
+    }
+
+    /**
+     * Where to ride the shared [ride] from here: each place a taxi goes with its fare by the way there, or why it cannot
+     * be paid now, and 그만. A place it cannot reach, or one right here, is left out.
+     */
+    private fun HTMLElement.rideChooser(month: Month, town: WalkableTown, ride: Ride) {
+        val kind = ride.fare ?: return
+        val fare = SharedFare.of(kind) ?: return
+        val empty = if (rideFares.all { it == null }) Riding.NOWHERE else null
+        val stop = { renting = null }
+        whereTo(Riding.shared(ride.vehicle.item), Riding.where(fare), empty, stop) {
+            for ((index, place) in TransitLines.taxiStopsFor(town.homeZone).withIndex()) {
+                val amount = rideFares.getOrNull(index) ?: continue
+                val blocked = month.spendBlockedBy(kind, amount)
+                button("keyword go") {
+                    disabled = blocked != null
+                    child("span", "action-name", place.first)
+                    child("span", "action-effect", money(amount))
+                    if (blocked != null) child("span", "action-why", Transit.cannotPay(blocked))
+                    onclick = { rideOff(month, town, ride, place.second, amount) }
+                }
+            }
+        }
+    }
+
+    /**
+     * A card over the town that asks where to go, as a talk opens: [title], the [line] under it, [empty] when there is
+     * nowhere to go, the places [rows] adds, and 그만, which closes it after [stop].
+     */
+    private fun HTMLElement.whereTo(
+        title: String,
+        line: String,
+        empty: String?,
+        stop: () -> Unit,
+        rows: HTMLElement.() -> Unit,
+    ) {
         child("section", "talk chooser") {
             setAttribute("role", "dialog")
             setAttribute("aria-label", title)
@@ -1138,29 +1211,13 @@ class PhoneGame private constructor(
             child("p", "talk-name") {
                 child("strong", text = title)
             }
-            child("p", "talk-line", Transit.where(transport))
-            if (transport == Transport.TAXI && taxiFares.all { it == null }) child("p", "chooser-empty", Transit.NOWHERE)
-            child("div", "keywords chooser-list") {
-                for (index in 0 until TransitLines.count(transport)) {
-                    // A bus goes only along its own line.
-                    if (index == from || !TransitLines.joins(transport, from, index)) continue
-                    val fare = if (transport == Transport.TAXI) taxiFares.getOrNull(index) ?: continue else 0
-                    val kind = transport.fare
-                    val amount = if (kind == null) 0 else if (transport == Transport.TAXI) fare else kind.price
-                    val blocked = kind?.let { month.spendBlockedBy(it, amount) }
-                    button("keyword go") {
-                        disabled = blocked != null
-                        child("span", "action-name", TransitLines.nameOf(Stop(transport, index)))
-                        child("span", "action-effect", Transit.fare(transport, amount))
-                        if (blocked != null) child("span", "action-why", Transit.cannotPay(blocked))
-                        onclick = { go(month, town, transport, from, index, amount) }
-                    }
-                }
-            }
+            child("p", "talk-line", line)
+            if (empty != null) child("p", "chooser-empty", empty)
+            child("div", "keywords chooser-list") { rows() }
             child("div", "keywords") {
                 button("keyword", text = Transit.STOP) {
                     onclick = {
-                        choosing = null
+                        stop()
                         focusNext = ".hud"
                         show()
                     }
@@ -1184,11 +1241,12 @@ class PhoneGame private constructor(
         show()
     }
 
-    /** Closes whatever talk is open: a place's, a passerby's or the shop keeper's. */
+    /** Closes whatever talk is open: a place's, a passerby's or the shop keeper's, or a card asking where to go. */
     private fun closeTalks() {
         talkingAt = null
         atShop = false
         choosing = null
+        renting = null
         if (chattingWith != null) walkable?.endChat()
         chattingWith = null
     }
@@ -1277,21 +1335,47 @@ class PhoneGame private constructor(
     }
 
     /**
-     * Rents a shared bike or e-scooter for [ride]'s fare, and the character gets on; or says why it cannot. The fare is
-     * paid only when the town will get on it, so a fare is never paid for a ride not taken.
+     * At a shared bike or e-scooter: opens where to ride it, as a talk opens, each place with its fare by the way there
+     * from where the character stands; or says why it cannot be rented, when even the cheapest place's fare cannot be
+     * paid. Nothing is paid until a place is chosen ([rideOff]).
      */
     private fun rent(ride: Ride) {
         val current = month ?: return
         val town = walkable ?: return
-        val fare = ride.fare ?: return
+        val kind = ride.fare ?: return
+        val fare = SharedFare.of(kind) ?: return
         if (!town.canRide(ride)) return
-        val blocked = current.spendBlockedBy(fare)
-        if (blocked != null) {
-            rideNote = Riding.cannotRent(fare, blocked)
-        } else if (pay(current, fare)) {
-            rideNote = null
-            town.ride(ride)
+        val fares = TransitLines.taxiStopsFor(town.homeZone).map { (_, spot) ->
+            town.taxiDistance(spot)?.let { fare.forDistance(it) }
         }
+        val blocked = current.spendBlockedBy(kind, fares.filterNotNull().minOrNull() ?: fare.base)
+        if (blocked != null) {
+            rideNote = Riding.cannotRent(kind, blocked)
+            show()
+            return
+        }
+        closeTalks()
+        rideNote = null
+        renting = ride
+        rideFares = fares
+        talkOpened = window.performance.now()
+        focusNext = ".talk"
+        sound?.blip()
+        show()
+    }
+
+    /**
+     * Rides the shared [ride] to [to] for [fare], the fare its card showed: paid first through the month's rules, and
+     * only when the town can set off there, so a fare is never paid for a ride not taken. No day goes by.
+     */
+    private fun rideOff(month: Month, town: WalkableTown, ride: Ride, to: Spot, fare: Int) {
+        val kind = ride.fare ?: return
+        if (dayChanging || renting != ride || !town.canRideTo(ride, to)) return
+        if (!pay(month, kind, fare)) return
+        renting = null
+        ridePaid = fare
+        town.rideTo(ride, to)
+        focusNext = ".hud-ride-button"
         show()
     }
 

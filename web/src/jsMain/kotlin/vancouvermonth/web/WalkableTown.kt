@@ -58,7 +58,8 @@ interface WalkableTown {
 
     /**
      * Called when the character reaches a shared bike or e-scooter the player tapped, with the ride it would be. The
-     * game pays the fare and calls [ride] with it, or says why it cannot.
+     * game offers where to ride it, each place with its fare by the way there ([taxiDistance]), pays the fare of the
+     * place chosen and calls [rideTo]; or says why it cannot.
      */
     var onRent: (Ride) -> Unit
 
@@ -80,6 +81,19 @@ interface WalkableTown {
     fun ride(ride: Ride)
 
     /**
+     * True when [ride], the shared one the character has just reached, would take it to [to] now: [canRide], and a way
+     * there along the streets. The game pays the fare for [to] only when this is true.
+     */
+    fun canRideTo(ride: Ride, to: Spot): Boolean = canRide(ride)
+
+    /**
+     * Gets on [ride], the shared one the character has just reached, and rides it to [to] along the way its fare was
+     * worked out for ([taxiDistance]). There the character gets off, the shared one goes back, and [onTravelled] is
+     * called; on the way the town takes no taps, and [getOff] gets off where it is.
+     */
+    fun rideTo(ride: Ride, to: Spot) = ride(ride)
+
+    /**
      * Gets off and goes on foot: a shared bike or e-scooter goes back where it was rented. A walk on its way goes on
      * at walking pace. The game asks for this whenever a talk opens; the town does it itself when the day ends.
      */
@@ -91,7 +105,10 @@ interface WalkableTown {
      */
     var onStop: (Stop) -> Unit
 
-    /** Called when a ride on the SkyTrain, a bus, the water bus or a taxi is over: the character is on foot again. */
+    /**
+     * Called when a ride on the SkyTrain, a bus, the water bus or a taxi is over, or a shared one ridden to a place got
+     * there: the character is on foot again.
+     */
     var onTravelled: () -> Unit
 
     /**
@@ -100,7 +117,10 @@ interface WalkableTown {
      */
     val travelling: Transport?
 
-    /** How far a taxi from where the character stands drives to [to], along the streets; null when it cannot get there. */
+    /**
+     * How far a taxi from where the character stands drives to [to], along the streets, and a shared bike or e-scooter
+     * rides; null when it cannot get there.
+     */
     fun taxiDistance(to: Spot): Double?
 
     /**
@@ -426,11 +446,14 @@ internal class NeighbourhoodScene(
     private var rentedFrom = -1
 
     /**
-     * The shared one the character is on its way to, to rent on arrival; and the one it has reached, while the game is
-     * asked to pay for it. -1 for none.
+     * The shared one the character is on its way to, to rent on arrival; and the one it has reached and stands by,
+     * while the game offers where to ride it. -1 for none.
      */
     private var rentAt = -1
     private var renting = -1
+
+    /** Where the shared one ridden now goes, the place its fare was paid for; null for none. */
+    private var rideTo: Spot? = null
 
     /** The station, stop or dock the character is on its way to, by its place in [TransitLines.tapStops]; -1 for none. */
     private var stopAt = -1
@@ -926,7 +949,7 @@ internal class NeighbourhoodScene(
             label.style.top = "0"
             label.onclick = {
                 touched()
-                if (nightFell == null && journey == null) goTalk(venue.place, dash = false)
+                if (nightFell == null && journey == null && rideTo == null) goTalk(venue.place, dash = false)
             }
             element.appendChild(label)
             labels[venue.place] = label
@@ -939,7 +962,7 @@ internal class NeighbourhoodScene(
         shopLabel.style.top = "0"
         shopLabel.onclick = {
             touched()
-            if (nightFell == null && journey == null) goToShop(dash = false)
+            if (nightFell == null && journey == null && rideTo == null) goToShop(dash = false)
         }
         element.appendChild(shopLabel)
     }
@@ -1022,6 +1045,7 @@ internal class NeighbourhoodScene(
         getOff()
         endJourney()
         rentAt = -1
+        renting = -1
         stopAt = -1
         trip = null
         marker.visible = false
@@ -1051,8 +1075,26 @@ internal class NeighbourhoodScene(
 
     override fun canRide(ride: Ride): Boolean {
         if (sitting || nightFell != null || this.ride != null || journey != null) return false
-        // A shared one only as the character reaches it, and of its kind.
+        // A shared one only while the character stands by the one it reached, and of its kind.
         return !ride.shared || (renting >= 0 && Rides.shared[renting].vehicle == ride.vehicle)
+    }
+
+    override fun canRideTo(ride: Ride, to: Spot): Boolean = canRide(ride) && (!ride.shared || taxiWay(to) != null)
+
+    override fun rideTo(ride: Ride, to: Spot) {
+        if (!ride.shared || !canRideTo(ride, to)) return
+        val way = taxiWay(to) ?: return
+        ride(ride)
+        // Along the very way the fare was worked out for, so the way paid for is the way ridden.
+        rideTo = to
+        tripDash = false
+        trip = Trip(way, paceFor(dash = false))
+        tripStarted = window.performance.now()
+        opensOnArrival = false
+        cameraMovedOnWalk = false
+        marker.position.set(to.x, 0.0, to.z)
+        marker.visible = true
+        askForFrame()
     }
 
     override fun ride(ride: Ride) {
@@ -1079,7 +1121,14 @@ internal class NeighbourhoodScene(
         for (mesh in rideMeshes) mesh.visible = false
         if (rentedFrom >= 0) showParked(rentedFrom, true)
         rentedFrom = -1
-        goOnFromHere()
+        if (rideTo != null) {
+            // Off a shared one on its way to a place: the character stands where it got off.
+            rideTo = null
+            trip = null
+            marker.visible = false
+        } else {
+            goOnFromHere()
+        }
         touched()
         askForFrame()
     }
@@ -1123,6 +1172,7 @@ internal class NeighbourhoodScene(
         trip = null
         marker.visible = false
         rentAt = -1
+        renting = -1
         stopAt = -1
         // A vehicle still going on from the last ride gives way to this one, rather than stand still in the street.
         if (leaving != null) {
@@ -1201,6 +1251,7 @@ internal class NeighbourhoodScene(
         trip = null
         marker.visible = false
         rentAt = -1
+        renting = -1
         stopAt = -1
         askForFrame()
     }
@@ -1531,6 +1582,7 @@ internal class NeighbourhoodScene(
     internal fun standAt(spot: Spot) {
         trip = null
         marker.visible = false
+        renting = -1
         this.spot = spot
         view.jumpTo(Point(spot.x, FOCUS_HEIGHT, spot.z))
         askForFrame()
@@ -1769,7 +1821,7 @@ internal class NeighbourhoodScene(
      */
     private fun tap(x: Double, y: Double) {
         val frame = canvas.getBoundingClientRect()
-        if (frame.width == 0.0 || frame.height == 0.0 || nightFell != null || journey != null) return
+        if (frame.width == 0.0 || frame.height == 0.0 || nightFell != null || journey != null || rideTo != null) return
         val dash = taps.isDouble(window.performance.now(), x, y)
         // The passersby can be tapped while they are out.
         val boxes = if (crowd.visible) passersby.map { Passerby.boxAround(it.spot) } else emptyList()
@@ -1886,18 +1938,21 @@ internal class NeighbourhoodScene(
         stopAt = index
     }
 
-    /** At the shared one [index]: asks the game to pay its fare, which gets the character on it. */
+    /**
+     * At the shared one [index]: the character stands by it, and the game is asked where to ride it, which gets the
+     * character on it.
+     */
     private fun askToRent(index: Int) {
         rentAt = -1
         renting = index
         onRent(Ride.shared(Rides.shared[index].vehicle))
-        renting = -1
     }
 
     /** Starts a trip to [target] at the pace the character goes now, unless it is there. True when it set off. */
     private fun walkTo(target: Spot, dash: Boolean, opensOnArrival: Boolean): Boolean {
         if (sitting) return false
         rentAt = -1
+        renting = -1
         stopAt = -1
         val route = site.grid.route(spot, target)
         if (route.size < 2) return false
@@ -2301,6 +2356,12 @@ internal class NeighbourhoodScene(
      * front along the street rather than down between the towers.
      */
     private fun arrive(end: Spot) {
+        if (rideTo != null) {
+            // At the place the shared ride was paid for: off it, and the game is told.
+            getOff()
+            onTravelled()
+            return
+        }
         if (rentAt >= 0 && ride == null) {
             askToRent(rentAt)
             return
