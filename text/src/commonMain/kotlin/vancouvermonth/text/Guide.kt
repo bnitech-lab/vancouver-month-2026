@@ -19,8 +19,8 @@ object Guide {
     const val TITLE = "마을에서 지내는 법"
 
     /**
-     * How to get about, how a day is spent (stamina and time, and sleep at 내 방), the rides and the small map, one
-     * short line each. On the card the goal comes after them, from [goalLine].
+     * How to get about, how a day is spent (stamina and time, and sleep at 내 방), the rides, the small map and the places
+     * round the map, one short line each. On the card the goal comes after them, from [goalLine].
      */
     val LINES = listOf(
         "땅을 누르면 걷고, 두 번 누르면 빨리 가요.",
@@ -30,6 +30,7 @@ object Guide {
         "스카이트레인 역, 버스 정류장, 수상버스 선착장을 누르면 타요.",
         "자전거는 가게에서 사거나 길에서 빌리고, 택시는 위 카드로 불러요.",
         "오른쪽 위 작은 지도는 내 주변을, 누르면 지도 전체를 보여요.",
+        "카페·도서관·코워킹·회사는 여러 동네에 있고, 어디서나 같은 일을 해요.",
     )
 
     /** The card's button: it opens mid-month from the "?", so it closes the card rather than starts anything. */
