@@ -678,6 +678,8 @@ class WalkableTownTest {
                 spendButton().click()
                 assertTrue(town.isChangingDay, "no night's sleep")
                 assertTrue("오늘9월 3일" in screen, screen)
+                // Through the night the top card keeps the hour and the stamina the sleep began with.
+                assertTrue("밤 11시 · 체력 0/5" in hud(), hud())
             },
             Step("the next morning", { !town.isChangingDay }) {
                 assertEquals(Neighbourhood.venue(Place.HOME).door, town.characterSpot, "not at 내 방's door")

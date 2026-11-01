@@ -172,6 +172,10 @@ class PhoneGame private constructor(
     /** True from a night's sleep until the town's morning: meanwhile no talk opens. */
     private var dayChanging = false
 
+    /** The hour and the stamina the night's sleep began with, which the top card keeps until the town's morning. */
+    private var sleptAt = Month.NIGHT_AT
+    private var sleptWith = 0
+
     /** What takes the focus once the screen is drawn again: a talk that opened, or the day's log after an answer. */
     private var focusNext: String? = null
 
@@ -710,6 +714,10 @@ class PhoneGame private constructor(
         // Nothing is done while the character travels: it gets out at its stop first.
         if (walkable?.travelling != null) return
         val sleep = choice == Choice.Take(Action.REST)
+        if (sleep) {
+            sleptAt = month.hour
+            sleptWith = month.energy
+        }
         lastEvents = spentToday + month.play(choice)
         lastLines = dayLog(lastEvents, month)
         spentToday = emptyList()
@@ -743,7 +751,15 @@ class PhoneGame private constructor(
     }
 
     /** The hour on the month's own clock while a month is played, or null around it. */
-    private fun clockHour(): Int? = month?.takeIf { !it.isOver }?.hour
+    private fun clockHour(): Int? = month?.takeIf { !it.isOver }?.let { shownHour(it) }
+
+    /**
+     * The hour and the stamina the top card shows: the month's, but through the town's night after a sleep the ones it
+     * began with, until the morning comes on screen.
+     */
+    private fun shownHour(month: Month): Int = if (dayChanging) sleptAt else month.hour
+
+    private fun shownEnergy(month: Month): Int = if (dayChanging) sleptWith else month.energy
 
     /** The ending has no town, so the town lets go of its drawing. */
     private fun closeTown() {
@@ -770,7 +786,11 @@ class PhoneGame private constructor(
             if (guide?.isOpen != true) focusNext = ".hud"
             show()
         }
-        town.onMorning = { dayChanging = false }
+        town.onMorning = {
+            dayChanging = false
+            // The top card comes to the morning's hour with the town.
+            show()
+        }
         // Once the character reaches 내 방 with its talk open, the sleep it offers can start.
         town.onArrived = { place -> if (place == Place.HOME && talkingAt == Place.HOME && !dayChanging) show() }
         town.onSounds = { train, fire, night -> sound?.nearby(train, fire, night) }
@@ -838,9 +858,9 @@ class PhoneGame private constructor(
                     child("p", "hud-stats") {
                         // The time and the stamina left first, then the skills. On a narrow phone the line breaks
                         // between two of them, never inside one.
-                        child("span", "hud-time", clockName(month.hour))
+                        child("span", "hud-time", clockName(shownHour(month)))
                         listOf(
-                            "체력 ${month.energy}/${Month.MAX_ENERGY}",
+                            "체력 ${shownEnergy(month)}/${Month.MAX_ENERGY}",
                             "영어 ${month.english}/${Month.MAX_SKILL}",
                             "코딩 ${month.coding}/${Month.MAX_SKILL}",
                         ).forEach { figure ->
