@@ -196,6 +196,9 @@ interface WalkableTown {
      */
     fun isAt(place: Place): Boolean
 
+    /** True when the character is at the bike shop, as [isAt] says of a place. What is bought there is bought only there. */
+    val isAtShop: Boolean
+
     /**
      * True while a card covers most of the town, as a talk does. The town's own life then moves at a slower beat,
      * to spare the battery.
@@ -318,12 +321,17 @@ internal class NeighbourhoodScene(
     override var onMorning: () -> Unit = {}
     override var onArrived: (Place) -> Unit = {}
 
-    override fun isAt(place: Place): Boolean {
-        if (place == Place.HOME && sitting) return true
-        if (site.placeAt(spot) == place) return true
-        // Stepping up from its door to its person, the character has not left the place.
+    override fun isAt(place: Place): Boolean =
+        (place == Place.HOME && sitting) || standsWhere { site.placeAt(it) == place }
+
+    override val isAtShop: Boolean
+        get() = standsWhere { Neighbourhood.isAtShop(it) }
+
+    /** True when [there] holds where the character stands, or at both ends of its walk: stepping up from a door to a person. */
+    private fun standsWhere(there: (Spot) -> Boolean): Boolean {
+        if (there(spot)) return true
         val steps = trip?.route ?: return false
-        return site.placeAt(steps.first()) == place && site.placeAt(steps.last()) == place
+        return there(steps.first()) && there(steps.last())
     }
 
     override var onSounds: (Double, Double, Double) -> Unit = { _, _, _ -> }
@@ -2281,7 +2289,7 @@ internal class NeighbourhoodScene(
 
     /** Turns to the bike shop's keeper, as [goUpTo] does. */
     private fun goToShop(dash: Boolean) =
-        goUpTo(Shop.NAME, Neighbourhood.shop.talkSpot, Neighbourhood.isAtShop(spot), dash) { onShop() }
+        goUpTo(Shop.NAME, Neighbourhood.shop.talkSpot, isAtShop, dash) { onShop() }
 
     /**
      * Sends the character to [talkSpot], where the person of [name] is talked to. Already [there], it steps up to them

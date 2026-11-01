@@ -1451,7 +1451,8 @@ class PhoneGame private constructor(
     /** Buys [kind] from the keeper, who says how to get on it. */
     private fun buy(month: Month, kind: Spending) {
         val item = kind.buys ?: return
-        if (!pay(month, kind)) return
+        // Nothing is bought from afar, as nothing is done from afar ([spend]).
+        if (walkable?.isAtShop == false || !pay(month, kind)) return
         talkLine = Shop.bought(item)
         focusNext = ".talk"
         show()

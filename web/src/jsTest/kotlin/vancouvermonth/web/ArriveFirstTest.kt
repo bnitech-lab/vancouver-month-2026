@@ -373,6 +373,28 @@ class ArriveFirstTest {
     }
 
     @Test
+    fun `a bike still on offer is not sold once the character has been moved away`(): Promise<Unit> {
+        val town = open(zone = 1)
+        return play(
+            Step("the keeper's talk at the shop's door, then the character elsewhere with no redraw", { town.isStill }) {
+                town.standAt(Neighbourhood.shop.door)
+                town.shopName.click()
+                val bike = assertNotNull(talk(), "No talk: $screen").button("자전거 사기")
+                assertFalse(bike.disabled, bike.textContent)
+                val before = figures()
+                town.standAt(Neighbourhood.venue(Place.HOME).door)
+                bike.click()
+                assertEquals(before, figures(), "the bike was sold from afar")
+                assertFalse(bike.disabled, "the button was drawn again")
+                // Back at the shop it sells.
+                town.standAt(Neighbourhood.shop.door)
+                bike.click()
+                assertFalse(before == figures(), "no bike at the shop")
+            },
+        )
+    }
+
+    @Test
     fun `from zone 3 a tap on the near café's name walks there, the talk opens on arrival, and the shift can be worked`():
         Promise<Unit> {
         val town = open(zone = 3)
