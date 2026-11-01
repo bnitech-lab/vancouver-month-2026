@@ -1472,7 +1472,8 @@ VLQ_DIGITS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
 def vlq(n):
     """A whole number as a base-64 VLQ, as source maps write them: the sign in the lowest bit, then five bits to a
-    character, lowest first, the sixth bit set while more follow."""
+    character, lowest first, the sixth bit set while more follow. Six characters at most, as the game reads no more."""
+    assert abs(n) < 2 ** 29, f"{n} is too big to pack"
     value = (-n << 1) | 1 if n < 0 else n << 1
     out = []
     while True:

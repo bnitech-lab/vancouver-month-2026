@@ -71,6 +71,8 @@ fun unpackNumbers(text: String, fields: Int): List<IntArray> {
         value += (digit and 31) shl shift
         if (digit and 32 != 0) {
             shift += 5
+            // Six characters at most: a seventh would go past the 32 bits of an Int and read back wrong.
+            require(shift <= 25) { "A packed number longer than six characters" }
         } else {
             numbers.add(if (value and 1 == 1) -(value shr 1) else value shr 1)
             value = 0

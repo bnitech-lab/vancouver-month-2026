@@ -61,6 +61,9 @@ class VancouverMapTest {
         assertFailsWith<IllegalArgumentException> { unpackNumbers("C,E", 2) }
         assertFailsWith<IllegalArgumentException> { unpackNumbers("CEA", 2) }
         assertFailsWith<IllegalArgumentException> { unpackNumbers("Cg", 1) }
+        // The most six characters hold, 2^29 - 1, reads back; 2^30 takes seven, past what an Int holds, and is refused.
+        assertEquals(listOf(536_870_911), unpackNumbers("+////f", 1).map { it.single() })
+        assertFailsWith<IllegalArgumentException> { unpackNumbers("ggggggC", 1) }
     }
 
     /**
