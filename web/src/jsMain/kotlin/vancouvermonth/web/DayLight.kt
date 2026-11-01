@@ -18,6 +18,41 @@ data class Lighting(
 )
 
 /**
+ * A light written over and over rather than made anew: the town works its light out into one on every frame of a change
+ * of light, so those frames make nothing new. [set] takes another light's values; [toLighting] gives them back.
+ */
+class TownLight {
+    var sky = 0
+    var ambient = 0.0
+    var ambientColour = 0
+    var sun = 0.0
+    var sunColour = 0
+    var glow = 0.0
+
+    fun set(lighting: Lighting): TownLight {
+        sky = lighting.sky
+        ambient = lighting.ambient
+        ambientColour = lighting.ambientColour
+        sun = lighting.sun
+        sunColour = lighting.sunColour
+        glow = lighting.glow
+        return this
+    }
+
+    fun set(light: TownLight): TownLight {
+        sky = light.sky
+        ambient = light.ambient
+        ambientColour = light.ambientColour
+        sun = light.sun
+        sunColour = light.sunColour
+        glow = light.glow
+        return this
+    }
+
+    fun toLighting(): Lighting = Lighting(sky, ambient, ambientColour, sun, sunColour, glow)
+}
+
+/**
  * How the town is lit through a day and from one day into the next. Through the day the light follows how much of the
  * day has gone ([during], from the morning at 0.0 to the night at 1.0, as the month's stamina spent says): a soft
  * morning, a bright day, a warm late afternoon, a golden evening and a night with the windows, the lamps and the
@@ -77,15 +112,21 @@ object DayLight {
     )
 
     /** The light when [share] of the day has gone, from 0.0 in the morning to 1.0 at night. */
-    fun during(share: Double): Lighting = blend(day, share.coerceIn(0.0, 1.0))
+    fun during(share: Double): Lighting = during(share, TownLight()).toLighting()
+
+    /** The same, written into [into], which is returned. */
+    fun during(share: Double, into: TownLight): TownLight = blend(day, share.coerceIn(0.0, 1.0), into)
 
     /**
      * The light at [progress] of a night's sleep begun when [from] of the day had gone: the day's own light carried on
      * to the night by [NIGHT_FALLS], then the night, dawn and the morning.
      */
-    fun at(progress: Double, from: Double = 0.0): Lighting {
+    fun at(progress: Double, from: Double = 0.0): Lighting = at(progress, from, TownLight()).toLighting()
+
+    /** The same, written into [into], which is returned. */
+    fun at(progress: Double, from: Double, into: TownLight): TownLight {
         val p = progress.coerceIn(0.0, 1.0)
-        return if (p < NIGHT_FALLS) during(timeOfSleep(p, from)) else blend(sleep, p)
+        return if (p < NIGHT_FALLS) during(timeOfSleep(p, from), into) else blend(sleep, p, into)
     }
 
     /** How much of the day has gone at [progress] of a night's sleep begun at [from], until the night has fallen. */
@@ -120,21 +161,20 @@ object DayLight {
     private const val COME_OUT_FROM = 0.75
     private const val COME_OUT_BY = 0.95
 
-    /** The light at [at] along [steps], blended between the two steps it falls between. */
-    private fun blend(steps: List<Pair<Double, Lighting>>, at: Double): Lighting {
+    /** The light at [at] along [steps], blended between the two steps it falls between, written into [into]. */
+    private fun blend(steps: List<Pair<Double, Lighting>>, at: Double, into: TownLight): TownLight {
         val p = at.coerceIn(steps.first().first, steps.last().first)
         val (endAt, end) = steps.first { it.first >= p }
         val (startAt, start) = steps.last { it.first <= p }
-        if (endAt == startAt) return end
+        if (endAt == startAt) return into.set(end)
         val share = (p - startAt) / (endAt - startAt)
-        return Lighting(
-            sky = mix(start.sky, end.sky, share),
-            ambient = start.ambient + (end.ambient - start.ambient) * share,
-            ambientColour = mix(start.ambientColour, end.ambientColour, share),
-            sun = start.sun + (end.sun - start.sun) * share,
-            sunColour = mix(start.sunColour, end.sunColour, share),
-            glow = start.glow + (end.glow - start.glow) * share,
-        )
+        into.sky = mix(start.sky, end.sky, share)
+        into.ambient = start.ambient + (end.ambient - start.ambient) * share
+        into.ambientColour = mix(start.ambientColour, end.ambientColour, share)
+        into.sun = start.sun + (end.sun - start.sun) * share
+        into.sunColour = mix(start.sunColour, end.sunColour, share)
+        into.glow = start.glow + (end.glow - start.glow) * share
+        return into
     }
 
     /**
@@ -142,23 +182,30 @@ object DayLight {
      * so shadows are faint. A rainy day greys the sky more and darkens it, the sun is only a soft glow through the
      * clouds and the light comes from all round, and the windows and lamps glow a little even by day.
      */
-    fun weathered(lighting: Lighting, weather: Weather): Lighting = when (weather) {
-        Weather.SUNNY -> lighting
-        Weather.CLOUDY -> lighting.copy(
-            sky = grey(lighting.sky, 0.55, 0.97),
-            ambient = lighting.ambient * 1.05,
-            ambientColour = grey(lighting.ambientColour, 0.3, 1.0),
-            sun = lighting.sun * 0.55,
-            sunColour = grey(lighting.sunColour, 0.5, 1.0),
-        )
-        Weather.RAINY -> lighting.copy(
-            sky = grey(lighting.sky, 0.8, 0.82),
-            ambient = lighting.ambient * 1.02,
-            ambientColour = grey(lighting.ambientColour, 0.45, 0.95),
-            sun = lighting.sun * 0.3,
-            sunColour = grey(lighting.sunColour, 0.7, 1.0),
-            glow = max(lighting.glow, RAIN_GLOW),
-        )
+    fun weathered(lighting: Lighting, weather: Weather): Lighting =
+        if (weather == Weather.SUNNY) lighting else underSky(TownLight().set(lighting), weather).toLighting()
+
+    /** The same, greying [light] itself, which is returned. */
+    fun underSky(light: TownLight, weather: Weather): TownLight {
+        when (weather) {
+            Weather.SUNNY -> {}
+            Weather.CLOUDY -> {
+                light.sky = grey(light.sky, 0.55, 0.97)
+                light.ambient *= 1.05
+                light.ambientColour = grey(light.ambientColour, 0.3, 1.0)
+                light.sun *= 0.55
+                light.sunColour = grey(light.sunColour, 0.5, 1.0)
+            }
+            Weather.RAINY -> {
+                light.sky = grey(light.sky, 0.8, 0.82)
+                light.ambient *= 1.02
+                light.ambientColour = grey(light.ambientColour, 0.45, 0.95)
+                light.sun *= 0.3
+                light.sunColour = grey(light.sunColour, 0.7, 1.0)
+                light.glow = max(light.glow, RAIN_GLOW)
+            }
+        }
+        return light
     }
 
     /** How brightly the windows and lamps glow by day in the rain. */

@@ -2,6 +2,7 @@ package vancouvermonth.web
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import vancouvermonth.text.Weather
 
@@ -87,6 +88,23 @@ class DayLightTest {
             assertTrue(dawn.zipWithNext().all { (a, b) -> b >= a }, "someone went in at dawn")
         }
         assertTrue(DayLight.outdoors(0.34) in 0.1..0.9, "all gone at once")
+    }
+
+    @Test
+    fun `a light written over and over gives what a new one would, and is the same light each time`() {
+        val into = TownLight()
+        for (share in (0..20).map { it / 20.0 }) {
+            assertSame(into, DayLight.during(share, into))
+            assertEquals(DayLight.during(share), into.toLighting(), "at $share")
+            for (weather in Weather.entries) {
+                val greyed = DayLight.underSky(TownLight().set(into), weather)
+                assertEquals(DayLight.weathered(DayLight.during(share), weather), greyed.toLighting(), "$weather at $share")
+            }
+        }
+        for (progress in (0..20).map { it / 20.0 }) {
+            assertSame(into, DayLight.at(progress, 0.6, into))
+            assertEquals(DayLight.at(progress, 0.6), into.toLighting(), "night at $progress")
+        }
     }
 
     @Test

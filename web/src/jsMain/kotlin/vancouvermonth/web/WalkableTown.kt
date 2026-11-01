@@ -398,8 +398,12 @@ internal class NeighbourhoodScene(
     private var shownWeather = Weather.SUNNY
     private var comingWeather: Weather? = null
 
-    /** The light as the time of day has it, before the weather greys it. */
-    private var lighting = DayLight.MORNING
+    /**
+     * The light as the time of day has it, before the weather greys it, and as it is drawn, greyed: written over on
+     * every frame of a change of light, never made anew.
+     */
+    private val shownLight = TownLight().set(DayLight.MORNING)
+    private val drawnLight = TownLight()
 
     /** The sea, one plane under the whole town, which darkens in the rain. */
     private lateinit var sea: InstancedMesh
@@ -1105,7 +1109,7 @@ internal class NeighbourhoodScene(
         if (nightFell != null) return
         timePassed = null
         shownShare = share.coerceIn(0.0, 1.0)
-        light(DayLight.during(shownShare))
+        light(DayLight.during(shownShare, shownLight))
         askForFrame()
     }
 
@@ -1679,7 +1683,7 @@ internal class NeighbourhoodScene(
     internal val timeShown: Double
         get() = shownShare
     internal val lightShown: Lighting
-        get() = lighting
+        get() = shownLight.toLighting()
 
     /**
      * True once the town has drawn and nothing of the player's moves: no walk, no change of day, the camera settled
@@ -2252,7 +2256,7 @@ internal class NeighbourhoodScene(
         placeBlocks(drifting, shimmer.at(now, dull) + Petals.at(now) + Clouds.at(now))
         if (rain.visible) placeRain(now)
         // How loud the train and the fire are where the player is: the train at the camera, the fire at the character.
-        val night = lighting.glow
+        val night = shownLight.glow
         val fire = Campfire.nearness(distanceBetween(player, site.campfire))
         val rumble = if (trainRide == null) {
             SkyTrainRun.rumbleAround(runStand + trainShift, SkyTrainRun.speedAt(now), SkyTrainRun.opacityAt(now), view.eye)
@@ -2338,7 +2342,7 @@ internal class NeighbourhoodScene(
         crowd.visible = out
         placePassersby(0.0, if (sitting) site.benchSeat else spot)
         if (rainy) placeRain(lifeNow)
-        light(lighting)
+        light(shownLight)
         touched()
         askForFrame()
     }
@@ -2417,7 +2421,7 @@ internal class NeighbourhoodScene(
         val start = nightFell ?: return false
         val progress = ((now - start) / nightMillis).coerceIn(0.0, 1.0)
         nightProgress = progress
-        light(DayLight.at(progress, nightFrom))
+        light(DayLight.at(progress, nightFrom, shownLight))
         // In the dark the next day's weather comes.
         val coming = comingWeather
         if (progress >= DayLight.DARK_AT && coming != null) {
@@ -2440,7 +2444,7 @@ internal class NeighbourhoodScene(
         val progress = ((now - start) / passMillis).coerceIn(0.0, 1.0)
         val eased = progress * progress * (3 - 2 * progress)
         shownShare = timeFrom + (timeTo - timeFrom) * eased
-        light(DayLight.during(shownShare))
+        light(DayLight.during(shownShare, shownLight))
         if (progress < 1.0) return true
         timePassed = null
         return false
@@ -2474,9 +2478,15 @@ internal class NeighbourhoodScene(
     }
 
     /** Lights the town as [lighting] says for the time of day, greyed as today's weather asks. */
-    private fun light(lighting: Lighting) {
-        this.lighting = lighting
-        val lit = DayLight.weathered(lighting, shownWeather)
+    private fun light(lighting: Lighting) = light(shownLight.set(lighting))
+
+    /**
+     * Lights the town as [light] says for the time of day, greyed as today's weather asks; [light] becomes the light
+     * shown. It makes nothing new, as it runs on every frame of a change of light.
+     */
+    private fun light(light: TownLight) {
+        if (light !== shownLight) shownLight.set(light)
+        val lit = DayLight.underSky(drawnLight.set(shownLight), shownWeather)
         sky.setHex(lit.sky)
         haze.color.setHex(lit.sky)
         ambient.intensity = lit.ambient
