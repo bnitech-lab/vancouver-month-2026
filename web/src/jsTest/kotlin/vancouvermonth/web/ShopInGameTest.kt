@@ -210,7 +210,7 @@ class ShopInGameTest {
     }
 
     @Test
-    fun `the money spent during a day heads that day's log, and the kept month keeps it`() {
+    fun `the money spent before an action heads its log, and the kept month keeps it`() {
         val town = QuietTown()
         open(town)
         startSeed1011(root)
@@ -224,10 +224,12 @@ class ShopInGameTest {
         val log = root.querySelectorAll(".log li").asList().map { it.textContent }
         assertEquals("자전거를 샀어요. -\$350", log[0])
         assertEquals("공유 퀵보드를 빌렸어요. -\$4", log[1])
-        assertTrue(log[2].orEmpty().startsWith("영어 실력이 올랐어요."), "$log")
-        assertTrue(money(startBalance - 350 - 4 - Month.DAILY_LIVING_COST) in log[3].orEmpty(), "$log")
-        assertNull(root.querySelector(".hud-riding"), "the ride outlived its day")
-        assertNull(town.riding, "the night ended the ride")
+        assertTrue(log[2].orEmpty().startsWith("영어 공부를 했어요."), "$log")
+        // No living cost until the night's sleep.
+        assertEquals(3, log.size, "$log")
+        assertTrue("잔고${money(startBalance - 350 - 4)}" in root.querySelector(".hud")?.textContent.orEmpty())
+        assertNull(root.querySelector(".hud-riding"), "the ride outlived the talk")
+        assertNull(town.riding, "the talk ended the ride")
         val kept = record(
             Spend(Spending.BIKE, 350),
             Spend(Spending.SHARED_E_SCOOTER_RIDE, 4),

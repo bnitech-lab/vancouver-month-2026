@@ -166,7 +166,7 @@ class BurnabyTownTest {
             },
             Step("the next morning, kept; the page opens again and goes on", { !first.isChangingDay }) {
                 val kept = assertNotNull(MonthRecord.decode(store.items[SaveSlot.KEY]), "nothing kept")
-                assertTrue(kept.days.isNotEmpty(), "the day was not kept")
+                assertTrue(kept.choices.isNotEmpty(), "the day was not kept")
                 first.close()
                 town = null
                 openGame(300.0, store)

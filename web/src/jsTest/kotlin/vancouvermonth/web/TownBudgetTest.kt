@@ -5,6 +5,7 @@ import kotlin.js.Promise
 import kotlin.math.PI
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlinx.browser.document
@@ -80,6 +81,18 @@ class TownBudgetTest {
             val cost = town.measureFrames(FRAMES)
             report("downtown", cost)
             withinBudget(cost)
+        }
+    }
+
+    @Test
+    fun `downtown at night, the lamps and windows lit, costs what the day does`(): Promise<Unit> {
+        val town = open(1)
+        town.showTime(1.0)
+        return whenReady({ town.isStill }) {
+            val cost = town.measureFrames(FRAMES)
+            report("downtown at night", cost)
+            withinBudget(cost)
+            assertEquals(DayLight.NIGHT, town.lightShown)
         }
     }
 

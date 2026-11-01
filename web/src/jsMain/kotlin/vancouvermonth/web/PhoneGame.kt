@@ -30,8 +30,10 @@ import vancouvermonth.text.Intro
 import vancouvermonth.text.actionEffect
 import vancouvermonth.text.actionName
 import vancouvermonth.text.arrivalLines
+import vancouvermonth.text.bedtimeLine
 import vancouvermonth.text.breakdown
 import vancouvermonth.text.cheapestLine
+import vancouvermonth.text.clockName
 import vancouvermonth.text.continueFrom
 import vancouvermonth.text.date
 import vancouvermonth.text.dayLog
@@ -75,8 +77,8 @@ import vancouvermonth.text.whyNotSpend
 import vancouvermonth.text.whyTotalLines
 
 /**
- * Draws one run in [root]: the intro, the room picked on the map and the guess on September 1st, then one action a day,
- * then the ending.
+ * Draws one run in [root]: the intro, the room picked on the map and the guess on September 1st, then the month, each
+ * day a few actions while its stamina lasts and a night's sleep at 내 방, then the ending.
  * The rules are in core and the wording in text; this only shows the state and passes each tap on.
  * Every tap redraws the whole screen from that state. A run comes from a seed or from today's date, never both.
  * The month is played in a town the player walks in, which [makeWalkableTown] makes on the first day for the room's
@@ -119,7 +121,7 @@ class PhoneGame private constructor(
     private var walkable: WalkableTown? = null
     private var playedInTown = false
 
-    /** The day the last action was spent on, and what happened, as the month told it and as written. */
+    /** The day of the last action, interview or sleep, and what it brought, as the month told it and as written. */
     private var lastDay = 0
     private var lastEvents: List<Event> = emptyList()
     private var lastLines: List<String> = emptyList()
@@ -139,8 +141,8 @@ class PhoneGame private constructor(
     private var shopTalks = 0
 
     /**
-     * The money spent today so far, which goes at the top of today's log when the day is spent; and, on the top card
-     * until the next ride or the day's end, why a shared one could not be rented.
+     * The money spent since the last action, which goes at the top of the next one's log; and, on the top card until
+     * the next ride or action, why a shared one could not be rented.
      */
     private var spentToday: List<Event> = emptyList()
     private var rideNote: String? = null
@@ -167,7 +169,7 @@ class PhoneGame private constructor(
     private var talkOpened = 0.0
     internal var talkSettleMillis = TALK_SETTLE_MILLIS
 
-    /** True from an answer until the town's morning: meanwhile no talk opens. */
+    /** True from a night's sleep until the town's morning: meanwhile no talk opens. */
     private var dayChanging = false
 
     /** What takes the focus once the screen is drawn again: a talk that opened, or the day's log after an answer. */
@@ -264,7 +266,7 @@ class PhoneGame private constructor(
                 child("section", "card kept") {
                     setAttribute("aria-labelledby", "kept-title")
                     child("h2", text = Continue.TITLE).id = "kept-title"
-                    child("p", "kept-from", continueFrom(month.day, month.balance)).id = "kept-from"
+                    child("p", "kept-from", continueFrom(month.day, month.balance, month.hour)).id = "kept-from"
                     child("p", "kept-note", Continue.NOTE).id = "kept-note"
                 }
             }
@@ -502,8 +504,12 @@ class PhoneGame private constructor(
         month = started
         record = keeping
         slot?.keep(keeping)
-        // 내 방 stands where the room is: the room's zone decides where it is and where each morning starts.
-        walkable = makeWalkableTown(started.room.zone.number)?.also { listenTo(it) }
+        // 내 방 stands where the room is: the room's zone decides where it is and where each morning starts. The town
+        // shows the time of day the month is at, as a month taken up again may be past the morning.
+        walkable = makeWalkableTown(started.room.zone.number)?.also {
+            listenTo(it)
+            it.showTime(started.dayShare)
+        }
         if (walkable == null) town = makeTown()
         guide?.onOpenChange = { walkable?.isCovered = isTownCovered() }
         // In the town the update news open from the guide's foot, never over a talk or the change of day.
@@ -541,25 +547,27 @@ class PhoneGame private constructor(
         picked = record.room
         guess = "${record.guess}"
         reveal = offer.replayed.reveal
-        if (record.days.isNotEmpty()) {
-            lastDay = month.day - 1
+        if (record.choices.isNotEmpty()) {
             lastEvents = offer.replayed.lastEvents
+            // A night's sleep was the day before's last choice; anything else was today's.
+            lastDay = if (lastEvents.any { it is Event.Rested }) month.day - 1 else month.day
             lastLines = dayLog(lastEvents, month)
         }
         // What was bought is the month's own; what was spent today goes into today's log, as if never closed.
         spentToday = offer.replayed.spentToday
-        // Who was met is not kept, but the people of the places where days were spent know the player by now.
-        for (choice in record.days) {
+        // Who was met is not kept, but the people of the places where time was spent know the player by now.
+        for (choice in record.choices) {
             met += personAt(if (choice is Choice.Take) placeFor(choice.action) else INTERVIEW_PLACE)
         }
-        // In the town, the focus lands where a day ends: on the day before's log, or on the top card on the first day.
-        focusNext = if (record.days.isEmpty()) ".hud" else ".over-town .log"
+        // In the town, the focus lands where a choice ends: on the last one's log, or on the top card at the start.
+        focusNext = if (record.choices.isEmpty()) ".hud" else ".over-town .log"
         beginMonth(month, record)
     }
 
     private fun showDay(month: Month) {
         root.child("header", "topbar") {
             dayFigure(month.day, weatherOf(month.day))
+            figure("지금", clockName(month.hour))
             figure("남은 날", "${month.daysLeft}일")
             figure("잔고", money(month.balance))
             figure("10월 1일에 낼 총비용", money(month.room.totalMonthlyCost))
@@ -586,8 +594,10 @@ class PhoneGame private constructor(
 
     private fun showStats(month: Month) {
         root.child("section", "card stats") {
-            meter("영어", "english", month.english, Month.MAX_SKILL)
-            meter("코딩", "coding", month.coding, Month.MAX_SKILL)
+            // A skill's bar fills toward its next level with each study, ahead of the level it shows.
+            val steps = Month.STEPS_PER_LEVEL.toDouble()
+            meter("영어", "english", month.english, Month.MAX_SKILL, month.englishProgress / steps)
+            meter("코딩", "coding", month.coding, Month.MAX_SKILL, month.codingProgress / steps)
             meter("체력", "energy", month.energy, Month.MAX_ENERGY)
         }
     }
@@ -611,7 +621,8 @@ class PhoneGame private constructor(
                     onclick = { spend(month, INTERVIEW_PLACE, Choice.AttendInterview) }
                 }
             } else {
-                child("h2", text = "오늘 할 일 하나")
+                child("h2", text = "지금 할 일")
+                bedtimeLine(month)?.let { child("p", "bedtime", it) }
                 for (action in Action.entries) {
                     val blocked = month.blockedBy(action)
                     button("action") {
@@ -684,13 +695,15 @@ class PhoneGame private constructor(
     }
 
     /**
-     * Spends today at [place] on [choice], keeps what happened for the next screen, and goes back to the top of the
-     * page. The character sets off for [place] as the day's log appears. The slot keeps the month, or lets it go at
-     * the ending.
+     * Plays [choice] at [place], keeps what happened for the next screen, and goes back to the top of the page. An
+     * action or the interview leaves the character where it is while the time it took passes over the town; a night's
+     * sleep at 내 방 ends the day, and the town goes through the night to the next morning. The slot keeps the month,
+     * or lets it go at the ending.
      */
     private fun spend(month: Month, place: Place, choice: Choice) {
-        // No day ends while the character travels: it gets out at its stop first.
+        // Nothing is done while the character travels: it gets out at its stop first.
         if (walkable?.travelling != null) return
+        val sleep = choice == Choice.Take(Action.REST)
         lastDay = month.day
         lastEvents = spentToday + month.play(choice)
         lastLines = dayLog(lastEvents, month)
@@ -705,14 +718,19 @@ class PhoneGame private constructor(
             closeTown()
         } else {
             record?.let { slot?.keep(it) }
-            sound?.chime()
             town?.walkTo(place)
             val walking = walkable
-            if (walking != null) {
-                // Until the morning, the town takes no input and no talk opens. The day's log takes the focus.
-                dayChanging = true
-                focusNext = ".over-town .log"
-                walking.endDay(place)
+            // The log of what happened takes the focus.
+            if (walking != null) focusNext = ".over-town .log"
+            if (sleep) {
+                sound?.chime()
+                if (walking != null) {
+                    // Until the morning, the town takes no input and no talk opens.
+                    dayChanging = true
+                    walking.endDay(place)
+                }
+            } else {
+                walking?.passTime(month.dayShare)
             }
         }
         show()
@@ -808,18 +826,22 @@ class PhoneGame private constructor(
                 }
                 child("div", "hud-line") {
                     child("p", "hud-stats") {
-                        // On a narrow phone the line breaks between two skills, never inside one.
+                        // The time and the stamina left first, then the skills. On a narrow phone the line breaks
+                        // between two of them, never inside one.
+                        child("span", "hud-time", clockName(month.hour))
                         listOf(
+                            "체력 ${month.energy}/${Month.MAX_ENERGY}",
                             "영어 ${month.english}/${Month.MAX_SKILL}",
                             "코딩 ${month.coding}/${Month.MAX_SKILL}",
-                            "체력 ${month.energy}/${Month.MAX_ENERGY}",
-                        ).forEachIndexed { index, skill ->
-                            if (index > 0) appendChild(document.createTextNode(" · "))
-                            child("span", text = skill)
+                        ).forEach { figure ->
+                            appendChild(document.createTextNode(" · "))
+                            child("span", text = figure)
                         }
                     }
                     townControls()
                 }
+                // When nothing but sleep is left today, a short line sends the player home.
+                bedtimeLine(month)?.let { child("p", "hud-note hud-bedtime", it) }
                 val interview = month.interview
                 when {
                     month.hasInterviewToday -> child("p", "hud-note", "오늘은 면접 날이에요. 회사로 가세요.")
@@ -1385,13 +1407,17 @@ private fun HTMLElement.dayFigure(day: Int, weather: Weather) {
     }
 }
 
-/** A labelled bar; the "3/10" next to it is the value a screen reader reads. */
-private fun HTMLElement.meter(label: String, kind: String, value: Int, max: Int) {
+/**
+ * A labelled bar; the "3/10" next to it is the value a screen reader reads. [toward] is how far toward the next whole
+ * value the bar has filled, from 0.0 to under 1.0, for a skill's studies toward its next level.
+ */
+private fun HTMLElement.meter(label: String, kind: String, value: Int, max: Int, toward: Double = 0.0) {
     child("div", "meter $kind") {
         child("span", "meter-label", label)
         child("span", "meter-bar") {
             setAttribute("aria-hidden", "true")
-            child("span", "meter-fill") { style.width = "${value * 100 / max}%" }
+            val filled = ((value + toward) * 100 / max).coerceAtMost(100.0)
+            child("span", "meter-fill") { style.width = "$filled%" }
         }
         child("span", "meter-value", "$value/$max")
     }

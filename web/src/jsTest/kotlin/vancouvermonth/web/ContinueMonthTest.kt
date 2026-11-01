@@ -42,7 +42,22 @@ private class EveningTown(private val quiet: QuietTown = QuietTown()) : Walkable
     }
 }
 
-/** The month in progress survives a reload: kept after every day, offered on opening, and let go at the ending. */
+/**
+ * A town that notes each time of day the game shows on it, at once or passing. Everything else is [QuietTown]'s.
+ */
+private class TimedTown(private val quiet: QuietTown = QuietTown()) : WalkableTown by quiet {
+    val times = mutableListOf<Pair<String, Double>>()
+
+    override fun showTime(share: Double) {
+        times += "show" to share
+    }
+
+    override fun passTime(share: Double) {
+        times += "pass" to share
+    }
+}
+
+/** The month in progress survives a reload: kept after every choice, offered on opening, and let go at the ending. */
 class ContinueMonthTest {
     private val root = (document.createElement("main") as HTMLElement).also { document.body!!.appendChild(it) }
     private val other = (document.createElement("main") as HTMLElement).also { document.body!!.appendChild(it) }
@@ -122,30 +137,40 @@ class ContinueMonthTest {
         val buttons = into.querySelectorAll("button").asList().map { it as HTMLButtonElement }
         val choice = buttons.firstOrNull { "면접 보기" in it.textContent.orEmpty() }
             ?: buttons.first { "지원서 넣기" in it.textContent.orEmpty() }.takeIf { !it.disabled }
-            ?: buttons.first { "쉬기" in it.textContent.orEmpty() }
+            ?: buttons.first { "자기" in it.textContent.orEmpty() }
         choice.click()
     }
 
     @Test
-    fun `after a few days in the town, a reload offers 이어하기 on that day, and goes on there in the town`() {
-        val town = QuietTown()
+    fun `after a few days in the town, a reload offers 이어하기 on that day and time, and goes on there in the town`() {
+        val town = TimedTown()
         open(town = town)
         startSeed1011(root)
-        for (place in listOf(Place.LIBRARY, Place.CAFE, Place.COWORKING)) {
+        val places = listOf(Place.LIBRARY, Place.CAFE, Place.HOME, Place.COWORKING, Place.OFFICE, Place.HOME)
+        for (place in places + Place.LIBRARY) {
             town.onPlace(place)
             (root.querySelector(".talk .spend") as HTMLButtonElement).click()
         }
-        val month = played(Action.STUDY_ENGLISH, Action.WORK, Action.PRACTISE_CODING)
-        assertEquals(5, month.day)
+        val month = played(
+            Action.STUDY_ENGLISH, Action.WORK, Action.REST, Action.PRACTISE_CODING, Action.APPLY, Action.REST,
+            Action.STUDY_ENGLISH,
+        )
+        assertEquals(4, month.day)
+        assertEquals(14, month.hour)
+        // The town was shown the morning, then each action's time passed on it; the nights were the town's own.
+        assertEquals(
+            listOf("show" to 0.0, "pass" to 0.4, "pass" to 1.0, "pass" to 0.4, "pass" to 0.6, "pass" to 0.4),
+            town.times,
+        )
         val sky = town.weather
         assertEquals(weatherOn(1011, month.day), sky)
 
-        val again = QuietTown()
+        val again = TimedTown()
         open(town = again)
         val offer = assertNotNull(card, "No card on opening again")
         assertEquals(Continue.TITLE, text(".kept h2"))
-        assertEquals(continueFrom(month.day, month.balance), text(".kept-from"))
-        assertTrue("9월 5일부터" in offer.textContent.orEmpty())
+        assertEquals(continueFrom(month.day, month.balance, month.hour), text(".kept-from"))
+        assertTrue("9월 4일 오후 2시부터" in offer.textContent.orEmpty(), offer.textContent)
         assertNull(root.querySelector(".rooms"), "The rooms came before the card")
         // Each button says what it does, and 이어하기 is described by the day and balance it goes on from.
         val goOn = root.button(Continue.CONTINUE)
@@ -159,12 +184,14 @@ class ContinueMonthTest {
         assertSame(again.element, root.firstElementChild, "Not in the town")
         val hud = text(".hud")
         assertTrue(date(month.day) in hud && money(month.balance) in hud, hud)
-        val skills = "영어 ${month.english}/10 · 코딩 ${month.coding}/10 · 체력 ${month.energy}/5"
+        val skills = "오후 2시 · 체력 ${month.energy}/5 · 영어 ${month.english}/10 · 코딩 ${month.coding}/10"
         assertTrue(skills in hud, hud)
+        // The town opens at the time the day had reached.
+        assertEquals(listOf("show" to 0.4), again.times)
         // The same sky as before the reload: the weather comes from the run and the day alone.
         assertEquals(sky, again.weather)
         assertEquals(" 날씨 ${weatherWord(sky)}", text(".hud .weather"))
-        assertTrue("${date(month.day - 1)}에 있었던 일" in text(".over-town .log"))
+        assertTrue("${date(month.day)}에 있었던 일" in text(".over-town .log"))
         assertNull(root.querySelector(".guide-card"), "The guide opened again")
         assertSame(root.querySelector(".over-town .log"), document.activeElement, "The focus is not on the log")
     }
@@ -264,11 +291,14 @@ class ContinueMonthTest {
         startSeed1011(root)
         town.onPlace(Place.LIBRARY)
         (root.querySelector(".talk .spend") as HTMLButtonElement).click()
-        assertEquals(Place.LIBRARY, town.evening, "The day did not start to change")
+        assertNull(town.evening, "An action changed the day")
+        town.onPlace(Place.HOME)
+        (root.querySelector(".talk .spend") as HTMLButtonElement).click()
+        assertEquals(Place.HOME, town.evening, "The day did not start to change")
 
         val again = QuietTown()
         open(town = again)
-        val month = played(Action.STUDY_ENGLISH)
+        val month = played(Action.STUDY_ENGLISH, Action.REST)
         assertEquals(continueFrom(month.day, month.balance), text(".kept-from"))
         root.button(Continue.CONTINUE).click()
         assertTrue("${date(Month.FIRST_DAY)}에 있었던 일" in text(".over-town .log"))
@@ -279,7 +309,7 @@ class ContinueMonthTest {
     }
 
     @Test
-    fun `the month is kept from its start and after every day`() {
+    fun `the month is kept from its start and after every action and sleep`() {
         open()
         assertNull(kept, "Kept before the month started")
         startSeed1011(root)
@@ -287,8 +317,9 @@ class ContinueMonthTest {
         assertEquals(MonthRecord(1011, null, game.cheapestRoomIndex, game.lowestTotal), kept)
         root.button("영어 공부").click()
         root.button("카페 알바").click()
-        val days = listOf(Choice.Take(Action.STUDY_ENGLISH), Choice.Take(Action.WORK))
-        assertEquals(days, kept?.days)
+        root.button("자기").click()
+        val choices = listOf(Choice.Take(Action.STUDY_ENGLISH), Choice.Take(Action.WORK), Choice.Take(Action.REST))
+        assertEquals(choices, kept?.choices)
         assertEquals("vancouver-month.save", SaveSlot.KEY)
     }
 
@@ -345,7 +376,7 @@ class ContinueMonthTest {
     fun `the ending lets the kept month go, so the next visit starts fresh`() {
         open()
         startSeed1011(root)
-        while ("다시 하기" !in root.textContent.orEmpty()) root.button("쉬기").click()
+        while ("다시 하기" !in root.textContent.orEmpty()) root.button("자기").click()
         assertNull(kept)
         assertEquals("", store.items[SaveSlot.KEY])
 
@@ -380,6 +411,7 @@ class ContinueMonthTest {
         open()
         startSeed1011(root)
         root.button("영어 공부").click()
+        root.button("자기").click()
         val first = kept
 
         open(seed = 2022)
@@ -418,6 +450,7 @@ class ContinueMonthTest {
         open(today = today)
         startRun(today.seed)
         root.button("영어 공부").click()
+        root.button("자기").click()
         assertEquals(today, kept?.today)
 
         open(today = TodaysRun(2026, 10, 31))
@@ -433,16 +466,19 @@ class ContinueMonthTest {
 
     @Test
     fun `a kept line that does not read or does not replay is dropped without a word`() {
-        // A bad letter, another version (the first, from before money could be spent, and the second, from before the
-        // guess moved money), an interview on a day without one, a room that is not there, and a bike bought twice.
+        // A bad letter, another version (the first, from before money could be spent, the second, from before the
+        // guess moved money, and the third, from when a day held one action), an interview on a day without one, a
+        // room that is not there, a bike bought twice, and work after the day's stamina is gone.
         val lines = listOf(
-            "3|1011||2|1165|Z",
+            "4|1011||2|1165|Z",
             "9|1011||2|1165|",
             "1|1011||2|1165|EWC",
             "2|1011||2|1165|EWC",
-            "3|1011||2|1165|I",
-            "3|1011||7|1165|",
-            "3|1011||2|1165|b350Eb350",
+            "3|1011||2|1165|EWC",
+            "4|1011||2|1165|I",
+            "4|1011||7|1165|",
+            "4|1011||2|1165|b350Eb350",
+            "4|1011||2|1165|EWW",
         )
         for (line in lines) {
             store.items[SaveSlot.KEY] = line
@@ -471,14 +507,17 @@ class ContinueMonthTest {
     @Test
     fun `only a kept month that replays decides the run of an address with no run`() {
         val slot = SaveSlot(Memory { store })
-        store.items[SaveSlot.KEY] = "3|1011||2|1165|EWC"
+        store.items[SaveSlot.KEY] = "4|1011||2|1165|EWRC"
         assertEquals(1011, slot.continuable()?.seed)
-        val notContinuable = listOf("3|1011||2|1165|I", "3|1011||2|1165|Z", "1|1011||2|1165|EWC", "2|1011||2|1165|EWC", "")
+        val notContinuable = listOf(
+            "4|1011||2|1165|I", "4|1011||2|1165|Z", "1|1011||2|1165|EWC", "2|1011||2|1165|EWC", "3|1011||2|1165|EWC",
+            "4|1011||2|1165|EWC", "",
+        )
         for (line in notContinuable) {
             store.items[SaveSlot.KEY] = line
             assertNull(slot.continuable(), "Continuable: $line")
         }
-        store.items[SaveSlot.KEY] = "3|1011||2|1165|EWC"
+        store.items[SaveSlot.KEY] = "4|1011||2|1165|EWRC"
         assertNull(SaveSlot(Memory { store }) { error("A rule this line was not kept under") }.continuable())
     }
 

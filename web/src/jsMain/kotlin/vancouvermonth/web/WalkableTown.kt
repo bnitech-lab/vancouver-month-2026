@@ -66,16 +66,16 @@ interface WalkableTown {
     val riding: Ride?
 
     /**
-     * True when [ride] would get the character on now: not by night, nor sitting by the fire, nor already riding; a
-     * shared one only when the character has just reached one of its kind. The game pays a fare only when this is
-     * true, so the fare and the ride never part.
+     * True when [ride] would get the character on now: not in a night's sleep, nor sitting by the fire, nor already
+     * riding; a shared one only when the character has just reached one of its kind. The game pays a fare only when
+     * this is true, so the fare and the ride never part.
      */
     fun canRide(ride: Ride): Boolean
 
     /**
      * Gets on [ride]: one of the player's own, or the shared one the character has just reached (asked for through
-     * [onRent]). From here the character goes at the ride's speed, along the same streets. Not by night, nor sitting by
-     * the fire, nor already riding.
+     * [onRent]). From here the character goes at the ride's speed, along the same streets. Not in a night's sleep, nor
+     * sitting by the fire, nor already riding.
      */
     fun ride(ride: Ride)
 
@@ -104,9 +104,9 @@ interface WalkableTown {
     fun taxiDistance(to: Spot): Double?
 
     /**
-     * True when a ride on [transport] from stop [from] to stop [to] could start now: not by night, nor sitting by the
-     * fire, nor already travelling; the character at [from]; for a taxi ([from] -1), a way along the streets to the
-     * place [to] of [TransitLines.taxiStops]. The game pays a fare only when this is true.
+     * True when a ride on [transport] from stop [from] to stop [to] could start now: not in a night's sleep, nor
+     * sitting by the fire, nor already travelling; the character at [from]; for a taxi ([from] -1), a way along the
+     * streets to the place [to] of [TransitLines.taxiStops]. The game pays a fare only when this is true.
      */
     fun canTravel(transport: Transport, from: Int, to: Int): Boolean
 
@@ -164,10 +164,21 @@ interface WalkableTown {
     fun endChat()
 
     /**
-     * Ends a day spent at [place]: a golden evening, a night with the lights on, then morning, with the character
-     * back at 내 방's door and [onMorning] called. A day of rest is spent on the bench by the campfire.
+     * Ends the day with a night's sleep at [place], 내 방: from the time it is, on through the evening to a night with
+     * the lights on, then morning, with the character at 내 방's door and [onMorning] called. The night is spent on the
+     * bench by the campfire.
      */
     fun endDay(place: Place)
+
+    /**
+     * Moves the time of day on to [share] of the day (from 0.0 in the morning to 1.0 at night), from the time shown
+     * now, over [DayLight.PASS_MILLIS]: the sky, the sun, the lamps and the windows change little by little, and the
+     * character stays where it is. A phone that asks for less motion sees the new time at once.
+     */
+    fun passTime(share: Double) {}
+
+    /** Shows the time of day [share] at once, as for a month taken up again at that time. */
+    fun showTime(share: Double) {}
 
     /** Lets go of the drawing for good: the renderer, the shapes and the colours. */
     fun close()
@@ -541,8 +552,23 @@ internal class NeighbourhoodScene(
     private var sitting = false
     private var wentHome = false
 
+    /** How much of the day had gone when the night's sleep began: the light carries on from there. */
+    private var nightFrom = 0.0
+
     /** How long the change of day takes. A test may shorten it, to play a month quickly. */
     internal var nightMillis = DayLight.MILLIS
+
+    /**
+     * How much of the day has gone as the town shows it, from 0.0 in the morning to 1.0 at night; and, while the time
+     * an action took passes, when that began and the time it goes from and to.
+     */
+    private var shownShare = 0.0
+    private var timePassed: Double? = null
+    private var timeFrom = 0.0
+    private var timeTo = 0.0
+
+    /** How long the time an action takes passes on screen. A test may shorten it. */
+    internal var passMillis = DayLight.PASS_MILLIS
 
     /**
      * The player's own turn, tilt and distance of the camera, kept while it looks at the campfire for a night of
@@ -1028,6 +1054,9 @@ internal class NeighbourhoodScene(
         pointers.clear()
         stopChatting()
         sitting = place == Place.HOME
+        // The night falls from the time it is, even halfway through the time an action took.
+        timePassed = null
+        nightFrom = shownShare
         if (sitting) {
             // The camera comes round to the far side of the fire, near and low, to see the character's face in its
             // light. The player's own view comes back in the morning.
@@ -1043,6 +1072,26 @@ internal class NeighbourhoodScene(
             return
         }
         nightFell = window.performance.now()
+        askForFrame()
+    }
+
+    override fun passTime(share: Double) {
+        if (nightFell != null) return
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            showTime(share)
+            return
+        }
+        timeFrom = shownShare
+        timeTo = share.coerceIn(0.0, 1.0)
+        timePassed = window.performance.now()
+        askForFrame()
+    }
+
+    override fun showTime(share: Double) {
+        if (nightFell != null) return
+        timePassed = null
+        shownShare = share.coerceIn(0.0, 1.0)
+        light(DayLight.during(shownShare))
         askForFrame()
     }
 
@@ -1608,13 +1657,23 @@ internal class NeighbourhoodScene(
     internal val isChangingDay: Boolean
         get() = nightFell != null
 
+    /** True while the time an action took passes on screen. For tests. */
+    internal val isPassingTime: Boolean
+        get() = timePassed != null
+
+    /** How much of the day has gone as the town shows it now, and the light it shows. For tests. */
+    internal val timeShown: Double
+        get() = shownShare
+    internal val lightShown: Lighting
+        get() = lighting
+
     /**
      * True once the town has drawn and nothing of the player's moves: no walk, no change of day, the camera settled
      * and no building still folding or rising. The town's own life may still move. For tests.
      */
     internal val isStill: Boolean
         get() = framesDrawn > 0 && !urgent && !gliding && trip == null && nightFell == null && !cutaway.isMoving &&
-            journey == null
+            journey == null && timePassed == null
 
     /** True when the [index]th of [Neighbourhood.foldables] is folded down out of the way, or folding. For tests. */
     internal fun isFolded(index: Int): Boolean = cutaway.isFolding(index)
@@ -1969,7 +2028,7 @@ internal class NeighbourhoodScene(
         if (closed) return
         val hidden = pageHidden() || contextLost
         val moving = urgent || trip != null || nightFell != null || gliding || cutaway.isMoving || journey != null ||
-            leaving != null || trainRide != null
+            leaving != null || trainRide != null || timePassed != null
         if (!pace.shouldDraw(now, moving, hidden)) {
             // Hidden or without WebGL, nothing more is asked for until that ends; otherwise the life waits its turn.
             if (!hidden) nextFrame()
@@ -1985,6 +2044,7 @@ internal class NeighbourhoodScene(
         var walking = false
         var travelled = false
         var night = false
+        var passing = false
         var folding = false
         try {
             // Inside the try, so that if the walk, the change of day (which brings the new day's weather) or the life
@@ -1992,6 +2052,7 @@ internal class NeighbourhoodScene(
             walking = stepWalk(now)
             travelled = stepJourney(now)
             night = stepNight(now)
+            passing = stepTime(now)
             placeCharacter()
             val subject = if (sitting) site.benchSeat else spot
             gliding = view.follow(Point(subject.x, focusHeight, subject.z), millis)
@@ -2026,7 +2087,7 @@ internal class NeighbourhoodScene(
             }
         }
         framesDrawn += 1
-        if (walking || travelled || night || gliding || folding || !still) nextFrame()
+        if (walking || travelled || night || passing || gliding || folding || !still) nextFrame()
     }
 
     /**
@@ -2140,7 +2201,11 @@ internal class NeighbourhoodScene(
         }
         keeperFigure.write(keeper.step(now, millis, player), townsfolk.instanceMatrix.array, first)
         townsfolk.instanceMatrix.needsUpdate = true
-        val out = if (nightFell == null) 1.0 else DayLight.outdoors(nightProgress)
+        val out = if (nightFell == null) {
+            DayLight.outdoorsAt(shownShare)
+        } else {
+            DayLight.outdoors(nightProgress, nightFrom)
+        }
         passerbyMaterial.opacity = out
         crowd.visible = out > 0.0
         // A fading figure would leave a solid shadow, so the passersby cast none until they are all there.
@@ -2171,7 +2236,7 @@ internal class NeighbourhoodScene(
         placeBlocks(drifting, shimmer.at(now, dull) + Petals.at(now) + Clouds.at(now))
         if (rain.visible) placeRain(now)
         // How loud the train and the fire are where the player is: the train at the camera, the fire at the character.
-        val night = if (nightFell == null) 0.0 else DayLight.at(nightProgress).glow
+        val night = lighting.glow
         val fire = Campfire.nearness(distanceBetween(player, site.campfire))
         val rumble = if (trainRide == null) {
             SkyTrainRun.rumbleAround(runStand + trainShift, SkyTrainRun.speedAt(now), SkyTrainRun.opacityAt(now), view.eye)
@@ -2336,7 +2401,7 @@ internal class NeighbourhoodScene(
         val start = nightFell ?: return false
         val progress = ((now - start) / nightMillis).coerceIn(0.0, 1.0)
         nightProgress = progress
-        light(DayLight.at(progress))
+        light(DayLight.at(progress, nightFrom))
         // In the dark the next day's weather comes, and the character goes home, unless it spends the night by the
         // fire.
         val coming = comingWeather
@@ -2352,6 +2417,21 @@ internal class NeighbourhoodScene(
         if (progress < 1.0) return true
         nightFell = null
         morning()
+        return false
+    }
+
+    /**
+     * Moves the light on through the time an action took, eased in and out, from the time it was to the time it is.
+     * True while it goes on.
+     */
+    private fun stepTime(now: Double): Boolean {
+        val start = timePassed ?: return false
+        val progress = ((now - start) / passMillis).coerceIn(0.0, 1.0)
+        val eased = progress * progress * (3 - 2 * progress)
+        shownShare = timeFrom + (timeTo - timeFrom) * eased
+        light(DayLight.during(shownShare))
+        if (progress < 1.0) return true
+        timePassed = null
         return false
     }
 
@@ -2375,6 +2455,7 @@ internal class NeighbourhoodScene(
         val coming = comingWeather
         comingWeather = null
         if (coming != null && coming != shownWeather) showWeather(coming)
+        shownShare = 0.0
         light(DayLight.MORNING)
         viewBeforeRest?.let { (turn, tilt, distance) -> view.aim(turn, tilt, distance) }
         viewBeforeRest = null

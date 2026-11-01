@@ -94,7 +94,7 @@ class PhoneGameTest {
         PhoneGame(root, today, playAgain = { playedAgain = true }).show()
         val game = FirstMinute(today.seed)
         startMonth(room = game.cheapestRoomIndex + 1, amount = "${game.lowestTotal}")
-        while ("다시 하기" !in screen) tap("쉬기")
+        while ("다시 하기" !in screen) tap("자기")
     }
 
     @Test
@@ -128,12 +128,22 @@ class PhoneGameTest {
         assertTrue("10월 1일에 낼 총비용\$1,345" in screen)
         assertTrue("지원서 넣기면접이 잡힐 확률 27%, 체력 -1" in screen)
 
+        assertTrue("지금아침 8시" in screen, screen)
+
         tap("영어 공부")
         assertTrue("9월 2일에 있었던 일" in screen)
         assertEquals("polite", root.querySelector(".log")?.getAttribute("aria-live"))
-        assertTrue("영어 실력이 올랐어요. 영어 2/10" in screen)
+        assertTrue("영어 공부를 했어요. 레벨업까지 3번" in screen)
+        // The day goes on, at two in the afternoon, and no living cost is paid until the night's sleep.
+        assertTrue("오늘9월 2일" in screen)
+        assertTrue("지금오후 2시" in screen, screen)
+        assertTrue("잔고\$1,710" in screen)
+        assertTrue("영어 공부레벨업까지 3번, 체력 -2" in screen, screen)
+        tap("자기")
+        assertTrue("내 방에서 푹 잤어요. 체력 5/5" in screen)
         assertTrue("생활비 -\$40, 잔고 \$1,670" in screen)
         assertTrue("오늘9월 3일" in screen)
+        assertTrue("지금아침 8시" in screen, screen)
     }
 
     @Test
@@ -221,7 +231,7 @@ class PhoneGameTest {
         assertEquals(order.sorted(), order)
         tap("시작하기")
         assertTrue("잔고${money(start)}" in text(".topbar"), screen)
-        tap("쉬기")
+        tap("자기")
         assertTrue("생활비 -\$40, 잔고 ${money(start - 40)}" in screen, screen)
     }
 
@@ -240,7 +250,7 @@ class PhoneGameTest {
         startMonth(room = 1, amount = "1200")
         assertTrue("오늘9월 2일 날씨 흐림" in screen, screen)
         assertEquals("흐림", root.querySelector(".topbar .weather")?.lastChild?.textContent)
-        tap("쉬기")
+        tap("자기")
         assertTrue("오늘9월 3일 날씨 비" in screen, screen)
     }
 
@@ -263,17 +273,26 @@ class PhoneGameTest {
     }
 
     @Test
-    fun `a tired player can only rest and is told why`() {
+    fun `a tired player can only sleep and is told why`() {
         open(1011)
         startMonth(room = 3, amount = "1165")
-        repeat(5) { tap("카페 알바") }
+        tap("카페 알바")
+        // Two stamina left: a second shift is too much, a study fits.
+        assertTrue("체력2/5" in screen)
+        assertTrue(button("카페 알바").disabled)
+        assertTrue("체력이 모자라요." in button("카페 알바").textContent.orEmpty())
+        assertFalse(button("영어 공부").disabled)
+        assertNull(root.querySelector(".actions .bedtime"))
+        tap("영어 공부")
         assertTrue("체력0/5" in screen)
         for (action in listOf("카페 알바", "영어 공부", "코딩 연습", "지원서 넣기")) {
             val button = button(action)
             assertTrue(button.disabled, action)
-            assertTrue("체력이 없어요. 쉬어야 해요." in button.textContent.orEmpty(), action)
+            assertTrue("체력이 없어요. 내 방에 가서 자요." in button.textContent.orEmpty(), action)
         }
-        assertFalse(button("쉬기").disabled)
+        assertFalse(button("자기").disabled)
+        assertEquals("밤이에요. 체력을 다 썼어요. 내 방에 가서 자요.", root.querySelector(".actions .bedtime")?.textContent)
+        assertTrue("지금밤 11시" in screen, screen)
     }
 
     @Test
@@ -282,7 +301,7 @@ class PhoneGameTest {
         startMonth(room = 3, amount = "1165")
         while ("오늘은 면접 날이에요." !in screen && "다시 하기" !in screen) {
             val apply = button("지원서 넣기")
-            if (apply.disabled) tap("쉬기") else apply.click()
+            if (apply.disabled) tap("자기") else apply.click()
         }
         assertTrue("오늘은 면접 날이에요." in screen, "seed 1011 should book an interview: $screen")
         assertEquals(listOf("면접 보기"), buttons().map { it.textContent })
@@ -296,7 +315,7 @@ class PhoneGameTest {
     fun `a month of rest ends with the ending line and another run`() {
         open(1011)
         startMonth(room = 3, amount = "1165")
-        while ("다시 하기" !in screen) tap("쉬기")
+        while ("다시 하기" !in screen) tap("자기")
         assertTrue("9월이 끝났어요." in screen)
         assertTrue("짐작 보상+\$100" in text(".ending .figures"), screen)
         assertFalse("점수" in screen, screen)
@@ -377,7 +396,7 @@ class PhoneGameTest {
     fun `every ending offers today's run after 다시 하기`() {
         open(1011)
         startMonth(room = 3, amount = "1165")
-        while ("다시 하기" !in screen) tap("쉬기")
+        while ("다시 하기" !in screen) tap("자기")
         val link = root.querySelector(".ending a") ?: error("No link on the ending: $screen")
         assertEquals("오늘의 판", link.textContent)
         assertEquals("?today", link.getAttribute("href"))
@@ -397,7 +416,7 @@ class PhoneGameTest {
     fun `a run from a seed ends without a result line`() {
         open(1011)
         startMonth(room = 3, amount = "1165")
-        while ("다시 하기" !in screen) tap("쉬기")
+        while ("다시 하기" !in screen) tap("자기")
         assertNull(root.querySelector(".result-line"))
         assertTrue(buttons().none { "결과 복사" in it.textContent.orEmpty() })
     }
@@ -424,9 +443,10 @@ class PhoneGameTest {
         assertSame(town.element, root.querySelector(".topbar")?.nextElementSibling)
         // The day's buttons come right under the town, and what happened comes after them.
         assertSame(root.querySelector(".actions"), town.element.nextElementSibling)
-        for (action in listOf("카페 알바", "영어 공부", "코딩 연습", "지원서 넣기", "쉬기")) tap(action)
+        // A shift and English fill the first day; after the night, coding and an application on the next.
+        for (action in listOf("카페 알바", "영어 공부", "자기", "코딩 연습", "지원서 넣기")) tap(action)
         assertSame(root.querySelector(".log"), root.querySelector(".actions")?.nextElementSibling)
-        assertEquals(listOf(Place.CAFE, Place.LIBRARY, Place.COWORKING, Place.OFFICE, Place.HOME), town.visits)
+        assertEquals(listOf(Place.CAFE, Place.LIBRARY, Place.HOME, Place.COWORKING, Place.OFFICE), town.visits)
         // Every day redraws the screen around the same town, so the character stays where it was.
         assertSame(town.element, root.querySelector(".topbar")?.nextElementSibling)
         assertEquals(1, root.querySelectorAll(".town").length)
@@ -439,7 +459,7 @@ class PhoneGameTest {
         startMonth(room = 3, amount = "1165")
         while ("오늘은 면접 날이에요." !in screen) {
             val apply = button("지원서 넣기")
-            if (apply.disabled) tap("쉬기") else apply.click()
+            if (apply.disabled) tap("자기") else apply.click()
         }
         assertSame(town.element, root.querySelector(".topbar")?.nextElementSibling)
         assertSame(root.querySelector(".actions"), town.element.nextElementSibling)
@@ -460,7 +480,7 @@ class PhoneGameTest {
         assertEquals(0, made, "the room screen makes no town")
         tap("시작하기")
         assertEquals(1, made)
-        while ("다시 하기" !in screen) tap("쉬기")
+        while ("다시 하기" !in screen) tap("자기")
         assertEquals(1, made)
         assertTrue(town.closed)
         assertNull(root.querySelector(".town"))
@@ -480,7 +500,7 @@ class PhoneGameTest {
         tap("카페 알바")
         assertNull(root.querySelector(".town"))
         assertSame(root.querySelector(".log"), root.querySelector(".topbar")?.nextElementSibling)
-        assertTrue("카페에서 일했어요. +\$110" in screen)
+        assertTrue("카페에서 일했어요. +\$70" in screen)
     }
 
     @Test
