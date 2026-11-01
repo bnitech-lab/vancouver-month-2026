@@ -127,6 +127,31 @@ class MinimapTest {
     }
 
     @Test
+    fun `the whole map on a tap names all five places, none over another, in every zone`() {
+        for (zone in 1..3) {
+            val minimap = Minimap(HomeSite.of(zone))
+            val element = minimap.element
+            minimap.isLarge = true
+            // As large as on a 375-point phone: four fifths of it.
+            element.style.width = "300px"
+            document.body!!.appendChild(element)
+            shown += element
+            minimap.measure()
+            val office = Neighbourhood.venue(Place.OFFICE).door
+            minimap.draw(office.x, office.z, 0.0, office.x, office.z + 20.0, office.x, office.z, 0.8, marked = null)
+            assertEquals(5, minimap.namesDrawn, "zone $zone")
+            val boxes = minimap.nameBoxes
+            for ((index, a) in boxes.withIndex()) {
+                assertTrue(a[0] >= 0.0 && a[1] >= 0.0 && a[2] <= element.clientWidth && a[3] <= element.clientHeight, "zone $zone: $a")
+                for (b in boxes.drop(index + 1)) {
+                    val apart = a[2] <= b[0] || b[2] <= a[0] || a[3] <= b[1] || b[3] <= a[1]
+                    assertTrue(apart, "zone $zone: $a over $b")
+                }
+            }
+        }
+    }
+
+    @Test
     fun `off the small map, 내 방 and 회사 show as arrows on its edge`() {
         val minimap = Minimap(HomeSite.of(2))
         document.body!!.appendChild(minimap.element)
