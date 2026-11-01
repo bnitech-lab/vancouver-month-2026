@@ -47,30 +47,48 @@ class FollowCamera(
     walls: List<Wall> = Neighbourhood.walls,
     people: List<Wall> = Neighbourhood.people,
 ) {
-    /**
-     * The box of every wall the camera keeps out of as six numbers, its low and high corners, gathered once: the
-     * five places, the SkyTrain deck, stations and tunnel mouth, the awning and the canopy, never the city's
-     * buildings.
-     */
-    private val WALLS: DoubleArray = walls.filter { !it.folds }.let { kept ->
-        DoubleArray(kept.size * 6).also { numbers ->
-            for ((index, wall) in kept.withIndex()) {
-                val box = wall.box
-                numbers[index * 6] = box.x
-                numbers[index * 6 + 1] = box.y
-                numbers[index * 6 + 2] = box.z
-                numbers[index * 6 + 3] = box.x + box.width
-                numbers[index * 6 + 4] = box.y + box.height
-                numbers[index * 6 + 5] = box.z + box.depth
-            }
-        }
-    }
+    /** The walls this camera keeps out of and a tap can land on, gathered once for each town ([Gathered.of]). */
+    private val gathered = Gathered.of(walls, people)
 
     /**
-     * What a tap can land on besides the city's buildings, which fold: every other wall, and the five places'
-     * people, gathered once.
+     * The box of every wall the camera keeps out of as six numbers, its low and high corners: the five places, the
+     * SkyTrain deck, stations and tunnel mouth, the awning and the canopy, never the city's buildings.
      */
-    private val TAPPABLE: List<Wall> = walls.filter { !it.folds } + people
+    private val WALLS: DoubleArray = gathered.boxes
+
+    /** What a tap can land on besides the city's buildings, which fold: every other wall, and the five places' people. */
+    private val TAPPABLE: List<Wall> = gathered.tappable
+
+    /**
+     * The walls of a town as the camera asks for them, gathered once for each list of walls and people, as every
+     * camera of the same town shares them.
+     */
+    private class Gathered(val walls: List<Wall>, val people: List<Wall>) {
+        val boxes: DoubleArray
+        val tappable: List<Wall>
+
+        init {
+            val kept = walls.filter { !it.folds }
+            boxes = DoubleArray(kept.size * 6)
+            for ((index, wall) in kept.withIndex()) {
+                val box = wall.box
+                boxes[index * 6] = box.x
+                boxes[index * 6 + 1] = box.y
+                boxes[index * 6 + 2] = box.z
+                boxes[index * 6 + 3] = box.x + box.width
+                boxes[index * 6 + 4] = box.y + box.height
+                boxes[index * 6 + 5] = box.z + box.depth
+            }
+            tappable = kept + people
+        }
+
+        companion object {
+            private val made = mutableListOf<Gathered>()
+
+            fun of(walls: List<Wall>, people: List<Wall>): Gathered =
+                made.firstOrNull { it.walls === walls && it.people === people } ?: Gathered(walls, people).also { made.add(it) }
+        }
+    }
 
     /** The turn around the character, in radians. 0 puts the camera south of it; -PI / 2 puts it west, looking east. */
     var yaw = START_YAW
