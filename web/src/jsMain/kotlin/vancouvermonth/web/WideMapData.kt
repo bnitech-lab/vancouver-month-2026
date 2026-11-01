@@ -9,7 +9,7 @@
 // This data is licensed under those two licences, not under the MIT licence of the code: see Map data in the
 // README, and MAP-DATA-NOTICE.txt beside the page.
 //
-// Fetched 2026-11-01T00:07:17Z from https://opendata.vancouver.ca:
+// Fetched 2026-11-01T01:15:28Z from https://opendata.vancouver.ca:
 //   Shoreline 2002 (shoreline-2002), sha1 cda26f7553662a813b82fac323f6f49b28237922
 //   Parks - polygon representation (parks-polygon-representation), sha1 a738a1e496839e1c1476105b26fc710b7da38fae
 //   Rapid transit lines (rapid-transit-lines), sha1 ec50c9d272a1182c520c84779038ccda678b9b90
@@ -22,12 +22,12 @@
 //   Burnaby Boundary (OpenData3/MapServer/12), sha1 31376d45f561ea313e64a680be7f47a7ca48870e
 //   SkyTrain (OpenData5/MapServer/11), sha1 0078df50b214b1ba036549a7a2cc94a8116367ea
 //   SkyTrain Station (OpenData5/MapServer/10), sha1 76f432a951db6789c64564d4abb7ff94e8d920c2
-//   Park Inventory (OpenData1/MapServer/6), sha1 b2589ac6769cf11cc937e82f04ca380337917e28
+//   Park Inventory (OpenData1/MapServer/6), sha1 b0e046d195ac71e7661c7be020d5e7b5bfedfe8e
 //   Street (OpenData5/MapServer/8), sha1 b0bee67aadd712274365a8c9163148e065b928f6
 //   Legal Block (OpenData4/MapServer/9), in 2 pages, sha1 2ef4ce7a09a5c80788740367bfd1e5f544484561
 //     and 2f0048d773b5e2014404a638688a0caff039e751
 //   District Lot (OpenData4/MapServer/6), sha1 bbd65f219cc0995247d96750b33c2c41f1626e64
-//   Community Plan Area Boundaries (OpenData1/MapServer/10), sha1 007feb0f4ff2e25fc138567b9e880db5c6f70176
+//   Community Plan Area Boundaries (OpenData1/MapServer/10), sha1 8be1125a411185e6ad56a0796ee71c4cd486fc6a
 package vancouvermonth.web
 
 /**
@@ -219,18 +219,18 @@ internal object WideMapData {
      * [STATIONS] is one of its points.
      */
     const val RAIL =
-        "196.5,62.8 196.6,62.8 206.9,62.0 213.6,57.6 217.1,57.0 221.1,58.6 229.2,65.4 231.2,65.9 234.6,64.3 " +
-        "243.9,60.1 270.5,44.7 282.4,38.6 285.5,37.6 288.3,37.4 299.9,39.8 303.6,39.3 329.0,31.1 331.8,32.6 " +
-        "332.1,32.8 349.8,50.8 354.1,54.3 356.5,55.6 360.2,56.5 374.9,57.3 404.3,50.9 437.5,43.5 484.7,33.1 " +
-        "484.8,33.1 552.0,21.4 552.8,21.3 568.9,17.7 581.9,15.6 612.6,10.5 616.8,9.1 631.4,2.0 635.3,0.0"
+        "196.5,62.8 206.9,62.0 213.6,57.6 217.1,57.0 221.1,58.6 229.2,65.4 231.2,65.9 234.6,64.3 243.9,60.1 " +
+        "270.5,44.7 282.4,38.6 285.5,37.6 288.3,37.4 299.9,39.8 303.6,39.3 329.0,31.1 331.8,32.6 332.1,32.8 " +
+        "349.8,50.8 354.1,54.3 356.5,55.6 360.2,56.5 374.9,57.3 404.3,50.9 437.5,43.5 484.7,33.1 552.0,21.4 " +
+        "552.8,21.3 568.9,17.7 581.9,15.6 612.6,10.5 616.8,9.1 631.4,2.0 635.3,0.0"
 
     /**
      * The real stations on [RAIL], in order from the tunnel's mouth: "x,z,along", the point on the line and how
      * far along it that is, in squares. The game gives them made-up names.
      */
     const val STATIONS =
-        "196.6,62.8,0.1 234.6,64.3,42.7 331.8,32.6,148.6 404.3,50.9,231.1 437.5,43.5,265.0 484.8,33.1,313.6 " +
-        "552.0,21.4,381.8 581.9,15.6,412.2 631.4,2.0,464.0"
+        "196.5,62.8,0.0 234.6,64.3,42.7 331.8,32.6,148.5 404.3,50.9,231.0 437.5,43.5,265.0 484.7,33.1,313.4 " +
+        "552.0,21.4,381.7 581.9,15.6,412.2 631.4,2.0,463.9"
 
     /** The main streets (arterials), one string of points per street, simplified to within half a square. */
     val streets: List<String> = listOf(
@@ -811,9 +811,9 @@ internal object WideMapData {
 
     /**
      * Where each transit zone a room can be in lies: 1 downtown and the West End (the town's corner), 2 the
-     * Burnaby town centre round the big station, 3 the outer edge in Burnaby, the quiet west side of the slope
-     * down to the river, off the line. Each zone is one or more areas, each a string of points round its
-     * edge, cut to the grid.
+     * Burnaby plan area round the big station, 3 a strip of the Burnaby plan area north-west of the big park,
+     * along the city line at the grid's top edge. Each zone is one or more areas, each a string of points
+     * round its edge, cut to the grid.
      */
     val zones: Map<Int, List<String>> = mapOf(
         1 to listOf(
@@ -826,14 +826,17 @@ internal object WideMapData {
             "536.5,0.0 510.6,25.2 553.0,67.9 575.7,45.5 586.9,56.3 602.1,41.4 613.6,29.7 602.6,18.8 621.6,0.0",
         ),
         3 to listOf(
-            "560.1,60.8 553.0,67.9 596.2,110.7 603.1,104.3",
+            "506.8,0.0 489.3,0.0 487.5,1.8 510.6,25.2 521.4,14.7",
         ),
     )
 
-    /** The proposed square of 내 방 in each zone: zone 1's is the town's own. Rough points, never an address. */
+    /**
+     * The square of 내 방 in each zone: zone 1's is the town's own; in zones 2 and 3, the square the build's
+     * written rule picks, on a road between blocks (never on a lot), off the main streets.
+     */
     val homes: Map<Int, Cell> = mapOf(
         1 to Cell(115, 92),
-        2 to Cell(577, 32),
-        3 to Cell(584, 93),
+        2 to Cell(516, 23),
+        3 to Cell(495, 6),
     )
 }
