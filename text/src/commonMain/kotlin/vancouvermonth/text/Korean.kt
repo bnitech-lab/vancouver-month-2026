@@ -189,7 +189,8 @@ fun eventLine(event: Event, month: Month): String = when (event) {
     is Event.Studied -> studied(event.skill) + " " +
         if (event.stepsLeft == 0) "이미 최고 레벨이에요." else stepsLine(event.stepsLeft)
     is Event.Applied -> applied(event.interview)
-    is Event.Rested -> "내 방에서 푹 잤어요. 체력 ${event.energy}/${Month.MAX_ENERGY}"
+    // The month's last night has no morning after it, so it promises no stamina.
+    is Event.Rested -> if (month.isOver) "내 방에서 푹 잤어요." else "내 방에서 푹 잤어요. 체력 ${event.energy}/${Month.MAX_ENERGY}"
     is Event.InterviewHeld -> interviewResult(event, month.canStillApplyThisMonth)
     is Event.LivingCost -> "생활비 -${money(event.amount)}, 잔고 ${money(month.balance)}"
     is Event.Spent -> spentLine(event)

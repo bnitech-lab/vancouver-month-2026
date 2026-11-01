@@ -291,6 +291,11 @@ class KoreanTest {
             eventLine(Event.Applied(Interview(InterviewStage.PHONE_SCREEN, 6)), month),
         )
         assertEquals("내 방에서 푹 잤어요. 체력 5/5", eventLine(Event.Rested(5), month))
+        // After the last night there is no morning: no stamina is promised.
+        val over = month()
+        var last = emptyList<Event>()
+        while (!over.isOver) last = over.take(Action.REST)
+        assertEquals("내 방에서 푹 잤어요.", eventLine(last.first(), over))
         assertEquals(
             "1차 영어 면접 통과! 2차 기술 면접이 9월 9일이에요.",
             eventLine(Event.InterviewHeld(InterviewStage.PHONE_SCREEN, true, Interview(InterviewStage.TECHNICAL, 9)), month),
