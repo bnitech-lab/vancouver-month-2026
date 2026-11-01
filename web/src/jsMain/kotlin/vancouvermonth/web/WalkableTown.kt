@@ -33,6 +33,9 @@ import vancouvermonth.text.Shop
 import vancouvermonth.text.Transport
 import vancouvermonth.text.Weather
 
+/** What a frame of the town costs: draws, triangles, boxes (twelve triangles each) and milliseconds. For the budget test. */
+internal data class FrameCost(val draws: Int, val triangles: Int, val boxes: Int, val millis: Double)
+
 /** What the phone screen needs from the town the player walks in. */
 interface WalkableTown {
     /** The whole town, to fill the screen. */
@@ -168,6 +171,10 @@ interface WalkableTown {
 
     /** Lets go of the drawing for good: the renderer, the shapes and the colours. */
     fun close()
+
+    /** The zone of the room 내 방 stands for: where it stands, and where each morning starts ([HomeSite]). */
+    val homeZone: Int
+        get() = 1
 }
 
 /**
@@ -178,12 +185,13 @@ interface WalkableTown {
 fun openWalkableTown(
     canvas: HTMLCanvasElement = document.createElement("canvas") as HTMLCanvasElement,
     lessMotion: Boolean = window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    homeZone: Int = 1,
 ): WalkableTown? {
     if (lessMotion) return null
     return try {
         // Asking for WebGL before Three.js does lets a browser without it fail quietly.
         val context = canvas.getContext("webgl2", json("antialias" to true, "alpha" to false))
-        if (context == null) null else NeighbourhoodScene(canvas, context)
+        if (context == null) null else NeighbourhoodScene(canvas, context, homeZone)
     } catch (error: Throwable) {
         console.warn("The town could not be drawn:", error)
         null
@@ -199,7 +207,18 @@ fun openWalkableTown(
  * is drawn while the page is hidden. The city's buildings in the camera's way fold down out of it ([Cutaway]), and a
  * small map in the corner shows where the character is ([Minimap]).
  */
-internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context: RenderingContext) : WalkableTown {
+internal class NeighbourhoodScene(
+    private val canvas: HTMLCanvasElement,
+    context: RenderingContext,
+    override val homeZone: Int = 1,
+) : WalkableTown {
+    /** The town as lived in for the room's zone: 내 방 where the room is, and the ground to walk on with it. */
+    private val site = HomeSite.of(homeZone)
+
+    /** Every box that stands still: the town's, then 내 방's; and every glowing one, likewise. */
+    private val stillBlocks = Neighbourhood.blocks + site.blocks
+    private val glowingBlocks = Neighbourhood.glowing + site.glowing
+
     override val element = document.createElement("div") as HTMLElement
     override var onPlace: (Place?) -> Unit = {}
     override var onPasserby: (Passer) -> Unit = {}
@@ -233,9 +252,20 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
      * else.
      */
     private val tiles = mutableListOf<InstancedMesh>()
-    private val tileOf = IntArray(Neighbourhood.blocks.size)
-    private val slotOf = IntArray(Neighbourhood.blocks.size)
+    private val tileOf = IntArray(stillBlocks.size)
+    private val slotOf = IntArray(stillBlocks.size)
     private lateinit var glowing: InstancedMesh
+
+    /**
+     * Each draw of the town that may be left out when far from the camera: where its middle is, how far its boxes reach
+     * from it, and whether it holds anything tall. The haze hides low boxes long before the far plane, so those are
+     * left out from [LOW_REACH] on, tall ones only from [FollowCamera.FAR_PLANE].
+     */
+    private val farMeshes = mutableListOf<InstancedMesh>()
+    private var farX = DoubleArray(0)
+    private var farZ = DoubleArray(0)
+    private var farRadius = DoubleArray(0)
+    private var farReach = DoubleArray(0)
 
     /** The city's buildings that fold down out of the camera's way, and where the camera and character last were. */
     private val cutaway = Cutaway(Neighbourhood.foldables.map { it.box })
@@ -249,7 +279,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
      * The small map in the corner, and what it last showed: the character, the way it faced and the camera. It is drawn
      * again only when one of them moved, it was resized, or the day's place to go changed.
      */
-    private val minimap = Minimap()
+    private val minimap = Minimap(site)
     private var mapX = Double.NaN
     private var mapZ = Double.NaN
     private var mapHeading = Double.NaN
@@ -269,10 +299,10 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     // The town's own life. Everything in it moves by the town's own time, [lifeClock], which a test may set.
     internal var lifeClock: () -> Double = { window.performance.now() }
     private var lifeNow = lifeClock()
-    private val greeters = Neighbourhood.venues.mapIndexed { index, venue ->
+    private val greeters = site.venues.mapIndexed { index, venue ->
         Greeter(venue.person, venue.facing, phase = index * 1.3)
     }
-    private val greeterParts = Neighbourhood.venues.map { Figures.townsperson(personAt(it.place)) }
+    private val greeterParts = site.venues.map { Figures.townsperson(personAt(it.place)) }
     private val greeterFigures = greeterParts.map { FigureBoxes(it) }
 
     /** The bike shop's keeper, who looks about and greets the player as the five places' people do. */
@@ -313,6 +343,12 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     /** How far the train is from its stop at the station, as last drawn. */
     private var trainShift = 0.0
+
+    /**
+     * Where along the guideway the line's own train stands at the station it runs at now: the one by the tunnel's mouth
+     * at first, and then the one nearest where the player looks ([SkyTrainRun.nearestStand]).
+     */
+    private var runStand = SkyTrainRun.STAND
 
     /** The weather drawn now, and the one to come in the dark when it was set while the day changed. */
     private var shownWeather = Weather.SUNNY
@@ -388,7 +424,16 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private lateinit var vehicles: InstancedMesh
     private val busRun = LoopRun(
         TransitLines.busLoop,
-        DoubleArray(TransitLines.busStops.size) { TransitLines.busStops[it].along },
+        TransitLines.busLines[0].stops.map { it.along }.toDoubleArray(),
+        Journey.BUS_SPEED,
+        Journey.BUS_RAMP,
+        BUS_DWELL,
+    )
+
+    /** The bus of the line out to Burnaby, on its own way out and back. */
+    private val burnabyRun = LoopRun(
+        TransitLines.burnabyLoop,
+        TransitLines.busLines[1].stops.map { it.along }.toDoubleArray(),
         Journey.BUS_SPEED,
         Journey.BUS_RAMP,
         BUS_DWELL,
@@ -442,8 +487,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private var labelsFocus: Point? = null
     private var labelsStale = true
 
-    private val home = Neighbourhood.venue(Place.HOME)
-    private val view = FollowCamera(Point(home.door.x, FOCUS_HEIGHT, home.door.z))
+    private val home = site.home
+    private val view = FollowCamera(Point(home.door.x, FOCUS_HEIGHT, home.door.z), site.walls, site.people)
     private val taps = TapTimer()
     private val resizeObserver = ResizeObserver { fit() }
 
@@ -631,9 +676,57 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         sea.castShadow = false
         scene.add(sea)
         scene.add(boxes(ground, material).also { it.castShadow = false })
-        tiled(Neighbourhood.blocks, material)
-        glowing = boxes(Neighbourhood.glowing, glowMaterial)
+        scene.add(boxes(Neighbourhood.corner, material).also { it.castShadow = false })
+        for (tile in Neighbourhood.groundTiles) {
+            val mesh = boxes(tile, material)
+            mesh.castShadow = false
+            scene.add(mesh)
+            far(mesh, tile)
+        }
+        tiled(stillBlocks, material)
+        glowing = boxes(glowingBlocks, glowMaterial)
         scene.add(glowing)
+    }
+
+    /** Notes [mesh], drawing [blocks], as one to leave out when it is far from the camera ([leaveOutFar]). */
+    private fun far(mesh: InstancedMesh, blocks: List<Block>) {
+        var west = Double.MAX_VALUE
+        var east = -Double.MAX_VALUE
+        var north = Double.MAX_VALUE
+        var south = -Double.MAX_VALUE
+        var tallest = 0.0
+        for (block in blocks) {
+            // A turned box reaches past its own sides by up to half its diagonal.
+            val out = if (block.turn == 0.0) 0.0 else hypot(block.width, block.depth) / 2
+            val middleX = block.x + block.width / 2
+            val middleZ = block.z + block.depth / 2
+            west = min(west, min(block.x, middleX - out))
+            east = max(east, max(block.x + block.width, middleX + out))
+            north = min(north, min(block.z, middleZ - out))
+            south = max(south, max(block.z + block.depth, middleZ + out))
+            tallest = max(tallest, block.y + block.height)
+        }
+        val index = farMeshes.size
+        farMeshes.add(mesh)
+        farX = farX.copyOf(index + 1)
+        farZ = farZ.copyOf(index + 1)
+        farRadius = farRadius.copyOf(index + 1)
+        farReach = farReach.copyOf(index + 1)
+        farX[index] = (west + east) / 2
+        farZ[index] = (north + south) / 2
+        farRadius[index] = hypot(east - west, south - north) / 2
+        farReach[index] = if (tallest > TALL) FollowCamera.FAR_PLANE else LOW_REACH
+    }
+
+    /**
+     * Leaves out each draw of [farMeshes] whose boxes all lie farther from the camera's eye at [eyeX], [eyeZ] than it
+     * can be seen, and draws the rest. It makes nothing new, as it runs every frame.
+     */
+    private fun leaveOutFar(eyeX: Double, eyeZ: Double) {
+        for (index in farMeshes.indices) {
+            val away = hypot(farX[index] - eyeX, farZ[index] - eyeZ) - farRadius[index]
+            farMeshes[index].visible = away < farReach[index]
+        }
     }
 
     /**
@@ -652,7 +745,10 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
                 tileOf[index] = tiles.size
                 slotOf[index] = slot
             }
-            tiles.add(boxes(members.map { blocks[it] }, material).also { scene.add(it) })
+            val tile = members.map { blocks[it] }
+            val mesh = boxes(tile, material).also { scene.add(it) }
+            tiles.add(mesh)
+            far(mesh, tile)
         }
     }
 
@@ -694,7 +790,9 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     /** The buses, water buses and the taxi in one draw, placed again as they move; the ones ridden hidden until a ride. */
     private fun addVehicles() {
-        val models = listOf(TransitLines.bus, TransitLines.bus, TransitLines.boat, TransitLines.boat, TransitLines.taxi)
+        val models = listOf(
+            TransitLines.bus, TransitLines.bus, TransitLines.boat, TransitLines.boat, TransitLines.taxi, TransitLines.bus,
+        )
         vehicles = movingBoxes(models.flatten(), material)
         for (slot in listOf(RIDE_BUS, RIDE_BOAT, TAXI)) hideVehicle(slot)
         placeLoopVehicles(lifeNow)
@@ -730,7 +828,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val cars = Neighbourhood.CARS
         trainCars = movingBoxes(List(cars) { Neighbourhood.trainCar }.flatten(), trainMaterial)
         trainWindows = movingBoxes(List(cars) { Neighbourhood.trainCarWindows }.flatten(), trainGlowMaterial)
-        val fire = Neighbourhood.campfire
+        val fire = site.campfire
         flames.add(boxes(Neighbourhood.flames, flameMaterial).also { it.castShadow = false })
         flames.position.set(fire.x, Neighbourhood.FLAME_BASE, fire.z)
         scene.add(flames)
@@ -756,7 +854,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         rain.renderOrder = 1
         meshes.add(rain)
         scene.add(rain)
-        puddles = boxes(Rain.puddles, material)
+        puddles = boxes(Rain.puddlesAt(site), material)
         puddles.castShadow = false
         puddles.visible = false
         scene.add(puddles)
@@ -782,7 +880,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     /** Each building's name, floating over it; a tap on the name talks to the place's person, as a tap on them does. */
     private fun addLabels() {
-        for (venue in Neighbourhood.venues) {
+        for (venue in site.venues) {
             val label = document.createElement("button") as HTMLButtonElement
             label.type = "button"
             label.className = "place-name"
@@ -953,21 +1051,29 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     override val travelling: Transport?
         get() = journey?.transport
 
-    /** The taxi's way from where the character stands to each place, worked out once while it stands there. */
+    /**
+     * The taxi's way from where the character stands to each place, worked out once while it stands there: all of the
+     * places a taxi goes in one search over the ground, as the wide map's ways are long.
+     */
     private var taxiFrom: Spot? = null
     private val taxiWays = mutableMapOf<Spot, List<Spot>?>()
+    private val taxiStops = TransitLines.taxiStopsFor(homeZone)
 
     /** The way along the streets from where the character stands to [to], or null when it cannot get there. */
     private fun taxiWay(to: Spot): List<Spot>? {
         if (taxiFrom != spot) {
             taxiFrom = spot
             taxiWays.clear()
+            val places = taxiStops.map { it.second }
+            val routes = site.grid.routes(spot, places)
+            for ((index, place) in places.withIndex()) taxiWays[place] = usable(routes[index], place)
         }
-        return taxiWays.getOrPut(to) {
-            val route = Neighbourhood.grid.route(spot, to)
-            route.takeIf { it.size >= 2 && it.last() == to && distanceBetween(spot, to) > TAXI_NOT_NEEDED }
-        }
+        return taxiWays.getOrPut(to) { usable(site.grid.route(spot, to), to) }
     }
+
+    /** [route] as a taxi's way to [to]: null when it does not get there, or [to] is too near to need one. */
+    private fun usable(route: List<Spot>, to: Spot): List<Spot>? =
+        route.takeIf { it.size >= 2 && it.last() == to && distanceBetween(spot, to) > TAXI_NOT_NEEDED }
 
     override fun taxiDistance(to: Spot): Double? =
         taxiWay(to)?.zipWithNext { a, b -> distanceBetween(a, b) }?.sum()
@@ -975,8 +1081,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     override fun canTravel(transport: Transport, from: Int, to: Int): Boolean {
         if (sitting || nightFell != null || journey != null) return false
         if (to !in 0 until TransitLines.count(transport) || to == from) return false
-        if (transport == Transport.TAXI) return from == -1 && taxiWay(TransitLines.taxiStops[to].second) != null
-        if (from !in 0 until TransitLines.count(transport)) return false
+        if (transport == Transport.TAXI) return from == -1 && taxiWay(taxiStops[to].second) != null
+        if (from !in 0 until TransitLines.count(transport) || !TransitLines.joins(transport, from, to)) return false
         return distanceBetween(spot, TransitLines.waitAt(Stop(transport, from))) <= TransitLines.STOP_REACH
     }
 
@@ -999,8 +1105,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         journey = made
         journeyStarted = now
         if (transport == Transport.SKYTRAIN) {
-            val stand = Neighbourhood.TRAIN_STOP + Neighbourhood.TRAIN_LENGTH / 2
-            val scheduled = SkyTrainRun.shiftAt(lifeNow) + stand
+            val scheduled = SkyTrainRun.shiftAt(lifeNow) + runStand
             // The line's own train already standing at the station is the one boarded; elsewhere it comes in faded.
             trainFadesIn = abs(scheduled - made.railFrom) > 0.5 || !SkyTrainRun.isShownAt(lifeNow) ||
                 trainBackAt + TRAIN_FADE > now
@@ -1017,14 +1122,17 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             val start = TransitLines.stations[from].along
             val end = TransitLines.stations[to].along
             val way = Journey.wayOn(Neighbourhood.guideway, start, end, TRAIN_GOING_ON)
+            // A long ride goes faster at its quickest, as a train between far stations does.
+            val cruise = Journey.trainCruise(abs(end - start))
             Journey(
-                transport, way, abs(end - start), TransitLines.stations[to].door, Journey.TRAIN_SPEED,
-                Journey.TRAIN_RAMP, start, if (end >= start) 1.0 else -1.0,
+                transport, way, abs(end - start), TransitLines.stations[to].door, cruise,
+                Journey.trainRamp(cruise), start, if (end >= start) 1.0 else -1.0,
             )
         }
         Transport.BUS -> {
             val stops = TransitLines.busStops
-            val (way, distance) = Journey.roundLoop(TransitLines.busLoop, stops[from].along, stops[to].along, Journey.GOING_ON)
+            val loop = TransitLines.lineOf(from).loop
+            val (way, distance) = Journey.roundLoop(loop, stops[from].along, stops[to].along, Journey.GOING_ON)
             Journey(transport, way, distance, stops[to].wait, Journey.BUS_SPEED, Journey.BUS_RAMP)
         }
         Transport.WATER_BUS -> {
@@ -1035,7 +1143,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
                 from = docks[from].wait,
             )
         }
-        Transport.TAXI -> taxiWay(TransitLines.taxiStops[to].second)?.let { route ->
+        Transport.TAXI -> taxiWay(taxiStops[to].second)?.let { route ->
             val there = route.zipWithNext { a, b -> distanceBetween(a, b) }.sum()
             // After dropping the character, the taxi turns back down the street it came along.
             val back = alongFor(route.reversed(), Journey.GOING_ON)
@@ -1239,7 +1347,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     /** Shrinks the vehicle whose boxes start at [slot] to nothing. */
     private fun hideVehicle(slot: Int) {
         val model = when (slot) {
-            RIDE_BUS, BUS_ON_LOOP -> TransitLines.bus
+            RIDE_BUS, BUS_ON_LOOP, BURNABY_BUS -> TransitLines.bus
             RIDE_BOAT, BOAT_ON_LOOP -> TransitLines.boat
             else -> TransitLines.taxi
         }
@@ -1259,8 +1367,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             trainBackAt = now
             return
         }
-        val stand = Neighbourhood.TRAIN_STOP + Neighbourhood.TRAIN_LENGTH / 2
-        trainShift = ride.alongAt(elapsed) - stand
+        trainShift = ride.alongAt(elapsed) - runStand
         placeTrain(trainShift)
         val fadeIn = if (trainFadesIn) (elapsed / Journey.BOARD_MILLIS).coerceIn(0.0, 1.0) else 1.0
         val fadeOut = ((ride.goneMillis - elapsed) / TRAIN_FADE).coerceIn(0.0, 1.0)
@@ -1281,6 +1388,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val place = loopPlace
         TransitLines.busLoop.placeAt(busRun.alongAt(millis), place)
         VehicleBoxes.write(TransitLines.bus, BUS_ON_LOOP, place[0], 0.0, place[1], place[2], false, array)
+        TransitLines.burnabyLoop.placeAt(burnabyRun.alongAt(millis), place)
+        VehicleBoxes.write(TransitLines.bus, BURNABY_BUS, place[0], 0.0, place[1], place[2], false, array)
         TransitLines.boatLoop.placeAt(boatRun.alongAt(millis), place)
         VehicleBoxes.write(TransitLines.boat, BOAT_ON_LOOP, place[0], 0.0, place[1], place[2], false, array)
         vehicles.instanceMatrix.needsUpdate = true
@@ -1289,7 +1398,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     /** A trip on its way goes on from where the character is, at the pace it now goes. */
     private fun goOnFromHere() {
         val current = trip ?: return
-        val route = Neighbourhood.grid.route(spot, current.route.last())
+        val route = site.grid.route(spot, current.route.last())
         if (route.size < 2) return
         trip = Trip(route, paceFor(tripDash))
         tripStarted = window.performance.now()
@@ -1383,6 +1492,11 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         askForFrame()
     }
 
+    /** Sends the character walking to [target], as a tap on the ground there would. For tests. */
+    internal fun walkFor(target: Spot) {
+        walkTo(target, dash = false, opensOnArrival = false)
+    }
+
     /** Puts the character at [spot] at once, the camera with it, for tests that start somewhere on purpose. */
     internal fun standAt(spot: Spot) {
         trip = null
@@ -1424,6 +1538,30 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         }
         val numbers = vehicles.instanceMatrix.array
         return Spot(numbers[slot * 16 + 12].toDouble(), numbers[slot * 16 + 14].toDouble())
+    }
+
+    /**
+     * What a frame of the town costs where the camera is now, for the budget test: [frames] frames drawn at once, each
+     * with the sun's shadows, how many draws, triangles and boxes the last one took (a box is twelve triangles), and the
+     * milliseconds each took on average with the graphics finished.
+     */
+    internal fun measureFrames(frames: Int): FrameCost {
+        val subject = if (sitting) site.benchSeat else spot
+        view.follow(Point(subject.x, focusHeight, subject.z), 0.0)
+        placeCamera()
+        val info = renderer.asDynamic().info.render
+        val gl = renderer.asDynamic().getContext()
+        // Reading a pixel back waits for the frame to be drawn, which a finish alone does not in every browser.
+        val pixel = Uint8Array(4)
+        val started = window.performance.now()
+        for (frame in 0 until frames) {
+            renderer.shadowMap.needsUpdate = true
+            renderer.render(scene, camera)
+            gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel)
+        }
+        val millis = (window.performance.now() - started) / frames
+        val triangles = (info.triangles as Number).toInt()
+        return FrameCost((info.calls as Number).toInt(), triangles, triangles / 12, millis)
     }
 
     /** True while the train is a ride's, not the line's own. For tests. */
@@ -1472,6 +1610,10 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     internal val minimapDot: Pair<Double, Double>
         get() = minimap.dotLeft to minimap.dotTop
+
+    /** The places the small map last pointed to with arrows on its edge, out of its sight. For tests. */
+    internal val minimapPointsTo: Set<Place>
+        get() = minimap.pointedTo
 
     /** How far east of its stop at the station the train was last drawn, for tests. */
     internal val trainShiftDrawn: Double
@@ -1617,14 +1759,14 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             }
             is Picked.AtPlace -> {
                 if (dash) {
-                    walkTo(Neighbourhood.venue(picked.place).talkSpot, dash = true, opensOnArrival = false)
+                    walkTo(site.venue(picked.place).talkSpot, dash = true, opensOnArrival = false)
                 } else {
                     goTalk(picked.place, dash = false)
                 }
             }
             is Picked.OnGround -> {
                 onPlace(null)
-                walkTo(Neighbourhood.landing(spot, picked.spot), dash, opensOnArrival = true)
+                walkTo(site.landing(spot, picked.spot), dash, opensOnArrival = true)
             }
             null -> {}
         }
@@ -1665,7 +1807,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     /** Sends the character to [place]'s person, and opens the place at once. */
     private fun goTalk(place: Place, dash: Boolean) {
-        walkTo(Neighbourhood.venue(place).talkSpot, dash, opensOnArrival = false)
+        walkTo(site.venue(place).talkSpot, dash, opensOnArrival = false)
         onPlace(place)
     }
 
@@ -1723,7 +1865,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         if (sitting) return false
         rentAt = -1
         stopAt = -1
-        val route = Neighbourhood.grid.route(spot, target)
+        val route = site.grid.route(spot, target)
         if (route.size < 2) return false
         tripDash = dash
         trip = Trip(route, paceFor(dash))
@@ -1817,7 +1959,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             travelled = stepJourney(now)
             night = stepNight(now)
             placeCharacter()
-            val subject = if (sitting) Neighbourhood.benchSeat else spot
+            val subject = if (sitting) site.benchSeat else spot
             gliding = view.follow(Point(subject.x, focusHeight, subject.z), millis)
             placeCamera()
             folding = foldBuildings(subject, millis, still)
@@ -1882,7 +2024,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
      * those boxes are put again, in the draws that already hold them.
      */
     private fun placeFolds() {
-        val blocks = Neighbourhood.blocks
+        val blocks = stillBlocks
         for (at in 0 until cutaway.changedCount) {
             val index = cutaway.changed[at]
             val building = Neighbourhood.foldables[index]
@@ -1900,7 +2042,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
 
     /** Draws pane [index] of the glowing glass [shrink] times as tall and as high up, to fit its folding building. */
     private fun shrinkPane(index: Int, shrink: Double) {
-        val box = Neighbourhood.glowing[index]
+        val box = glowingBlocks[index]
         val numbers = glowing.instanceMatrix.array
         numbers[index * 16 + 5] = (box.height * shrink).toFloat()
         numbers[index * 16 + 13] = ((box.y + box.height / 2) * shrink).toFloat()
@@ -1925,7 +2067,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
      * what it marks.
      */
     private fun drawMinimap() {
-        val subject = if (sitting) Neighbourhood.benchSeat else spot
+        val subject = if (sitting) site.benchSeat else spot
         val facing = if (sitting) Neighbourhood.BENCH_FACING else heading
         val eye = view.eye
         val moved = subject.x != mapX || subject.z != mapZ || facing != mapHeading || eye.x != mapEyeX ||
@@ -1953,7 +2095,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val now = lifeClock()
         val millis = (now - lifeNow).coerceIn(0.0, MAX_LIFE_STEP_MILLIS)
         lifeNow = now
-        val player = if (sitting) Neighbourhood.benchSeat else spot
+        val player = if (sitting) site.benchSeat else spot
         var first = 0
         for (index in greeters.indices) {
             val pose = greeters[index].step(now, millis, player)
@@ -1971,6 +2113,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         // The train of a ride is placed with the ride, every frame; otherwise the line's own runs, faded back in after
         // a ride.
         if (trainRide == null) {
+            // Away down the line, the train comes round next at the station nearest where the player looks.
+            if (!SkyTrainRun.isShownAt(now)) runStand = SkyTrainRun.nearestStand(view.focus.x, view.focus.z)
             trainShift = SkyTrainRun.shiftAt(now)
             placeTrain(trainShift)
             val back = ((window.performance.now() - trainBackAt) / TRAIN_FADE).coerceIn(0.0, 1.0)
@@ -1992,11 +2136,11 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         if (rain.visible) placeRain(now)
         // How loud the train and the fire are where the player is: the train at the camera, the fire at the character.
         val night = if (nightFell == null) 0.0 else DayLight.at(nightProgress).glow
-        val fire = Campfire.nearness(distanceBetween(player, Neighbourhood.campfire))
+        val fire = Campfire.nearness(distanceBetween(player, site.campfire))
         val rumble = if (trainRide == null) {
-            SkyTrainRun.rumbleAt(now, view.eye)
+            SkyTrainRun.rumbleAround(runStand + trainShift, SkyTrainRun.speedAt(now), SkyTrainRun.opacityAt(now), view.eye)
         } else {
-            SkyTrainRun.rumble(trainShift, trainRideSpeed, trainMaterial.opacity, view.eye)
+            SkyTrainRun.rumbleAround(runStand + trainShift, trainRideSpeed, trainMaterial.opacity, view.eye)
         }
         tellSounds(rumble, fire, night)
     }
@@ -2027,7 +2171,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
      */
     private fun placeTrain(shift: Double) {
         for (car in 0 until Neighbourhood.CARS) {
-            val west = Neighbourhood.TRAIN_STOP + shift + car * Neighbourhood.CAR_SPACING
+            val west = runStand - Neighbourhood.TRAIN_LENGTH / 2 + shift + car * Neighbourhood.CAR_SPACING
             val middle = west + Neighbourhood.CAR_LENGTH / 2
             val inTunnel = middle + Neighbourhood.CAR_LENGTH / 2 < 0
             val place = trainPlace
@@ -2075,7 +2219,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         }
         drifting.instanceColor?.needsUpdate = true
         crowd.visible = out
-        placePassersby(0.0, if (sitting) Neighbourhood.benchSeat else spot)
+        placePassersby(0.0, if (sitting) site.benchSeat else spot)
         if (rainy) placeRain(lifeNow)
         light(lighting)
         touched()
@@ -2141,8 +2285,8 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
             if (opensOnArrival) onShop()
             return
         }
-        val place = Neighbourhood.placeAt(end) ?: return
-        val venue = Neighbourhood.venue(place)
+        val place = site.placeAt(end) ?: return
+        val venue = site.venue(place)
         if (distanceBetween(end, venue.talkSpot) <= Neighbourhood.REACH) {
             heading = atan2(venue.person.x - end.x, venue.person.z - end.z)
         }
@@ -2242,7 +2386,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         character.visible = true
         mount.visible = true
         if (sitting) {
-            val seat = Neighbourhood.benchSeat
+            val seat = site.benchSeat
             // A little forward on the seat, toward the way the bench faces.
             character.position.set(seat.x, SITTING_LIFT, seat.z + 0.1 * cos(Neighbourhood.BENCH_FACING))
             character.rotation.y = Neighbourhood.BENCH_FACING
@@ -2287,6 +2431,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
     private fun placeCamera() {
         val eye = view.eye
         val focus = view.focus
+        leaveOutFar(eye.x, eye.z)
         camera.position.set(eye.x, eye.y, eye.z)
         camera.lookAt(focus.x, focus.y, focus.z)
         // The sun's shadows are worked out around the character, where they matter, so they stay sharp.
@@ -2313,7 +2458,7 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         // The names are all one line, so the first one tells how tall a name is.
         val tall = labels.values.first().offsetHeight.toDouble()
         for ((place, label) in labels) {
-            placeLabel(label, Neighbourhood.venue(place).labelAnchor, width, height, tall, covered)
+            placeLabel(label, site.venue(place).labelAnchor, width, height, tall, covered)
         }
         placeLabel(shopLabel, Neighbourhood.shop.labelAnchor, width, height, tall, covered)
     }
@@ -2441,6 +2586,11 @@ internal class NeighbourhoodScene(private val canvas: HTMLCanvasElement, context
         val BOAT_ON_LOOP = 2 * TransitLines.bus.size
         val RIDE_BOAT = BOAT_ON_LOOP + TransitLines.boat.size
         val TAXI = RIDE_BOAT + TransitLines.boat.size
+        val BURNABY_BUS = TAXI + TransitLines.taxi.size
+
+        /** A draw with nothing taller than this is left out [LOW_REACH] from the camera, deep in the haze. */
+        const val TALL = 6.5
+        const val LOW_REACH = 175.0
 
         /** How far a bike goes for one turn of its pedals, and how far the legs swing with them, in radians. */
         const val PEDAL_LENGTH = 1.8
