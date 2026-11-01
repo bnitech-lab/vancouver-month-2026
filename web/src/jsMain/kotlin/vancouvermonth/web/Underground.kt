@@ -35,8 +35,13 @@ object UndergroundRide {
     val MOUTH: Spot = Neighbourhood.guideway.points.first()
     val LINE_Z: Double = MOUTH.z
 
-    /** How far along the line the train's middle stands at the station under downtown. */
-    val PLATFORM: Double = TransitLines.stations.first { it.underground }.along
+    /**
+     * The station under downtown: its place among the stations, its name on the sign, and how far along the line the
+     * train's middle stands at it.
+     */
+    val STATION: Int = TransitLines.stations.indexOfFirst { it.underground }
+    val NAME: String = Transit.STATIONS[STATION]
+    val PLATFORM: Double = TransitLines.stations[STATION].along
 
 
     /** Where along x a point [along] the line is, under downtown. */
@@ -590,7 +595,7 @@ internal class UndergroundScene(private val cube: BoxGeometry, shades: DataTextu
             pen.font = "bold 64px sans-serif"
             pen.textAlign = CanvasTextAlign.CENTER
             pen.textBaseline = CanvasTextBaseline.MIDDLE
-            pen.fillText(Transit.STATIONS[0], 256.0, 58.0)
+            pen.fillText(UndergroundRide.NAME, 256.0, 58.0)
             return CanvasTexture(canvas).also {
                 it.colorSpace = SRGB
                 it.needsUpdate = true

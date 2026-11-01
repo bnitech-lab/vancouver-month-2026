@@ -53,6 +53,9 @@ class UndergroundRideTest {
         }
         // The platform's middle is under the station's entrance on the street, and the train fits in the hall.
         val station = stations.first { it.underground }
+        assertEquals(station, stations[UndergroundRide.STATION])
+        assertEquals(station.along, UndergroundRide.PLATFORM)
+        assertEquals("다운타운역", UndergroundRide.NAME)
         assertTrue(abs(station.door.x - UndergroundRide.PLATFORM_X) < 2.0, "${station.door}")
         assertTrue(UndergroundRide.PLATFORM_X - UndergroundRide.TRAIN_HALF > UndergroundRide.HALL_WEST)
         assertTrue(UndergroundRide.PLATFORM_X + UndergroundRide.TRAIN_HALF < UndergroundRide.HALL_EAST)
