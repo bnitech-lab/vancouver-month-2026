@@ -46,7 +46,7 @@ class TownsfolkTest {
         month.playUntil(15)
         // Two weeks of rest leave the coding level low, and nothing else to notice.
         assertEquals(listOf(Situation.LOW_CODING, Situation.ORDINARY), situations(month, false, emptyList()))
-        assertEquals("커피 내릴 줄 알지? 오늘도 한 시간 부탁해.", greeting(Townsperson.HANA, month, false, emptyList()))
+        assertEquals("커피 내릴 줄 알지? 오늘도 한나절 부탁해.", greeting(Townsperson.HANA, month, false, emptyList()))
         assertEquals(Situation.ORDINARY, situations(month(), true, emptyList()).last())
     }
 
@@ -57,7 +57,7 @@ class TownsfolkTest {
             listOf(Situation.FIRST_MEETING, Situation.LOW_CODING, Situation.FIRST_WEEK, Situation.ORDINARY),
             situations(month, firstMeeting = true, yesterday = emptyList()),
         )
-        assertEquals("새로 왔구나? 오늘 손이 모자라. 한 시간만 도와줄래?", greeting(Townsperson.HANA, month, true, emptyList()))
+        assertEquals("새로 왔구나? 오늘 손이 모자라. 오후까지만 도와줄래?", greeting(Townsperson.HANA, month, true, emptyList()))
         assertEquals("비 오는 날엔 손님이 두 배야. 우산 챙겨.", greeting(Townsperson.HANA, month, false, emptyList()))
     }
 
@@ -192,7 +192,7 @@ class TownsfolkTest {
         }
         // What matters more still comes first: a first meeting, or tired eyes.
         assertEquals(
-            "새로 왔구나? 오늘 손이 모자라. 한 시간만 도와줄래?",
+            "새로 왔구나? 오늘 손이 모자라. 오후까지만 도와줄래?",
             greeting(Townsperson.HANA, month(), true, emptyList(), Weather.RAINY),
         )
         val tired = month()

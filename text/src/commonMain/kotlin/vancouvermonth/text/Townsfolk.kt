@@ -104,7 +104,7 @@ fun smallTalk(person: Townsperson, month: Month, count: Int): String {
 /** Each person's line for each situation they react to. Every person has an [Situation.ORDINARY] line. */
 private val greetings: Map<Townsperson, Map<Situation, String>> = mapOf(
     Townsperson.HANA to mapOf(
-        Situation.FIRST_MEETING to "새로 왔구나? 오늘 손이 모자라. 한 시간만 도와줄래?",
+        Situation.FIRST_MEETING to "새로 왔구나? 오늘 손이 모자라. 오후까지만 도와줄래?",
         Situation.NIGHT to "오늘은 문 닫았어. 들어가서 푹 자.",
         Situation.INTERVIEW_TODAY to "오늘 면접이라며? 일은 면접 보고 와서 해. 회사로 가 봐.",
         Situation.LOW_ENERGY to "얼굴이 피곤해 보여. 오늘은 들어가서 쉬어.",
@@ -112,7 +112,7 @@ private val greetings: Map<Townsperson, Map<Situation, String>> = mapOf(
         Situation.RAINY to "오늘 같은 날엔 다들 따뜻한 걸 찾아. 손이 모자라.",
         Situation.LAST_WEEK to "벌써 그달 끝이네. 잘 버텼어.",
         Situation.FIRST_WEEK to "비 오는 날엔 손님이 두 배야. 우산 챙겨.",
-        Situation.ORDINARY to "커피 내릴 줄 알지? 오늘도 한 시간 부탁해.",
+        Situation.ORDINARY to "커피 내릴 줄 알지? 오늘도 한나절 부탁해.",
     ),
     Townsperson.LEO to mapOf(
         Situation.FIRST_MEETING to "조용히... 영어 책은... 저쪽 창가에 있어요.",
