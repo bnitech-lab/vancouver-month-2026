@@ -351,6 +351,27 @@ class ArriveFirstTest {
     }
 
     @Test
+    fun `an answer still enabled spends nothing once the character has been moved away`(): Promise<Unit> {
+        val town = open(zone = 1)
+        val cafe = Neighbourhood.venue(Place.CAFE)
+        return play(
+            Step("the café's talk at its door, then the character elsewhere with no redraw", { town.isStill }) {
+                town.standAt(cafe.door)
+                tapName(Place.CAFE)
+                val shift = answer()
+                assertFalse(shift.disabled, "no shift at the café: ${shift.textContent}")
+                val before = hud()
+                town.standAt(Neighbourhood.venue(Place.HOME).door)
+                // The button drawn at the door is still enabled: only the check in the game itself can refuse it.
+                assertFalse(shift.disabled, "the button was drawn again")
+                shift.click()
+                assertEquals(before, hud(), "the shift was worked from afar")
+                assertFalse("방금 있었던 일" in screen, screen)
+            },
+        )
+    }
+
+    @Test
     fun `from zone 3 a tap on the near café's name walks there, the talk opens on arrival, and the shift can be worked`():
         Promise<Unit> {
         val town = open(zone = 3)
