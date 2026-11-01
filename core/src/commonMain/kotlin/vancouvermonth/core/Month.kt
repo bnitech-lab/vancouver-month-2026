@@ -57,7 +57,8 @@ enum class Item { BIKE, E_SCOOTER }
 /**
  * What money can go on in the town without spending stamina or time: something to keep ([buys]), or one ride's fare.
  * Each costs [price]; a taxi's fare depends on the trip, so it may cost anything from its [price] up to [most]
- * ([TaxiFare]). All of them are invented. A ride that is free with the month's pass (the SkyTrain, the bus) needs no spending at all.
+ * ([TaxiFare]). All of them are invented. A ride that is free with the month's pass (the SkyTrain, the bus) needs no
+ * spending at all.
  */
 enum class Spending(val price: Int, val buys: Item? = null, val most: Int = price) {
     BIKE(350, Item.BIKE),

@@ -181,8 +181,8 @@ class PhoneGame private constructor(
     private var focusNext: String? = null
 
     /**
-     * The sound switch, and the sounds of a talk and of the change of day; null for a game with no sound. Its tune keeps
-     * the month's own time while a month is played.
+     * The sound switch, and the sounds of a talk and of the change of day; null for a game with no sound. Its tune
+     * keeps the month's own time while a month is played.
      */
     internal var sound: Sound? = null
         set(value) {

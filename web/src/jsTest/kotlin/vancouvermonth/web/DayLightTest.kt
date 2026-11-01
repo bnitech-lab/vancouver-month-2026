@@ -98,7 +98,8 @@ class DayLightTest {
             assertEquals(DayLight.during(share), into.toLighting(), "at $share")
             for (weather in Weather.entries) {
                 val greyed = DayLight.underSky(TownLight().set(into), weather)
-                assertEquals(DayLight.weathered(DayLight.during(share), weather), greyed.toLighting(), "$weather at $share")
+                val expected = DayLight.weathered(DayLight.during(share), weather)
+                assertEquals(expected, greyed.toLighting(), "$weather at $share")
             }
         }
         for (progress in (0..20).map { it / 20.0 }) {

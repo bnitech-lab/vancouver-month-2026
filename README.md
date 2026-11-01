@@ -329,7 +329,8 @@ night (23:00), with the lamps and windows coming on toward evening and the passe
 one of those hours. What happened goes over the top of the screen, and the top card shows the time and the stamina left.
 With nothing but sleep left (no stamina, or too little for anything still open), a line there says to go home to sleep;
 the character walks, rides or takes a taxi home as by day. Sleep starts only with the character at 내 방: in a talk
-with the neighbour opened from afar, 자기 waits with "내 방에 도착하면 잘 수 있어요." until it arrives. Sleep ends the day: from the time it is, on to a
+with the neighbour opened from afar, 자기 waits with "내 방에 도착하면 잘 수 있어요." until it arrives. Sleep ends the day: from the
+time it is, on to a
 night with the windows, lamps and campfire lit, then the morning, in 1.5 seconds; the character spends the night sitting
 on the bench by the campfire, with the camera come round to the far side of the fire, and in the morning it stands at
 내 방's door and the camera is the player's own again. Nothing ever takes the character home on its own: a new month
@@ -383,7 +384,8 @@ pentatonic over soft chords and a low note, at 70 beats a minute, in a loop of 1
 (A A' B A''). The theme comes from a fixed seed, and each pass through the loop changes a few notes a little, so it
 never repeats exactly. The clock colours it, the month's own while a month is played and the phone's on the screens
 around it: the whole tune by day (from 6:00), a softer, sparser and darker one in the evening (from 18:00), and at
-night (from 22:00) only a quiet bed of soft noise that rises and falls like the sea, under a few slow notes. A talk opens with a soft blip, a line types out with very quiet ticks (at most
+night (from 22:00) only a quiet bed of soft noise that rises and falls like the sea, under a few slow notes. A talk
+opens with a soft blip, a line types out with very quiet ticks (at most
 one every 110 ms), and the change of day rings a gentle chime.
 
 The town has sounds of its own, made from noise in code in the same way. On a rainy day a soft bed of rain plays under
