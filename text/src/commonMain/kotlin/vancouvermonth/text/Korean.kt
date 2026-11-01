@@ -171,6 +171,12 @@ fun clockName(hour: Int): String {
 /** Under 자기 in 내 방's talk while the character is still on its way there: the sleep waits for it. */
 const val SLEEP_ON_ARRIVAL = "내 방에 도착하면 잘 수 있어요."
 
+/** Under the answer of any other talk open before the character has come: what is done there waits for it. */
+const val DO_ON_ARRIVAL = "도착하면 할 수 있어요."
+
+/** On the top card, on the month's first very long walk only: the walk is the player's to shorten. */
+const val FAR_WALK_HINT = "멀어요. 택시나 스카이트레인을 타면 빨라요."
+
 /**
  * A short line telling the player to go home to sleep, when nothing but sleep is left today: no stamina at all, or
  * too little for anything still open. Null while something can still be done, on an interview day before the
@@ -298,6 +304,9 @@ fun todaysRunResult(run: TodaysRun, guessMoney: Int, ending: Ending, day: Int): 
  * the office applied at, followed by 로 or 으로 as its last syllable asks ([towardParticle]).
  */
 fun interviewDayLine(office: String): String = "오늘은 면접 날이에요. $office${towardParticle(office)} 가세요."
+
+/** On the top card while a tap from afar has the character on its way to [place]: "비탈 카페로 가는 중". */
+fun onTheWayLine(place: String): String = "$place${towardParticle(place)} 가는 중"
 
 /**
  * The particle for "to" after [word]: 으로 after a syllable ending in a consonant other than ㄹ (도서관으로), 로 after a

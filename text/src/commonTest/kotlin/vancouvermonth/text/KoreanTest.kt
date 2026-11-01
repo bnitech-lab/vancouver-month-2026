@@ -394,6 +394,14 @@ class KoreanTest {
     }
 
     @Test
+    fun `the top card says where a tap from afar sent the character, with 로 or 으로 as the name asks`() {
+        assertEquals("비탈 카페로 가는 중", onTheWayLine("비탈 카페"))
+        assertEquals("시내 도서관으로 가는 중", onTheWayLine("시내 도서관"))
+        assertEquals("내 방으로 가는 중", onTheWayLine("내 방"))
+        assertEquals("자전거 가게로 가는 중", onTheWayLine(Shop.NAME))
+    }
+
+    @Test
     fun `every reason money cannot be spent reads as Korean`() {
         assertEquals(
             listOf("9월이 끝났어요.", "이미 있어요.", "잔고가 모자라요.", "이걸 사면 9월 생활비가 모자라요."),
