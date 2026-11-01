@@ -49,7 +49,7 @@ class TerminalGameTest {
         val (_, screen) = playWith(1011, "2", "1300", "2")
         val expectedLines = ("BNI Tech" + sample).lines().map { it.trimEnd() }.filter { it.isNotBlank() }
         val shownLines = screen.lines().map { it.trimEnd() }.filter { it.isNotBlank() }
-        // The README stops after the first day; the screen goes on to the next day's question.
+        // The README stops at the first day's second question, where the input ends.
         assertEquals(expectedLines, shownLines.take(expectedLines.size))
     }
 
@@ -57,7 +57,7 @@ class TerminalGameTest {
     fun `a whole month of rest ends on the 30th and offers another run`() {
         val answers = arrayOf("3", "1165") + Array(29) { "5" } + arrayOf("y")
         val (again, screen) = playWith(1011, *answers)
-        assertTrue("[9월 30일] 남은 날 1일" in screen)
+        assertTrue("[9월 30일 아침 8시] 남은 날 1일" in screen)
         assertTrue("9월이 끝났어요." in screen)
         assertTrue(again)
     }
@@ -107,9 +107,42 @@ class TerminalGameTest {
 
     @Test
     fun `an action the player cannot take is explained and asked again`() {
-        val (_, screen) = playWith(1011, "3", "1165", "1", "1", "1", "1", "1", "1")
-        assertTrue("체력 0/5" in screen)
-        assertTrue("지금은 못 해요. 체력이 없어요. 쉬어야 해요." in screen)
+        val (_, screen) = playWith(1011, "3", "1165", "1", "1", "2", "4", "4", "1")
+        // A shift leaves two of five: another shift is short, a study fits, and then it is night.
+        assertTrue("[9월 2일 오후 5시] 남은 날 29일" in screen, screen)
+        assertTrue("체력 2/5" in screen)
+        assertTrue("지금은 못 해요. 체력이 모자라요." in screen)
+        assertTrue("[9월 2일 밤 11시] 남은 날 29일" in screen, screen)
+        assertTrue("  밤이에요. 체력을 다 썼어요. 내 방에 가서 자요." in screen.lines(), screen)
+        assertTrue("지금은 못 해요. 체력이 없어요. 내 방에 가서 자요." in screen)
+    }
+
+    @Test
+    fun `a day holds several actions, the clock moves with the stamina, and sleep starts the next morning`() {
+        val (_, screen) = playWith(1011, "3", "1165", "4", "2", "3", "5")
+        val headers = screen.lines().filter { it.startsWith("[9월") }
+        assertEquals(
+            listOf(
+                "[9월 2일 아침 8시] 남은 날 29일",
+                "[9월 2일 오전 11시] 남은 날 29일",
+                "[9월 2일 오후 5시] 남은 날 29일",
+                "[9월 2일 밤 11시] 남은 날 29일",
+                "[9월 3일 아침 8시] 남은 날 28일",
+            ),
+            headers,
+        )
+        val lines = screen.lines()
+        for (line in listOf(
+            "  연락이 왔어요! 1차 영어 면접이 9월 6일에 잡혔어요.",
+            "  4) 지원서 넣기   면접이 잡힐 확률 27%, 체력 -1   (면접이 잡혀 있어요.)",
+            "  영어 공부를 했어요. 레벨업까지 3번",
+            "  코딩 연습을 했어요. 레벨업까지 3번",
+            "  밤이에요. 체력을 다 썼어요. 내 방에 가서 자요.",
+            "  5) 자기          다음 날 아침, 체력 5",
+            "  내 방에서 푹 잤어요. 체력 5/5",
+        )) {
+            assertTrue(line in lines, "Missing: $line\n$screen")
+        }
     }
 
     @Test
@@ -119,7 +152,7 @@ class TerminalGameTest {
         assertEquals("27%", percent(0.27))
         assertEquals("50%", percent(0.05 + 0.09 * 5))
         assertEquals("29%", percent(0.05 + 0.08 * 3))
-        assertEquals("쉬기          ", padToColumns("쉬기", 14))
+        assertEquals("자기          ", padToColumns("자기", 14))
         assertEquals("지원서 넣기   ", padToColumns("지원서 넣기", 14))
     }
 

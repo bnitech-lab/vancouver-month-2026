@@ -10,8 +10,10 @@ import vancouvermonth.core.TodaysRun
 import vancouvermonth.text.actionEffect
 import vancouvermonth.text.actionName
 import vancouvermonth.text.arrivalLines
+import vancouvermonth.text.bedtimeLine
 import vancouvermonth.text.breakdown
 import vancouvermonth.text.cheapestLine
+import vancouvermonth.text.clockName
 import vancouvermonth.text.date
 import vancouvermonth.text.endingLine
 import vancouvermonth.text.eventLine
@@ -37,7 +39,8 @@ import vancouvermonth.text.whyTotalLines
 
 /**
  * Plays one run as text: the room and the guess at its total on September 1st, the guess's money as the month starts,
- * then one action a day until the month ends.
+ * then the month, one choice at a time: each action costs stamina and moves the day's clock, and sleep starts the next
+ * day, until the month ends.
  * Input and output are passed in, so a test can play a whole run.
  * [input] returns null when the input ends (Ctrl+D), which ends the game.
  */
@@ -134,15 +137,17 @@ class TerminalGame(
         line()
     }
 
+    /** Where the day stands, its date and time first, then what can be done now, each with its stamina or why not. */
     private fun showDay(month: Month) {
-        line("[${date(month.day)}] 남은 날 ${month.daysLeft}일")
+        line("[${date(month.day)} ${clockName(month.hour)}] 남은 날 ${month.daysLeft}일")
         line("  잔고 ${money(month.balance)} · 10월 1일에 낼 총비용 ${money(month.room.totalMonthlyCost)}")
         line("  영어 ${month.english}/${Month.MAX_SKILL} · 코딩 ${month.coding}/${Month.MAX_SKILL} · 체력 ${month.energy}/${Month.MAX_ENERGY}")
         month.interview?.let { line("  면접: ${stageName(it.stage)} ${date(it.day)} (통과 확률 ${percent(month.passChance(it.stage))})") }
         if (month.hasInterviewToday) {
-            line("  오늘은 면접 날이에요.")
+            line("  오늘은 면접 날이에요. 면접부터 봐요.")
         } else {
-            line("오늘 할 일 하나:")
+            bedtimeLine(month)?.let { line("  $it") }
+            line("지금 할 일:")
             Action.entries.forEachIndexed { index, action -> line("  ${index + 1}) ${describe(action, month)}") }
         }
     }
@@ -185,7 +190,7 @@ class TerminalGame(
     private fun askAction(month: Month): Action? {
         val actions = Action.entries
         while (true) {
-            val answer = ask("오늘 할 일? (1-${actions.size}) > ") ?: return null
+            val answer = ask("지금 할 일? (1-${actions.size}) > ") ?: return null
             val index = parseRoomChoice(answer, actions.size)
             val blocked = index?.let { month.blockedBy(actions[it]) }
             when {
