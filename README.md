@@ -328,7 +328,8 @@ a soft morning (8:00) through a bright day (14:00) and a warm late afternoon (17
 night (23:00), with the lamps and windows coming on toward evening and the passersby going home; a rainy day greys every
 one of those hours. What happened goes over the top of the screen, and the top card shows the time and the stamina left.
 With nothing but sleep left (no stamina, or too little for anything still open), a line there says to go home to sleep;
-the character walks, rides or takes a taxi home as by day. Sleep at 내 방 ends the day: from the time it is, on to a
+the character walks, rides or takes a taxi home as by day. Sleep starts only with the character at 내 방: in a talk
+with the neighbour opened from afar, 자기 waits with "내 방에 도착하면 잘 수 있어요." until it arrives. Sleep ends the day: from the time it is, on to a
 night with the windows, lamps and campfire lit, then the morning, in 1.5 seconds; the character spends the night sitting
 on the bench by the campfire, with the camera come round to the far side of the fire, and in the morning it stands at
 내 방's door and the camera is the player's own again. Nothing ever takes the character home on its own: a new month

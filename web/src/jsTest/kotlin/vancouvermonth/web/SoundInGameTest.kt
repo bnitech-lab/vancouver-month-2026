@@ -33,6 +33,8 @@ internal class QuietTown : WalkableTown {
     var taxiSquares: Double? = 30.0
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
+    override var onArrived: (Place) -> Unit = {}
+    override val isHome = true
     override var isCovered = false
     override var weather = Weather.SUNNY
     override var onSounds: (Double, Double, Double) -> Unit = { _, _, _ -> }

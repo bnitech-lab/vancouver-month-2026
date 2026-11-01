@@ -39,6 +39,7 @@ import vancouvermonth.text.Continue
 import vancouvermonth.text.actionName
 import vancouvermonth.text.money
 import vancouvermonth.text.Passer
+import vancouvermonth.text.SLEEP_ON_ARRIVAL
 import vancouvermonth.text.Transit
 import vancouvermonth.text.Transport
 import vancouvermonth.text.Weather
@@ -61,6 +62,8 @@ private class SilentTown : WalkableTown {
     var taxiSquares: Double? = 30.0
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
+    override var onArrived: (Place) -> Unit = {}
+    override val isHome = true
     override var isCovered = false
     override var weather = Weather.SUNNY
     override var onSounds: (Double, Double, Double) -> Unit = { _, _, _ -> }
@@ -235,6 +238,15 @@ class WalkableTownTest {
         val name = root.querySelectorAll(".place-name").asList().map { it as HTMLButtonElement }
             .first { it.textContent == place.label }
         name.click()
+    }
+
+    /**
+     * Opens 내 방's talk with the character at its door, where a night's sleep can start, as a walk home leaves it: the
+     * way home from downtown is too long for a test to walk every night.
+     */
+    private fun talkAtHome(town: NeighbourhoodScene) {
+        town.standAt(Neighbourhood.venue(Place.HOME).door)
+        talkTo(Place.HOME)
     }
 
     /** The answer that spends the day, in the open talk. */
@@ -747,7 +759,7 @@ class WalkableTownTest {
                     return
                 }
                 talkTo(Place.OFFICE)
-                if (spendButton().disabled) talkTo(Place.HOME)
+                if (spendButton().disabled) talkAtHome(town)
                 spendButton().click()
                 whenReady({ !town.isChangingDay }, reject) { nextDay() }
             }
@@ -801,7 +813,7 @@ class WalkableTownTest {
                     talkTo(Place.OFFICE)
                 } else {
                     talkTo(placeFor(action))
-                    if (spendButton().disabled) talkTo(Place.HOME)
+                    if (spendButton().disabled) talkAtHome(town)
                 }
                 val sleep = "자기" in spendButton().textContent.orEmpty()
                 view = Triple(town.cameraTurn, town.cameraTilt, town.cameraDistance)
@@ -900,6 +912,35 @@ class WalkableTownTest {
     }
 
     @Test
+    fun `sleep starts only at 내 방, and a talk opened from afar offers it once the character arrives`():
+        Promise<Unit> {
+        val town = startInTown()
+        val home = Neighbourhood.venue(Place.HOME)
+        return play(
+            Step("from the library, talk to the neighbour", { town.isStill }) {
+                town.standAt(Neighbourhood.venue(Place.LIBRARY).door)
+                talkTo(Place.HOME)
+                assertFalse(town.isHome)
+                assertTrue(spendButton().disabled, "sleep from afar")
+                assertTrue(SLEEP_ON_ARRIVAL in spendButton().textContent.orEmpty(), spendButton().textContent)
+                spendButton().click()
+                assertFalse(town.isChangingDay, "the night fell far from 내 방")
+                assertTrue("오늘9월 2일" in screen, screen)
+                // Most of the way home at once, to keep the test short; the last steps are walked.
+                town.standAt(home.door)
+                town.walkFor(home.talkSpot)
+            },
+            Step("arrived at the neighbour", { town.isStill }) {
+                assertTrue(town.isHome)
+                assertNotNull(root.querySelector(".talk"), "the talk closed")
+                assertFalse(spendButton().disabled, "no sleep at 내 방")
+                spendButton().click()
+                assertTrue(town.isChangingDay, "no night's sleep at 내 방")
+            },
+        )
+    }
+
+    @Test
     fun `the passersby go home as the day's time runs out, and are out again in the morning`(): Promise<Unit> {
         val town = startInTown(night = 1_500.0, pass = 300.0)
         return play(
@@ -913,7 +954,7 @@ class WalkableTownTest {
             },
             Step("at night", { !town.isPassingTime && !town.arePassersbyOut }) {
                 assertEquals(1.0, town.timeShown, 1e-9)
-                talkTo(Place.HOME)
+                talkAtHome(town)
                 tap("자기")
                 assertTrue(town.isChangingDay)
             },
@@ -1106,7 +1147,7 @@ class WalkableTownTest {
                 if (day < rainyDay) {
                     assertFalse(town.isRaining, "rain on day $day")
                     assertEquals(" 날씨 ${weatherWord(weatherOn(1011, day))}", word, "day $day")
-                    talkTo(Place.HOME)
+                    talkAtHome(town)
                     spendButton().click()
                     day++
                     whenReady({ !town.isChangingDay }, reject) { nextDay() }
@@ -1184,7 +1225,7 @@ class WalkableTownTest {
                         talkTo(Place.OFFICE)
                     } else {
                         talkTo(placeFor(cycle[(seen.size - 1) % cycle.size]))
-                        if (spendButton().disabled) talkTo(Place.HOME)
+                        if (spendButton().disabled) talkAtHome(town)
                     }
                     spendButton().click()
                     whenReady({ !town.isChangingDay }, reject) {

@@ -167,6 +167,9 @@ fun clockName(hour: Int): String {
     return "$part ${twelve}시"
 }
 
+/** Under 자기 in 내 방's talk while the character is still on its way there: the sleep waits for it. */
+const val SLEEP_ON_ARRIVAL = "내 방에 도착하면 잘 수 있어요."
+
 /**
  * A short line telling the player to go home to sleep, when nothing but sleep is left today: no stamina at all, or
  * too little for anything still open. Null while something can still be done, on an interview day before the

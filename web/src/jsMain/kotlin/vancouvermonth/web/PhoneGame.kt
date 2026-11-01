@@ -59,6 +59,7 @@ import vancouvermonth.text.passerLine
 import vancouvermonth.text.passPrices
 import vancouvermonth.text.percent
 import vancouvermonth.text.Riding
+import vancouvermonth.text.SLEEP_ON_ARRIVAL
 import vancouvermonth.text.Shop
 import vancouvermonth.text.smallTalk
 import vancouvermonth.text.stageName
@@ -763,6 +764,8 @@ class PhoneGame private constructor(
             show()
         }
         town.onMorning = { dayChanging = false }
+        // Once the character reaches 내 방 with its talk open, the sleep it offers can start.
+        town.onArrived = { place -> if (place == Place.HOME && talkingAt == Place.HOME && !dayChanging) show() }
         town.onSounds = { train, fire, night -> sound?.nearby(train, fire, night) }
         town.onFail = {
             walkable = null
@@ -967,12 +970,17 @@ class PhoneGame private constructor(
         }
         val action = actionAt(place)
         val blocked = month.blockedBy(action)
+        // A night's sleep starts only with the character at 내 방: a talk opened from afar waits for it to arrive.
+        val onTheWay = action == Action.REST && blocked == null && walkable?.isHome == false
         button("keyword spend") {
-            disabled = blocked != null
+            disabled = blocked != null || onTheWay
             child("span", "action-name", keyword(action))
             child("span", "action-effect", actionEffect(action, month))
             if (blocked != null) child("span", "action-why", whyNot(blocked))
-            onclick = { spend(month, place, Choice.Take(action)) }
+            if (onTheWay) child("span", "action-why", SLEEP_ON_ARRIVAL)
+            onclick = {
+                if (action != Action.REST || walkable?.isHome != false) spend(month, place, Choice.Take(action))
+            }
         }
     }
 

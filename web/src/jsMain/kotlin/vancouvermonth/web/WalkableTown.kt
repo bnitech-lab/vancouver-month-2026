@@ -132,6 +132,18 @@ interface WalkableTown {
     var onMorning: () -> Unit
 
     /**
+     * Called when a walk the player sent by a place's name or person ends there, with that place: the talk opened at
+     * once, and what it offers may change now that the character has come.
+     */
+    var onArrived: (Place) -> Unit
+
+    /**
+     * True when the character stands at 내 방, by its door or its neighbour: a night's sleep starts only there, so
+     * nothing ever takes the character home.
+     */
+    val isHome: Boolean
+
+    /**
      * True while a card covers most of the town, as a talk does. The town's own life then moves at a slower beat,
      * to spare the battery.
      */
@@ -250,6 +262,10 @@ internal class NeighbourhoodScene(
     override var onTravelled: () -> Unit = {}
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
+    override var onArrived: (Place) -> Unit = {}
+
+    override val isHome: Boolean
+        get() = sitting || site.placeAt(spot) == Place.HOME
     override var onSounds: (Double, Double, Double) -> Unit = { _, _, _ -> }
 
     private val renderer = WebGLRenderer(json("canvas" to canvas, "context" to context))
@@ -2393,7 +2409,7 @@ internal class NeighbourhoodScene(
         }
         val streetSide = if (venue.doorFacesSouth) 0.0 else PI
         if (!cameraMovedOnWalk) view.aim(streetSide, FollowCamera.ARRIVAL_TILT, view.distance)
-        if (opensOnArrival) onPlace(place)
+        if (opensOnArrival) onPlace(place) else onArrived(place)
     }
 
     /** Moves the light through evening, night and morning. True while the change of day goes on. */
