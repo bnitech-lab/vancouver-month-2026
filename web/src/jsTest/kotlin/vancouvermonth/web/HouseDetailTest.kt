@@ -24,6 +24,7 @@ import org.khronos.webgl.get
  * town, the low rows of the blocks drawn one by one put away.
  */
 class HouseDetailTest {
+    private val casterNumbers = Float32Array(HouseDetail.CASTER_CAPACITY * 16)
     private val numbers = Float32Array(HouseDetail.CAPACITY * 16)
 
     /** A camera's tan of half its view across, on a 375 by 812 phone, and up and down at 60 degrees. */
@@ -37,11 +38,32 @@ class HouseDetailTest {
         return Point(focus.x + cos(pitch) * sin(yaw) * reach, 1.0 + sin(pitch) * reach, focus.z + cos(pitch) * cos(yaw) * reach)
     }
 
+    private fun detailOf(yards: List<Yard>) = HouseDetail(yards, casterNumbers, numbers)
+
     private fun HouseDetail.fillFor(eye: Point, focus: Spot, foldOf: (Int) -> Double = { 0.0 }) =
         fill(eye.x, eye.y, eye.z, focus.x, 1.0, focus.z, tanAcross, tanUp, foldOf)
 
+    /** One box the last fill wrote: its sixteen numbers, its colour, and whether it is in the draw that casts shadows. */
+    private class Box(val numbers: DoubleArray, val colour: Int, val casts: Boolean) {
+        val tipped: Boolean
+            get() = abs(numbers[1]) > 1e-6
+        /** How wide it is along its own width, on the ground. */
+        val across: Double
+            get() = hypot(numbers[0], numbers[2])
+        val height: Double
+            get() = numbers[5]
+    }
+
+    /** Every box the last fill wrote: those round the character first, then the others. */
+    private fun boxes(detail: HouseDetail): List<Box> = listOf(detail.casters to casterNumbers, detail.others to numbers)
+        .flatMap { (draw, array) ->
+            (0 until draw.count).map { box ->
+                Box(DoubleArray(16) { array[box * 16 + it].toDouble() }, draw.colours[box], draw === detail.casters)
+            }
+        }
+
     /** How many of the boxes written are tipped, as only a roof is. */
-    private fun roofs(detail: HouseDetail): Int = (0 until detail.count).count { abs(numbers[it * 16 + 1]) > 1e-6 }
+    private fun roofs(detail: HouseDetail): Int = boxes(detail).count { it.tipped }
 
     /** A block of [count] houses in a row at [x], [z], straight on the grid, 1.2 wide with 1.5 between. */
     private fun yardAt(x: Double, z: Double, count: Int = 2, foldable: Int = 0): Yard {
@@ -51,54 +73,64 @@ class HouseDetailTest {
         return Yard(TurnedBox(x, z, count * 2.7, 2.0, 0.0), Block(x - count * 1.35, 0.0, z - 1.0, count * 2.7, 0.035, 2.0, 0xA4CC74), emptyList(), houses)
     }
 
+    /** The camera [away] east of [spot], looking west at the character standing 21 squares in front of it. */
+    private fun HouseDetail.fillEastOf(spot: Spot, away: Double) =
+        fillFor(Point(spot.x + away, 8.0, spot.z), Spot(spot.x + away - FollowCamera.START_DISTANCE, spot.z))
+
     @Test
     fun `near the camera and in its view, a block's houses stand one by one, with roofs and doors`() {
         val focus = Neighbourhood.home(2).door
         val eye = eyeFor(focus, FollowCamera.START_YAW)
-        val detail = HouseDetail(Neighbourhood.yards, numbers)
+        val detail = detailOf(Neighbourhood.yards)
         detail.fillFor(eye, focus)
         assertTrue(detail.count in 100 until HouseDetail.CAPACITY, "${detail.count} boxes")
         val shown = Neighbourhood.yards.filterIndexed { index, _ -> detail.shown[index] }
         assertTrue(shown.size > 10, "only ${shown.size} blocks near zone 2's 내 방")
-        // Each shown block is within reach, and in front of the camera; one well behind it never is.
+        // Each shown block is within reach, and in front of the camera, or round the character.
         val ahead = Spot(focus.x - eye.x, focus.z - eye.z)
         for (yard in shown) {
             val away = hypot(yard.middle.x - eye.x, yard.middle.z - eye.z) - yard.reach
             assertTrue(away <= HouseDetail.REACH, "${yard.middle} is $away away")
+            if (distanceBetween(yard.middle, focus) - yard.reach <= HouseDetail.SHADOW_NEAR) continue
             val toward = (yard.middle.x - eye.x) * ahead.x + (yard.middle.z - eye.z) * ahead.z
             assertTrue(toward > -yard.reach * hypot(ahead.x, ahead.z), "${yard.middle} is behind the camera")
         }
         assertTrue(shown.size < Neighbourhood.yards.size / 4)
+        // Every block round the character is drawn one by one, in view or not, into the draw that casts shadows.
+        val round = Neighbourhood.yards.indices.filter {
+            distanceBetween(Neighbourhood.yards[it].middle, focus) - Neighbourhood.yards[it].reach <= HouseDetail.SHADOW_NEAR
+        }
+        assertTrue(round.isNotEmpty() && round.all { detail.shown[it] })
+        assertTrue(detail.casters.count > 0 && detail.casters.count < detail.count)
         // A roof for each house in those blocks but the ones at the very edge of reach, which have not grown on yet.
         val houses = shown.sumOf { it.houses.size }
         assertTrue(roofs(detail) in houses * 3 / 4..houses, "${roofs(detail)} roofs for $houses houses")
         assertEquals(detail.changedCount, shown.size)
         // Turned the other way round, other blocks: those first shown go, and others come.
         detail.fillFor(eyeFor(focus, FollowCamera.START_YAW + PI), focus)
-        assertTrue(detail.changedCount > shown.size / 2)
+        assertTrue(detail.changedCount > (shown.size - round.size) / 2)
     }
 
     @Test
     fun `a roof grows on over the last stretch of reach, so nothing pops, and nothing is drawn past it`() {
         val yards = listOf(yardAt(500.0, 50.0, count = 1))
-        val detail = HouseDetail(yards, numbers)
+        val detail = detailOf(yards)
         val house = yards[0].houses[0]
+        val spot = Spot(house.shape.x, house.shape.z)
         val full = (house.shape.width + 2 * Suburbs.EAVE) / kotlin.math.sqrt(2.0)
-        // The camera east of the house, looking at it, close by, halfway into the stretch, and past reach.
+        // The camera east of the house, looking toward it, close by and halfway into the stretch.
         for ((away, share) in listOf(20.0 to 1.0, HouseDetail.REACH - HouseDetail.GROW / 2 to 0.5)) {
-            val eye = Point(house.shape.x + away, 8.0, house.shape.z)
-            detail.fillFor(eye, Spot(house.shape.x, house.shape.z))
-            val roof = (0 until detail.count).first { abs(numbers[it * 16 + 1]) > 1e-6 }
-            val size = hypot(numbers[roof * 16].toDouble(), numbers[roof * 16 + 1].toDouble())
-            assertEquals(full * share, size, 1e-3, "at $away")
+            detail.fillEastOf(spot, away)
+            val roof = boxes(detail).first { it.tipped }
+            assertEquals(full * share, hypot(roof.numbers[0], roof.numbers[1]), 1e-3, "at $away")
             assertTrue(detail.shown[0])
         }
-        detail.fillFor(Point(house.shape.x + HouseDetail.REACH + 5, 8.0, house.shape.z), Spot(house.shape.x, house.shape.z))
+        detail.fillEastOf(spot, HouseDetail.REACH + 5)
         assertFalse(detail.shown[0])
         // Past reach only the lawn, as far as the lawns go.
         assertEquals(1, detail.count)
         assertEquals(0, roofs(detail))
-        detail.fillFor(Point(house.shape.x + HouseDetail.LAWN_REACH + 5, 8.0, house.shape.z), Spot(house.shape.x, house.shape.z))
+        detail.fillEastOf(spot, HouseDetail.LAWN_REACH + 5)
         assertEquals(0, detail.count)
     }
 
@@ -106,23 +138,21 @@ class HouseDetailTest {
     fun `at the edge of reach a row's houses are its low box, and coming near they grow into themselves`() {
         val yard = Neighbourhood.yards.first { yard -> yard.rows == 1 && yard.houses.size == 2 && yard.houses.all { it.slotShift != 0.0 } }
         val row = Neighbourhood.blocks[yard.firstRow]
-        val detail = HouseDetail(listOf(yard), numbers)
+        val detail = detailOf(listOf(yard))
         // Looking across the row from just inside reach: each house's walls are its share, the shares as wide as the box.
         val turn = yard.houses[0].shape.turn
         val far = HouseDetail.REACH - 0.01
         val eye = Point(yard.middle.x + sin(turn) * far, 8.0, yard.middle.z + cos(turn) * far)
         detail.fillFor(eye, yard.middle)
         assertTrue(detail.shown[0])
-        val walls = (0 until detail.count).filter { abs(numbers[it * 16 + 5] - 0.035f) > 1e-3 && abs(numbers[it * 16 + 1]) < 1e-6 }
-            .filter { detail.colours[it] == yard.houses[0].colour }
+        val walls = boxes(detail).filter { abs(it.height - 0.035) > 1e-3 && !it.tipped && it.colour == yard.houses[0].colour }
         assertEquals(2, walls.size)
-        val widths = walls.map { hypot(numbers[it * 16].toDouble(), numbers[it * 16 + 2].toDouble()) }
-        assertEquals(row.width, widths.sum(), 0.01)
-        for (at in walls) assertEquals(row.height, numbers[at * 16 + 5].toDouble(), 0.01)
+        assertEquals(row.width, walls.sumOf { it.across }, 0.01)
+        for (box in walls) assertEquals(row.height, box.height, 0.01)
         // Close by, each is its own width, the yard between them open.
         detail.fillFor(Point(yard.middle.x + sin(turn) * 20.0, 8.0, yard.middle.z + cos(turn) * 20.0), yard.middle)
-        val near = (0 until detail.count).filter { abs(numbers[it * 16 + 1]) < 1e-6 && detail.colours[it] == yard.houses[0].colour }
-        for (at in near) assertEquals(yard.houses[0].shape.width, hypot(numbers[at * 16].toDouble(), numbers[at * 16 + 2].toDouble()), 1e-3)
+        val near = boxes(detail).filter { !it.tipped && it.colour == yard.houses[0].colour }
+        for (box in near) assertEquals(yard.houses[0].shape.width, box.across, 1e-3)
     }
 
     @Test
@@ -131,27 +161,27 @@ class HouseDetailTest {
         val house = yards[0].houses[0]
         val spot = Spot(house.shape.x, house.shape.z)
         val edge = HouseDetail.REACH + yards[0].reach + HouseDetail.HOLD / 2
-        val detail = HouseDetail(yards, numbers)
+        val detail = detailOf(yards)
         // Coming from near, it is still drawn just past reach; coming from far, not yet.
-        detail.fillFor(Point(house.shape.x + 30.0, 8.0, house.shape.z), spot)
+        detail.fillEastOf(spot, 30.0)
         assertTrue(detail.shown[0])
-        detail.fillFor(Point(house.shape.x + edge, 8.0, house.shape.z), spot)
+        detail.fillEastOf(spot, edge)
         assertTrue(detail.shown[0], "dropped at the edge")
-        detail.fillFor(Point(house.shape.x + edge + HouseDetail.HOLD, 8.0, house.shape.z), spot)
+        detail.fillEastOf(spot, edge + HouseDetail.HOLD)
         assertFalse(detail.shown[0])
-        detail.fillFor(Point(house.shape.x + edge, 8.0, house.shape.z), spot)
+        detail.fillEastOf(spot, edge)
         assertFalse(detail.shown[0], "drawn again at the edge")
     }
 
     @Test
     fun `a folded house has no roof, and its walls stand at the plinth`() {
         val yards = listOf(yardAt(500.0, 50.0, count = 2, foldable = 10))
-        val detail = HouseDetail(yards, numbers)
+        val detail = detailOf(yards)
         val eye = Point(510.0, 8.0, 50.0)
         // The first house folded all the way, the second standing.
         detail.fillFor(eye, Spot(500.0, 50.0)) { if (it == 10) 1.0 else 0.0 }
         assertEquals(1, roofs(detail))
-        val heights = (0 until detail.count).filter { abs(numbers[it * 16 + 1]) < 1e-6 }.map { numbers[it * 16 + 5].toDouble() }
+        val heights = boxes(detail).filter { !it.tipped }.map { it.height }
         assertTrue(heights.any { abs(it - Cutaway.PLINTH) < 1e-6 }, "$heights")
         assertTrue(heights.any { abs(it - 1.2) < 1e-6 }, "$heights")
     }
@@ -159,15 +189,15 @@ class HouseDetailTest {
     @Test
     fun `with too many blocks in view the farthest go without, never more boxes than it holds`() {
         // Rows of blocks reaching away from a camera looking along them: far more than it holds.
-        val yards = (0 until 40).flatMap { row -> (0 until 12).map { across -> yardAt(500.0 + row * 1.8, 40.0 + across * 2.2, count = 3) } }
-        val detail = HouseDetail(yards, numbers)
-        detail.fillFor(Point(470.0, 12.0, 52.0), Spot(520.0, 52.0))
-        assertTrue(detail.count <= HouseDetail.CAPACITY)
-        assertTrue(detail.count > HouseDetail.CAPACITY - 12, "${detail.count}")
+        val yards = (0 until 40).flatMap { row -> (0 until 20).map { across -> yardAt(500.0 + row * 1.8, 30.0 + across * 2.2, count = 4) } }
+        val detail = detailOf(yards)
+        detail.fillFor(Point(470.0, 12.0, 52.0), Spot(491.0, 52.0))
+        assertTrue(detail.others.count <= HouseDetail.CAPACITY && detail.casters.count <= HouseDetail.CASTER_CAPACITY)
+        assertTrue(detail.others.count > HouseDetail.CAPACITY - 12, "${detail.others.count}")
         // Along the middle of the view: the near ones all drawn, and some within reach left out.
         val middle = yards.indices.filter { abs(yards[it].middle.z - 52.0) < 2.0 }
-        assertTrue(middle.filter { yards[it].middle.x < 507.0 }.all { detail.shown[it] })
-        assertTrue(middle.any { !detail.shown[it] && yards[it].middle.x - 470.0 < HouseDetail.REACH })
+        assertTrue(middle.filter { yards[it].middle.x < 507.0 }.all { detail.shown[it] }, "a near one left out")
+        assertTrue(middle.any { !detail.shown[it] && yards[it].middle.x - 470.0 < HouseDetail.REACH }, "none left out")
     }
 
     private var town: NeighbourhoodScene? = null

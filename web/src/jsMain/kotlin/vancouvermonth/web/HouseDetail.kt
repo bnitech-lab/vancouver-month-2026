@@ -14,17 +14,27 @@ import org.khronos.webgl.set
  * wide), which the town always draws; within [REACH] of the camera and in its view, a block's houses stand one by one
  * instead ([shown]), each growing out of its share of its row's low box, the yards opening and its roof and door
  * growing on, over the last [GROW] as the camera comes nearer; the lawns reach on to [LAWN_REACH]. A house folds out
- * of the camera's way as the city's buildings do, its roof sinking with its walls. [fill] writes them into [numbers]
- * (sixteen for each box, as a draw of many boxes keeps them) and [colours], the nearest blocks first and never more than
- * [CAPACITY] boxes, making nothing new.
+ * of the camera's way as the city's buildings do, its roof sinking with its walls. [fill] writes them into two draws:
+ * the blocks near the character, which cast the sun's shadows ([casters], written into [casterNumbers]), and the rest in
+ * view, which cast none ([others], into [numbers]), the nearest blocks first and never more than each holds, making
+ * nothing new.
  */
-internal class HouseDetail(private val yards: List<Yard>, private val numbers: Float32Array) {
-    /** Each box's colour, as 0xRRGGBB, for the first [count] boxes. */
-    val colours = IntArray(CAPACITY)
+internal class HouseDetail(private val yards: List<Yard>, casterNumbers: Float32Array, numbers: Float32Array) {
+    /**
+     * The blocks within [SHADOW_NEAR] of the character, all of them drawn one by one, in view or not, so the sun's
+     * shadows round the character are the houses' own; only they go through the shadow pass.
+     */
+    val casters = NearDraw(casterNumbers, CASTER_CAPACITY)
 
-    /** How many boxes the last [fill] wrote. */
-    var count = 0
-        private set
+    /** The other blocks in view and within reach, and the lawns past it, which cast no shadow. */
+    val others = NearDraw(numbers, CAPACITY)
+
+    /** The draw being written. */
+    private var into = others
+
+    /** How many boxes the last [fill] wrote, in both draws. */
+    val count: Int
+        get() = casters.count + others.count
 
     private val middleX = DoubleArray(yards.size) { yards[it].middle.x }
     private val middleZ = DoubleArray(yards.size) { yards[it].middle.z }
@@ -32,6 +42,9 @@ internal class HouseDetail(private val yards: List<Yard>, private val numbers: F
 
     /** How far each block is from the camera on the ground, its nearest edge, or -1.0 when it is out of the camera's view. */
     private val away = DoubleArray(yards.size)
+
+    /** True for each block within [SHADOW_NEAR] of the character. */
+    private val byCharacter = BooleanArray(yards.size)
 
     /** True for each block whose houses the last [fill] drew one by one, in place of its rows' low boxes. */
     val shown = BooleanArray(yards.size)
@@ -42,9 +55,9 @@ internal class HouseDetail(private val yards: List<Yard>, private val numbers: F
         private set
 
     /**
-     * Writes the roofs, doors, lawns and trees for a camera at [eyeX], [eyeY], [eyeZ] looking at [focusX], [focusY],
-     * [focusZ], seeing [tanAcross] to each side and [tanUp] up and down for each unit ahead; [foldOf] says how far each
-     * of [Neighbourhood.foldables] is folded as drawn.
+     * Writes the houses, lawns and trees for a camera at [eyeX], [eyeY], [eyeZ] looking at the character's [focusX],
+     * [focusY], [focusZ], seeing [tanAcross] to each side and [tanUp] up and down for each unit ahead; [foldOf] says how
+     * far each of [Neighbourhood.foldables] is folded as drawn.
      */
     fun fill(
         eyeX: Double,
@@ -78,6 +91,12 @@ internal class HouseDetail(private val yards: List<Yard>, private val numbers: F
             val hold = if (shown[index]) HOLD else 0.0
             val onGround = hypot(middleX[index] - eyeX, middleZ[index] - eyeZ) - reach[index] - hold
             away[index] = -1.0
+            // Round the character, in view or not, as the sun's shadows fall there.
+            byCharacter[index] = hypot(middleX[index] - focusX, middleZ[index] - focusZ) - reach[index] <= SHADOW_NEAR
+            if (byCharacter[index]) {
+                away[index] = kotlin.math.max(0.0, onGround)
+                continue
+            }
             if (onGround > LAWN_REACH) continue
             // A ball round the block and its houses, tried against the four sides of the camera's view.
             val ball = hypot(reach[index], BALL_HEIGHT) + VIEW_SLACK + hold
@@ -92,20 +111,35 @@ internal class HouseDetail(private val yards: List<Yard>, private val numbers: F
             if (kotlin.math.abs(up) > ahead * tanUp + ball * upSlant) continue
             away[index] = kotlin.math.max(0.0, onGround)
         }
-        count = 0
+        casters.count = 0
+        others.count = 0
         changedCount = 0
-        // The nearest blocks first, so when there are too many boxes it is the farthest that go without.
+        // The blocks round the character into the draw that casts shadows, or the other should it be full; then the
+        // nearest blocks first, so when there are too many boxes it is the farthest that go without.
         for (index in yards.indices) {
-            if (away[index] >= 0.0 && away[index] <= REACH / 2) show(index, addYard(yards[index], eyeX, eyeZ, foldOf))
+            if (!byCharacter[index]) continue
+            into = casters
+            var drawn = addYard(yards[index], eyeX, eyeZ, foldOf)
+            if (!drawn) {
+                into = others
+                drawn = addYard(yards[index], eyeX, eyeZ, foldOf)
+            }
+            show(index, drawn)
+        }
+        into = others
+        for (index in yards.indices) {
+            if (!byCharacter[index] && away[index] >= 0.0 && away[index] <= REACH / 2) {
+                show(index, addYard(yards[index], eyeX, eyeZ, foldOf))
+            }
         }
         for (index in yards.indices) {
             val far = away[index]
-            if (far >= 0.0 && far <= REACH / 2) continue
+            if (byCharacter[index] || (far >= 0.0 && far <= REACH / 2)) continue
             show(index, far > REACH / 2 && far <= REACH && addYard(yards[index], eyeX, eyeZ, foldOf))
         }
         for (index in yards.indices) {
             val lawn = yards[index].lawn ?: continue
-            if (away[index] > REACH && count < CAPACITY) addBox(lawn, 1.0, lawn.colour)
+            if (away[index] > REACH && others.count < others.capacity) addBox(lawn, 1.0, lawn.colour)
         }
     }
 
@@ -121,7 +155,7 @@ internal class HouseDetail(private val yards: List<Yard>, private val numbers: F
      * camera is near; false, drawing nothing, when they would not all fit.
      */
     private fun addYard(yard: Yard, eyeX: Double, eyeZ: Double, foldOf: (Int) -> Double): Boolean {
-        if (count + yard.trees.size + 3 * yard.houses.size + 1 > CAPACITY) return false
+        if (into.count + yard.trees.size + 3 * yard.houses.size + 1 > into.capacity) return false
         val lawn = yard.lawn
         if (lawn != null) addBox(lawn, 1.0, lawn.colour)
         for (box in yard.trees) addBox(box, grown(box.x + box.width / 2, box.z + box.depth / 2, eyeX, eyeZ), box.colour)
@@ -187,10 +221,12 @@ internal class HouseDetail(private val yards: List<Yard>, private val numbers: F
         tilt: Double,
         colour: Int,
     ) {
-        if (count >= CAPACITY) return
+        val draw = into
+        if (draw.count >= draw.capacity) return
+        val numbers = draw.numbers
         val tipCosine = cos(tilt)
         val tipSine = sin(tilt)
-        val at = count * 16
+        val at = draw.count * 16
         numbers[at] = (cosine * tipCosine * width).toFloat()
         numbers[at + 1] = (tipSine * width).toFloat()
         numbers[at + 2] = (-sine * tipCosine * width).toFloat()
@@ -207,13 +243,20 @@ internal class HouseDetail(private val yards: List<Yard>, private val numbers: F
         numbers[at + 13] = y.toFloat()
         numbers[at + 14] = z.toFloat()
         numbers[at + 15] = 1f
-        colours[count] = colour
-        count += 1
+        draw.colours[draw.count] = colour
+        draw.count += 1
     }
 
     companion object {
-        /** The most boxes drawn near the camera at once. */
+        /** The most boxes drawn near the camera at once, besides those round the character, and the most of those. */
         const val CAPACITY = 2_400
+        const val CASTER_CAPACITY = 800
+
+        /**
+         * The blocks within this of the character on the ground cast the sun's shadows: the sun's shadow box reaches 15
+         * squares round it (the town's `SHADOW_REACH`), and this a little more.
+         */
+        const val SHADOW_NEAR = 20.0
 
         /** Roofs, doors and trees are drawn this far from the camera, grown on over the last [GROW] of it. */
         const val REACH = 75.0
@@ -237,4 +280,11 @@ internal class HouseDetail(private val yards: List<Yard>, private val numbers: F
         private const val DOOR_DEPTH = 0.04
         private const val DOOR = 0x6B4630
     }
+}
+
+/** One draw of the near houses: [capacity] boxes' numbers, sixteen each, and their colours, the first [count] in use. */
+internal class NearDraw(val numbers: Float32Array, val capacity: Int) {
+    /** Each box's colour, as 0xRRGGBB. */
+    val colours = IntArray(capacity)
+    var count = 0
 }

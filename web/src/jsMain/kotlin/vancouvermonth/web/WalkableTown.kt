@@ -289,10 +289,12 @@ internal class NeighbourhoodScene(
 
     /**
      * The suburbs' houses near the camera, walls, roofs and doors, with their lawns and yard trees ([HouseDetail]), in
-     * one draw written again whenever the camera moves or a building folds, and where the camera was when it was last
-     * written. The houses' own walls among the still boxes are not drawn there ([isHouse]); a block whose houses are
-     * drawn near the camera has its rows' low boxes put away while they are.
+     * two draws written again whenever the camera moves or a house folds: those round the character, which cast the
+     * sun's shadows, and the rest, which cast none; and where the camera was when they were last written. The houses'
+     * own walls among the still boxes are not drawn there ([isHouse]); a block whose houses are drawn near the camera
+     * has its rows' low boxes put away while they are.
      */
+    private lateinit var casterDetails: InstancedMesh
     private lateinit var details: InstancedMesh
     private val isHouse = BooleanArray(stillBlocks.size).also { house ->
         for (each in Neighbourhood.houses) house[each.body] = true
@@ -746,21 +748,27 @@ internal class NeighbourhoodScene(
     }
 
     /**
-     * The draw of the suburbs' houses near the camera, their lawns and yard trees: as many boxes as it may ever hold,
-     * each with a colour from the start, none drawn until the camera is placed ([placeHouseDetail]). They cast the sun's
-     * shadows as the town's other boxes do.
+     * The two draws of the suburbs' houses near the camera, their lawns and yard trees: each as many boxes as it may
+     * ever hold, each with a colour from the start, none drawn until the camera is placed ([placeHouseDetail]). Only
+     * the one round the character casts the sun's shadows, as the shadows are drawn only there.
      */
     private fun addHouseDetail() {
-        details = InstancedMesh(cube, material, HouseDetail.CAPACITY)
-        details.castShadow = true
-        details.receiveShadow = true
-        details.frustumCulled = false
-        details.instanceMatrix.setUsage(DynamicDrawUsage)
-        for (index in 0 until HouseDetail.CAPACITY) details.setColorAt(index, detailColour)
-        details.count = 0
-        houseDetail = HouseDetail(Neighbourhood.yards, details.instanceMatrix.array)
-        meshes.add(details)
-        scene.add(details)
+        casterDetails = nearDraw(HouseDetail.CASTER_CAPACITY, castsShadows = true)
+        details = nearDraw(HouseDetail.CAPACITY, castsShadows = false)
+        houseDetail = HouseDetail(Neighbourhood.yards, casterDetails.instanceMatrix.array, details.instanceMatrix.array)
+    }
+
+    private fun nearDraw(capacity: Int, castsShadows: Boolean): InstancedMesh {
+        val mesh = InstancedMesh(cube, material, capacity)
+        mesh.castShadow = castsShadows
+        mesh.receiveShadow = true
+        mesh.frustumCulled = false
+        mesh.instanceMatrix.setUsage(DynamicDrawUsage)
+        for (index in 0 until capacity) mesh.setColorAt(index, detailColour)
+        mesh.count = 0
+        meshes.add(mesh)
+        scene.add(mesh)
+        return mesh
     }
 
     /**
@@ -790,14 +798,19 @@ internal class NeighbourhoodScene(
             val yard = Neighbourhood.yards[index]
             for (row in yard.firstRow until yard.firstRow + yard.rows) showStill(row, !houseDetail.shown[index])
         }
-        val count = houseDetail.count
-        for (index in 0 until count) details.setColorAt(index, detailColour.setHex(houseDetail.colours[index]))
-        details.count = count
+        sendNear(casterDetails, houseDetail.casters)
+        sendNear(details, houseDetail.others)
+    }
+
+    /** Draws the boxes [draw] holds with [mesh], sending only those to the graphics card again. */
+    private fun sendNear(mesh: InstancedMesh, draw: NearDraw) {
+        val count = draw.count
+        for (index in 0 until count) mesh.setColorAt(index, detailColour.setHex(draw.colours[index]))
+        mesh.count = count
         if (count == 0) return
-        // Only the boxes drawn go to the graphics card again.
-        details.instanceMatrix.addUpdateRange(0, count * 16)
-        details.instanceMatrix.needsUpdate = true
-        val colours = details.instanceColor ?: return
+        mesh.instanceMatrix.addUpdateRange(0, count * 16)
+        mesh.instanceMatrix.needsUpdate = true
+        val colours = mesh.instanceColor ?: return
         colours.addUpdateRange(0, count * 3)
         colours.needsUpdate = true
     }
@@ -1697,7 +1710,7 @@ internal class NeighbourhoodScene(
 
     /** How many of the suburbs' houses, roofs, doors, lawns and yard trees are drawn near the camera now. For tests. */
     internal val houseDetailBoxes: Int
-        get() = details.count
+        get() = casterDetails.count + details.count
 
     /** True when block [yard] of [Neighbourhood.yards] has its houses drawn one by one now. For tests. */
     internal fun isHouseDrawn(yard: Int): Boolean = houseDetail.shown[yard]
