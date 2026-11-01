@@ -148,7 +148,9 @@ class IntroTest {
         val kept = assertNotNull(root.querySelector(".intro .kept"), "No kept month on the intro")
         assertSame(root.querySelector(".intro")?.firstElementChild, kept, "The kept month is not first")
         assertEquals(Continue.TITLE, text(".kept h2"))
-        assertEquals(continueFrom(month.day, month.balance), text(".kept-from"))
+        // At night on the first day, after a study and a shift.
+        assertEquals(continueFrom(month.day, month.balance, month.hour), text(".kept-from"))
+        assertEquals("9월 2일 밤 11시부터 · 잔고 ${money(month.balance)}", text(".kept-from"))
         assertEquals(Continue.NOTE, text(".kept-note"))
         // The story and how to play are still there for whoever forgot.
         assertNotNull(root.querySelector(".intro .story"))

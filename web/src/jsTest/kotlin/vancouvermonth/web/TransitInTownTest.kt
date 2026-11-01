@@ -488,7 +488,8 @@ class TransitInTownTest {
     }
 
     @Test
-    fun `while the bus runs no talk opens and no day can end, and once out a day is spent as ever`(): Promise<Unit> {
+    fun `while the bus runs no talk opens and no day can end, and once out the day ends with a sleep at 내 방`():
+        Promise<Unit> {
         val town = startInTown()
         val from = Stop(Transport.BUS, 4)
         return play(
@@ -509,13 +510,23 @@ class TransitInTownTest {
                 assertTrue(date(Month.FIRST_DAY) in hud())
                 assertTrue(town.travelling == Transport.BUS)
             },
-            Step("out at the park's stop, then home's talk spends the day", arrived(town)) {
+            Step("out at the park's stop, home's talk waits for the character to come home", arrived(town)) {
                 assertFalse(town.isChangingDay)
                 val name = root.querySelectorAll(".place-name").asList().map { it as HTMLButtonElement }
                     .first { it.textContent == Place.HOME.label }
                 name.click()
                 val answer = assertNotNull(root.querySelector(".talk .spend") as? HTMLButtonElement, screen)
+                assertTrue(answer.disabled, "a sleep far from 내 방")
                 answer.click()
+                assertFalse(town.isChangingDay, "the night fell at the park")
+                // Back at 내 방's door at once (the whole way home is the town's own tests'), the last steps walked.
+                town.standAt(Neighbourhood.venue(Place.HOME).door)
+                town.walkFor(Neighbourhood.venue(Place.HOME).talkSpot)
+            },
+            Step("at the neighbour, the sleep ends the day", { town.isStill }) {
+                val home = assertNotNull(root.querySelector(".talk .spend") as? HTMLButtonElement, screen)
+                assertFalse(home.disabled, "no sleep at 내 방")
+                home.click()
                 assertTrue(town.isChangingDay)
             },
         )

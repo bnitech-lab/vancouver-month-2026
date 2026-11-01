@@ -189,7 +189,7 @@ class FirstRunGuideTest {
         assertNotNull(root.querySelector(".talk"))
         assertNotNull(helpButton())
         (root.querySelector(".talk .spend") as HTMLButtonElement).click()
-        assertTrue("9월 2일에 있었던 일" in root.textContent.orEmpty())
+        assertTrue("방금 있었던 일" in root.textContent.orEmpty())
         assertNotNull(helpButton())
         assertNull(card)
     }

@@ -1,9 +1,11 @@
 package vancouvermonth.web
 
+import kotlin.js.Date
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.browser.document
 import org.w3c.dom.HTMLButtonElement
@@ -33,6 +35,12 @@ internal class QuietTown : WalkableTown {
     var taxiSquares: Double? = 30.0
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
+    override var onArrived: (Place) -> Unit = {}
+    override val isHome = true
+
+    override fun passTime(share: Double) {}
+
+    override fun showTime(share: Double) {}
     override var isCovered = false
     override var weather = Weather.SUNNY
     override var onSounds: (Double, Double, Double) -> Unit = { _, _, _ -> }
@@ -80,7 +88,7 @@ internal class QuietTown : WalkableTown {
         onTravelled()
     }
 
-    override fun endDay(place: Place) {
+    override fun endDay() {
         riding = null
         onMorning()
     }
@@ -126,7 +134,7 @@ class SoundInGameTest {
         assertNotNull(parent.querySelector(".sound-switch") as? HTMLButtonElement, "No sound switch: ${parent.innerHTML}")
 
     @Test
-    fun `the switch is on the intro and the day's buttons, and a day changes with a chime`() {
+    fun `the switch is on the intro and the day's buttons, and a night's sleep changes the day with a chime`() {
         val game = PhoneGame(root, 1011, playAgain = {})
         game.sound = sound
         game.show()
@@ -136,11 +144,13 @@ class SoundInGameTest {
         val topbar = assertNotNull(root.querySelector(".topbar") as? HTMLElement)
         assertEquals("소리 끄기", switchIn(topbar).textContent)
         root.button("영어 공부").click()
+        assertEquals(listOf("on"), speaker.asked, "an action ends no day")
+        root.button("자기").click()
         assertEquals(listOf("on", "chime"), speaker.asked)
     }
 
     @Test
-    fun `in the town the switch is in the top card, a talk opens with a blip and a day ends with a chime`() {
+    fun `in the town the switch is in the top card, a talk opens with a blip and a night's sleep with a chime`() {
         val town = QuietTown()
         val game = PhoneGame(root, 1011, playAgain = {}, makeWalkableTown = { town })
         game.sound = sound
@@ -156,7 +166,30 @@ class SoundInGameTest {
         assertNotNull(root.querySelector(".talk"))
         assertNotNull(root.querySelector(".hud .sound-switch"), "The top card lost its switch when the talk opened")
         (root.querySelector(".talk .spend") as HTMLButtonElement).click()
-        assertEquals(listOf("on", "blip", "chime"), speaker.asked.filter { it != "tick" })
+        assertEquals(listOf("on", "blip"), speaker.asked.filter { it != "tick" }, "an action ends no day")
+        town.onPlace(Place.HOME)
+        (root.querySelector(".talk .spend") as HTMLButtonElement).click()
+        assertEquals(listOf("on", "blip", "blip", "chime"), speaker.asked.filter { it != "tick" })
+    }
+
+    @Test
+    fun `the tune keeps the month's own time while a month is played, and the phone's around it`() {
+        val game = PhoneGame(root, 1011, playAgain = {})
+        game.sound = sound
+        game.show()
+        assertNull(sound.gameHour(), "a month's hour on the intro")
+        val before = Date().getHours()
+        val hour = sound.hour()
+        assertTrue(hour == before || hour == Date().getHours(), "not the phone's hour: $hour")
+        startSeed1011(root)
+        assertEquals(8, sound.hour())
+        root.button("영어 공부").click()
+        assertEquals(14, sound.hour())
+        root.button("카페 알바").click()
+        assertEquals(23, sound.hour())
+        assertEquals(Mood.NIGHT, moodAt(sound.hour()))
+        root.button("자기").click()
+        assertEquals(8, sound.hour())
     }
 
     @Test

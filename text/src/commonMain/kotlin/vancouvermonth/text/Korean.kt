@@ -112,6 +112,8 @@ fun monthStartLines(room: Room): List<String> = listOf(
     goalLine(),
     "매일 생활비 ${money(Month.DAILY_LIVING_COST)}이 나가고, " +
         "${date(Month.LAST_DAY + 1)}에는 이 방의 총비용 ${money(room.totalMonthlyCost)}를 또 내야 해요.",
+    "하루는 ${clockName(Month.DAY_STARTS_AT)}에 체력 ${Month.MAX_ENERGY}로 시작해요. 일을 하면 체력만큼 시간이 흘러요.",
+    "체력을 다 쓰면 밤이에요. 내 방에서 자면 다음 날 아침이에요.",
     "면접은 두 번이에요. 1차 영어 면접은 영어 실력, 2차 기술 면접은 코딩 실력으로 붙어요.",
 )
 
@@ -120,32 +122,75 @@ fun actionName(action: Action): String = when (action) {
     Action.STUDY_ENGLISH -> "영어 공부"
     Action.PRACTISE_CODING -> "코딩 연습"
     Action.APPLY -> "지원서 넣기"
-    Action.REST -> "쉬기"
+    Action.REST -> "자기"
 }
 
-fun actionEffect(action: Action, month: Month): String = when (action) {
-    Action.WORK -> "+${money(Month.WORK_PAY)}, 체력 -1"
-    Action.STUDY_ENGLISH -> "영어 +1, 체력 -1"
-    Action.PRACTISE_CODING -> "코딩 +1, 체력 -1"
-    Action.APPLY -> "면접이 잡힐 확률 ${percent(month.applyChance)}, 체력 -1"
-    Action.REST -> "체력 +${Month.REST_GAIN}"
+/** What [action] does now and what it costs: "+$70, 체력 -3", "레벨업까지 3번, 체력 -2", "다음 날 아침, 체력 5". */
+fun actionEffect(action: Action, month: Month): String {
+    val cost = "체력 -${Month.cost(action)}"
+    return when (action) {
+        Action.WORK -> "+${money(Month.WORK_PAY)}, $cost"
+        Action.STUDY_ENGLISH -> "${stepsLine(month.stepsLeft(Skill.ENGLISH))}, $cost"
+        Action.PRACTISE_CODING -> "${stepsLine(month.stepsLeft(Skill.CODING))}, $cost"
+        Action.APPLY -> "면접이 잡힐 확률 ${percent(month.applyChance)}, $cost"
+        Action.REST -> "다음 날 아침, 체력 ${Month.MAX_ENERGY}"
+    }
 }
 
-/** Why an action cannot be taken today, from the reason the month gives. */
+/** How far a skill is from its next level: "레벨업까지 3번", or "최고 레벨" at the top ([left] 0). */
+fun stepsLine(left: Int): String = if (left == 0) "최고 레벨" else "레벨업까지 ${left}번"
+
+/** Why an action cannot be taken now, from the reason the month gives. */
 fun whyNot(blocked: Blocked): String = when (blocked) {
     Blocked.MONTH_OVER -> "9월이 끝났어요."
-    Blocked.INTERVIEW_TODAY -> "오늘은 면접 날이에요."
-    Blocked.NO_ENERGY -> "체력이 없어요. 쉬어야 해요."
+    Blocked.INTERVIEW_TODAY -> "오늘은 면접부터 봐요."
+    Blocked.NO_ENERGY -> "체력이 없어요. 내 방에 가서 자요."
+    Blocked.LOW_ENERGY -> "체력이 모자라요."
+    Blocked.SKILL_MAXED -> "이미 최고 레벨이에요."
     Blocked.INTERVIEW_BOOKED -> "면접이 잡혀 있어요."
+    Blocked.APPLIED_TODAY -> "지원서는 하루에 한 번이에요."
     Blocked.APPLICATIONS_CLOSED -> "지금 지원하면 9월 안에 면접을 다 볼 수 없어요."
+}
+
+/**
+ * The time on today's clock as people say it: "아침 8시", "오전 11시", "낮 12시", "오후 2시", "저녁 8시", "밤 11시".
+ */
+fun clockName(hour: Int): String {
+    val part = when (hour) {
+        in 5..9 -> "아침"
+        in 10..11 -> "오전"
+        12 -> "낮"
+        in 13..17 -> "오후"
+        in 18..20 -> "저녁"
+        else -> "밤"
+    }
+    val twelve = if (hour % 12 == 0) 12 else hour % 12
+    return "$part ${twelve}시"
+}
+
+/** Under 자기 in 내 방's talk while the character is still on its way there: the sleep waits for it. */
+const val SLEEP_ON_ARRIVAL = "내 방에 도착하면 잘 수 있어요."
+
+/**
+ * A short line telling the player to go home to sleep, when nothing but sleep is left today: no stamina at all, or
+ * too little for anything still open. Null while something can still be done, on an interview day before the
+ * interview, and after the month.
+ */
+fun bedtimeLine(month: Month): String? = when {
+    month.isOver || month.hasInterviewToday -> null
+    month.energy == 0 -> "밤이에요. 체력을 다 썼어요. 내 방에 가서 자요."
+    Action.entries.none { it != Action.REST && month.canTake(it) } -> "오늘 할 수 있는 일은 다 했어요. 내 방에 가서 자요."
+    else -> null
 }
 
 /** One line for something that happened on a day. [month] is read after the day, for what it left. */
 fun eventLine(event: Event, month: Month): String = when (event) {
     is Event.Earned -> "카페에서 일했어요. +${money(event.amount)}"
     is Event.SkillUp -> "${skillName(event.skill)} 실력이 올랐어요. ${skillName(event.skill)} ${event.level}/${Month.MAX_SKILL}"
+    is Event.Studied -> "${studied(event.skill)} ${stepsLine(event.stepsLeft)}"
     is Event.Applied -> applied(event.interview)
-    is Event.Rested -> "푹 쉬었어요. 체력 ${event.energy}/${Month.MAX_ENERGY}"
+    // The month's last night has no morning after it, so it promises no stamina.
+    is Event.Rested -> if (month.isOver) "내 방에서 푹 잤어요." else "내 방에서 푹 잤어요. 체력 ${event.energy}/${Month.MAX_ENERGY}"
     is Event.InterviewHeld -> interviewResult(event, month.canStillApplyThisMonth)
     is Event.LivingCost -> "생활비 -${money(event.amount)}, 잔고 ${money(month.balance)}"
     is Event.Spent -> spentLine(event)
@@ -196,6 +241,12 @@ fun whyNotSpend(blocked: SpendBlocked): String = when (blocked) {
     SpendBlocked.ALREADY_OWNED -> "이미 있어요."
     SpendBlocked.NOT_ENOUGH_MONEY -> "잔고가 모자라요."
     SpendBlocked.LIVING_COST -> "이걸 사면 9월 생활비가 모자라요."
+}
+
+/** "영어 공부를 했어요." or "코딩 연습을 했어요.", for a study that did not raise the level yet. */
+private fun studied(skill: Skill): String = when (skill) {
+    Skill.ENGLISH -> "영어 공부를 했어요."
+    Skill.CODING -> "코딩 연습을 했어요."
 }
 
 private fun applied(interview: Interview?): String =

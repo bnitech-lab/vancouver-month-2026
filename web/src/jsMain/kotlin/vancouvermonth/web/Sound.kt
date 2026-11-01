@@ -47,6 +47,15 @@ internal class Sound(
     /** True on a rainy day, kept so a sound made later starts with the rain. */
     private var rainy = false
 
+    /**
+     * The hour on the month's own clock while a month is played, or null on the screens around it: the tune's mood
+     * follows it, and the phone's own clock only when there is none. The game sets it.
+     */
+    var gameHour: () -> Int? = { null }
+
+    /** The hour the tune's mood follows now: the month's, or else the phone's. */
+    fun hour(): Int = gameHour() ?: Date().getHours()
+
     /** The switches on the page now, to show the sound off everywhere if it cannot be made. */
     private val switches = mutableListOf<HTMLButtonElement>()
     private val onFirstTap: (Event) -> Unit = { event -> if (countsAsTap(event)) wake() }
@@ -209,12 +218,19 @@ internal class Sound(
     }
 }
 
-/** The page's sound: remembered in [memory], made with Web Audio where the browser has it, in the mood of the hour. */
-internal fun pageSound(memory: Memory): Sound = Sound(
-    memory,
-    if (hasWebAudio()) {
-        { WebAudioSpeaker(AudioContext(), VillageTune.THEME_SEED) { Date().getHours() } }
-    } else {
-        null
-    },
-)
+/**
+ * The page's sound: remembered in [memory], made with Web Audio where the browser has it, in the mood of the hour: the
+ * month's own while a month is played ([Sound.gameHour]), the phone's around it.
+ */
+internal fun pageSound(memory: Memory): Sound {
+    lateinit var sound: Sound
+    sound = Sound(
+        memory,
+        if (hasWebAudio()) {
+            { WebAudioSpeaker(AudioContext(), VillageTune.THEME_SEED) { sound.hour() } }
+        } else {
+            null
+        },
+    )
+    return sound
+}
