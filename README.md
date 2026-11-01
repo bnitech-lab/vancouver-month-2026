@@ -396,14 +396,20 @@ is the switch, `FirstRunGuide.kt` the card and `Memory.kt` the storage that may 
 
 The rooms are chosen on the whole wide map, north up, as the small map shows it larger: its ground, the stations, stops
 and docks, the places as dots with 회사 and 카페 named, and a pin for each room at the door 내 방 has in that room's zone
-(the West End for zone 1, Burnaby for zones 2 and 3), so the player sees how far each room is from work. A pin carries
+(the West End for zone 1, Burnaby for zones 2 and 3), so the player sees how far each room is from 회사 (where the
+applications and interviews are) and 카페 (where the shifts are). A pin carries
 the room's number; a tap on it picks the room and shows its card under the map (rent, zone, utilities), the guess and
 the real total following as before, and the picked pin stays filled in. The pins are buttons, 44 points across, reached
 with Tab in the rooms' order, each heard by a screen reader as its room in full ("1번 방, 월세 $1,070, 교통 1구역,
 웨스트엔드, 공과금 포함", the area standing in for the map); 회사's and 카페's names are placed where they cover no pin.
 Pins closer than a finger on a narrow map are pushed apart, with a line back to their doors. The map is a 2D canvas, so it is the same on the button screen; where a browser
 cannot draw one, the rooms are the list of buttons they were before. Nothing of the town is made until the month starts.
-`RoomMap` draws it, with the small map's painting (`Minimap`).
+`RoomMap` draws it, with the small map's painting (`Minimap`). The map's ground, and the city's layout it is painted
+from, are made while the intro is read, when the browser is idle, so the rooms open at once after 시작하기; tapped
+before that is done, the rooms screen still shows first and the picture follows just after. A tap made before the rooms
+were on the screen (a second tap on 시작하기, queued while the page was busy) picks no pin. The map is measured only once
+the whole screen is built, so a pick never pulls a scrolled page back up, and it is painted again when the page
+changes size.
 
 ### Patch notes (업데이트 소식)
 
