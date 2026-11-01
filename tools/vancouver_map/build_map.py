@@ -149,30 +149,34 @@ STRAIGHT_ON = 30.0
 LARGEST_BLOCK = 400
 
 # The zones a room can be in, as the room chooser's transit zones: 1 is downtown and the West End (the town's corner),
-# 2 is the Burnaby plan area round the big station, 3 the Burnaby plan area north-west of the big park, along the city
-# line at the grid's top edge. Zone 1 is two of the City of Vancouver's local areas, by name (that layer has no other
-# key); zones 2 and 3 are City of Burnaby community plan areas, by their OBJECTID in that layer. Each is cut to the grid.
+# 2 is the Burnaby plan area round the big station, 3 the outer, pricier one: the Burnaby plan area on the slope south
+# of the big park, down to the river, off the line. Zone 1 is two of the City of Vancouver's local areas, by name (that
+# layer has no other key); zones 2 and 3 are City of Burnaby community plan areas, by their OBJECTID in that layer.
+# Each is cut to the grid.
 ZONE_AREAS = {
     1: [("vancouver", "Downtown"), ("vancouver", "West End")],
     2: [("burnaby", 8)],
-    3: [("burnaby", 15)],
+    3: [("burnaby", 9)],
 }
 # Each Burnaby plan area's size as fetched, in hectares: if a republished layer numbers its areas differently, the
 # build stops instead of drawing the wrong zone. It also stops unless zone 2's area holds two stations and zone 3's
 # area reaches the city line.
-PLAN_AREA_HECTARES = {8: 413.0, 15: 193.6}
-# Zone 3 keeps only the strip of its plan area within this many squares (375 m) east of the area's west edge, the
-# city line.
-ZONE_STRIPS = {3: 15.0}
-# The room in zones 2 and 3 is chosen by rule, never by hand: of the squares in the zone with a 5 x 5 block of plain
+PLAN_AREA_HECTARES = {8: 413.0, 9: 334.4}
+# Zone 3 keeps only the strip of its plan area within this many squares (225 m) east of the area's west edge, the
+# city line: the residential streets down the slope.
+ZONE_STRIPS = {3: 9.0}
+# The room in zones 2 and 3 is chosen by rule, never by hand. Of the squares in the zone with a 5 x 5 block of plain
 # land round them, at least ROOM_INSET squares inside the grid's edges, 2 squares off every main street and 4 off the
 # guideway, whose middle lies on a road (outside every City of Burnaby legal block and City of Vancouver block
-# outline, so never on a lot), the one farthest from the last station inside the grid. Zone 1's room is the town's.
+# outline, so never on a lot), it takes the one farthest from ROOM_AWAY_FROM: in zone 2 the last station inside the
+# grid, in zone 3 회사, so zone 3's room is the farther out. The build stops unless zone 3's room is farther from 회사
+# than zone 2's. Zone 1's room is the town's.
 ROOM_INSET = 5
+ROOM_AWAY_FROM = {2: "last station", 3: "OFFICE"}
 ZONE_NOTES = {
     1: "웨스트엔드 주택가 (지금 내 방)",
     2: "큰 역 구역의 북서쪽 끝 주택가, 시 경계 가까이",
-    3: "큰 공원 북서쪽, 시 경계를 따라 난 주택가",
+    3: "큰 공원 남쪽 비탈, 강 쪽으로 내려가는 시 경계 주택가",
 }
 
 
@@ -1335,7 +1339,8 @@ class WideMap:
         f = self.frame
         lots = LotIndex([[f.game(*p) for p in polygon[0]] for polygon in self.wide.burnaby_blocks]
                         + [[f.game(*p) for p in ring] for ring in self.town.sources.blocks])
-        last = self.stations()[-1][1]
+        away = {"last station": self.stations()[-1][1]}
+        away.update({name: (x + 0.5, z + 0.5) for name, (x, z) in self.town.spots.items()})
         rail = self.rail()
         streets = self.streets()
         zones = self.zones()
@@ -1348,7 +1353,7 @@ class WideMap:
             for z in range(max(ROOM_INSET, math.floor(min(zs))), min(self.rows - ROOM_INSET, math.ceil(max(zs)))):
                 for x in range(max(ROOM_INSET, math.floor(min(xs))), min(self.columns - ROOM_INSET, math.ceil(max(xs)))):
                     middle = (x + 0.5, z + 0.5)
-                    far = math.dist(middle, last)
+                    far = math.dist(middle, away[ROOM_AWAY_FROM[zone]])
                     if best is not None and far <= best[0]:
                         continue
                     if not any(point_in_ring(middle[0], middle[1], shape) for shape in shapes):
@@ -1363,6 +1368,9 @@ class WideMap:
             if best is None:
                 sys.exit(f"zone {zone}: no square meets the rule for a room")
             out[zone] = best[1]
+        office = away["OFFICE"]
+        if math.dist((out[3][0] + 0.5, out[3][1] + 0.5), office) <= math.dist((out[2][0] + 0.5, out[2][1] + 0.5), office):
+            sys.exit("zone 3's room is not farther from 회사 than zone 2's")
         # The rule's road test, said again as a check: no room's middle on a lot.
         for zone, (x, z) in out.items():
             if zone != 1 and lots.holds((x + 0.5, z + 0.5)):
@@ -1717,9 +1725,9 @@ def write_wide_kotlin(wide, fetched, van_hashes, bby_hashes):
     out.append("")
     out.append("    /**")
     out.append("     * Where each transit zone a room can be in lies: 1 downtown and the West End (the town's corner), 2 the")
-    out.append("     * Burnaby plan area round the big station, 3 a strip of the Burnaby plan area north-west of the big park,")
-    out.append("     * along the city line at the grid's top edge. Each zone is one or more areas, each a string of points")
-    out.append("     * round its edge, cut to the grid.")
+    out.append("     * Burnaby plan area round the big station, 3 the outer one: a strip of the Burnaby plan area on the slope")
+    out.append("     * south of the big park, along the city line down toward the river. Each zone is one or more areas, each")
+    out.append("     * a string of points round its edge, cut to the grid.")
     out.append("     */")
     out.append("    val zones: Map<Int, List<String>> = mapOf(")
     for zone, shapes in zones.items():
