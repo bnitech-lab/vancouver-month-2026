@@ -7,6 +7,12 @@ kotlin {
     js {
         // ES modules let webpack leave out the parts of Three.js the town does not use, about a quarter of it.
         useEsModules()
+        // JavaScript classes and arrow functions, which every browser that runs WebGL 2 has, write the page smaller.
+        compilerOptions {
+            target.set("es2015")
+            // A lambda that captures values is written where it is used, not as a function apart that makes it.
+            freeCompilerArgs.add("-Xir-generate-inline-anonymous-functions")
+        }
         browser {
             commonWebpackConfig {
                 outputFileName = "vancouver-month.js"

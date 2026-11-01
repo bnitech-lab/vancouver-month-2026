@@ -52,6 +52,40 @@ class VancouverMapTest {
     }
 
     @Test
+    fun `packed numbers are read as changes from the item before, and a broken packing is refused`() {
+        // The changes 0, 1, -1, 15, 16 and -16 are A, C, D, e, gB and hB, so the numbers run 0, 1, 0, 15, 31, 15.
+        assertEquals(listOf(0, 1, 0, 15, 31, 15), unpackNumbers("ACDegBhB", 1).map { it.single() })
+        // Three characters, as the map's larger numbers take: +1024 is ggC and -1024 is hgC.
+        assertEquals(listOf(1024, 0), unpackNumbers("ggChgC", 1).map { it.single() })
+        assertEquals(listOf(listOf(1, 2), listOf(1, 18)), unpackNumbers("CEAgB", 2).map { it.toList() })
+        assertEquals(emptyList(), unpackNumbers("", 5))
+        assertEquals(listOf(Spot(1.0, 2.5), Spot(-3.0, 4.0)), unpackPoints("UyBxCe"))
+        assertFailsWith<IllegalArgumentException> { unpackNumbers("C,E", 2) }
+        assertFailsWith<IllegalArgumentException> { unpackNumbers("CEA", 2) }
+        assertFailsWith<IllegalArgumentException> { unpackNumbers("Cg", 1) }
+        // The most six characters hold, 2^29 - 1, reads back; 2^30 takes seven, past what an Int holds, and is refused.
+        assertEquals(listOf(536_870_911), unpackNumbers("+////f", 1).map { it.single() })
+        assertFailsWith<IllegalArgumentException> { unpackNumbers("ggggggC", 1) }
+    }
+
+    /**
+     * Each packed number is the change from the one before, so the last point of a line stands for every character
+     * before it. The numbers are the ones `tools/vancouver_map/build_map.py` prints ("packed town shoreline", "packed
+     * town park"); they change only when the map is made again.
+     */
+    @Test
+    fun `the packed shoreline and park read back to the numbers the map script printed`() {
+        val shore = RealVancouver.shoreLines
+        assertEquals(listOf(2, 2, 420), shore.map { it.size })
+        assertEquals(Spot(205.8, -1.0), shore.first().first())
+        assertEquals(Spot(113.5, 156.0), shore.last().last())
+        val park = RealVancouver.park
+        assertEquals(133, park.size)
+        assertEquals(Spot(93.6, 66.1), park.first())
+        assertEquals(Spot(93.6, 66.1), park.last())
+    }
+
+    @Test
     fun `water lies north, west and south of the peninsula`() {
         // The inlet, north of the office towers and the old brick streets.
         for (place in listOf(Place.OFFICE, Place.COWORKING)) {

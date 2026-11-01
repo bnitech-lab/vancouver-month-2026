@@ -31,7 +31,7 @@ class TerrainMap(val columns: Int, val rows: Int, private val squares: List<Terr
     val grid: Grid by lazy { Grid(columns, rows, cellsOf(Terrain.WATER)) }
 
     companion object {
-        /** The map [lines] draw, one line per row and one character per square, as in [VancouverMapData.rows]. */
+        /** The map [lines] draw, one line per row and one character per square, as [unpackRuns] spells out a row. */
         fun parse(lines: List<String>): TerrainMap {
             require(lines.isNotEmpty()) { "A map needs at least one row" }
             val columns = lines.first().length
@@ -47,11 +47,46 @@ class TerrainMap(val columns: Int, val rows: Int, private val squares: List<Terr
     }
 }
 
-/** The points of a line written as "x,z x,z ...", as [VancouverMapData] keeps its lines. */
+/** The points of a line written as "x,z x,z ...", as [VancouverMapData.RAIL] keeps them. */
 fun pointsOf(text: String): List<Spot> = text.split(' ').filter { it.isNotEmpty() }.map { pair ->
     val (x, z) = pair.split(',')
     Spot(x.toDouble(), z.toDouble())
 }
+
+/** The 64 digits of a base-64 VLQ, in order of their value. */
+private const val VLQ_DIGITS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+/**
+ * Whole numbers packed by `tools/vancouver_map`, [fields] to an item: each number written as a base-64 VLQ, as source
+ * maps write them (five bits to a character, lowest first, the sixth set while more follow, the sign in the lowest
+ * bit), and each the change from the same number of the item before (the first item's from 0).
+ */
+fun unpackNumbers(text: String, fields: Int): List<IntArray> {
+    val numbers = mutableListOf<Int>()
+    var value = 0
+    var shift = 0
+    for (char in text) {
+        val digit = VLQ_DIGITS.indexOf(char)
+        require(digit >= 0) { "Not a VLQ digit: '$char'" }
+        value += (digit and 31) shl shift
+        if (digit and 32 != 0) {
+            shift += 5
+            // Six characters at most: a seventh would go past the 32 bits of an Int and read back wrong.
+            require(shift <= 25) { "A packed number longer than six characters" }
+        } else {
+            numbers.add(if (value and 1 == 1) -(value shr 1) else value shr 1)
+            value = 0
+            shift = 0
+        }
+    }
+    require(shift == 0 && numbers.size % fields == 0) { "${numbers.size} numbers do not make items of $fields" }
+    val sums = IntArray(fields)
+    // Item by item by hand: chunked would bring Kotlin's sequence code, about 8 KB, into the page.
+    return (numbers.indices step fields).map { start -> IntArray(fields) { sums[it] += numbers[start + it]; sums[it] } }
+}
+
+/** The points of a line packed as [unpackNumbers] reads them, x and z in tenths of a square. */
+fun unpackPoints(text: String): List<Spot> = unpackNumbers(text, 2).map { (x, z) -> Spot(x / 10.0, z / 10.0) }
 
 /**
  * Real Vancouver, traced from the City of Vancouver's open data by `tools/vancouver_map`: the ground, the shoreline,
@@ -59,13 +94,13 @@ fun pointsOf(text: String): List<Spot> = text.split(' ').filter { it.isNotEmpty(
  * places. [Neighbourhood] builds the town on it.
  */
 object RealVancouver {
-    val map: TerrainMap by lazy { TerrainMap.parse(VancouverMapData.rows) }
+    val map: TerrainMap by lazy { TerrainMap.parse(VancouverMapData.rows.map(::unpackRuns)) }
 
     /** How many metres of the real city one square stands for. */
     const val METRES_PER_UNIT = VancouverMapData.METRES_PER_UNIT
 
-    val shoreLines: List<List<Spot>> by lazy { VancouverMapData.shoreLines.map(::pointsOf) }
-    val park: List<Spot> by lazy { pointsOf(VancouverMapData.PARK) }
+    val shoreLines: List<List<Spot>> by lazy { VancouverMapData.shoreLines.map(::unpackPoints) }
+    val park: List<Spot> by lazy { unpackPoints(VancouverMapData.PARK) }
     val rail: List<Spot> by lazy { pointsOf(VancouverMapData.RAIL) }
     val mountains: List<Spot> by lazy { pointsOf(VancouverMapData.MOUNTAINS) }
     val spots: Map<Place, Cell> get() = VancouverMapData.spots

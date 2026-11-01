@@ -2,7 +2,10 @@ package vancouvermonth.web
 
 import kotlin.math.PI
 
-/** A row written as runs, as [WideMapData.rows] keeps them ("~3.2s"), spelt out square by square ("~~~..s"). */
+/**
+ * A row written as runs, as [WideMapData.rows] and [VancouverMapData.rows] keep them ("~3.2s"), spelt out square by
+ * square ("~~~..s").
+ */
 fun unpackRuns(text: String): String = buildString {
     var index = 0
     while (index < text.length) {
@@ -65,12 +68,11 @@ object WideVancouver {
         }
     }
 
-    val streets: List<List<Spot>> by lazy { WideMapData.streets.map(::pointsOf) }
+    val streets: List<List<Spot>> by lazy { WideMapData.streets.map(::unpackPoints) }
 
     val blocks: List<TurnedLot> by lazy {
-        WideMapData.blocks.flatMap { it.split(' ') }.filter { it.isNotEmpty() }.map {
-            val (x, z, width, depth, degrees) = it.split(',').map(String::toDouble)
-            TurnedLot(Spot(x, z), width, depth, degrees * PI / 180)
+        unpackNumbers(WideMapData.blocks, 5).map { (x, z, width, depth, degrees) ->
+            TurnedLot(Spot(x / 10.0, z / 10.0), width / 10.0, depth / 10.0, degrees * PI / 180)
         }
     }
 

@@ -426,10 +426,9 @@ rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, al
 `Passersby.kt` for the passersby's), and so are each day's weather (`Weather.kt`) and the bike shop's and riding's
 words (`Shop.kt`), and the SkyTrain's, the bus's, the water bus's and the taxi's (`Transit.kt`). `WalkableTown` draws
 all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about 1,044
-KB
-(about 299 KB gzipped), under the 1 MiB aim. `TownBudgetTest` measures what a frame costs downtown (by day and at
-night),
+`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about 942 KB
+(about 283 KB gzipped), under the 1 MiB aim: the maps' rows, long lines and the wide map's blocks are packed small (the map tool's README
+says how), and Kotlin writes the page as ES2015, with JavaScript classes. `TownBudgetTest` measures what a frame costs downtown (by day and at night),
 in East Vancouver, in Burnaby (by day and at night), on a walk, on the train, under downtown and with the camera turning
 (so the near houses are written again each frame), the sun's shadows counted too, and keeps it within a phone's budget.
 
