@@ -764,8 +764,8 @@ internal class NeighbourhoodScene(
     }
 
     /**
-     * Writes the suburbs' houses, lawns and yard trees for the camera as it is now, when it moved or a building folded
-     * since they were last written.
+     * Writes the suburbs' houses, lawns and yard trees for the camera as it is now, when it moved or a house folded
+     * since they were last written: once a frame, after the camera is placed and the buildings folded.
      */
     private fun placeHouseDetail() {
         val eye = view.eye
@@ -1679,6 +1679,7 @@ internal class NeighbourhoodScene(
         val subject = if (sitting) site.benchSeat else spot
         view.follow(Point(subject.x, focusHeight, subject.z), 0.0)
         placeCamera()
+        placeHouseDetail()
         val info = renderer.asDynamic().info.render
         val gl = renderer.asDynamic().getContext()
         // Reading a pixel back waits for the frame to be drawn, which a finish alone does not in every browser.
@@ -2104,6 +2105,8 @@ internal class NeighbourhoodScene(
             gliding = view.follow(Point(subject.x, focusHeight, subject.z), millis)
             placeCamera()
             folding = foldBuildings(subject, millis, still)
+            // Once a frame, after the folds, so a house folding sinks with its roof in the same frame.
+            placeHouseDetail()
             if (!still && pace.stepsLife) stepLife()
             // A town whose life stands still has no train passing and no fire to hear.
             if (still) quietSounds()
@@ -2169,8 +2172,11 @@ internal class NeighbourhoodScene(
         for (at in 0 until cutaway.changedCount) {
             val index = cutaway.changed[at]
             val building = Neighbourhood.foldables[index]
-            // A suburban house folds where it is drawn, near the camera ([placeHouseDetail]), below.
-            if (isHouse[building.body]) continue
+            // A suburban house folds where it is drawn, near the camera: its walls, roof and door are written again.
+            if (isHouse[building.body]) {
+                detailStale = true
+                continue
+            }
             val fold = cutaway.foldOf(index)
             val body = blocks[building.body]
             val full = body.height
@@ -2181,9 +2187,6 @@ internal class NeighbourhoodScene(
             if (building.glassNorth >= 0) shrinkPane(building.glassNorth, shrink)
             if (building.glassSouth >= 0) shrinkPane(building.glassSouth, shrink)
         }
-        // A house's roof and door sink with its walls.
-        detailStale = true
-        placeHouseDetail()
     }
 
     /** Draws pane [index] of the glowing glass [shrink] times as tall and as high up, to fit its folding building. */
@@ -2580,7 +2583,6 @@ internal class NeighbourhoodScene(
         val eye = view.eye
         val focus = view.focus
         leaveOutFar(eye.x, eye.z)
-        placeHouseDetail()
         camera.position.set(eye.x, eye.y, eye.z)
         camera.lookAt(focus.x, focus.y, focus.z)
         // The sun's shadows are worked out around the character, where they matter, so they stay sharp.
