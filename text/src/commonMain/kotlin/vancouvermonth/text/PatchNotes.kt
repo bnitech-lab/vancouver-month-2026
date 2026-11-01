@@ -32,10 +32,27 @@ class PatchNote(
  */
 object PatchNotes {
     /** The newest version, shown by the title; it is [ALL]'s first entry. */
-    const val CURRENT = "0.18"
+    const val CURRENT = "0.19"
 
     /** Every update, newest first. */
     val ALL: List<PatchNote> = listOf(
+        PatchNote(
+            version = "0.19",
+            date = "2026-11-01",
+            headline = "도심을 벗어나면 낮은 집들",
+            added = listOf(
+                "이스트 밴쿠버와 버나비의 주택가가 집 한 채 한 채로 바뀌었어요.",
+                "집마다 경사 지붕과 현관문, 잔디 마당이 있어요.",
+                "마당에 나무가 한두 그루 서 있는 집도 있어요.",
+            ),
+            improved = listOf(
+                "다운타운에서 멀어질수록 집이 작고 낮아지고, 집 사이 마당이 넓어져요.",
+                "역 바로 옆은 중간 높이 건물, 버나비 중심가는 높은 건물 그대로예요.",
+                "집 사이가 넓은 동네에서는 마당으로 걸어서 지나갈 수 있어요.",
+                "2·3구역 내 방의 집과 정원은 그대로이고, 내 방 주변은 주택가예요.",
+                "지도 끝 너머 먼 동네도 낮은 집 높이로 보여요.",
+            ),
+        ),
         PatchNote(
             version = "0.18",
             date = "2026-11-01",

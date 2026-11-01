@@ -3,10 +3,12 @@ package vancouvermonth.web
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 import kotlin.random.Random
 import vancouvermonth.text.Townsperson
 
@@ -311,6 +313,15 @@ object Neighbourhood {
     /** The town corner's buildings as built: a lot each, after the five places and the station took their room. */
     val cityLots: List<Lot>
 
+    /**
+     * East Vancouver's and Burnaby's residential blocks, a detached house on each lot ([Suburbs]), and every one of the
+     * houses. A house's walls are among [blocks], for the cutaway and taps, and it folds as the city's buildings do, but
+     * it is drawn only near the camera ([HouseDetail]); farther off, each row of houses is one low box of [blocks], or
+     * each house one out where the yards are wide ([Suburbs.ROWS_UP_TO]).
+     */
+    val yards: List<Yard>
+    val houses: List<House>
+
     /** True for each square of the grid a building of the city stands on, square by square from the north row. */
     internal val built: BooleanArray
 
@@ -376,6 +387,8 @@ object Neighbourhood {
         flames = town.flames
         blossoms = town.blossoms
         cityLots = town.cityLots
+        yards = town.yards
+        houses = yards.flatMap { it.houses }
         built = town.built
         foldables = town.foldables
         sharedWalls = listOf(Wall(shop.box, null, shop = true)) + town.otherWalls.map { Wall(it, null) } +
@@ -500,6 +513,7 @@ object Neighbourhood {
         val otherWalls = mutableListOf<Block>()
         val foldables = mutableListOf<Foldable>()
         val cityLots = mutableListOf<Lot>()
+        val yards = mutableListOf<Yard>()
         val built = BooleanArray(COLUMNS * ROWS)
         private val map = WideVancouver.map
 
@@ -509,6 +523,12 @@ object Neighbourhood {
          */
         private val random = Random(2026)
         private val wideRandom = Random(2427)
+
+        /** The suburbs' houses draw from their own, so the rest of the wide map comes out as it did before them. */
+        private val houseRandom = Random(2727)
+
+        /** The houses laid out so far, in buckets of [HOUSE_BUCKET] squares, so where two real blocks overlap one wins. */
+        private val housesNear = mutableMapOf<Int, MutableList<TurnedBox>>()
 
         fun add(x: Double, y: Double, z: Double, width: Double, height: Double, depth: Double, colour: Int) {
             blocks.add(Block(x, y, z, width, height, depth, colour))
@@ -668,7 +688,9 @@ object Neighbourhood {
         }
 
         private fun addBeyond(x: Double, z: Double, chances: Random, turn: Double) {
-            val height = 3.0 + chances.nextDouble() * 3.5
+            // Past the wide map's edges the city goes on as low as its far suburbs; past the corner's, as it always was.
+            val tall = 3.0 + chances.nextDouble() * 3.5
+            val height = if (turn == 0.0) tall else BEYOND_LOW + (tall - 3.0) / 3.5 * BEYOND_LOW_SPREAD
             val colour = LOW_COLOURS[chances.nextInt(LOW_COLOURS.size)]
             val body = blocks.size
             val size = BEYOND_BLOCK.toDouble()
@@ -1000,13 +1022,16 @@ object Neighbourhood {
             }
             // The corner's own buildings are kept too, where a wide block reaches back over the corner's edge.
             addWideCity(kept + cityLots + TransitLines.keptForStops + Rides.keptForDocks)
+            plantYards()
         }
 
         /**
-         * East Vancouver and Burnaby: a box on each real block of the wide map ([WideVancouver.blocks]), turned as the
-         * block is and a little smaller, so the streets between are wide enough to walk ([WIDE_SHRINK]). Low houses all
-         * over, a cluster of towers round the Burnaby town centre, and mid-rise round the stations. None on a park or the
-         * water, under or beside the guideway, on a main street, or where [kept] keeps the ground clear.
+         * East Vancouver and Burnaby on the real blocks of the wide map ([WideVancouver.blocks]), each turned as the
+         * block is and a little smaller, so the streets between are wide enough to walk ([WIDE_SHRINK]): a cluster of
+         * towers round the Burnaby town centre, a box of mid-rise on each block round the other stations, and everywhere
+         * else detached houses, one on each lot ([addHouses]). None on a park or the water, under or beside the
+         * guideway, or on a main street; where [kept] keeps the ground clear, no building, and only the houses clear of
+         * it.
          */
         fun addWideCity(kept: List<Lot>) {
             val streets = Samples(WideVancouver.streets + TransitLines.busLines.map { it.loop.points })
@@ -1022,19 +1047,144 @@ object Neighbourhood {
                 if (terrain == Terrain.WATER || terrain == Terrain.PARK) continue
                 val shape = TurnedBox(middle.x, middle.z, width, depth, lot.turn)
                 if (rail.anyWithin(shape, WIDE_RAIL_CLEAR) || streets.anyWithin(shape, WIDE_STREET_CLEAR)) continue
-                if (kept.any { shape.overlaps(it, 0.5) }) continue
-                val chance = wideRandom.nextDouble()
-                val pick = wideRandom.nextDouble()
+                val inKept = kept.any { shape.overlaps(it, 0.5) }
                 val fromCentre = distanceBetween(middle, centre)
                 val nearStation = stations.minOf { distanceBetween(it.spot, middle) }
+                val residential = fromCentre >= TOWN_CENTRE_REACH && nearStation >= STATION_REACH
+                if (inKept && !residential) continue
+                // Drawn for every block that stood before the houses came, so the wide map's other chances are as they were.
+                val chance = if (inKept) 0.0 else wideRandom.nextDouble()
+                val pick = if (inKept) 0.0 else wideRandom.nextDouble()
+                if (residential) {
+                    addHouses(shape, kept.filter { inKept && shape.overlaps(it, 0.5) }, streets)
+                    continue
+                }
                 var (height, colours) = when {
                     fromCentre < TOWN_CENTRE_REACH -> 8.0 + chance * 12.0 * (1 - fromCentre / TOWN_CENTRE_REACH / 2) to TOWER_COLOURS
-                    nearStation < STATION_REACH -> 3.2 + chance * 3.0 to MID_COLOURS
-                    else -> 1.6 + chance * 1.6 to (if (middle.x < BOUNDARY_X) WEST_END_COLOURS else LOW_COLOURS)
+                    else -> 3.2 + chance * 3.0 to MID_COLOURS
                 }
                 // Low right beside the guideway, so the deck never runs into a wall.
                 if (rail.anyWithin(shape, WIDE_RAIL_LOW)) height = min(height, DECK_HEIGHT - 1.5)
                 addTurnedBuilding(shape, height, colours.pick(pick))
+            }
+        }
+
+        /**
+         * A residential block split into lots, a detached house on each ([Suburbs.layOut]), a single row's doors to
+         * a main street beside it ([streets]) if there is one: each house folding as the city's buildings do and
+         * blocking only the squares it stands on, so a yard wide enough is walked through; a yard tree's trunk blocks
+         * its square. Far off, each row of houses is one low box, as long as the row and as tall as its houses on the
+         * whole, out to [Suburbs.ROWS_UP_TO]; farther out, where the yards are wide enough to see, and on a row a house
+         * is missing from, it is a box for each house. A house on a park, on the water, in the town's corner or on a
+         * lot in [kept] is left out, and a block that reaches such a lot has no lawn or trees. The small map shows the
+         * block as it did.
+         */
+        fun addHouses(block: TurnedBox, kept: List<Lot>, streets: Samples) {
+            val walls = if (block.x < BOUNDARY_X) WEST_END_COLOURS else LOW_COLOURS
+            val share = Suburbs.share(Spot(block.x, block.z))
+            // A single row's doors face a main street if one runs along the block, and never a park or the water.
+            val plan = Suburbs.layOut(block, share, walls, houseRandom) { spot ->
+                val terrain = map.terrainAt(floor(spot.x).toInt(), floor(spot.z).toInt())
+                when {
+                    terrain == Terrain.PARK || terrain == Terrain.WATER -> -1
+                    streets.within(spot, MAIN_STREET_NEAR) -> 1
+                    else -> 0
+                }
+            }
+            val standing = plan.houses.filter { house ->
+                house.shape.x > TOWN_COLUMNS && kept.none { house.shape.overlaps(it, 0.5) } &&
+                    Suburbs.cornersOf(house.shape).all { (x, z) ->
+                        val terrain = map.terrainAt(floor(x).toInt(), floor(z).toInt())
+                        terrain != Terrain.WATER && terrain != Terrain.PARK
+                    } && nearHouses(house.shape).none { it.overlaps(house.shape, HOUSE_APART) }
+            }
+            if (standing.isEmpty()) return
+            for (house in standing) {
+                housesNear.getOrPut(houseBucket(house.shape.x, house.shape.z)) { mutableListOf() }.add(house.shape)
+            }
+            val firstRow = blocks.size
+            // Each house's share of its row's low box: from halfway to the house before it to halfway to the next.
+            val slots = mutableMapOf<House, Triple<Double, Double, Double>>()
+            for (front in standing.map { it.front }.distinct()) {
+                val row = standing.filter { it.front == front }
+                if (share <= Suburbs.ROWS_UP_TO && row.size == plan.houses.count { it.front == front }) {
+                    val first = row.first().shape
+                    val last = row.last().shape
+                    val length = hypot(last.x - first.x, last.z - first.z) + first.width
+                    val far = TurnedBox((first.x + last.x) / 2, (first.z + last.z) / 2, length, first.depth, first.turn)
+                    val farWall = row.sumOf { it.wall } / row.size
+                    blocks.add(far.block(0.0, farWall, row.first().colour))
+                    val along = row.map { (it.shape.x - first.x) * cos(first.turn) - (it.shape.z - first.z) * sin(first.turn) }
+                    for ((at, house) in row.withIndex()) {
+                        val from = if (at == 0) along[at] - first.width / 2 else (along[at - 1] + along[at]) / 2
+                        val to = if (at == row.lastIndex) along[at] + first.width / 2 else (along[at] + along[at + 1]) / 2
+                        slots[house] = Triple((from + to) / 2 - along[at], to - from, farWall)
+                    }
+                } else {
+                    for (house in row) blocks.add(house.shape.block(0.0, house.wall, house.colour))
+                }
+            }
+            val rows = blocks.size - firstRow
+            val houses = standing.map { house ->
+                val body = blocks.size
+                blocks.add(house.shape.block(0.0, house.wall, house.colour))
+                val foldable = foldables.size
+                val box = house.shape.bounds(house.wall + house.ridge, house.colour)
+                foldables.add(Foldable(box, body, roof = -1, glassNorth = -1, glassSouth = -1))
+                claim(house.shape, box, marks = kept.isNotEmpty())
+                // However thin, it blocks the square its middle is on.
+                turnedFootprints.add(Cell(floor(house.shape.x).toInt(), floor(house.shape.z).toInt()))
+                val (shift, width, farWall) = slots[house] ?: Triple(0.0, house.shape.width, house.wall)
+                House(
+                    house.shape, house.wall, house.colour, house.roof, house.front, house.doorAt, body, foldable,
+                    shift, width, farWall,
+                )
+            }
+            if (kept.isEmpty()) claim(block, block.bounds(0.0, 0), marks = true, blocking = false)
+            val trees = if (kept.isEmpty()) plan.trees else emptyList()
+            yards.add(Yard(block, if (kept.isEmpty()) plan.lawn else null, trees, houses, firstRow, rows))
+        }
+
+        /** The houses laid out so far near [shape]: in its bucket and the eight round it. */
+        private fun nearHouses(shape: TurnedBox): List<TurnedBox> {
+            val near = mutableListOf<TurnedBox>()
+            val column = floor(shape.x / HOUSE_BUCKET).toInt()
+            val row = floor(shape.z / HOUSE_BUCKET).toInt()
+            for (dx in -1..1) for (dz in -1..1) housesNear[(column + dx) * HOUSE_BUCKETS + row + dz]?.let { near.addAll(it) }
+            return near
+        }
+
+        private fun houseBucket(x: Double, z: Double): Int =
+            floor(x / HOUSE_BUCKET).toInt() * HOUSE_BUCKETS + floor(z / HOUSE_BUCKET).toInt()
+
+        /**
+         * Once every house stands, the yard trees clear of all of them (two real blocks may overlap), each trunk
+         * blocking its square.
+         */
+        fun plantYards() {
+            for ((index, yard) in yards.withIndex()) {
+                if (yard.trees.isEmpty()) continue
+                val trees = yard.trees.chunked(2).filter { (_, crown) ->
+                    val spot = TurnedBox(crown.x + crown.width / 2, crown.z + crown.depth / 2, crown.width, crown.depth, 0.0)
+                    nearHouses(spot).none { it.overlaps(spot, 0.0) }
+                }
+                for ((trunk, _) in trees) footprints.add(trunk)
+                yards[index] = Yard(yard.block, yard.lawn, trees.flatten(), yard.houses, yard.firstRow, yard.rows)
+            }
+        }
+
+        /**
+         * Blocks every square of the grid whose middle comes within the character's clearance of [shape] (held by [box]),
+         * when [blocking]; and when [marks], marks every square [shape] stands over as built, for the small map.
+         */
+        private fun claim(shape: TurnedBox, box: Block, marks: Boolean, blocking: Boolean = true) {
+            for (x in floor(box.x).toInt()..floor(box.x + box.width).toInt()) {
+                for (z in floor(box.z).toInt()..floor(box.z + box.depth).toInt()) {
+                    if (x !in 0 until COLUMNS || z !in 0 until ROWS) continue
+                    val gap = shape.distanceTo(x + 0.5, z + 0.5)
+                    if (blocking && gap < Grid.CLEARANCE) turnedFootprints.add(Cell(x, z))
+                    if (marks && gap == 0.0) built[z * COLUMNS + x] = true
+                }
             }
         }
 
@@ -1057,14 +1207,7 @@ object Neighbourhood {
             val box = shape.bounds(height, colour)
             foldables.add(Foldable(box, body, roof = -1, glassNorth = glass, glassSouth = if (glass < 0) -1 else glass + 1))
             // It blocks every square whose middle it comes within the character's clearance of.
-            for (x in floor(box.x).toInt()..floor(box.x + box.width).toInt()) {
-                for (z in floor(box.z).toInt()..floor(box.z + box.depth).toInt()) {
-                    if (x !in 0 until COLUMNS || z !in 0 until ROWS) continue
-                    val gap = shape.distanceTo(x + 0.5, z + 0.5)
-                    if (gap < Grid.CLEARANCE) turnedFootprints.add(Cell(x, z))
-                    if (gap == 0.0) built[z * COLUMNS + x] = true
-                }
-            }
+            claim(shape, box, marks = true)
         }
 
         /** How tall a building at [x], [z] stands, and its colour, by the district it is in. */
@@ -1283,8 +1426,8 @@ object Neighbourhood {
     private const val WIDE_RAIL_LOW = 1.8
 
     /** How far the Burnaby town centre's towers reach from its station, and the mid-rise round the other stations. */
-    private const val TOWN_CENTRE_REACH = 22.0
-    private const val STATION_REACH = 9.0
+    internal const val TOWN_CENTRE_REACH = 22.0
+    internal const val STATION_REACH = 9.0
 
     /** Roughly where Vancouver ends and Burnaby begins along the line: East Vancouver's houses are in livelier colours. */
     private const val BOUNDARY_X = 505.0
@@ -1300,6 +1443,18 @@ object Neighbourhood {
     private const val BEYOND_STEP = 9
     private const val BEYOND_BLOCK = 5
     private const val BEYOND_ROWS = 3
+
+    /** A single row of houses faces a main street whose middle is this near the ground past its side. */
+    private const val MAIN_STREET_NEAR = 2.0
+
+    /** The houses are kept in buckets this many squares wide while laid out, and kept this far apart at least. */
+    private const val HOUSE_BUCKET = 8.0
+    private const val HOUSE_BUCKETS = 1_000
+    private const val HOUSE_APART = 0.1
+
+    /** How tall the low blocks past the wide map's edges stand: as low as the far suburbs' houses, and a little more. */
+    private const val BEYOND_LOW = 1.3
+    private const val BEYOND_LOW_SPREAD = 0.7
 
     // A soft, warm palette, as in a storybook village.
     /** The sea's colour on a sunny day. */

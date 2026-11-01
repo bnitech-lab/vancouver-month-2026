@@ -15,7 +15,8 @@ import vancouvermonth.text.Transport
 
 /**
  * What a frame of the town costs on a phone, drawn for real on SwiftShader at a phone's size: downtown as it always
- * was, East Vancouver, Burnaby, on a walk and on the train. Each prints its draws, triangles, boxes and milliseconds
+ * was, East Vancouver, Burnaby, on a walk and on the train, and with the camera turning, so the near houses are written
+ * again each frame. Each prints its draws, triangles, boxes and milliseconds, and the sun's shadows' draws and boxes
  * (SwiftShader draws on the computer's processor, so the milliseconds are for comparing, not a phone's), and keeps
  * within the budget: the far city left to the haze, never drawn all at once.
  */
@@ -65,13 +66,21 @@ class TownBudgetTest {
     }
 
     private fun report(name: String, cost: FrameCost) {
-        println("BUDGET $name: ${cost.draws} draws, ${cost.triangles} triangles, ${cost.boxes} boxes, ${cost.millis} ms")
+        println(
+            "BUDGET $name: ${cost.draws} draws, ${cost.triangles} triangles, ${cost.boxes} boxes, ${cost.millis} ms; " +
+                "shadows ${cost.shadowDraws} draws, ${cost.shadowBoxes} boxes; near houses ${town?.houseDetailBoxes}",
+        )
     }
 
-    /** Within the phone's budget: about what downtown always cost, and never the whole wide map at once. */
+    /**
+     * Within the phone's budget: about what downtown always cost, and never the whole wide map at once, for the picture
+     * and with the sun's shadows counted too.
+     */
     private fun withinBudget(cost: FrameCost) {
         assertTrue(cost.draws <= MOST_DRAWS, "${cost.draws} draws")
         assertTrue(cost.boxes <= MOST_BOXES, "${cost.boxes} boxes")
+        assertTrue(cost.allDraws <= MOST_DRAWS_WITH_SHADOWS, "${cost.allDraws} draws with the shadows")
+        assertTrue(cost.allBoxes <= MOST_BOXES_WITH_SHADOWS, "${cost.allBoxes} boxes with the shadows")
     }
 
     @Test
@@ -93,6 +102,19 @@ class TownBudgetTest {
             report("downtown at night", cost)
             withinBudget(cost)
             assertEquals(DayLight.NIGHT, town.lightShown)
+        }
+    }
+
+    @Test
+    fun `Burnaby at night, at zone 2's 내 방 among the houses, costs what the day does`(): Promise<Unit> {
+        val town = open(2)
+        town.showTime(1.0)
+        return whenReady({ town.isStill }) {
+            val cost = town.measureFrames(FRAMES)
+            report("Burnaby at night, 내 방 zone 2", cost)
+            withinBudget(cost)
+            assertEquals(DayLight.NIGHT, town.lightShown)
+            assertTrue(town.houseDetailBoxes > 0, "no houses drawn near 내 방 at night")
         }
     }
 
@@ -122,6 +144,37 @@ class TownBudgetTest {
                 withinBudget(cost)
             }
         }.then { }
+    }
+
+    @Test
+    fun `Burnaby, at 내 방 in zone 3`(): Promise<Unit> {
+        val town = open(3)
+        return whenReady({ town.isStill }) {
+            val cost = town.measureFrames(FRAMES)
+            report("Burnaby, 내 방 zone 3", cost)
+            withinBudget(cost)
+        }
+    }
+
+    @Test
+    fun `East Vancouver, the camera turning round the character, each frame a moving one`(): Promise<Unit> {
+        val town = open(1)
+        town.standAt(TransitLines.stations[3].door)
+        return whenReady({ town.isStill }) {
+            val cost = town.measureFrames(FRAMES, turning = true)
+            report("East Vancouver, turning", cost)
+            withinBudget(cost)
+        }
+    }
+
+    @Test
+    fun `Burnaby, at 내 방 in zone 2, the camera turning round the character`(): Promise<Unit> {
+        val town = open(2)
+        return whenReady({ town.isStill }) {
+            val cost = town.measureFrames(FRAMES, turning = true)
+            report("Burnaby, 내 방 zone 2, turning", cost)
+            withinBudget(cost)
+        }
     }
 
     @Test
@@ -172,6 +225,7 @@ class TownBudgetTest {
     fun `under downtown, on the platform and in the tunnel, a few draws and no town`(): Promise<Unit> {
         val town = open(1)
         town.standAt(TransitLines.stations[0].door)
+        var writes = 0
         // Its shaders and sign are readied ahead, while the town idles after its first frame.
         return whenReady({ town.isStill && town.isUndergroundReady }) {
             town.travel(Transport.SKYTRAIN, 0, 1)
@@ -181,6 +235,7 @@ class TownBudgetTest {
                 report("under downtown, on the platform", cost)
                 withinBudget(cost)
                 assertTrue(cost.draws <= UNDERGROUND_DRAWS, "${cost.draws} draws")
+                writes = town.houseDetailWrites
             }
         }.then {
             // Out in the tunnel, or just short of it: the camera is there for most of a second, and a slow test browser
@@ -190,6 +245,8 @@ class TownBudgetTest {
                 report("under downtown, in the tunnel", cost)
                 withinBudget(cost)
                 assertTrue(cost.draws <= UNDERGROUND_DRAWS, "${cost.draws} draws")
+                // The town is not drawn down here, so its near houses were not written again as the camera moved.
+                assertEquals(writes, town.houseDetailWrites, "the near houses were written under the ground")
             }
         }.then { }
     }
@@ -205,5 +262,12 @@ class TownBudgetTest {
          */
         const val MOST_DRAWS = 56
         const val MOST_BOXES = 4_800
+
+        /**
+         * The same frame with the sun's shadows counted (Three.js counts afresh after drawing them, so the picture's
+         * numbers leave them out) took 68 draws and 5,839 boxes on main at v0.16; the budget is that and about a sixth.
+         */
+        const val MOST_DRAWS_WITH_SHADOWS = 80
+        const val MOST_BOXES_WITH_SHADOWS = 6_800
     }
 }

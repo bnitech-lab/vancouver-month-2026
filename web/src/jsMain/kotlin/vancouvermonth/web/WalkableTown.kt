@@ -33,8 +33,25 @@ import vancouvermonth.text.Shop
 import vancouvermonth.text.Transport
 import vancouvermonth.text.Weather
 
-/** What a frame of the town costs: draws, triangles, boxes (twelve triangles each) and milliseconds. For the budget test. */
-internal data class FrameCost(val draws: Int, val triangles: Int, val boxes: Int, val millis: Double)
+/**
+ * What a frame of the town costs: draws, triangles, boxes (twelve triangles each) and milliseconds. [draws], [triangles]
+ * and [boxes] are the picture's alone; [shadowDraws] and [shadowBoxes] what the sun's shadows took besides, drawn first.
+ * For the budget test.
+ */
+internal data class FrameCost(
+    val draws: Int,
+    val triangles: Int,
+    val boxes: Int,
+    val millis: Double,
+    val shadowDraws: Int = 0,
+    val shadowBoxes: Int = 0,
+) {
+    /** The picture's and the shadows' together. */
+    val allDraws: Int
+        get() = draws + shadowDraws
+    val allBoxes: Int
+        get() = boxes + shadowBoxes
+}
 
 /** What the phone screen needs from the town the player walks in. */
 interface WalkableTown {
@@ -317,7 +334,7 @@ internal class NeighbourhoodScene(
      * of them and where in it. A building that folds is put again where it is drawn, and nowhere else.
      */
     private val tiles = mutableListOf<InstancedMesh>()
-    private val tileOf = IntArray(stillBlocks.size)
+    private val tileOf = IntArray(stillBlocks.size) { NOT_TILED }
     private val slotOf = IntArray(stillBlocks.size)
     private val glowDraws = mutableListOf<InstancedMesh>()
     private val glowDrawOf = IntArray(glowingBlocks.size)
@@ -339,6 +356,30 @@ internal class NeighbourhoodScene(
     /** The city's buildings that fold down out of the camera's way, and where the camera and character last were. */
     private val cutaway =
         Cutaway(Neighbourhood.foldables.map { it.box }, Neighbourhood.foldables.map { Neighbourhood.blocks[it.body] })
+
+    /**
+     * The suburbs' houses near the camera, walls, roofs and doors, with their lawns and yard trees ([HouseDetail]), in
+     * two draws written again whenever the camera moves or a house folds: those round the character, which cast the
+     * sun's shadows, and the rest, which cast none; and where the camera was when they were last written. The houses'
+     * own walls among the still boxes are not drawn there ([isHouse]); a block whose houses are drawn near the camera
+     * has its rows' low boxes put away while they are.
+     */
+    private lateinit var casterDetails: InstancedMesh
+    private lateinit var details: InstancedMesh
+    private val isHouse = BooleanArray(stillBlocks.size).also { house ->
+        for (each in Neighbourhood.houses) house[each.body] = true
+    }
+    private lateinit var houseDetail: HouseDetail
+    private val foldOf: (Int) -> Double = { cutaway.foldOf(it) }
+    private val detailColour = Color(0)
+    private var detailEyeX = Double.NaN
+    private var detailEyeY = Double.NaN
+    private var detailEyeZ = Double.NaN
+    private var detailFocusX = Double.NaN
+    private var detailFocusY = Double.NaN
+    private var detailFocusZ = Double.NaN
+    private var detailAcross = Double.NaN
+    private var detailStale = true
     private var aimedEyeX = Double.NaN
     private var aimedEyeY = Double.NaN
     private var aimedEyeZ = Double.NaN
@@ -790,6 +831,7 @@ internal class NeighbourhoodScene(
             far(mesh, tile)
         }
         tiled(stillBlocks, material)
+        addHouseDetail()
         // The glass of the wide map's towers and 내 방 out there in a draw of their own, left out from far off.
         val (corner, wide) = glowingBlocks.indices.partition { glowingBlocks[it].x < Neighbourhood.TOWN_COLUMNS }
         for ((draw, members) in listOf(corner, wide).withIndex()) {
@@ -804,6 +846,103 @@ internal class NeighbourhoodScene(
             glowDraws.add(mesh)
             if (draw == 1) far(mesh, panes)
         }
+    }
+
+    /**
+     * The two draws of the suburbs' houses near the camera, their lawns and yard trees: each as many boxes as it may
+     * ever hold, each with a colour from the start, none drawn until the camera is placed ([placeHouseDetail]). Only
+     * the one round the character casts the sun's shadows, as the shadows are drawn only there.
+     */
+    private fun addHouseDetail() {
+        casterDetails = nearDraw(HouseDetail.CASTER_CAPACITY, castsShadows = true)
+        details = nearDraw(HouseDetail.CAPACITY, castsShadows = false)
+        houseDetail = HouseDetail(
+            Neighbourhood.yards,
+            casterDetails.instanceMatrix.array, casterDetails.instanceColor!!.array,
+            details.instanceMatrix.array, details.instanceColor!!.array,
+        )
+    }
+
+    private fun nearDraw(capacity: Int, castsShadows: Boolean): InstancedMesh {
+        val mesh = InstancedMesh(cube, material, capacity)
+        mesh.castShadow = castsShadows
+        mesh.receiveShadow = true
+        mesh.frustumCulled = false
+        mesh.instanceMatrix.setUsage(DynamicDrawUsage)
+        for (index in 0 until capacity) mesh.setColorAt(index, detailColour)
+        mesh.instanceColor?.setUsage(DynamicDrawUsage)
+        mesh.count = 0
+        meshes.add(mesh)
+        scene.add(mesh)
+        return mesh
+    }
+
+    /**
+     * Writes the suburbs' houses, lawns and yard trees for the camera as it is now, when it moved or a house folded
+     * since they were last written: once a frame, after the camera is placed and the buildings folded.
+     */
+    private fun placeHouseDetail() {
+        val eye = view.eye
+        val focus = view.focus
+        if (!detailStale && eye.x == detailEyeX && eye.y == detailEyeY && eye.z == detailEyeZ && focus.x == detailFocusX &&
+            focus.y == detailFocusY && focus.z == detailFocusZ && across == detailAcross
+        ) return
+        detailStale = false
+        houseDetailWrites += 1
+        detailEyeX = eye.x
+        detailEyeY = eye.y
+        detailEyeZ = eye.z
+        detailFocusX = focus.x
+        detailFocusY = focus.y
+        detailFocusZ = focus.z
+        detailAcross = across
+        houseDetail.fill(
+            eye.x, eye.y, eye.z, focus.x, focus.y, focus.z, tan(across / 2), tan(view.fov * PI / 360), foldOf,
+        )
+        // The rows' low boxes of each block that came near, or went off, put away or back.
+        for (at in 0 until houseDetail.changedCount) {
+            val index = houseDetail.changed[at]
+            val yard = Neighbourhood.yards[index]
+            for (row in yard.firstRow until yard.firstRow + yard.rows) showStill(row, !houseDetail.shown[index])
+        }
+        sendNear(casterDetails, houseDetail.casters)
+        sendNear(details, houseDetail.others)
+    }
+
+    /**
+     * Draws the boxes [draw] holds with [mesh], sending only those to the graphics card again, and of their colours only
+     * those written again.
+     */
+    private fun sendNear(mesh: InstancedMesh, draw: NearDraw) {
+        val count = draw.count
+        mesh.count = count
+        if (count == 0) return
+        mesh.instanceMatrix.addUpdateRange(0, count * 16)
+        mesh.instanceMatrix.needsUpdate = true
+        val from = draw.coloursFrom
+        val colours = mesh.instanceColor ?: return
+        if (from >= count) return
+        colours.addUpdateRange(from * 3, (count - from) * 3)
+        colours.needsUpdate = true
+    }
+
+    /** Draws still box [index] where it stands, turned as it is, or [shown] false, puts it away at no size at all. */
+    private fun showStill(index: Int, shown: Boolean) {
+        requireTiled(index)
+        val block = stillBlocks[index]
+        val mesh = tiles[tileOf[index]]
+        val at = slotOf[index] * 16
+        val numbers = mesh.instanceMatrix.array
+        val size = if (shown) 1.0 else 0.0
+        val cosine = cos(block.turn) * size
+        val sine = sin(block.turn) * size
+        numbers[at] = (cosine * block.width).toFloat()
+        numbers[at + 2] = (-sine * block.width).toFloat()
+        numbers[at + 5] = (block.height * size).toFloat()
+        numbers[at + 8] = (sine * block.depth).toFloat()
+        numbers[at + 10] = (cosine * block.depth).toFloat()
+        mesh.instanceMatrix.addUpdateRange(at, 11)
+        mesh.instanceMatrix.needsUpdate = true
     }
 
     /** Notes [mesh], drawing [blocks], as one to leave out when it is far from the camera ([leaveOutFar]). */
@@ -856,6 +995,8 @@ internal class NeighbourhoodScene(
     private fun tiled(blocks: List<Block>, material: Material) {
         val groups = LinkedHashMap<Pair<Int, Int>, MutableList<Int>>()
         for ((index, block) in blocks.withIndex()) {
+            // A suburban house is drawn only near the camera, with its roof and door ([details]).
+            if (isHouse[index]) continue
             val column = floor((block.x + block.width / 2) / TILE).toInt()
             val key = column to floor((block.z + block.depth / 2) / TILE).toInt()
             groups.getOrPut(key) { mutableListOf() }.add(index)
@@ -1707,33 +1848,67 @@ internal class NeighbourhoodScene(
 
     /**
      * What a frame of the town costs where the camera is now, for the budget test: [frames] frames drawn at once, each
-     * with the sun's shadows, how many draws, triangles and boxes the last one took (a box is twelve triangles), and the
-     * milliseconds each took on average with the graphics finished.
+     * with the sun's shadows, how many draws, triangles and boxes the last one took for the picture and for the shadows
+     * (a box is twelve triangles), and the milliseconds each took on average with the graphics finished. When
+     * [turning], the camera turns a little before each frame, so each is a moving frame: the camera placed, the
+     * buildings folded and the near houses written again, all timed.
      */
-    internal fun measureFrames(frames: Int): FrameCost {
+    internal fun measureFrames(frames: Int, turning: Boolean = false): FrameCost {
         val subject = if (sitting) site.benchSeat else spot
-        view.follow(Point(subject.x, focusHeight, subject.z), 0.0)
+        val focus = Point(subject.x, focusHeight, subject.z)
+        view.follow(focus, 0.0)
         placeCamera()
-        // Under downtown, the platform and the tunnel as they are drawn there.
+        // Under downtown, the platform and the tunnel as they are drawn there, and no town to write houses for.
         val going = journey
         val drawn = if (focusUnderground && going != null) underground.scene else scene
         if (drawn !== scene && going != null) {
             underground.place(going, window.performance.now() - journeyStarted, false, drawnLight.sky, camera)
         }
-        val info = renderer.asDynamic().info.render
+        if (drawn === scene) placeHouseDetail()
+        val info = renderer.asDynamic().info
         val gl = renderer.asDynamic().getContext()
         // Reading a pixel back waits for the frame to be drawn, which a finish alone does not in every browser.
         val pixel = Uint8Array(4)
+        // Three.js counts afresh after drawing the shadows, so the shadows are counted here by hand: reset before each.
+        info.autoReset = false
         val started = window.performance.now()
         for (frame in 0 until frames) {
+            if (turning) {
+                view.orbit(TURN_PIXELS, 0.0)
+                view.jumpTo(focus)
+                placeCamera()
+                if (drawn === scene) {
+                    foldBuildings(subject, FRAME_MILLIS, still = false)
+                    placeHouseDetail()
+                }
+            }
+            info.reset()
             renderer.shadowMap.needsUpdate = true
             renderer.render(drawn, camera)
             gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel)
         }
         val millis = (window.performance.now() - started) / frames
-        val triangles = (info.triangles as Number).toInt()
-        return FrameCost((info.calls as Number).toInt(), triangles, triangles / 12, millis)
+        val allDraws = (info.render.calls as Number).toInt()
+        val allTriangles = (info.render.triangles as Number).toInt()
+        // The picture alone: one more frame, untimed, without the shadows.
+        info.autoReset = true
+        renderer.shadowMap.needsUpdate = false
+        renderer.render(drawn, camera)
+        val draws = (info.render.calls as Number).toInt()
+        val triangles = (info.render.triangles as Number).toInt()
+        return FrameCost(draws, triangles, triangles / 12, millis, allDraws - draws, (allTriangles - triangles) / 12)
     }
+
+    /** How many of the suburbs' houses, roofs, doors, lawns and yard trees are drawn near the camera now. For tests. */
+    internal val houseDetailBoxes: Int
+        get() = casterDetails.count + details.count
+
+    /** How many times the near houses have been written. For tests. */
+    internal var houseDetailWrites = 0
+        private set
+
+    /** True when block [yard] of [Neighbourhood.yards] has its houses drawn one by one now. For tests. */
+    internal fun isHouseDrawn(yard: Int): Boolean = houseDetail.shown[yard]
 
     /** True while the train is a ride's, not the line's own. For tests. */
     internal val isTrainRidden: Boolean
@@ -1787,8 +1962,15 @@ internal class NeighbourhoodScene(
     internal fun isFolded(index: Int): Boolean = cutaway.isFolding(index)
 
     /** How tall box [index] of [Neighbourhood.blocks] is drawn now, read from where the drawing keeps it. For tests. */
-    internal fun drawnHeight(index: Int): Double =
-        tiles[tileOf[index]].instanceMatrix.array[slotOf[index] * 16 + 5].toDouble()
+    internal fun drawnHeight(index: Int): Double {
+        requireTiled(index)
+        return tiles[tileOf[index]].instanceMatrix.array[slotOf[index] * 16 + 5].toDouble()
+    }
+
+    /** Fails loudly for a box the still tiles do not draw, a suburban house's walls, rather than read another's. */
+    private fun requireTiled(index: Int) {
+        require(tileOf[index] != NOT_TILED) { "Box $index is drawn near the camera, not in the still tiles" }
+    }
 
     /** How far the camera's eye is from the point it looks at, for tests. */
     internal val cameraReach: Double
@@ -2170,8 +2352,10 @@ internal class NeighbourhoodScene(
             val subject = if (sitting) site.benchSeat else spot
             gliding = view.follow(Point(subject.x, focusHeight, subject.z), millis)
             placeCamera()
-            // Under the ground the town is not drawn, so no building folds for it.
+            // Under the ground the town is not drawn, so no building folds for it, and no near house is written.
             folding = !focusUnderground && foldBuildings(subject, millis, still)
+            // Once a frame, after the folds, so a house folding sinks with its roof in the same frame.
+            if (!focusUnderground) placeHouseDetail()
             if (!still && pace.stepsLife) stepLife()
             // A town whose life stands still has no train passing and no fire to hear.
             if (still) quietSounds()
@@ -2246,6 +2430,11 @@ internal class NeighbourhoodScene(
         for (at in 0 until cutaway.changedCount) {
             val index = cutaway.changed[at]
             val building = Neighbourhood.foldables[index]
+            // A suburban house folds where it is drawn, near the camera: its walls, roof and door are written again.
+            if (isHouse[building.body]) {
+                detailStale = true
+                continue
+            }
             val fold = cutaway.foldOf(index)
             val body = blocks[building.body]
             val full = body.height
@@ -2273,6 +2462,7 @@ internal class NeighbourhoodScene(
 
     /** Puts box [index] of the still boxes [height] tall from [bottom] up, its footprint as it was. */
     private fun standBox(index: Int, bottom: Double, height: Double) {
+        requireTiled(index)
         val mesh = tiles[tileOf[index]]
         val at = slotOf[index] * 16
         val numbers = mesh.instanceMatrix.array
@@ -2824,6 +3014,9 @@ internal class NeighbourhoodScene(
         /** How wide a tile of the town's still boxes is: each tile is one draw, left out when out of sight. */
         const val TILE = 40.0
 
+        /** The tile of a still box no tile draws: a suburban house's walls, drawn near the camera instead. */
+        const val NOT_TILED = -1
+
         /** The camera for a night by the campfire: north of it, near and low, looking south at the bench. */
         const val FIRESIDE_TURN = PI + 0.15
         const val FIRESIDE_TILT = 0.5
@@ -2861,6 +3054,10 @@ internal class NeighbourhoodScene(
         val RIDE_BOAT = BOAT_ON_LOOP + TransitLines.boat.size
         val TAXI = RIDE_BOAT + TransitLines.boat.size
         val BURNABY_BUS = TAXI + TransitLines.taxi.size
+
+        /** How far the budget test turns the camera before each moving frame it measures, and how long a frame lasts. */
+        const val TURN_PIXELS = 6.0
+        const val FRAME_MILLIS = 1000.0 / 60
 
         /** A place's name farther than this from the camera's eye is hidden, its place deep in the haze. */
         const val NAMES_REACH = 170.0

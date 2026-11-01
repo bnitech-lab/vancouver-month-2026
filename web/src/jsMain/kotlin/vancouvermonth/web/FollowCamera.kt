@@ -410,13 +410,15 @@ class FollowCamera(
          * The walls the camera keeps out of within [reach] of [from] on the ground: the only ones a camera that far off
          * can meet. For tests and one-off checks; the camera itself keeps its own list.
          */
-        fun wallsNear(from: Point, reach: Double): List<Block> = Neighbourhood.walls.mapNotNull { wall ->
-            val box = wall.box
-            if (wall.folds) return@mapNotNull null
+        fun wallsNear(from: Point, reach: Double): List<Block> = standingWalls.filter { box ->
             val dx = max(0.0, max(box.x - from.x, from.x - box.x - box.width))
             val dz = max(0.0, max(box.z - from.z, from.z - box.z - box.depth))
-            if (dx * dx + dz * dz <= reach * reach) box else null
+            dx * dx + dz * dz <= reach * reach
         }
+
+        /** Zone 1's walls the camera keeps out of, gathered once: the city's buildings, which fold, are not among them. */
+        private val standingWalls: List<Block> by lazy { Neighbourhood.walls.filter { !it.folds }.map { it.box } }
+
         const val MIN_PITCH = 0.2
         const val MAX_PITCH = 1.3
         const val NEAR = 4.5

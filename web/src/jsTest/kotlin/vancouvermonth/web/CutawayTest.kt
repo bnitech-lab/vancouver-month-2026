@@ -2,6 +2,7 @@ package vancouvermonth.web
 
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.test.Test
@@ -200,9 +201,17 @@ class CutawayTest {
         // Nothing that matters is among them: none overlaps a wall the camera keeps out of, or a place's lot.
         val important = Neighbourhood.walls.filter { !it.folds }
         assertTrue(important.mapNotNull { it.place }.toSet() == Place.entries.toSet())
+        // The walls in strips 16 squares wide along x, so each building is tried only against those its strips hold.
+        val strips = mutableMapOf<Int, MutableList<Wall>>()
+        for (wall in important) {
+            for (strip in floor(wall.box.x / 16).toInt()..floor((wall.box.x + wall.box.width) / 16).toInt()) {
+                strips.getOrPut(strip) { mutableListOf() }.add(wall)
+            }
+        }
         for (building in foldables) {
             val box = building.box
-            for (wall in important) {
+            val near = (floor(box.x / 16).toInt()..floor((box.x + box.width) / 16).toInt()).flatMap { strips[it].orEmpty() }
+            for (wall in near) {
                 val other = wall.box
                 val apart = box.x + box.width <= other.x || other.x + other.width <= box.x ||
                     box.z + box.depth <= other.z || other.z + other.depth <= box.z ||
@@ -210,8 +219,9 @@ class CutawayTest {
                 assertTrue(apart, "$box overlaps ${wall.place ?: other}")
             }
         }
-        // Each one's boxes are where it says, as tall as its walls: a turned one's box is the one round it, straight on
-        // the grid, with the same middle.
+        // Each one's boxes are where it says, as tall as its walls and roof: a turned one's box is the one round it,
+        // straight on the grid, with the same middle; a suburban house's roof is drawn near the camera, its ridge on top.
+        val ridges = Neighbourhood.houses.associate { it.body to it.ridge }
         for (building in foldables) {
             val body = Neighbourhood.blocks[building.body]
             if (body.turn == 0.0) {
@@ -232,7 +242,7 @@ class CutawayTest {
                     assertTrue(z >= building.box.z - 1e-9 && z <= building.box.z + building.box.depth + 1e-9, "$body")
                 }
             }
-            val roof = if (building.roof < 0) 0.0 else Neighbourhood.blocks[building.roof].height
+            val roof = if (building.roof < 0) ridges[building.body] ?: 0.0 else Neighbourhood.blocks[building.roof].height
             assertEquals(building.box.height, body.height + roof, 1e-9)
             if (building.glassNorth < 0) continue
             assertEquals(body.height - 1.6, Neighbourhood.glowing[building.glassNorth].height, 1e-9)
@@ -253,6 +263,14 @@ class CutawayTest {
         var folded = 0
         var turnedFolds = 0
         for (spot in spots) {
+            // Only a building within the camera's reach of the character, and the near view's width, can be in the way.
+            val reach = FollowCamera.START_DISTANCE + Cutaway.NEAR_RADIUS + Cutaway.SLACK + 2.0
+            val near = boxes.indices.filter { index ->
+                val box = boxes[index]
+                val dx = maxOf(0.0, box.x - spot.x, spot.x - box.x - box.width)
+                val dz = maxOf(0.0, box.z - spot.z, spot.z - box.z - box.depth)
+                dx * dx + dz * dz <= reach * reach
+            }
             for (yaw in listOf(FollowCamera.START_YAW, 0.0, PI / 2, PI, -PI / 2)) {
                 for (pitch in listOf(FollowCamera.MIN_PITCH, FollowCamera.START_PITCH, FollowCamera.MAX_PITCH)) {
                     // The camera where the player put it at the first view's distance: nothing of the city's moves it.
@@ -267,7 +285,10 @@ class CutawayTest {
                     val toHead = Point(head.x - eye.x, head.y - eye.y, head.z - eye.z)
                     val length = sqrt(toHead.x * toHead.x + toHead.y * toHead.y + toHead.z * toHead.z)
                     val way = Point(toHead.x / length, toHead.y / length, toHead.z / length)
-                    for ((index, box) in boxes.withIndex()) {
+                    // Every building in the way is among those near, so none far off folds.
+                    assertEquals(cutaway.foldingCount, near.count { cutaway.isFolding(it) }, "$spot, turn $yaw: one far off folds")
+                    for (index in near) {
+                        val box = boxes[index]
                         val shape = shapes[index]
                         if (shape.turn != 0.0) {
                             // A turned one of the wide map: in the way only when the ray comes near its walls.
