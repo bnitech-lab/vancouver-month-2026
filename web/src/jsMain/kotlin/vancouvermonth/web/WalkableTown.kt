@@ -33,8 +33,25 @@ import vancouvermonth.text.Shop
 import vancouvermonth.text.Transport
 import vancouvermonth.text.Weather
 
-/** What a frame of the town costs: draws, triangles, boxes (twelve triangles each) and milliseconds. For the budget test. */
-internal data class FrameCost(val draws: Int, val triangles: Int, val boxes: Int, val millis: Double)
+/**
+ * What a frame of the town costs: draws, triangles, boxes (twelve triangles each) and milliseconds. [draws], [triangles]
+ * and [boxes] are the picture's alone; [shadowDraws] and [shadowBoxes] what the sun's shadows took besides, drawn first.
+ * For the budget test.
+ */
+internal data class FrameCost(
+    val draws: Int,
+    val triangles: Int,
+    val boxes: Int,
+    val millis: Double,
+    val shadowDraws: Int = 0,
+    val shadowBoxes: Int = 0,
+) {
+    /** The picture's and the shadows' together. */
+    val allDraws: Int
+        get() = draws + shadowDraws
+    val allBoxes: Int
+        get() = boxes + shadowBoxes
+}
 
 /** What the phone screen needs from the town the player walks in. */
 interface WalkableTown {
@@ -1685,27 +1702,47 @@ internal class NeighbourhoodScene(
 
     /**
      * What a frame of the town costs where the camera is now, for the budget test: [frames] frames drawn at once, each
-     * with the sun's shadows, how many draws, triangles and boxes the last one took (a box is twelve triangles), and the
-     * milliseconds each took on average with the graphics finished.
+     * with the sun's shadows, how many draws, triangles and boxes the last one took for the picture and for the shadows
+     * (a box is twelve triangles), and the milliseconds each took on average with the graphics finished. When
+     * [turning], the camera turns a little before each frame, so each is a moving frame: the camera placed, the
+     * buildings folded and the near houses written again, all timed.
      */
-    internal fun measureFrames(frames: Int): FrameCost {
+    internal fun measureFrames(frames: Int, turning: Boolean = false): FrameCost {
         val subject = if (sitting) site.benchSeat else spot
-        view.follow(Point(subject.x, focusHeight, subject.z), 0.0)
+        val focus = Point(subject.x, focusHeight, subject.z)
+        view.follow(focus, 0.0)
         placeCamera()
         placeHouseDetail()
-        val info = renderer.asDynamic().info.render
+        val info = renderer.asDynamic().info
         val gl = renderer.asDynamic().getContext()
         // Reading a pixel back waits for the frame to be drawn, which a finish alone does not in every browser.
         val pixel = Uint8Array(4)
+        // Three.js counts afresh after drawing the shadows, so the shadows are counted here by hand: reset before each.
+        info.autoReset = false
         val started = window.performance.now()
         for (frame in 0 until frames) {
+            if (turning) {
+                view.orbit(TURN_PIXELS, 0.0)
+                view.jumpTo(focus)
+                placeCamera()
+                foldBuildings(subject, FRAME_MILLIS, still = false)
+                placeHouseDetail()
+            }
+            info.reset()
             renderer.shadowMap.needsUpdate = true
             renderer.render(scene, camera)
             gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel)
         }
         val millis = (window.performance.now() - started) / frames
-        val triangles = (info.triangles as Number).toInt()
-        return FrameCost((info.calls as Number).toInt(), triangles, triangles / 12, millis)
+        val allDraws = (info.render.calls as Number).toInt()
+        val allTriangles = (info.render.triangles as Number).toInt()
+        // The picture alone: one more frame, untimed, without the shadows.
+        info.autoReset = true
+        renderer.shadowMap.needsUpdate = false
+        renderer.render(scene, camera)
+        val draws = (info.render.calls as Number).toInt()
+        val triangles = (info.render.triangles as Number).toInt()
+        return FrameCost(draws, triangles, triangles / 12, millis, allDraws - draws, (allTriangles - triangles) / 12)
     }
 
     /** How many of the suburbs' houses, roofs, doors, lawns and yard trees are drawn near the camera now. For tests. */
@@ -2754,6 +2791,10 @@ internal class NeighbourhoodScene(
         val RIDE_BOAT = BOAT_ON_LOOP + TransitLines.boat.size
         val TAXI = RIDE_BOAT + TransitLines.boat.size
         val BURNABY_BUS = TAXI + TransitLines.taxi.size
+
+        /** How far the budget test turns the camera before each moving frame it measures, and how long a frame lasts. */
+        const val TURN_PIXELS = 6.0
+        const val FRAME_MILLIS = 1000.0 / 60
 
         /** A place's name farther than this from the camera's eye is hidden, its place deep in the haze. */
         const val NAMES_REACH = 170.0

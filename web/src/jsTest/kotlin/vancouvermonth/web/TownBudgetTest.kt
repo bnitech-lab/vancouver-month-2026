@@ -14,7 +14,8 @@ import vancouvermonth.text.Transport
 
 /**
  * What a frame of the town costs on a phone, drawn for real on SwiftShader at a phone's size: downtown as it always
- * was, East Vancouver, Burnaby, on a walk and on the train. Each prints its draws, triangles, boxes and milliseconds
+ * was, East Vancouver, Burnaby, on a walk and on the train, and with the camera turning, so the near houses are written
+ * again each frame. Each prints its draws, triangles, boxes and milliseconds, and the sun's shadows' draws and boxes
  * (SwiftShader draws on the computer's processor, so the milliseconds are for comparing, not a phone's), and keeps
  * within the budget: the far city left to the haze, never drawn all at once.
  */
@@ -64,13 +65,21 @@ class TownBudgetTest {
     }
 
     private fun report(name: String, cost: FrameCost) {
-        println("BUDGET $name: ${cost.draws} draws, ${cost.triangles} triangles, ${cost.boxes} boxes, ${cost.millis} ms, detail ${town?.houseDetailBoxes}")
+        println(
+            "BUDGET $name: ${cost.draws} draws, ${cost.triangles} triangles, ${cost.boxes} boxes, ${cost.millis} ms; " +
+                "shadows ${cost.shadowDraws} draws, ${cost.shadowBoxes} boxes; near houses ${town?.houseDetailBoxes}",
+        )
     }
 
-    /** Within the phone's budget: about what downtown always cost, and never the whole wide map at once. */
+    /**
+     * Within the phone's budget: about what downtown always cost, and never the whole wide map at once, for the picture
+     * and with the sun's shadows counted too.
+     */
     private fun withinBudget(cost: FrameCost) {
         assertTrue(cost.draws <= MOST_DRAWS, "${cost.draws} draws")
         assertTrue(cost.boxes <= MOST_BOXES, "${cost.boxes} boxes")
+        assertTrue(cost.allDraws <= MOST_DRAWS_WITH_SHADOWS, "${cost.allDraws} draws with the shadows")
+        assertTrue(cost.allBoxes <= MOST_BOXES_WITH_SHADOWS, "${cost.allBoxes} boxes with the shadows")
     }
 
     @Test
@@ -117,6 +126,27 @@ class TownBudgetTest {
         return whenReady({ town.isStill }) {
             val cost = town.measureFrames(FRAMES)
             report("Burnaby, 내 방 zone 3", cost)
+            withinBudget(cost)
+        }
+    }
+
+    @Test
+    fun `East Vancouver, the camera turning round the character, each frame a moving one`(): Promise<Unit> {
+        val town = open(1)
+        town.standAt(TransitLines.stations[3].door)
+        return whenReady({ town.isStill }) {
+            val cost = town.measureFrames(FRAMES, turning = true)
+            report("East Vancouver, turning", cost)
+            withinBudget(cost)
+        }
+    }
+
+    @Test
+    fun `Burnaby, at 내 방 in zone 2, the camera turning round the character`(): Promise<Unit> {
+        val town = open(2)
+        return whenReady({ town.isStill }) {
+            val cost = town.measureFrames(FRAMES, turning = true)
+            report("Burnaby, 내 방 zone 2, turning", cost)
             withinBudget(cost)
         }
     }
@@ -174,5 +204,12 @@ class TownBudgetTest {
          */
         const val MOST_DRAWS = 56
         const val MOST_BOXES = 4_800
+
+        /**
+         * The same frame with the sun's shadows counted (Three.js counts afresh after drawing them, so the picture's
+         * numbers leave them out) took 68 draws and 5,839 boxes on main at v0.16; the budget is that and about a sixth.
+         */
+        const val MOST_DRAWS_WITH_SHADOWS = 80
+        const val MOST_BOXES_WITH_SHADOWS = 6_800
     }
 }
