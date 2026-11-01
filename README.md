@@ -192,8 +192,9 @@ a red square, the others dots, 회사 green on an interview day as its name is),
 the character as a gold arrow pointing the way it faces. 내 방 and 회사, when off the small map, show as small arrows on
 its edge pointing the way to them. It is drawn again only when the character or the camera moves. A tap shows the whole
 map larger, about four fifths of the screen wide with the places' names; a tap or Escape brings the small one back, and
-a talk or the guide closes it. It is a picture: a screen reader hears only which place the character is
-nearest, as in "지도: 내 방 근처".
+a talk or the guide closes it. It is a picture: a screen reader hears only which place or station the character is
+nearest, as in "지도: 내 방 근처", or, more than 40 squares from any of them, which way the nearest is, as in
+"지도: 큰 공원역 쪽".
 
 | Do | What happens |
 |---|---|
@@ -265,7 +266,8 @@ total already pays. A water bus crosses False Creek between three docks (카페 
 character is on foot and no talk is open, lists the five places, the bike shop and the nine stations with each fare: $4 and $1.50 for every ten squares
 along the streets up to 160 squares and $0.70 for every ten past that, to the dollar (downtown to Burnaby is about $45;
 the meter stops at $60); a taxi appears where the
-character stands and drives there fast, and its 내리기 lets the character out on the way. A fare is paid through core
+character stands and drives there fast, faster still on a long ride (up to 24 squares a second, so Burnaby to downtown
+takes about 20 seconds), and its 내리기 lets the character out on the way. A fare is paid through core
 when the ride sets off and only then, heads that day's log ("수상버스를 탔어요. -$4", "택시를 탔어요. -$12"), is kept
 in the record (w and t, the record's version unchanged, so a month kept before still goes on), and is refused with the
 reason, as a purchase is, when what would be left could not pay September's living cost. While riding, the town takes no
@@ -282,7 +284,8 @@ character's walks go through them. In the evening they fade out on their way hom
 at the places stay where they are, so they are always found there, but they look about, turn to face the character when
 it comes near, and wave as it comes up. The SkyTrain stands at the station, pulls out east along the line, its cars
 turning with the guideway, and comes back from the west every 32 seconds, slowing into the station, with its windows lit
-at night: at whichever station is nearest where the player looks, moving there while the train is away down the line. The campfire flickers and lights the bench after dark, light glints on the water, petals
+at night: at the station nearest 내 방 at first, then at whichever station is nearest where the player looks, moving
+there while the train is away down the line. The campfire flickers and lights the bench after dark, light glints on the water, petals
 drift down from the blossom trees, and clouds drift high over the water.
 
 Each day has its weather, sunny, cloudy or rainy, worked out from the run's seed and the day, so a run always has the
