@@ -1938,7 +1938,8 @@ class WalkableTownTest {
     }
 
     @Test
-    fun `a shared bike to 내 방 arrives as a walk there does: turned to the neighbour, the talk open`(): Promise<Unit> {
+    fun `a shared bike to 내 방 arrives as a walk there does: turned to the neighbour, the talk open, a sleep there`():
+        Promise<Unit> {
         val town = startInTown()
         val bike = Rides.shared.first { it.vehicle == Vehicle.BIKE }
         val home = TransitLines.taxiStopsFor(1).first { it.first == Place.HOME.label }.second
@@ -1962,6 +1963,12 @@ class WalkableTownTest {
                 assertFalse(talk.classList.contains("chooser"), talk.textContent)
                 val toPerson = kotlin.math.atan2(venue.person.x - home.x, venue.person.z - home.z)
                 assertEquals(toPerson, town.characterHeading, 1e-9)
+                // At 내 방, so the night's sleep is there to take at once.
+                assertTrue(town.isHome)
+                val sleep = button(actionName(Action.REST))
+                assertFalse(sleep.disabled, sleep.textContent)
+                sleep.click()
+                assertTrue(town.isChangingDay, "no night after the sleep")
             },
         )
     }
