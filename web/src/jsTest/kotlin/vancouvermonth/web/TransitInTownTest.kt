@@ -291,7 +291,9 @@ class TransitInTownTest {
                 assertTrue(town.undergroundShown.areLampsShown)
                 assertEquals(0.0, town.undergroundShown.doorsDrawn)
             },
-            Step("out of the tunnel, on the line", { under.look() && town.characterSpot.x > UndergroundRide.MOUTH.x }) {
+            Step("out of the tunnel, on the line", {
+                under.look() && !town.isUnderground && town.characterSpot.x > UndergroundRide.MOUTH.x
+            }) {
                 assertFalse(town.isUnderground)
                 assertTrue(town.cameraReach < 40.0)
                 assertTrue(under.looks > 10, "${under.looks} looks")

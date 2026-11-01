@@ -122,6 +122,21 @@ class UndergroundRideTest {
     }
 
     @Test
+    fun `going out from under downtown the camera rides most of a second in the tunnel, and the train comes out`() {
+        for (to in listOf(1, 4, TransitLines.TOWN_CENTRE + 1)) {
+            val going = Journey.train(stations[0], stations[to])
+            val inTunnel = under(going).count { it.second[0] > UndergroundRide.HALL_EAST } * STEP
+            println("TUNNEL from under downtown to station $to: $inTunnel ms in the tunnel")
+            assertTrue(inTunnel >= 800.0, "to ${stations[to]}: $inTunnel ms in the tunnel")
+            // At the cut the town's train is coming out of the mouth, and the ride has not yet stopped.
+            val cut = UndergroundRide.cutMillis(going)
+            assertTrue(going.alongAt(cut) > -Neighbourhood.TRAIN_LENGTH / 2, "to ${stations[to]}: ${going.alongAt(cut)}")
+            assertTrue(cut < going.millis - going.alightMillis, "to ${stations[to]}")
+            assertEquals(cut, UndergroundRide.cutMillis(going))
+        }
+    }
+
+    @Test
     fun `into the tunnel the camera starts at the mouth, and at 다운타운역 the character steps out on the platform`() {
         for (from in listOf(1, 3, TransitLines.TOWN_CENTRE + 1)) {
             val going = Journey.train(stations[from], stations[0])

@@ -26,8 +26,9 @@ import vancouvermonth.text.Transport
  * 다운타운역 and the tunnel from it to the mouth by 터널 입구역 are ([UndergroundScene]). Getting on there, the train comes
  * in from the tunnel's far end, its doors open, the character steps in and it pulls out; stepping out, the doors open and
  * the character walks off along the platform. In between the camera rides behind the train, so the tunnel's lamps stream
- * past and the mouth's daylight comes up ahead. The tunnel runs straight along x from the mouth, as the guideway's first
- * leg does, so a point along the line is at [xAt] and [LINE_Z], at the guideway's own height.
+ * past and the mouth comes up ahead; going out, it rides a while in the tunnel as the train runs out into the open, and
+ * then cuts to the town ([cutMillis]). The tunnel runs straight along x from the mouth, as the guideway's first leg
+ * does, so a point along the line is at [xAt] and [LINE_Z], at the guideway's own height.
  */
 object UndergroundRide {
     /** Where the tunnel opens into daylight: the guideway's first point. */
@@ -69,8 +70,8 @@ object UndergroundRide {
     const val CAR_SIDE = 0.95
 
     /**
-     * Below this far along the line the whole train, as drawn under the ground, is in the tunnel, and the ride is shown
-     * there; on the line the town's smaller train is then in the tunnel too, so it comes out of the mouth after the cut.
+     * Below this far along the line the whole train, as drawn under the ground, is in the tunnel: a ride into it from the
+     * line is shown there from then on, and a ride starting there is one from under downtown.
      */
     const val UNDER = -(TRAIN_HALF + 1.0)
     const val CAR_BOTTOM = DECK + 0.35
@@ -111,8 +112,11 @@ object UndergroundRide {
     const val DRIFT = 0.45
     val BOARD_EYE: Double = PLATFORM_X - BEHIND
     val EYE_WEST: Double = HALL_WEST + 0.5
-    val EYE_EAST: Double = MOUTH.x - 0.8
+    val EYE_EAST: Double = MOUTH.x - 0.3
     private const val EASE_EAST = 2.0
+
+    /** How long the camera rides out in the tunnel, east of the hall, before a ride from under downtown cuts to the town. */
+    const val TUNNEL_MILLIS = 900.0
 
     /** How high the camera is and how far off the line, and where it looks, in the hall and out in the tunnel. */
     private const val HALL_EYE_Y = FLOOR + 2.2
@@ -130,8 +134,44 @@ object UndergroundRide {
     fun endsUnder(going: Journey): Boolean = going.transport == Transport.SKYTRAIN && going.railTo < UNDER
 
     /** True while [going], [elapsed] milliseconds in, is under downtown, and shown there rather than in the town. */
-    fun isUnder(going: Journey, elapsed: Double): Boolean =
-        going.transport == Transport.SKYTRAIN && going.alongAt(elapsed) < UNDER
+    fun isUnder(going: Journey, elapsed: Double): Boolean = when {
+        going.transport != Transport.SKYTRAIN -> false
+        // Going out from under downtown, the camera decides when the town comes back.
+        startsUnder(going) -> elapsed < cutMillis(going)
+        else -> going.alongAt(elapsed) < UNDER
+    }
+
+    /**
+     * When a ride from under downtown cuts back to the town: once the camera behind the train has ridden out in the
+     * tunnel, east of the hall, for [TUNNEL_MILLIS], or as it comes to the mouth, whichever is first. Meanwhile the train
+     * runs on out through the mouth into the open. Worked out once for each ride.
+     */
+    fun cutMillis(going: Journey): Double {
+        if (going === cutFor) return cut
+        val inTunnel = millisAt(going, HALL_EAST + BEHIND - MOUTH.x)
+        val atMouth = millisAt(going, EYE_EAST + BEHIND - MOUTH.x)
+        cut = min(inTunnel + TUNNEL_MILLIS, atMouth)
+        cutFor = going
+        return cut
+    }
+
+    /** The ride [cut] was last worked out for. */
+    private var cutFor: Journey? = null
+    private var cut = 0.0
+
+    /** When the train of [going], a ride east, first has its middle [along] the line; when it stops, if it never does. */
+    private fun millisAt(going: Journey, along: Double): Double {
+        var low = going.boardMillis
+        var high = going.millis
+        if (going.alongAt(high) < along) return high
+        repeat(SEARCH_STEPS) {
+            val middle = (low + high) / 2
+            if (going.alongAt(middle) < along) low = middle else high = middle
+        }
+        return high
+    }
+
+    private const val SEARCH_STEPS = 40
 
     /**
      * How far along the line the train's middle is: as [Journey.alongAt] says, but while the character waits to get on
