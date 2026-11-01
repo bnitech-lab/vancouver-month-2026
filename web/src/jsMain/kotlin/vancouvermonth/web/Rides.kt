@@ -9,8 +9,9 @@ import vancouvermonth.core.Spending
 
 /**
  * What the character can ride: a bike or an e-scooter, with how fast it goes in units a second (walking is 3.6) and a
- * little faster on a double tap, and how the rider sits on it: how high the body is lifted, and the turn of the legs
- * and arms from hanging down (negative is forward, as in [Figures]).
+ * little faster on a double tap, and at most on a long shared ride to a place ([cruise]); and how the rider sits on it:
+ * how high the body is lifted, and the turn of the legs and arms from hanging down (negative is forward, as in
+ * [Figures]).
  */
 enum class Vehicle(
     val item: Item,
@@ -19,9 +20,22 @@ enum class Vehicle(
     val lift: Double,
     val legs: Double,
     val arms: Double,
+    val top: Double,
 ) {
-    BIKE(Item.BIKE, 9.0, 10.5, lift = 0.3, legs = -0.4, arms = -1.25),
-    E_SCOOTER(Item.E_SCOOTER, 11.0, 13.0, lift = 0.14, legs = 0.0, arms = -1.8),
+    BIKE(Item.BIKE, 9.0, 10.5, lift = 0.3, legs = -0.4, arms = -1.25, top = 16.0),
+    E_SCOOTER(Item.E_SCOOTER, 11.0, 13.0, lift = 0.14, legs = 0.0, arms = -1.8, top = 20.0),
+    ;
+
+    /**
+     * How fast a shared one goes on a ride [length] units long to a place: as ever on a ride across downtown, quicker
+     * on a long one, up to [top], so a ride out to Burnaby takes about [SHARED_RIDE_SECONDS] rather than most of a
+     * minute, as the taxi's long rides do.
+     */
+    fun cruise(length: Double): Double = (length / SHARED_RIDE_SECONDS).coerceIn(speed, top)
+
+    companion object {
+        const val SHARED_RIDE_SECONDS = 18.0
+    }
 }
 
 /** One ride: the player's own [vehicle], or a shared one rented for [fare]. Each is drawn in its [colour]. */

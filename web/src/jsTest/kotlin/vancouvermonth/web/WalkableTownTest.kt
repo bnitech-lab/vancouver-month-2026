@@ -1752,6 +1752,35 @@ class WalkableTownTest {
     }
 
     @Test
+    fun `a long shared ride out to Burnaby goes quicker, an e-scooter in under half a minute`(): Promise<Unit> {
+        val town = startInTown()
+        val index = Rides.shared.indexOfFirst { it.vehicle == Vehicle.E_SCOOTER }
+        val scooter = Rides.shared[index]
+        val far = TransitLines.taxiStopsFor(1).last()
+        return play(
+            Step("stand a few steps east of the e-scooter", { town.isStill }) {
+                town.standAt(Spot(scooter.spot.x + 3.5, scooter.spot.z + 0.4))
+                town.aimCamera(PI / 2, 0.6, 10.0)
+            },
+            Step("tap it", { town.isStill }) {
+                tapScreen(town, onScreen(town, Point(scooter.spot.x, 0.5, scooter.spot.z)))
+            },
+            Step("reached it: ride to the town centre's station", { root.querySelector(".chooser") != null }) {
+                val squares = assertNotNull(town.taxiDistance(far.second))
+                goButton(far.first).click()
+                assertEquals(Ride.SHARED_E_SCOOTER, town.riding)
+                val millis = assertNotNull(town.tripMillis)
+                assertEquals(squares / Vehicle.E_SCOOTER.cruise(squares) * 1_000, millis, 1.0)
+                assertEquals(Vehicle.E_SCOOTER.top, Vehicle.E_SCOOTER.cruise(squares), "$squares squares")
+                // About 525 squares: 26 s at an e-scooter's top, where its everyday 11 would take 48.
+                assertTrue(millis < 30_000.0, "$millis ms for $squares squares")
+                tap("내리기")
+                assertNull(town.riding)
+            },
+        )
+    }
+
+    @Test
     fun `a month continued after buying a bike keeps the bike, ready to ride`() {
         val store = FakeStore()
         openKept(store)

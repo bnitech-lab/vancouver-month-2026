@@ -1099,10 +1099,10 @@ internal class NeighbourhoodScene(
         if (!ride.shared || !canRideTo(ride, to)) return
         val way = taxiWay(to) ?: return
         ride(ride)
-        // Along the very way the fare was worked out for, so the way paid for is the way ridden.
+        // Along the very way the fare was worked out for, so the way paid for is the way ridden; quicker on a long one.
         rideTo = to
         tripDash = false
-        trip = Trip(way, paceFor(dash = false))
+        trip = Trip(way, ride.vehicle.cruise(way.zipWithNext { a, b -> distanceBetween(a, b) }.sum()))
         tripStarted = window.performance.now()
         opensOnArrival = false
         cameraMovedOnWalk = false
