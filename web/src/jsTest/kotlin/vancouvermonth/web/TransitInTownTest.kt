@@ -664,18 +664,17 @@ class TransitInTownTest {
                 assertTrue(date(Month.FIRST_DAY) in hud())
                 assertTrue(town.travelling == Transport.BUS)
             },
-            Step("out at the park's stop, home's talk waits for the character to come home", arrived(town)) {
+            Step("out at the park's stop, a tap on 내 방's name sets off home, and no talk opens", arrived(town)) {
                 assertFalse(town.isChangingDay)
                 val name = root.querySelectorAll(".place-name").asList().map { it as HTMLButtonElement }
                     .first { it.textContent == Place.HOME.label }
                 name.click()
-                val answer = assertNotNull(root.querySelector(".talk .spend") as? HTMLButtonElement, screen)
-                assertTrue(answer.disabled, "a sleep far from 내 방")
-                answer.click()
+                assertNull(root.querySelector(".talk"), "the neighbour talks from the park: $screen")
                 assertFalse(town.isChangingDay, "the night fell at the park")
-                // Back at 내 방's door at once (the whole way home is the town's own tests'), the last steps walked.
-                town.standAt(Neighbourhood.venue(Place.HOME).door)
-                town.walkFor(Neighbourhood.venue(Place.HOME).talkSpot)
+                // A few steps from 내 방's door at once (the whole way home is too long to wait for), the last walked.
+                val door = Neighbourhood.venue(Place.HOME).door
+                town.standAt(Spot(door.x + 3.0, door.z))
+                name.click()
             },
             Step("at the neighbour, the sleep ends the day", { town.isStill }) {
                 val home = assertNotNull(root.querySelector(".talk .spend") as? HTMLButtonElement, screen)

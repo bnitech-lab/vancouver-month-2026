@@ -40,7 +40,6 @@ import vancouvermonth.text.Continue
 import vancouvermonth.text.actionName
 import vancouvermonth.text.money
 import vancouvermonth.text.Passer
-import vancouvermonth.text.SLEEP_ON_ARRIVAL
 import vancouvermonth.text.Shop
 import vancouvermonth.text.Transit
 import vancouvermonth.text.Transport
@@ -54,6 +53,7 @@ private class SilentTown : WalkableTown {
     override var onPlace: (Place?) -> Unit = {}
     override var onPasserby: (Passer) -> Unit = {}
     override var onShop: () -> Unit = {}
+    override var onHeading: (String?, Double) -> Unit = { _, _ -> }
     override var onRent: (Ride) -> Unit = {}
     override var onStop: (Stop) -> Unit = {}
     override var onTravelled: () -> Unit = {}
@@ -65,7 +65,7 @@ private class SilentTown : WalkableTown {
     override var onFail: () -> Unit = {}
     override var onMorning: () -> Unit = {}
     override var onArrived: (Place) -> Unit = {}
-    override val isHome = true
+    override fun isAt(place: Place) = true
 
     override fun passTime(share: Double) {}
 
@@ -239,22 +239,28 @@ class WalkableTownTest {
 
     private fun tap(text: String) = button(text).click()
 
-    /** Taps the floating name of [place], which talks to its person. */
-    private fun talkTo(place: Place) {
+    /** Taps the floating name of [place]: its talk opens at once at the place, and on arrival from afar. */
+    private fun tapName(place: Place) {
         val name = root.querySelectorAll(".place-name").asList().map { it as HTMLButtonElement }
             .first { it.textContent == place.label }
         name.click()
     }
 
     /**
-     * Opens 내 방's talk with the character at its door, where a night's sleep can start, as a walk home leaves it: the
-     * way home from downtown is too long for a test to walk every night. A talk already open is closed first, so 내 방's
-     * opens again with the character at the door, even when it was 내 방's, opened from afar.
+     * Opens [place]'s talk with the character at its door, where what the talk offers can be done, as a walk or a ride
+     * there leaves it: the ways across the map are too long for a test to walk each time. A talk already open is closed
+     * first, so the place's own opens again with the character there. What happens from afar is [ArriveFirstTest]'s.
      */
-    private fun talkAtHome(town: NeighbourhoodScene) {
+    private fun talkAtDoor(place: Place) {
         if (root.querySelector(".talk") != null) tap("그만")
-        town.standAt(Neighbourhood.venue(Place.HOME).door)
-        talkTo(Place.HOME)
+        assertNotNull(town).standAt(Neighbourhood.venue(place).door)
+        tapName(place)
+    }
+
+    /** Opens the talk with the bike shop's keeper with the character at its door, as [talkAtDoor] does. */
+    private fun talkAtShop(town: NeighbourhoodScene) {
+        town.standAt(Neighbourhood.shop.door)
+        town.shopName.click()
     }
 
     /** The answer that spends the day, in the open talk. */
@@ -475,7 +481,8 @@ class WalkableTownTest {
     }
 
     @Test
-    fun `a tap on a person or on a building opens that place's talk`(): Promise<Unit> {
+    fun `a tap on a building from afar walks there, and a tap on a person or a building at the place opens its talk`():
+        Promise<Unit> {
         val town = startInTown()
         val home = Neighbourhood.venue(Place.HOME)
         val office = Neighbourhood.venue(Place.OFFICE)
@@ -487,13 +494,14 @@ class WalkableTownTest {
         return play(
             Step("tap 회사's tower far across the town", { town.isStill }) {
                 tapScreen(town, onScreen(town, officeRoof), highest = 0.15)
-                val talk = root.querySelector(".talk")?.textContent.orEmpty()
-                assertTrue("마커스" in talk && "지원서 넣기" in talk, "no talk at 회사: $screen")
-                tap("그만")
-                assertNull(root.querySelector(".talk"), "그만 left the talk open")
+                assertNull(root.querySelector(".talk"), "a talk at 회사 from afar: $screen")
+                assertEquals("항구 회사로 가는 중", root.querySelector(".hud-going")?.textContent)
+                assertEquals(office.talkSpot, town.markerSpot)
             },
-            // At once, while the character has only just set off toward 회사.
+            // Back at the door, where the neighbour is near.
             Step("tap the neighbour", { true }) {
+                town.standAt(home.door)
+                assertNull(root.querySelector(".hud-going"), "still on the way to 회사: $screen")
                 tapScreen(town, onScreen(town, Point(home.person.x, 1.3, home.person.z)))
                 val talk = root.querySelector(".talk")?.textContent.orEmpty()
                 assertTrue("이웃 할머니" in talk, "no talk with the neighbour: $screen")
@@ -514,7 +522,7 @@ class WalkableTownTest {
         val town = startInTown()
         val home = Neighbourhood.venue(Place.HOME)
         return play(
-            Step("talk to the neighbour, and let the character walk up", { town.isStill }) { talkTo(Place.HOME) },
+            Step("talk to the neighbour, and let the character walk up", { town.isStill }) { tapName(Place.HOME) },
             Step("arrived", { town.isStill }) {
                 // 내 방's door faces south: the camera comes round to the south, looking north at its front.
                 assertEquals(0.0, town.cameraTurn, 1e-9)
@@ -525,7 +533,7 @@ class WalkableTownTest {
                 tapScreen(town, onScreen(town, Point(home.door.x, 0.0, home.door.z)))
             },
             Step("at the door, walk up to the neighbour again, turning the camera on the way", { town.isStill }) {
-                talkTo(Place.HOME)
+                tapName(Place.HOME)
                 drag(town)
             },
             Step("arrived again", { town.isStill }) {
@@ -565,7 +573,7 @@ class WalkableTownTest {
     @Test
     fun `a talk is a dialog that takes the focus, and after an answer the focus goes to the day's log`() {
         startInTown()
-        talkTo(Place.LIBRARY)
+        talkAtDoor(Place.LIBRARY)
         val talk = root.querySelector(".talk") as HTMLElement
         assertEquals("dialog", talk.getAttribute("role"))
         assertEquals("레오", talk.getAttribute("aria-label"))
@@ -577,7 +585,7 @@ class WalkableTownTest {
     @Test
     fun `a person's line types out, a tap finishes it, and small talk changes it`() {
         startInTown()
-        talkTo(Place.LIBRARY)
+        talkAtDoor(Place.LIBRARY)
         val line = root.querySelector(".talk-line") as HTMLElement
         val whole = "조용히... 영어 책은... 저쪽 창가에 있어요."
         assertEquals(whole, line.querySelector(".visually-hidden")?.textContent)
@@ -590,14 +598,14 @@ class WalkableTownTest {
         tap("그만")
         assertNull(root.querySelector(".talk"))
         // A second meeting is not a first one.
-        talkTo(Place.LIBRARY)
+        talkAtDoor(Place.LIBRARY)
         assertNotEquals(whole, root.querySelector(".talk-line .visually-hidden")?.textContent)
     }
 
     @Test
     fun `an answer takes the action in core, the day goes on, and its log shows over the town`() {
         startInTown()
-        talkTo(Place.LIBRARY)
+        talkAtDoor(Place.LIBRARY)
         tap("영어 공부")
         val month = FirstMinute(1011).let { it.startMonth(it.cheapestRoomIndex, it.lowestTotal) }
         month.take(Action.STUDY_ENGLISH)
@@ -620,7 +628,7 @@ class WalkableTownTest {
                 assertEquals(DayLight.MORNING, morning)
                 // Downtown is a long walk from 내 방: the test starts by the café's door.
                 town.standAt(Neighbourhood.venue(Place.CAFE).door)
-                talkTo(Place.CAFE)
+                talkAtDoor(Place.CAFE)
             },
             Step("work a shift once there", { town.isStill }) {
                 spot = town.characterSpot
@@ -643,11 +651,11 @@ class WalkableTownTest {
                 assertEquals(spot, town.characterSpot, "the character moved")
                 assertNotEquals(Neighbourhood.venue(Place.HOME).door, town.characterSpot)
                 // The town takes a talk at once, and offers only what the stamina left allows, with the reason.
-                talkTo(Place.CAFE)
+                talkAtDoor(Place.CAFE)
                 assertTrue(spendButton().disabled, "a second shift with two stamina")
                 assertTrue("체력이 모자라요." in spendButton().textContent.orEmpty(), spendButton().textContent)
                 tap("그만")
-                talkTo(Place.LIBRARY)
+                talkAtDoor(Place.LIBRARY)
                 assertFalse(spendButton().disabled, "no English with two stamina")
             },
         )
@@ -659,15 +667,15 @@ class WalkableTownTest {
         val town = startInTown(pass = 300.0, night = 600.0)
         return play(
             Step("work and study", { town.isStill }) {
-                talkTo(Place.CAFE)
+                talkAtDoor(Place.CAFE)
                 tap("알바하기")
                 // The library is a long walk from 내 방: the test puts the character by its door.
                 town.standAt(Neighbourhood.venue(Place.LIBRARY).door)
-                talkTo(Place.LIBRARY)
+                talkAtDoor(Place.LIBRARY)
                 tap("영어 공부")
                 assertTrue("밤 11시 · 체력 0/5" in hud(), hud())
                 assertEquals("밤이에요. 체력을 다 썼어요. 내 방에 가서 자요.", root.querySelector(".hud-bedtime")?.textContent)
-                talkTo(Place.CAFE)
+                talkAtDoor(Place.CAFE)
                 assertTrue("체력이 없어요. 내 방에 가서 자요." in spendButton().textContent.orEmpty(), screen)
                 tap("그만")
             },
@@ -678,7 +686,7 @@ class WalkableTownTest {
                 assertNotEquals(Neighbourhood.venue(Place.HOME).door, town.characterSpot, "taken home")
                 // The neighbour offers sleep, which a walk home reaches: from 내 방's door here, as the way is long.
                 town.standAt(Neighbourhood.venue(Place.HOME).door)
-                talkTo(Place.HOME)
+                talkAtDoor(Place.HOME)
                 assertEquals("자기", spendButton().querySelector(".action-name")?.textContent)
                 assertFalse(spendButton().disabled)
             },
@@ -718,7 +726,7 @@ class WalkableTownTest {
                 // A walk started before the answer leaves no marker behind.
                 tapScreen(town, onScreen(town, Point(town.characterSpot.x + 3.0, 0.0, town.characterSpot.z + 1.0)))
                 assertTrue(town.isMarkerShown, "no marker")
-                talkTo(Place.HOME)
+                talkAtDoor(Place.HOME)
                 tap("자기")
                 assertTrue(town.isSitting, "not on the bench")
                 assertFalse(town.isMarkerShown, "the marker stayed")
@@ -726,7 +734,7 @@ class WalkableTownTest {
             },
             Step("in the night", after(300)) {
                 // In the night: no talk, no walk, no turn and no zoom.
-                talkTo(Place.CAFE)
+                tapName(Place.CAFE)
                 assertNull(root.querySelector(".talk"), "a talk opened")
                 tapScreen(town, FramePoint(0.5, 0.6))
                 assertNull(town.markerSpot, "a walk began")
@@ -743,7 +751,7 @@ class WalkableTownTest {
                 assertEquals(turn, town.cameraTurn, 1e-9, "the turn")
                 assertEquals(tilt, town.cameraTilt, 1e-9, "the tilt")
                 assertEquals(distance, town.cameraDistance, 1e-9, "the distance")
-                talkTo(Place.CAFE)
+                talkAtDoor(Place.CAFE)
                 assertNotNull(root.querySelector(".talk"), "the morning takes no input")
             },
         )
@@ -756,11 +764,11 @@ class WalkableTownTest {
             fun nextDay() {
                 if ("오늘은 면접 날이에요" in screen) {
                     for (place in listOf(Place.HOME, Place.CAFE, Place.LIBRARY, Place.COWORKING)) {
-                        talkTo(place)
+                        talkAtDoor(place)
                         assertTrue(spendButton().disabled, "$place")
                         assertTrue("오늘은 면접부터 봐요." in spendButton().textContent.orEmpty(), "$place")
                     }
-                    talkTo(Place.OFFICE)
+                    talkAtDoor(Place.OFFICE)
                     assertEquals("면접 보기", spendButton().querySelector(".action-name")?.textContent)
                     assertFalse(spendButton().disabled)
                     assertEquals(Place.OFFICE.label, root.querySelector(".place-name.here")?.textContent)
@@ -770,8 +778,8 @@ class WalkableTownTest {
                     resolve(Unit)
                     return
                 }
-                talkTo(Place.OFFICE)
-                if (spendButton().disabled) talkAtHome(town)
+                talkAtDoor(Place.OFFICE)
+                if (spendButton().disabled) talkAtDoor(Place.HOME)
                 spendButton().click()
                 whenReady({ !town.isChangingDay }, reject) { nextDay() }
             }
@@ -821,14 +829,14 @@ class WalkableTownTest {
                     return
                 }
                 val action = cycle[step % cycle.size]
-                // Sleep straight at the door: how far the character has walked meanwhile goes by the clock, so 내 방's
-                // talk opened from afar may not yet offer 자기.
+                // Each answer at its place's door, where it can be taken, so nothing goes by how far the character has
+                // walked by the clock.
                 when {
-                    "오늘은 면접 날이에요" in screen -> talkTo(Place.OFFICE)
-                    action == Action.REST -> talkAtHome(town)
+                    "오늘은 면접 날이에요" in screen -> talkAtDoor(Place.OFFICE)
+                    action == Action.REST -> talkAtDoor(Place.HOME)
                     else -> {
-                        talkTo(placeFor(action))
-                        if (spendButton().disabled) talkAtHome(town)
+                        talkAtDoor(placeFor(action))
+                        if (spendButton().disabled) talkAtDoor(Place.HOME)
                     }
                 }
                 val sleep = "자기" in spendButton().textContent.orEmpty()
@@ -839,7 +847,7 @@ class WalkableTownTest {
                 if ("다시 하기" !in screen && sleep) {
                     nights++
                     // In the night no talk opens.
-                    talkTo(Place.CAFE)
+                    tapName(Place.CAFE)
                     assertNull(root.querySelector(".talk"), "a talk opened in the night")
                 } else if ("다시 하기" !in screen) {
                     // An action takes nobody home and ends no day: time passes where the character is.
@@ -929,27 +937,27 @@ class WalkableTownTest {
     }
 
     @Test
-    fun `sleep starts only at 내 방, and a talk opened from afar offers it once the character arrives`():
+    fun `sleep starts only at 내 방: a tap on its name from afar walks home, and the talk there offers it`():
         Promise<Unit> {
         val town = startInTown()
         val home = Neighbourhood.venue(Place.HOME)
         return play(
-            Step("from the library, talk to the neighbour", { town.isStill }) {
+            Step("from the library, tap 내 방's name", { town.isStill }) {
                 town.standAt(Neighbourhood.venue(Place.LIBRARY).door)
-                talkTo(Place.HOME)
-                assertFalse(town.isHome)
-                assertTrue(spendButton().disabled, "sleep from afar")
-                assertTrue(SLEEP_ON_ARRIVAL in spendButton().textContent.orEmpty(), spendButton().textContent)
-                spendButton().click()
+                tapName(Place.HOME)
+                assertFalse(town.isAt(Place.HOME))
+                assertNull(root.querySelector(".talk"), "the neighbour talks from afar")
+                assertEquals("내 방으로 가는 중", root.querySelector(".hud-going")?.textContent)
                 assertFalse(town.isChangingDay, "the night fell far from 내 방")
                 assertTrue("오늘9월 2일" in screen, screen)
                 // Most of the way home at once, to keep the test short; the last steps are walked.
-                town.standAt(home.door)
-                town.walkFor(home.talkSpot)
+                town.standAt(Spot(home.door.x + 3.0, home.door.z))
+                tapName(Place.HOME)
             },
             Step("arrived at the neighbour", { town.isStill }) {
-                assertTrue(town.isHome)
-                assertNotNull(root.querySelector(".talk"), "the talk closed")
+                assertTrue(town.isAt(Place.HOME))
+                assertNull(root.querySelector(".hud-going"), "still on the way: $screen")
+                assertNotNull(root.querySelector(".talk"), "no talk on arrival: $screen")
                 assertFalse(spendButton().disabled, "no sleep at 내 방")
                 spendButton().click()
                 assertTrue(town.isChangingDay, "no night's sleep at 내 방")
@@ -963,15 +971,15 @@ class WalkableTownTest {
         return play(
             Step("spend the day's stamina", { town.isStill }) {
                 assertTrue(town.arePassersbyOut, "nobody out by day")
-                talkTo(Place.LIBRARY)
+                talkAtDoor(Place.LIBRARY)
                 tap("영어 공부")
-                talkTo(Place.CAFE)
+                talkAtDoor(Place.CAFE)
                 tap("알바하기")
                 assertFalse(town.isChangingDay)
             },
             Step("at night", { !town.isPassingTime && !town.arePassersbyOut }) {
                 assertEquals(1.0, town.timeShown, 1e-9)
-                talkAtHome(town)
+                talkAtDoor(Place.HOME)
                 tap("자기")
                 assertTrue(town.isChangingDay)
             },
@@ -1096,7 +1104,7 @@ class WalkableTownTest {
         val town = startInTown()
         return play(
             Step("talk to the neighbour", { town.isStill }) {
-                talkTo(Place.HOME)
+                talkAtDoor(Place.HOME)
                 assertEquals("이웃 할머니", talkWith())
             },
             // On arrival the camera comes round to 내 방's front; look along 미나's street again.
@@ -1119,7 +1127,7 @@ class WalkableTownTest {
             Step("look along her street", { town.isStill }) { lookAlongMinasStreet(town) },
             Step("go to sleep, then tap 미나 as the evening begins", { town.isStill }) {
                 val mina = minaOn(town)
-                talkTo(Place.HOME)
+                talkAtDoor(Place.HOME)
                 tap("자기")
                 assertTrue(town.isChangingDay)
                 assertTrue(town.arePassersbyOut, "already gone")
@@ -1164,7 +1172,7 @@ class WalkableTownTest {
                 if (day < rainyDay) {
                     assertFalse(town.isRaining, "rain on day $day")
                     assertEquals(" 날씨 ${weatherWord(weatherOn(1011, day))}", word, "day $day")
-                    talkAtHome(town)
+                    talkAtDoor(Place.HOME)
                     spendButton().click()
                     day++
                     whenReady({ !town.isChangingDay }, reject) { nextDay() }
@@ -1201,7 +1209,7 @@ class WalkableTownTest {
             Step("spend a dry day", { town.isStill }) {
                 assertFalse(town.isRaining)
                 assertEquals(" 날씨 맑음", root.querySelector(".hud .weather")?.textContent)
-                talkTo(Place.HOME)
+                talkAtDoor(Place.HOME)
                 spendButton().click()
                 assertTrue(town.isChangingDay)
                 // The top card already shows the new day, but the evening is still dry.
@@ -1239,10 +1247,10 @@ class WalkableTownTest {
                         return
                     }
                     if ("오늘은 면접 날이에요" in screen) {
-                        talkTo(Place.OFFICE)
+                        talkAtDoor(Place.OFFICE)
                     } else {
-                        talkTo(placeFor(cycle[(seen.size - 1) % cycle.size]))
-                        if (spendButton().disabled) talkAtHome(town)
+                        talkAtDoor(placeFor(cycle[(seen.size - 1) % cycle.size]))
+                        if (spendButton().disabled) talkAtDoor(Place.HOME)
                     }
                     spendButton().click()
                     whenReady({ !town.isChangingDay }, reject) {
@@ -1455,7 +1463,7 @@ class WalkableTownTest {
                 (assertNotNull(root.querySelector(".place-name")) as HTMLElement).focus()
                 assertFalse(map.classList.contains("large"), "a name took the focus under the larger map")
                 map.click()
-                talkTo(Place.HOME)
+                talkAtDoor(Place.HOME)
                 assertNotNull(root.querySelector(".talk"))
                 assertFalse(map.classList.contains("large"), "a talk opened over the larger map")
                 // While the talk covers the town, it does not grow under it.
@@ -1525,14 +1533,14 @@ class WalkableTownTest {
                 pressAt(larger.left + larger.width / 2, larger.top + larger.height / 2)
                 assertFalse(map.classList.contains("large"))
                 assertNull(town.markerSpot, "a tap on the larger map walked the character")
-                talkTo(Place.HOME)
+                talkAtDoor(Place.HOME)
                 spendButton().click()
             },
             Step("the morning after, with the day's log", { !town.isChangingDay && town.isStill }) {
                 val frame = map.getBoundingClientRect()
                 val log = rectOf(".over-town .log")
                 assertTrue(frame.top >= log.bottom, "the map's top ${frame.top} is over the log, which ends at ${log.bottom}")
-                talkTo(Place.HOME)
+                talkAtDoor(Place.HOME)
             },
             Step("with a talk open under the log", { town.isStill }) {
                 clearOfTheCards("375 by 812")
@@ -1760,15 +1768,17 @@ class WalkableTownTest {
                 town.standAt(Spot(shop.talkSpot.x - 1.5, shop.talkSpot.z + 1.5))
                 town.aimCamera(0.0, FollowCamera.START_PITCH, 12.0)
             },
-            Step("tap its keeper", { town.isStill }) {
+            Step("tap its keeper, a few steps off", { town.isStill }) {
                 assertFalse(town.shopName.classList.contains("behind"), "the shop's name is not over it")
                 tapScreen(town, onScreen(town, Point(shop.keeper.x, 1.3, shop.keeper.z)))
+                assertNull(root.querySelector(".talk"), "he talks before the character has come")
+                assertEquals("자전거 가게로 가는 중", root.querySelector(".hud-going")?.textContent)
+            },
+            Step("walked up to him: his talk, then buy a bike", { town.isStill }) {
                 val talk = root.querySelector(".talk")?.textContent.orEmpty()
                 assertTrue("벤" in talk && "자전거 사기\$350" in talk && "퀵보드 사기\$550" in talk, talk)
                 assertTrue("이야기" in talk && "그만" in talk, talk)
                 assertTrue(town.isCovered)
-            },
-            Step("walked up to him, buy a bike", { town.isStill }) {
                 assertTrue(distanceBetween(town.characterSpot, shop.talkSpot) < 0.01, "${town.characterSpot}")
                 buyButton("자전거 사기").click()
                 assertTrue("9월 2일" in hud() && money(firstBalance - 350) in hud(), hud())
@@ -1794,7 +1804,7 @@ class WalkableTownTest {
         }
         return play(
             Step("buy a bike, from the shop's name", { town.isStill }) {
-                town.shopName.click()
+                talkAtShop(town)
                 buyButton("자전거 사기").click()
                 tap("그만")
                 backHome()
@@ -1973,7 +1983,7 @@ class WalkableTownTest {
                 val toPerson = kotlin.math.atan2(venue.person.x - home.x, venue.person.z - home.z)
                 assertEquals(toPerson, town.characterHeading, 1e-9)
                 // At 내 방, so the night's sleep is there to take at once.
-                assertTrue(town.isHome)
+                assertTrue(town.isAt(Place.HOME))
                 val sleep = button(actionName(Action.REST))
                 assertFalse(sleep.disabled, sleep.textContent)
                 sleep.click()
@@ -2017,7 +2027,7 @@ class WalkableTownTest {
         openKept(store)
         startMonth()
         val first = assertNotNull(town)
-        first.shopName.click()
+        talkAtShop(first)
         buyButton("자전거 사기").click()
         assertTrue(store.items[SaveSlot.KEY].orEmpty().endsWith("|b350"), store.items[SaveSlot.KEY])
         first.close()
@@ -2029,7 +2039,7 @@ class WalkableTownTest {
         assertTrue(money(firstBalance - 350) in hud(), hud())
         tap("자전거 타기")
         assertEquals(Ride.BIKE, again.riding)
-        again.shopName.click()
+        talkAtShop(again)
         assertNull(again.riding, "the keeper's talk did not get off")
         assertTrue(buyButton("자전거 사기").disabled)
     }
@@ -2044,7 +2054,7 @@ class WalkableTownTest {
         openKept(store)
         tap(Continue.CONTINUE)
         val town = assertNotNull(town)
-        town.shopName.click()
+        talkAtShop(town)
         assertTrue(money(firstBalance - 28 * Month.DAILY_LIVING_COST) in hud(), hud())
         buyButton("퀵보드 사기").click()
         val bike = buyButton("자전거 사기")
@@ -2061,7 +2071,7 @@ class WalkableTownTest {
         val scooter = Rides.shared[index]
         return play(
             Step("buy a bike, then stand a few steps east of the e-scooter", { town.isStill }) {
-                town.shopName.click()
+                talkAtShop(town)
                 buyButton("자전거 사기").click()
                 tap("그만")
                 town.standAt(Spot(scooter.spot.x + 3.5, scooter.spot.z + 0.4))
@@ -2102,7 +2112,7 @@ class WalkableTownTest {
         assertEquals(4, log.size, "$log")
         tap("자전거 타기")
         assertEquals(Ride.BIKE, town.riding)
-        talkTo(Place.HOME)
+        talkAtDoor(Place.HOME)
         assertNull(town.riding, "the talk did not get off")
         /** True once the talk has risen into place: its opening animation is over. */
         fun settled(): Boolean {

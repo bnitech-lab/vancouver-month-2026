@@ -38,7 +38,9 @@ import vancouvermonth.text.clockName
 import vancouvermonth.text.continueFrom
 import vancouvermonth.text.date
 import vancouvermonth.text.dayLog
+import vancouvermonth.text.DO_ON_ARRIVAL
 import vancouvermonth.text.endingLine
+import vancouvermonth.text.FAR_WALK_HINT
 import vancouvermonth.text.goalLine
 import vancouvermonth.text.greeting
 import vancouvermonth.text.guessExamplesLine
@@ -51,6 +53,7 @@ import vancouvermonth.text.keyword
 import vancouvermonth.text.money
 import vancouvermonth.text.monthCostLine
 import vancouvermonth.text.monthStartLines
+import vancouvermonth.text.onTheWayLine
 import vancouvermonth.text.replacesKept
 import vancouvermonth.text.signedMoney
 import vancouvermonth.text.startBalanceLine
@@ -85,8 +88,8 @@ import vancouvermonth.text.whyTotalLines
  * The rules are in core and the wording in text; this only shows the state and passes each tap on.
  * Every tap redraws the whole screen from that state. A run comes from a seed or from today's date, never both.
  * The month is played in a town the player walks in, which [makeWalkableTown] makes on the first day for the room's
- * zone, where 내 방 stands: each action, and the night's sleep, is chosen by talking to a place's person. Where it gives
- * none, the month is played with buttons, under a town that
+ * zone, where 내 방 stands: each action, and the night's sleep, is chosen by talking to a place's person, there and not
+ * from afar. Where it gives none, the month is played with buttons, under a town that
  * is a picture when [makeTown] gives one. Either town is closed at the ending. Given a [slot], the month in
  * progress is kept after every choice, and the page opened again for the same run offers to go on with it.
  */
@@ -134,6 +137,17 @@ class PhoneGame private constructor(
     private var talkLine = ""
     private var smallTalks = 0
     private val met = mutableSetOf<Townsperson>()
+
+    /** True while the open talk's answer waits for the character to come: a talk open away from its place. */
+    private var waitingToArrive = false
+
+    /**
+     * Where a tap from afar sent the character, for the top card, or null; while the first very long walk of the month
+     * lasts, [farWalkNow] says so too, and [farWalkTold] keeps it from being said again.
+     */
+    private var headingTo: String? = null
+    private var farWalkNow = false
+    private var farWalkTold = false
 
     /** The passerby the player has stopped for a word, or null. A word with them costs no stamina. */
     private var chattingWith: Passer? = null
@@ -734,8 +748,8 @@ class PhoneGame private constructor(
      * or lets it go at the ending.
      */
     private fun spend(month: Month, place: Place, choice: Choice) {
-        // Nothing is done while the character travels: it gets out at its stop first.
-        if (walkable?.travelling != null) return
+        // Nothing is done while the character travels, or from afar: it gets out at its stop and goes to the place first.
+        if (walkable?.travelling != null || walkable?.isAt(place) == false) return
         val sleep = choice == Choice.Take(Action.REST)
         if (sleep) {
             sleptAt = month.hour
@@ -802,6 +816,12 @@ class PhoneGame private constructor(
         }
         town.onPasserby = { passer -> if (!dayChanging && town.travelling == null) chatWith(passer) }
         town.onShop = { if (!dayChanging && town.travelling == null) openShop() }
+        town.onHeading = { name, squares ->
+            headingTo = name
+            farWalkNow = name != null && squares > FAR_WALK_SQUARES && town.riding == null && !farWalkTold
+            if (farWalkNow) farWalkTold = true
+            show()
+        }
         town.onRent = { ride -> if (!dayChanging && town.travelling == null) rent(ride) }
         town.onStop = { stop -> if (!dayChanging && town.travelling == null) choose(stop.transport, stop.index) }
         town.onTravelled = {
@@ -815,11 +835,17 @@ class PhoneGame private constructor(
             // The top card comes to the morning's hour with the town.
             show()
         }
-        // Once the character reaches 내 방 with its talk open, the sleep it offers can start.
-        town.onArrived = { place -> if (place == Place.HOME && talkingAt == Place.HOME && !dayChanging) show() }
+        // Once the character reaches a place whose talk was open before it came, what the talk offers can start.
+        town.onArrived = { place ->
+            if (place == talkingAt && waitingToArrive && !dayChanging) {
+                focusNext = ".talk"
+                show()
+            }
+        }
         town.onSounds = { train, fire, night -> sound?.nearby(train, fire, night) }
         town.onFail = {
             walkable = null
+            headingTo = null
             talkingAt = null
             atShop = false
             choosing = null
@@ -834,6 +860,7 @@ class PhoneGame private constructor(
     private fun talkTo(place: Place?) {
         val current = month ?: return
         talkingAt = place
+        waitingToArrive = false
         atShop = false
         choosing = null
         renting = null
@@ -849,7 +876,8 @@ class PhoneGame private constructor(
             talkLine = greeting(person, current, person !in met, lastEvents, weatherOf(current.day), elsewhere)
             met.add(person)
             talkOpened = window.performance.now()
-            focusNext = ".talk"
+            // Not out from under the guide, if it was opened on the way.
+            if (guide?.isOpen != true) focusNext = ".talk"
             sound?.blip()
         }
         show()
@@ -911,6 +939,11 @@ class PhoneGame private constructor(
                             "통과 확률 ${percent(month.passChance(interview.stage))}",
                     )
                 }
+                // Where a tap from afar sent the character, so the tap shows; a very long walk says once how to shorten it.
+                headingTo?.let { name ->
+                    child("p", "hud-note hud-going", onTheWayLine(name)).setAttribute("aria-live", "polite")
+                    if (farWalkNow) child("p", "hud-note", FAR_WALK_HINT)
+                }
                 rides(month, town)
             }
             showLog(this)
@@ -931,7 +964,7 @@ class PhoneGame private constructor(
                 chat(chatting)
             } else if (lastLines.isEmpty()) {
                 // On the first day, at the bottom where the talks open, how to get about.
-                child("p", "town-hint", "땅을 누르면 걷고, 두 번 누르면 빨리 가요. 사람이나 건물을 누르면 말을 걸어요.")
+                child("p", "town-hint", "땅을 누르면 걷고, 두 번 누르면 빨리 가요. 사람이나 건물을 누르면 걸어가서 말을 걸어요.")
             }
         }
         // The names of the buildings hide where the top card and the day's log cover the town.
@@ -994,6 +1027,8 @@ class PhoneGame private constructor(
             child("div", "keywords") {
                 answer(month, place)
                 button("keyword", text = "이야기") {
+                    // The person is there, not here.
+                    disabled = walkable?.isAt(place) == false
                     onclick = {
                         talkLine = smallTalk(person, month, smallTalks)
                         smallTalks += 1
@@ -1014,35 +1049,37 @@ class PhoneGame private constructor(
 
     /**
      * The answer that takes the place's action: what it does and costs, or why it cannot be done now. At 내 방 it is the
-     * night's sleep, which waits for the character to arrive. On an interview day the office applied at offers the
-     * interview instead.
+     * night's sleep. On an interview day the office applied at offers the interview instead. Either waits for the
+     * character to be at the place: a talk open away from it says so, until the town says it has come ([WalkableTown.onArrived]).
      */
     private fun HTMLElement.answer(month: Month, place: Place) {
+        val away = walkable?.isAt(place) == false
+        waitingToArrive = away
         val interview = month.interview
         if (month.hasInterviewToday && place == interviewPlace && interview != null) {
             button("keyword spend") {
+                disabled = away
                 child("span", "action-name", "면접 보기")
                 val chance = percent(month.passChance(interview.stage))
                 child("span", "action-effect", "${stageName(interview.stage)} · 통과 확률 $chance")
+                if (away) child("span", "action-why", DO_ON_ARRIVAL)
                 onclick = { spend(month, place, Choice.AttendInterview) }
             }
             return
         }
         val action = actionAt(place)
         val blocked = month.blockedBy(action)
-        // A night's sleep starts only with the character at 내 방: a talk opened from afar waits for it to arrive.
-        val onTheWay = action == Action.REST && blocked == null && walkable?.isHome == false
         button("keyword spend") {
-            disabled = blocked != null || onTheWay
+            disabled = blocked != null || away
             child("span", "action-name", keyword(action))
             child("span", "action-effect", actionEffect(action, month))
-            if (blocked != null) child("span", "action-why", whyNot(blocked))
-            if (onTheWay) child("span", "action-why", SLEEP_ON_ARRIVAL)
-            onclick = {
-                // Kept with the place's number among its kind, so a month taken up again knows where it was.
-                val choice = Choice.Take(action, place.number)
-                if (action != Action.REST || walkable?.isHome != false) spend(month, place, choice)
+            if (blocked != null) {
+                child("span", "action-why", whyNot(blocked))
+            } else if (away) {
+                child("span", "action-why", if (action == Action.REST) SLEEP_ON_ARRIVAL else DO_ON_ARRIVAL)
             }
+            // Kept with the place's number among its kind, so a month taken up again knows where it was.
+            onclick = { spend(month, place, Choice.Take(action, place.number)) }
         }
     }
 
@@ -1344,7 +1381,8 @@ class PhoneGame private constructor(
         talkLine = Shop.greeting(!metKeeper, current.owned)
         metKeeper = true
         talkOpened = window.performance.now()
-        focusNext = ".talk"
+        // Not out from under the guide, if it was opened on the way.
+        if (guide?.isOpen != true) focusNext = ".talk"
         sound?.blip()
         show()
     }
@@ -1502,6 +1540,9 @@ class PhoneGame private constructor(
 
         /** How long a talk ignores taps after it opens. */
         const val TALK_SETTLE_MILLIS = 400.0
+
+        /** A walk over this many squares (1.5 km, some 17 seconds on foot) is long enough to say a ride is quicker. */
+        const val FAR_WALK_SQUARES = 60.0
     }
 }
 
