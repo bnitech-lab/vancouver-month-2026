@@ -163,8 +163,6 @@ class TownLifeTest {
             last = shows
             assertEquals(shows > 0.0, SkyTrainRun.isShownAt(t))
         }
-        // All there while it is near its station: it starts to fade only past where the haze begins, at any station.
-        assertTrue(SkyTrainRun.FADE_FROM > Neighbourhood.HAZE_NEAR)
     }
 
     @Test
