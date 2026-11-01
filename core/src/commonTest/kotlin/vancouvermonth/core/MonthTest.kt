@@ -173,7 +173,7 @@ class MonthTest {
     fun `no interview is ever booked after the 30th`() {
         for (seed in 1..500) {
             val game = FirstMinute(seed)
-            val month = game.startMonth(0)
+            val month = game.startMonth(0, guess = 1_000)
             while (!month.isOver) {
                 if (month.hasInterviewToday) {
                     month.attendInterview()

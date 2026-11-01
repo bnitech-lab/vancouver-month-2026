@@ -107,7 +107,7 @@ class PhoneGameTest {
         tap("9월 2일 시작하기")
         assertTrue("오늘9월 2일" in screen)
         assertTrue("남은 날29일" in screen)
-        assertTrue("잔고\$1,655" in screen)
+        assertTrue("잔고\$1,710" in screen)
         assertTrue("10월 1일에 낼 총비용\$1,345" in screen)
         assertTrue("지원서 넣기면접이 잡힐 확률 27%, 체력 -1" in screen)
 
@@ -115,7 +115,7 @@ class PhoneGameTest {
         assertTrue("9월 2일에 있었던 일" in screen)
         assertEquals("polite", root.querySelector(".log")?.getAttribute("aria-live"))
         assertTrue("영어 실력이 올랐어요. 영어 2/10" in screen)
-        assertTrue("생활비 -\$40, 잔고 \$1,615" in screen)
+        assertTrue("생활비 -\$40, 잔고 \$1,670" in screen)
         assertTrue("오늘9월 3일" in screen)
     }
 

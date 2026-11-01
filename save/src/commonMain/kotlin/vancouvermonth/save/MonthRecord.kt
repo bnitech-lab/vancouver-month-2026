@@ -55,7 +55,7 @@ data class MonthRecord(
     fun after(move: Move): MonthRecord = copy(moves = moves + move)
 
     /**
-     * "2|1011||2|1165|Eb350Wq4C": the version, the seed, today's run's date or nothing, the room, the guess, and the
+     * "3|1011||2|1165|Eb350Wq4C": the version, the seed, today's run's date or nothing, the room, the guess, and the
      * moves: a capital letter for each day, and a small letter with its amount for each spend.
      */
     fun encode(): String =
@@ -74,7 +74,7 @@ data class MonthRecord(
         val firstMinute = FirstMinute(seed)
         if (room !in firstMinute.rooms.indices || guess < 0) return null
         val reveal = firstMinute.reveal(room, guess)
-        val month = firstMinute.startMonth(room)
+        val month = firstMinute.startMonth(room, guess)
         var lastEvents = emptyList<Event>()
         var spentToday = emptyList<Event>()
         for (move in moves) {
@@ -95,8 +95,9 @@ data class MonthRecord(
         /**
          * Goes up whenever this line or the rules change so that an older record would play out differently. A new
          * kind of spend with a letter of its own does not: every older line still reads and plays out as before.
+         * 3: the guess's money is added as the month starts, so a version 2 line would start with another balance.
          */
-        const val VERSION = 2
+        const val VERSION = 3
 
         private const val SEPARATOR = "|"
 

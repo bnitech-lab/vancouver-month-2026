@@ -55,7 +55,7 @@ class TerminalGame(
         val guess = askAmount() ?: return false
         val reveal = showReveal(game, roomIndex, guess)
 
-        val month = game.startMonth(roomIndex)
+        val month = game.startMonth(roomIndex, guess)
         showMonthStart(month)
         while (!month.isOver) {
             showDay(month)

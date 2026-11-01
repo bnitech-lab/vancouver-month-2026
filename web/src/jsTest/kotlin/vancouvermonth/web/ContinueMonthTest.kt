@@ -102,7 +102,7 @@ class ContinueMonthTest {
     /** Seed 1011's September, after [actions], as core plays it. */
     private fun played(vararg actions: Action): Month {
         val game = FirstMinute(1011)
-        val month = game.startMonth(game.cheapestRoomIndex)
+        val month = game.startMonth(game.cheapestRoomIndex, game.lowestTotal)
         for (action in actions) month.take(action)
         return month
     }
@@ -436,15 +436,16 @@ class ContinueMonthTest {
 
     @Test
     fun `a kept line that does not read or does not replay is dropped without a word`() {
-        // A bad letter, another version (the first one among them, from before money could be spent), an interview on
-        // a day without one, a room that is not there, and a bike bought twice.
+        // A bad letter, another version (the first, from before money could be spent, and the second, from before the
+        // guess moved money), an interview on a day without one, a room that is not there, and a bike bought twice.
         val lines = listOf(
-            "2|1011||2|1165|Z",
+            "3|1011||2|1165|Z",
             "9|1011||2|1165|",
             "1|1011||2|1165|EWC",
-            "2|1011||2|1165|I",
-            "2|1011||7|1165|",
-            "2|1011||2|1165|b350Eb350",
+            "2|1011||2|1165|EWC",
+            "3|1011||2|1165|I",
+            "3|1011||7|1165|",
+            "3|1011||2|1165|b350Eb350",
         )
         for (line in lines) {
             store.items[SaveSlot.KEY] = line
@@ -473,13 +474,14 @@ class ContinueMonthTest {
     @Test
     fun `only a kept month that replays decides the run of an address with no run`() {
         val slot = SaveSlot(Memory { store })
-        store.items[SaveSlot.KEY] = "2|1011||2|1165|EWC"
+        store.items[SaveSlot.KEY] = "3|1011||2|1165|EWC"
         assertEquals(1011, slot.continuable()?.seed)
-        for (line in listOf("2|1011||2|1165|I", "2|1011||2|1165|Z", "1|1011||2|1165|EWC", "")) {
+        val notContinuable = listOf("3|1011||2|1165|I", "3|1011||2|1165|Z", "1|1011||2|1165|EWC", "2|1011||2|1165|EWC", "")
+        for (line in notContinuable) {
             store.items[SaveSlot.KEY] = line
             assertNull(slot.continuable(), "Continuable: $line")
         }
-        store.items[SaveSlot.KEY] = "2|1011||2|1165|EWC"
+        store.items[SaveSlot.KEY] = "3|1011||2|1165|EWC"
         assertNull(SaveSlot(Memory { store }) { error("A rule this line was not kept under") }.continuable())
     }
 

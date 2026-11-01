@@ -334,7 +334,7 @@ class PhoneGame private constructor(
                 if (replacing != null) setAttribute("aria-describedby", "replaces")
                 onclick = {
                     val room = checkNotNull(picked)
-                    beginMonth(game.startMonth(room), MonthRecord(game.seed, today, room, reveal.guess))
+                    beginMonth(game.startMonth(room, reveal.guess), MonthRecord(game.seed, today, room, reveal.guess))
                 }
             }
         }

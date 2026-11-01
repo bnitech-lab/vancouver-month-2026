@@ -43,13 +43,6 @@ class FirstMinute(
         )
     }
 
-    /** September after picking [roomIndex], with the first month's total already paid. */
-    fun startMonth(roomIndex: Int, dice: Dice = RandomDice(seed xor MONTH_DICE_SALT)): Month {
-        require(roomIndex in rooms.indices) { "No room at index $roomIndex" }
-        val room = rooms[roomIndex]
-        return Month(room, startingBalance - room.totalMonthlyCost, dice)
-    }
-
     /**
      * September after picking [roomIndex] and guessing [guess] for its total: the first month's total already paid, and
      * the guess's money ([Reveal.guessMoney]) added once, as the month's opening event ([Month.opening]).
