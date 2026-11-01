@@ -2,6 +2,7 @@ package vancouvermonth.web
 
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.sin
 import vancouvermonth.core.Item
 import vancouvermonth.core.Spending
@@ -47,9 +48,10 @@ enum class Ride(val vehicle: Vehicle, val fare: Spending?, val colour: Int) {
 data class Parked(val vehicle: Vehicle, val spot: Spot, val turn: Double)
 
 /**
- * The bikes and e-scooters of the town, all made of boxes: the shared bikes two to a dock near 내 방, 도서관, 카페 and
- * the station, the shared e-scooters one to a street corner, and a bike on show beside the bike shop. None of them
- * blocks the way. All colours are invented, none a real company's.
+ * The bikes and e-scooters of the town, all made of boxes: the shared bikes two to a dock near the town's 내 방, 도서관,
+ * 카페 and the station, and out in Burnaby by 내 방 in zones 2 and 3 and by the two stations of the town centre; the
+ * shared e-scooters one to a street corner; and a bike on show beside the bike shop. None of them blocks the way. All
+ * colours are invented, none a real company's.
  */
 object Rides {
     const val OWN_BIKE = 0xC8463D
@@ -65,7 +67,15 @@ object Rides {
         Spot(173.0, 72.6) to PI,
         Spot(187.4, 109.2) to PI,
         Spot(210.0, 64.2) to 0.0,
+        Spot(518.4, 25.8) to PI,
+        Spot(595.2, 99.8) to PI,
+        Spot(550.6, 25.4) to PI,
+        Spot(584.4, 18.0) to PI,
     )
+
+    /** The ground the wide map's buildings and trees keep clear round each dock. */
+    val keptForDocks: List<Lot>
+        get() = docks.map { (spot, _) -> Lot(floor(spot.x).toInt() - 2, floor(spot.z).toInt() - 2, 5, 5) }
 
     /** How far apart the two bikes of a dock stand. */
     private const val DOCK_GAP = 0.8
