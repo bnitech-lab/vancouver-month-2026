@@ -1,6 +1,7 @@
 package vancouvermonth.text
 
 import vancouvermonth.core.Item
+import vancouvermonth.core.SharedFare
 import vancouvermonth.core.SpendBlocked
 import vancouvermonth.core.Spending
 
@@ -36,7 +37,7 @@ object Shop {
     fun smallTalk(count: Int): String = SMALL_TALK[count % SMALL_TALK.size]
 
     private val SMALL_TALK = listOf(
-        "공유 자전거는 거치대에서, 공유 퀵보드는 길모퉁이에서 빌려요. 탈 때마다 요금이 나가요.",
+        "공유 자전거는 거치대에서, 공유 퀵보드는 길모퉁이에서 빌려요. 가는 거리만큼 요금이 나가요.",
         "한 번 사면 9월 내내 공짜로 타요. 걷는 것보다 두세 배는 빨라요.",
         "비 오는 날 바닷가 길은 미끄러워요. 천천히 타요.",
         "누구랑 이야기를 시작하면 바로 내려서 걸어가요. 그게 이 동네 예의예요.",
@@ -58,6 +59,16 @@ object Riding {
 
     /** A shared one being ridden, with the [fare] it cost: "공유 퀵보드 타는 중 · -$4". */
     fun rented(vehicle: Item, fare: Int): String = "${now(vehicle, shared = true)} · -${money(fare)}"
+
+    /** The title of the card that asks where to ride a shared [vehicle]: "공유 자전거". */
+    fun shared(vehicle: Item): String = name(vehicle, shared = true)
+
+    /** The line under it: what a ride costs, "어디로 갈까요? 기본 $1에 거리만큼 더 나와요. 최대 $15.". */
+    fun where(fare: SharedFare): String =
+        "어디로 갈까요? 기본 ${money(fare.base)}에 거리만큼 더 나와요. 최대 ${money(fare.most)}."
+
+    /** On that card when no place can be ridden to from where the character stands. */
+    const val NOWHERE = "지금은 타고 갈 곳이 없어요."
 
     /** Why a shared bike or e-scooter could not be rented for [kind]'s fare. */
     fun cannotRent(kind: Spending, blocked: SpendBlocked): String {
