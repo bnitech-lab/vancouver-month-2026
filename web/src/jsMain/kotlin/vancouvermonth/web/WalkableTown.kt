@@ -1666,6 +1666,10 @@ internal class NeighbourhoodScene(
     internal val isTrainRidden: Boolean
         get() = trainRide != null
 
+    /** How many times the names have been laid out. For tests. */
+    internal var labelLayouts = 0
+        private set
+
     /** True once the underground's shaders and sign were readied ahead, while the town idled. For tests. */
     internal val isUndergroundReady: Boolean
         get() = undergroundReady
@@ -2079,7 +2083,8 @@ internal class NeighbourhoodScene(
             val subject = if (sitting) site.benchSeat else spot
             gliding = view.follow(Point(subject.x, focusHeight, subject.z), millis)
             placeCamera()
-            folding = foldBuildings(subject, millis, still)
+            // Under the ground the town is not drawn, so no building folds for it.
+            folding = !focusUnderground && foldBuildings(subject, millis, still)
             if (!still && pace.stepsLife) stepLife()
             // A town whose life stands still has no train passing and no fire to hear.
             if (still) quietSounds()
@@ -2099,7 +2104,8 @@ internal class NeighbourhoodScene(
         // The names move only with the camera, so they are laid out again only when it moved or the town was resized.
         val eye = view.eye
         val focus = view.focus
-        if (labelsStale || eye != labelsEye || focus != labelsFocus) {
+        // Under the ground they are hidden once, as it is entered, and left so.
+        if (labelsStale || (!focusUnderground && (eye != labelsEye || focus != labelsFocus))) {
             placeLabels()
             labelsEye = eye
             labelsFocus = focus
@@ -2610,6 +2616,7 @@ internal class NeighbourhoodScene(
      * hides, and cannot be reached with the Tab key or by a screen reader until it shows again.
      */
     private fun placeLabels() {
+        labelLayouts += 1
         val width = canvas.clientWidth.toDouble()
         val height = canvas.clientHeight.toDouble()
         val covered = coveredTop()

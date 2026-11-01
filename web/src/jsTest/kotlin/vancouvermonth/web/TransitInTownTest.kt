@@ -194,6 +194,14 @@ class TransitInTownTest {
     private class Underground(val town: NeighbourhoodScene) {
         private val eyes = mutableListOf<Pair<Double, Point>>()
 
+        /** How many times the names were laid out by the first look under the ground, and by the last. */
+        private var layoutsFirst = -1
+        private var layoutsLast = -1
+
+        /** How many more times the names were laid out while under the ground, after the first look there. */
+        val layoutsUnder: Int
+            get() = layoutsLast - layoutsFirst
+
         /** How many looks found the eye in the tunnel, and in how many of them the lamps, the character, open doors. */
         var inTunnel = 0
         var lampsInTunnel = 0
@@ -205,6 +213,9 @@ class TransitInTownTest {
             if (!town.isUnderground) return true
             val shown = town.undergroundShown
             eyes += Date.now() to shown.eye
+            // The hidden names are not laid out again under the ground, however the train moves.
+            if (layoutsFirst < 0) layoutsFirst = town.labelLayouts
+            layoutsLast = town.labelLayouts
             if (shown.eye.x > UndergroundRide.HALL_EAST) {
                 inTunnel += 1
                 if (shown.areLampsShown) lampsInTunnel += 1
@@ -307,6 +318,7 @@ class TransitInTownTest {
             }) {
                 // On the way, behind the train in the tunnel, its lamps going by, the doors shut, the character in.
                 assertTrue(under.inTunnel > 0, "the camera was never seen in the tunnel")
+                assertEquals(0, under.layoutsUnder, "the hidden names were laid out under the ground")
                 assertEquals(under.inTunnel, under.lampsInTunnel)
                 assertEquals(0, under.riderInTunnel)
                 assertEquals(0, under.doorsInTunnel)
