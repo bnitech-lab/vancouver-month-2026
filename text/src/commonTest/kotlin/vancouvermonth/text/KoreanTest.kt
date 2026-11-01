@@ -381,6 +381,19 @@ class KoreanTest {
     }
 
     @Test
+    fun `the interview day's line sends the player to the office with 로 or 으로 as its name asks`() {
+        assertEquals("오늘은 면접 날이에요. 항구 회사로 가세요.", interviewDayLine("항구 회사"))
+        assertEquals("오늘은 면접 날이에요. 중심가 회사로 가세요.", interviewDayLine("중심가 회사"))
+        // After a final consonant 으로, but after ㄹ 로, as after a vowel.
+        assertEquals("으로", towardParticle("도서관"))
+        assertEquals("로", towardParticle("큰길"))
+        assertEquals("로", towardParticle("카페"))
+        assertEquals("으로", towardParticle("본점"))
+        assertEquals("로", towardParticle("Office"))
+        assertEquals("로", towardParticle(""))
+    }
+
+    @Test
     fun `every reason money cannot be spent reads as Korean`() {
         assertEquals(
             listOf("9월이 끝났어요.", "이미 있어요.", "잔고가 모자라요.", "이걸 사면 9월 생활비가 모자라요."),
