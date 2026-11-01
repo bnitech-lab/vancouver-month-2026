@@ -20,8 +20,9 @@ class GuideTest {
         assertEquals(8, Guide.LINES.size)
         assertTrue("땅을 누르면" in Guide.LINES[0] && "두 번 누르면" in Guide.LINES[0])
         assertTrue("끌면" in Guide.LINES[1] && "벌리면" in Guide.LINES[1] && "모으면" in Guide.LINES[1])
-        assertTrue("말을 걸어요" in Guide.LINES[2] && "체력만큼 시간이 흘러요" in Guide.LINES[2])
-        assertTrue("밤" in Guide.LINES[3] && "내 방에서 자면" in Guide.LINES[3])
+        // A tap walks there, and a job waits for the character to arrive.
+        assertTrue("걸어가서 말을 걸어요" in Guide.LINES[2] && "도착해야" in Guide.LINES[2])
+        assertTrue("체력만큼 시간이 흘러요" in Guide.LINES[3] && "밤" in Guide.LINES[3] && "내 방에서 자면" in Guide.LINES[3])
         for (ride in listOf("스카이트레인", "버스", "수상버스")) assertTrue(ride in Guide.LINES[4], ride)
         for (ride in listOf("자전거", "택시")) assertTrue(ride in Guide.LINES[5], ride)
         // The shop sells; shared bikes are rented on the street.
