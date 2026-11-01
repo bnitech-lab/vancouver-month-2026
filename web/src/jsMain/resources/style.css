@@ -293,14 +293,15 @@ a:focus-visible {
   font-size: 14px;
   font-weight: 800;
   line-height: 1;
-  box-shadow: 0 1px 4px rgba(59, 47, 37, 0.45);
+  /* A thin dark ring outside the green one keeps the pin's edge clear of the water and the parks it may sit on. */
+  box-shadow: 0 0 0 1px #3b2f25, 0 1px 4px rgba(59, 47, 37, 0.45);
 }
 
 .room-pin[aria-pressed="true"] {
   border: 3px solid #fffaee;
   background: #1d6b57;
   color: #ffffff;
-  box-shadow: 0 0 0 2px #1d6b57, 0 2px 6px rgba(59, 47, 37, 0.5);
+  box-shadow: 0 0 0 2px #1d6b57, 0 0 0 3px #3b2f25, 0 2px 6px rgba(59, 47, 37, 0.5);
 }
 
 .room-pin:disabled:not([aria-pressed="true"]) {
