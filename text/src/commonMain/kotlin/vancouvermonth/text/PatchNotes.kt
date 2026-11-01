@@ -32,10 +32,26 @@ class PatchNote(
  */
 object PatchNotes {
     /** The newest version, shown by the title; it is [ALL]'s first entry. */
-    const val CURRENT = "0.20"
+    const val CURRENT = "0.21"
 
     /** Every update, newest first. */
     val ALL: List<PatchNote> = listOf(
+        PatchNote(
+            version = "0.21",
+            date = "2026-11-01",
+            headline = "일은 그 장소에 가서",
+            improved = listOf(
+                "일은 그 장소에 도착해야 할 수 있어요. 공부도, 지원도, 면접도요.",
+                "먼 곳의 이름을 누르면 걸어가요. 위 카드에 어디로 가는 중인지 나와요.",
+                "도착하면 바로 말을 걸어요. 이미 그 앞이면 누르자마자 말을 걸어요.",
+                "자전거 가게 벤과의 이야기도 가게에 도착해야 시작돼요.",
+                "가는 길에 택시를 부르거나 역, 정류장, 선착장을 눌러 탈 수 있어요.",
+                "아주 먼 길을 처음 걸으면 위 카드가 택시와 스카이트레인을 알려 줘요.",
+            ),
+            fixed = listOf(
+                "먼 곳의 이름만 눌러 그 자리에서 일을 끝낼 수 있던 것을 고쳤어요.",
+            ),
+        ),
         PatchNote(
             version = "0.20",
             date = "2026-11-01",
