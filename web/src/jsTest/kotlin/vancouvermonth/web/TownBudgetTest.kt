@@ -212,6 +212,7 @@ class TownBudgetTest {
     fun `under downtown, on the platform and in the tunnel, a few draws and no town`(): Promise<Unit> {
         val town = open(1)
         town.standAt(TransitLines.stations[0].door)
+        var writes = 0
         // Its shaders and sign are readied ahead, while the town idles after its first frame.
         return whenReady({ town.isStill && town.isUndergroundReady }) {
             town.travel(Transport.SKYTRAIN, 0, 1)
@@ -221,6 +222,7 @@ class TownBudgetTest {
                 report("under downtown, on the platform", cost)
                 withinBudget(cost)
                 assertTrue(cost.draws <= UNDERGROUND_DRAWS, "${cost.draws} draws")
+                writes = town.houseDetailWrites
             }
         }.then {
             // Out in the tunnel, or just short of it: the camera is there for most of a second, and a slow test browser
@@ -230,6 +232,8 @@ class TownBudgetTest {
                 report("under downtown, in the tunnel", cost)
                 withinBudget(cost)
                 assertTrue(cost.draws <= UNDERGROUND_DRAWS, "${cost.draws} draws")
+                // The town is not drawn down here, so its near houses were not written again as the camera moved.
+                assertEquals(writes, town.houseDetailWrites, "the near houses were written under the ground")
             }
         }.then { }
     }

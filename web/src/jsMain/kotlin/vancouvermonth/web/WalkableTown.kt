@@ -888,6 +888,7 @@ internal class NeighbourhoodScene(
             focus.y == detailFocusY && focus.z == detailFocusZ && across == detailAcross
         ) return
         detailStale = false
+        houseDetailWrites += 1
         detailEyeX = eye.x
         detailEyeY = eye.y
         detailEyeZ = eye.z
@@ -1857,13 +1858,13 @@ internal class NeighbourhoodScene(
         val focus = Point(subject.x, focusHeight, subject.z)
         view.follow(focus, 0.0)
         placeCamera()
-        // Under downtown, the platform and the tunnel as they are drawn there.
+        // Under downtown, the platform and the tunnel as they are drawn there, and no town to write houses for.
         val going = journey
         val drawn = if (focusUnderground && going != null) underground.scene else scene
         if (drawn !== scene && going != null) {
             underground.place(going, window.performance.now() - journeyStarted, false, drawnLight.sky, camera)
         }
-        placeHouseDetail()
+        if (drawn === scene) placeHouseDetail()
         val info = renderer.asDynamic().info
         val gl = renderer.asDynamic().getContext()
         // Reading a pixel back waits for the frame to be drawn, which a finish alone does not in every browser.
@@ -1876,8 +1877,10 @@ internal class NeighbourhoodScene(
                 view.orbit(TURN_PIXELS, 0.0)
                 view.jumpTo(focus)
                 placeCamera()
-                foldBuildings(subject, FRAME_MILLIS, still = false)
-                placeHouseDetail()
+                if (drawn === scene) {
+                    foldBuildings(subject, FRAME_MILLIS, still = false)
+                    placeHouseDetail()
+                }
             }
             info.reset()
             renderer.shadowMap.needsUpdate = true
@@ -1899,6 +1902,10 @@ internal class NeighbourhoodScene(
     /** How many of the suburbs' houses, roofs, doors, lawns and yard trees are drawn near the camera now. For tests. */
     internal val houseDetailBoxes: Int
         get() = casterDetails.count + details.count
+
+    /** How many times the near houses have been written. For tests. */
+    internal var houseDetailWrites = 0
+        private set
 
     /** True when block [yard] of [Neighbourhood.yards] has its houses drawn one by one now. For tests. */
     internal fun isHouseDrawn(yard: Int): Boolean = houseDetail.shown[yard]
@@ -2345,10 +2352,10 @@ internal class NeighbourhoodScene(
             val subject = if (sitting) site.benchSeat else spot
             gliding = view.follow(Point(subject.x, focusHeight, subject.z), millis)
             placeCamera()
-            // Under the ground the town is not drawn, so no building folds for it.
+            // Under the ground the town is not drawn, so no building folds for it, and no near house is written.
             folding = !focusUnderground && foldBuildings(subject, millis, still)
             // Once a frame, after the folds, so a house folding sinks with its roof in the same frame.
-            placeHouseDetail()
+            if (!focusUnderground) placeHouseDetail()
             if (!still && pace.stepsLife) stepLife()
             // A town whose life stands still has no train passing and no fire to hear.
             if (still) quietSounds()
