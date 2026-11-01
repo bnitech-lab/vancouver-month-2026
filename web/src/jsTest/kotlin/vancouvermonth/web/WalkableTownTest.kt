@@ -1686,8 +1686,12 @@ class WalkableTownTest {
                     val shown = goButton(name).querySelector(".action-effect")?.textContent
                     assertEquals(money(SharedFare.E_SCOOTER.forDistance(squares)), shown, name)
                 }
-                fare = SharedFare.E_SCOOTER.forDistance(assertNotNull(town.taxiDistance(shop)))
+                val priced = assertNotNull(town.taxiDistance(shop))
+                fare = SharedFare.E_SCOOTER.forDistance(priced)
                 goButton(Shop.NAME).click()
+                // The way ridden is the way priced, to the square: the ride follows the very way the fare was worked
+                // out for.
+                assertEquals(priced, assertNotNull(town.tripLength), 1e-9)
                 assertEquals(Ride.SHARED_E_SCOOTER, town.riding)
                 assertFalse(town.isParkedShown(index), "the rented one still stands on its corner")
                 assertTrue(town.isRideDrawn(Ride.SHARED_E_SCOOTER))

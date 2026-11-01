@@ -1605,6 +1605,10 @@ internal class NeighbourhoodScene(
     internal val isDashing: Boolean
         get() = trip != null && tripDash
 
+    /** How long the way of the trip under way is, in units, or null standing. For tests. */
+    internal val tripLength: Double?
+        get() = trip?.length
+
     /** How long the trip under way takes from where it started, in milliseconds, or null standing. For tests. */
     internal val tripMillis: Double?
         get() = trip?.millis
