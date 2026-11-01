@@ -276,7 +276,8 @@ internal class UndergroundScene(private val cube: BoxGeometry, shades: DataTextu
     private val glow = MeshBasicMaterial(json("color" to 0xFFFFFF))
     private val daylight = MeshBasicMaterial(json("color" to 0xFFFFFF, "fog" to false))
     private val signPlane = PlaneGeometry(SIGN_WIDTH, SIGN_HEIGHT)
-    private val signPicture = signPicture()
+    /** The sign's picture, null where the browser has no 2D canvas. */
+    internal val signPicture = signPicture()
     private val signMaterial = MeshBasicMaterial(json("map" to signPicture, "color" to 0xFFFFFF))
     private val meshes = mutableListOf<InstancedMesh>()
     private val lamps: InstancedMesh

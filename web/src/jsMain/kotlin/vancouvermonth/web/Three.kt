@@ -3,6 +3,7 @@
 package vancouvermonth.web
 
 import kotlin.js.Json
+import kotlin.js.Promise
 import org.khronos.webgl.Float32Array
 import org.khronos.webgl.Uint8Array
 import org.w3c.dom.HTMLCanvasElement
@@ -103,8 +104,14 @@ external class WebGLRenderer(parameters: Json) {
     fun setSize(width: Int, height: Int, updateStyle: Boolean)
     fun render(scene: Scene, camera: Camera)
 
-    /** Readies the shaders [scene]'s materials need, so the first frame drawn with them does not wait for it. */
-    fun compile(scene: Scene, camera: Camera)
+    /**
+     * Readies the shaders [scene]'s materials need, without holding up the page where the browser can make them in the
+     * background; the promise settles when they are ready.
+     */
+    fun compileAsync(scene: Scene, camera: Camera): Promise<Any?>
+
+    /** Sends [texture] to the graphics card now, rather than on the first frame that draws it. */
+    fun initTexture(texture: CanvasTexture)
 
     /** Lets go of what the renderer holds on the graphics card. */
     fun dispose()

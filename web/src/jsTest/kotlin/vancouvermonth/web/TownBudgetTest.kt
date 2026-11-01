@@ -159,7 +159,8 @@ class TownBudgetTest {
     fun `under downtown, on the platform and in the tunnel, a few draws and no town`(): Promise<Unit> {
         val town = open(1)
         town.standAt(TransitLines.stations[0].door)
-        return whenReady({ town.isStill }) {
+        // Its shaders and sign are readied ahead, while the town idles after its first frame.
+        return whenReady({ town.isStill && town.isUndergroundReady }) {
             town.travel(Transport.SKYTRAIN, 0, 1)
         }.then {
             whenReady({ town.isUnderground && town.undergroundShown.isRiderShown }) {

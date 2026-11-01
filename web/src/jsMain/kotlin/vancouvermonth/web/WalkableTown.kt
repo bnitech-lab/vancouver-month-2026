@@ -282,7 +282,7 @@ internal class NeighbourhoodScene(
     /** The platform under downtown and its tunnel, drawn instead of the town while a ride is down there. */
     private val underground = UndergroundScene(cube, shades)
 
-    /** True once the underground's shaders are ready, readied as the first ride that goes under sets off. */
+    /** True once the underground's shaders and sign are ready, readied while the town idles after its first frame. */
     private var undergroundReady = false
 
     /**
@@ -1195,11 +1195,6 @@ internal class NeighbourhoodScene(
             hideRideVehicle()
         }
         val now = window.performance.now()
-        if (!undergroundReady && (UndergroundRide.startsUnder(made) || UndergroundRide.endsUnder(made))) {
-            // Its shaders are made now, as the ride sets off, rather than on the frame the platform first shows.
-            undergroundReady = true
-            renderer.compile(underground.scene, camera)
-        }
         journey = made
         journeyStarted = now
         if (transport == Transport.SKYTRAIN) {
@@ -1671,6 +1666,10 @@ internal class NeighbourhoodScene(
     internal val isTrainRidden: Boolean
         get() = trainRide != null
 
+    /** True once the underground's shaders and sign were readied ahead, while the town idled. For tests. */
+    internal val isUndergroundReady: Boolean
+        get() = undergroundReady
+
     /** True while a ride is shown under downtown, the platform and the tunnel drawn instead of the town. For tests. */
     internal val isUnderground: Boolean
         get() = focusUnderground && journey != null
@@ -2117,6 +2116,7 @@ internal class NeighbourhoodScene(
             }
         }
         framesDrawn += 1
+        if (framesDrawn == 1) afterFirstFrame()
         if (walking || travelled || night || gliding || folding || !still) nextFrame()
     }
 
@@ -2430,6 +2430,36 @@ internal class NeighbourhoodScene(
         if (opensOnArrival) onPlace(place)
     }
 
+    /**
+     * Once the town has drawn its first frame, readies the underground when the browser is idle, or within
+     * [READY_LATEST] milliseconds at the latest: a page that keeps drawing may never be idle.
+     */
+    private fun afterFirstFrame() {
+        if (window.asDynamic().requestIdleCallback == undefined) {
+            window.setTimeout({ readyUnderground() }, READY_LATEST)
+        } else {
+            window.asDynamic().requestIdleCallback({ readyUnderground() }, json("timeout" to READY_LATEST))
+        }
+    }
+
+    /**
+     * Makes the underground's shaders and sends its sign's picture to the graphics card, in the background, so the
+     * platform's first frame does not wait for them. Where the browser cannot, they are made on that frame instead,
+     * and the town goes on either way.
+     */
+    private fun readyUnderground() {
+        if (closed || undergroundReady) return
+        try {
+            underground.signPicture?.let { renderer.initTexture(it) }
+            renderer.compileAsync(underground.scene, camera).then(
+                { undergroundReady = true },
+                { error -> console.warn("The underground's shaders were not made ahead:", error) },
+            )
+        } catch (error: Throwable) {
+            console.warn("The underground's shaders were not made ahead:", error)
+        }
+    }
+
     /** Moves the light through evening, night and morning. True while the change of day goes on. */
     private fun stepNight(now: Double): Boolean {
         val start = nightFell ?: return false
@@ -2707,6 +2737,9 @@ internal class NeighbourhoodScene(
 
         /** A place this near needs no taxi. */
         const val TAXI_NOT_NEEDED = 2.0
+
+        /** How long after the town's first frame, at the latest, the underground is readied, idle or not. */
+        const val READY_LATEST = 2_000
 
         /** Where each vehicle's boxes start in the one draw of them all. */
         val BUS_ON_LOOP = 0
