@@ -145,7 +145,7 @@ class PhoneGame private constructor(
      * Where a tap from afar sent the character, for the top card, or null; while the first very long walk of the month
      * lasts, [farWalkNow] says so too, and [farWalkTold] keeps it from being said again.
      */
-    private var headingTo: String? = null
+    private var sentTo: String? = null
     private var farWalkNow = false
     private var farWalkTold = false
 
@@ -816,8 +816,8 @@ class PhoneGame private constructor(
         }
         town.onPasserby = { passer -> if (!dayChanging && town.travelling == null) chatWith(passer) }
         town.onShop = { if (!dayChanging && town.travelling == null) openShop() }
-        town.onHeading = { name, squares ->
-            headingTo = name
+        town.onSentTo = { name, squares ->
+            sentTo = name
             farWalkNow = name != null && squares > FAR_WALK_SQUARES && town.riding == null && !farWalkTold
             if (farWalkNow) farWalkTold = true
             show()
@@ -845,7 +845,7 @@ class PhoneGame private constructor(
         town.onSounds = { train, fire, night -> sound?.nearby(train, fire, night) }
         town.onFail = {
             walkable = null
-            headingTo = null
+            sentTo = null
             talkingAt = null
             atShop = false
             choosing = null
@@ -940,7 +940,7 @@ class PhoneGame private constructor(
                     )
                 }
                 // Where a tap from afar sent the character, so the tap shows; a very long walk says once how to shorten it.
-                headingTo?.let { name ->
+                sentTo?.let { name ->
                     child("p", "hud-note hud-going", onTheWayLine(name)).setAttribute("aria-live", "polite")
                     if (farWalkNow) child("p", "hud-note", FAR_WALK_HINT)
                 }

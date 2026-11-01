@@ -61,7 +61,7 @@ interface WalkableTown {
     /**
      * Called with the place the player turns to: they tapped its building, its name or its person while at it, or the
      * character came to its door or its person on a walk that opens it. Called with null when they walk off somewhere
-     * else. A tap on a place from afar only sends the character there ([onHeading]).
+     * else. A tap on a place from afar only sends the character there ([onSentTo]).
      */
     var onPlace: (Place?) -> Unit
 
@@ -73,7 +73,7 @@ interface WalkableTown {
 
     /**
      * Called when the player turns to the bike shop's keeper: they tapped the shop, its name or the keeper while at it,
-     * or the character came to him on a walk that opens it. A tap from afar only sends the character there ([onHeading]).
+     * or the character came to him on a walk that opens it. A tap from afar only sends the character there ([onSentTo]).
      */
     var onShop: () -> Unit
 
@@ -82,7 +82,7 @@ interface WalkableTown {
      * goes and how many [squares] the way is: the talk there opens on arrival. Called with null when no such walk is
      * under way any more: it got there, stopped, or was sent somewhere else.
      */
-    var onHeading: (name: String?, squares: Double) -> Unit
+    var onSentTo: (name: String?, squares: Double) -> Unit
 
     /**
      * Called when the character reaches a shared bike or e-scooter the player tapped, with the ride it would be. The
@@ -307,7 +307,7 @@ internal class NeighbourhoodScene(
     override var onPlace: (Place?) -> Unit = {}
     override var onPasserby: (Passer) -> Unit = {}
     override var onShop: () -> Unit = {}
-    override var onHeading: (String?, Double) -> Unit = { _, _ -> }
+    override var onSentTo: (String?, Double) -> Unit = { _, _ -> }
     override var onRent: (Ride) -> Unit = {}
     override var onStop: (Stop) -> Unit = {}
     override var onTravelled: () -> Unit = {}
@@ -683,13 +683,13 @@ internal class NeighbourhoodScene(
 
     /**
      * The name of where a tap from afar sent the walk under way, whose talk opens on arrival; null for any other walk.
-     * The game hears each change ([onHeading]).
+     * The game hears each change ([onSentTo]).
      */
     private var sentTo: String? = null
         set(value) {
             if (field == value) return
             field = value
-            onHeading(value, trip?.length ?: 0.0)
+            onSentTo(value, trip?.length ?: 0.0)
         }
 
     /** True when the trip under way is a dash, after a double tap. */

@@ -25,7 +25,7 @@ internal class QuietTown : WalkableTown {
     override var onPlace: (Place?) -> Unit = {}
     override var onPasserby: (Passer) -> Unit = {}
     override var onShop: () -> Unit = {}
-    override var onHeading: (String?, Double) -> Unit = { _, _ -> }
+    override var onSentTo: (String?, Double) -> Unit = { _, _ -> }
     override var onRent: (Ride) -> Unit = {}
     override var onStop: (Stop) -> Unit = {}
     override var onTravelled: () -> Unit = {}
