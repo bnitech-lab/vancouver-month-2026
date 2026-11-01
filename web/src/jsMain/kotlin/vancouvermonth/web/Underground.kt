@@ -294,9 +294,9 @@ internal class UndergroundScene(private val cube: BoxGeometry, shades: DataTextu
     private val aim = DoubleArray(6)
     private var sky = -1
 
-    /** Where the camera's eye was last put, for the train's rumble; and how far open the doors were drawn. */
-    var eye = Point(0.0, 0.0, 0.0)
-        private set
+    /** Where the camera's eye was last put, for the train's rumble, made only when asked; how far the doors were open. */
+    val eye: Point
+        get() = Point(aim[0], aim[1], aim[2])
     var doorsDrawn = 0.0
         private set
 
@@ -350,7 +350,6 @@ internal class UndergroundScene(private val cube: BoxGeometry, shades: DataTextu
         UndergroundRide.camera(going, elapsed, calm, aim)
         camera.position.set(aim[0], aim[1], aim[2])
         camera.lookAt(aim[3], aim[4], aim[5])
-        eye = Point(aim[0], aim[1], aim[2])
     }
 
     /** The train with its middle at [middle] along x, its doors [open] that far: each car's boxes, then its lights. */
