@@ -168,6 +168,12 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
     var dotTop = 0.0
         private set
 
+    /** The order the larger map names the places in, 내 방 and 회사 first; and where each name went, to keep them apart. */
+    private val nameOrder = venues.indices.sortedBy { if (venues[it].place == Place.HOME) 0 else if (venues[it].place == Place.OFFICE) 1 else 2 + it }
+        .toIntArray()
+    private val nameLeft = DoubleArray(venues.size)
+    private val nameTop = DoubleArray(venues.size)
+
     /** Which of the five places were last drawn as arrows on the small map's edge, out of its sight, by their number. */
     private val pointed = BooleanArray(venues.size)
 
@@ -323,10 +329,22 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
         c.strokeStyle = INK
         c.stroke()
         north(map.width - NORTH_INSET * scale, NORTH_TOP * scale, scale, large)
-        // The names on the larger map, last, over the wedge and the arrow.
+        // The names on the larger map, last, over the wedge and the arrow: 내 방's first, and none over another, as the
+        // places downtown are close together on the whole map.
         if (large) {
-            for (at in venues.indices) {
-                name(venues[at].place.label, map.left(middleX[at], middleZ[at]), map.top(middleX[at], middleZ[at]) - BIG_DOT * scale - 3)
+            var named = 0
+            for (at in nameOrder) {
+                val left = map.left(middleX[at], middleZ[at])
+                val top = map.top(middleX[at], middleZ[at]) - BIG_DOT * scale - 3
+                var clear = true
+                for (other in 0 until named) {
+                    if (abs(nameLeft[other] - left) < NAME_WIDTH && abs(nameTop[other] - top) < NAME_HEIGHT) clear = false
+                }
+                if (!clear) continue
+                nameLeft[named] = left
+                nameTop[named] = top
+                named += 1
+                name(venues[at].place.label, left, top)
             }
         }
         // A screen reader hears the place the character is nearest, told again only when that changes.
@@ -595,6 +613,10 @@ internal class Minimap(private val site: HomeSite = HomeSite.of(1)) {
          */
         const val WINDOW_ACROSS = 100.0
         private const val WINDOW_SHAPE = "239 / 267"
+
+        /** How far apart two names on the larger map must be, across and down, in pixels, or the later one is left out. */
+        private const val NAME_WIDTH = 40.0
+        private const val NAME_HEIGHT = 14.0
 
         /** How far in from the small map's edge an arrow to a place out of sight sits, and how big it is, in pixels. */
         private const val EDGE_INSET = 6.0

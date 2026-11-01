@@ -299,9 +299,6 @@ object Neighbourhood {
     val blocks: List<Block>
     val ground: List<Block>
     val corner: List<Block>
-
-    /** The mountains north of East Vancouver and Burnaby, flat like [ground] but drawn on their own, far from downtown. */
-    val ridge: List<Block>
     val groundTiles: List<List<Block>>
     val glowing: List<Block>
 
@@ -373,7 +370,6 @@ object Neighbourhood {
         blocks = town.blocks
         ground = town.ground
         corner = town.corner
-        ridge = town.ridge
         groundTiles = town.groundTiles
         glowing = town.glowing
         flames = town.flames
@@ -476,10 +472,7 @@ object Neighbourhood {
      * [NORTH_SHORE_NEAR] squares behind the line the mountains stand behind.
      */
     private const val NORTH_SHORE_FROM = -90
-    private const val NORTH_SHORE_TO = 620
-
-    /** The stretches of the north shore the town always had end here; past it, the range is the [ridge]. */
-    private const val TOWN_RIDGE_ENDS = 360
+    private const val NORTH_SHORE_TO = 360
     private const val NORTH_SHORE_STEP = 26
     private const val NORTH_SHORE_HALF = 14.0
     private const val NORTH_SHORE_FAR = MOUNTAINS_BACK - 4
@@ -496,7 +489,6 @@ object Neighbourhood {
     private class Builder {
         val blocks = mutableListOf<Block>()
         val ground = mutableListOf<Block>()
-        val ridge = mutableListOf<Block>()
         val corner = mutableListOf<Block>()
         val groundTiles = mutableListOf<List<Block>>()
         val glowing = mutableListOf<Block>()
@@ -710,20 +702,16 @@ object Neighbourhood {
         fun addMountains() {
             val line = RealVancouver.mountains
             for ((index, x) in (NORTH_SHORE_FROM..NORTH_SHORE_TO step NORTH_SHORE_STEP).withIndex()) {
-                // The range north of East Vancouver and Burnaby in its own draw, seen only from out there.
-                val into = if (x > TOWN_RIDGE_ENDS) ridge else ground
                 val shore = zAlong(line, x.toDouble())
                 val depth = NORTH_SHORE_FAR - NORTH_SHORE_NEAR
-                into.add(
-                    Block(x - NORTH_SHORE_HALF, -0.5, shore - NORTH_SHORE_FAR, 2 * NORTH_SHORE_HALF, 1.2, depth, FOREST_DARK),
-                )
+                lay(x - NORTH_SHORE_HALF, -0.5, shore - NORTH_SHORE_FAR, 2 * NORTH_SHORE_HALF, 1.2, depth, FOREST_DARK)
                 val height = 30.0 + (index * 7) % 17
                 val z = shore - MOUNTAINS_BACK - (index * 11) % 20
                 val colours = listOf(FOREST, FOREST, FOREST_DARK, ROCK, ROCK_LIGHT, SNOW)
                 val step = height / colours.size
                 for ((level, colour) in colours.withIndex()) {
                     val width = 52.0 * (1 - level / 6.5)
-                    into.add(Block(x - width / 2, level * step - 0.6, z - width / 3, width, step, width / 1.5, colour))
+                    lay(x - width / 2, level * step - 0.6, z - width / 3, width, step, width / 1.5, colour)
                 }
             }
         }

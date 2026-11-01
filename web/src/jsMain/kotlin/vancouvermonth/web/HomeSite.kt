@@ -1,5 +1,6 @@
 package vancouvermonth.web
 
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.cos
@@ -31,6 +32,13 @@ class HomeSite private constructor(val zone: Int) {
 
     /** The middle of the campfire in front of the bench. */
     val campfire: Spot = campfireAt(home)
+
+    /**
+     * The first view's turn round 내 방's door, as [FollowCamera.yaw] counts it. In zone 2 the guideway runs just south of
+     * the door, so the first view looks along the street from the west, over the garden, the guideway to one side,
+     * rather than across it from the south-west, as elsewhere.
+     */
+    val startYaw: Double = if (zone == 2) -PI / 2 else FollowCamera.START_YAW
 
     private val parts = Neighbourhood.homeParts(home)
 

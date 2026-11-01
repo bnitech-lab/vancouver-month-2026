@@ -490,7 +490,11 @@ internal class NeighbourhoodScene(
     private var labelsStale = true
 
     private val home = site.home
-    private val view = FollowCamera(Point(home.door.x, FOCUS_HEIGHT, home.door.z), site.walls, site.people)
+    private val view = FollowCamera(Point(home.door.x, FOCUS_HEIGHT, home.door.z), site.walls, site.people).also {
+        // The first view, turned as 내 방's site asks.
+        it.aim(site.startYaw, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+        it.jumpTo(Point(home.door.x, FOCUS_HEIGHT, home.door.z))
+    }
     private val taps = TapTimer()
     private val resizeObserver = ResizeObserver { fit() }
 
@@ -679,9 +683,6 @@ internal class NeighbourhoodScene(
         scene.add(sea)
         scene.add(boxes(ground, material).also { it.castShadow = false })
         scene.add(boxes(Neighbourhood.corner, material).also { it.castShadow = false })
-        val ridge = boxes(Neighbourhood.ridge, material).also { it.castShadow = false }
-        scene.add(ridge)
-        far(ridge, Neighbourhood.ridge)
         for (tile in Neighbourhood.groundTiles) {
             val mesh = boxes(tile, material)
             mesh.castShadow = false
@@ -2495,7 +2496,10 @@ internal class NeighbourhoodScene(
         covered: Double,
     ) {
         val point = view.screenPoint(anchor)
-        val shown = point != null && point.left in 0.0..1.0 && point.top in 0.0..1.0
+        // A place far off, as downtown's are from Burnaby, is lost in the haze, and so is its name.
+        val eye = view.eye
+        val near = hypot(anchor.x - eye.x, anchor.z - eye.z) < NAMES_REACH
+        val shown = near && point != null && point.left in 0.0..1.0 && point.top in 0.0..1.0
         label.classList.toggle("behind", !shown)
         // A name that would reach up under the top card or the day's log is hidden there, and out of the finger's
         // way; it stays for the keyboard and a screen reader, as its person is still there to talk to.
@@ -2606,6 +2610,9 @@ internal class NeighbourhoodScene(
         val RIDE_BOAT = BOAT_ON_LOOP + TransitLines.boat.size
         val TAXI = RIDE_BOAT + TransitLines.boat.size
         val BURNABY_BUS = TAXI + TransitLines.taxi.size
+
+        /** A place's name farther than this from the camera's eye is hidden, its place deep in the haze. */
+        const val NAMES_REACH = 170.0
 
         /** A draw with nothing taller than this is left out [LOW_REACH] from the camera, deep in the haze. */
         const val TALL = 6.5
