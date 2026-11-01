@@ -82,8 +82,9 @@ class VancouverMapTest {
     }
 
     @Test
-    fun `each place has its own square of open land, with room for a building around it`() {
-        assertEquals(Place.entries.toSet(), spots.keys)
+    fun `each of downtown's places has its own square of open land, with room for a building around it`() {
+        // 내 방 and the first of each kind, downtown's: the town's map proposed their squares.
+        assertEquals(Place.entries.filter { it.number == 0 }.toSet(), spots.keys)
         for ((place, cell) in spots) {
             for (dx in -2..2) {
                 for (dz in -2..2) assertEquals(Terrain.LAND, map.terrainAt(Cell(cell.x + dx, cell.z + dz)), "$place")
@@ -105,10 +106,11 @@ class VancouverMapTest {
     }
 
     @Test
-    fun `the farthest walk between two of the five places takes about 25 seconds`() {
+    fun `the farthest walk between two of downtown's five places takes about 25 seconds`() {
         val grid = map.grid
-        val seconds = Place.entries.flatMapIndexed { index, a ->
-            Place.entries.drop(index + 1).map { b ->
+        val places = spots.keys.toList()
+        val seconds = places.flatMapIndexed { index, a ->
+            places.drop(index + 1).map { b ->
                 val route = grid.route(centre(spots.getValue(a)), centre(spots.getValue(b)))
                 assertEquals(centre(spots.getValue(b)), route.last(), "$a to $b")
                 assertTrue(route.zipWithNext().all { (p, q) -> grid.isClear(p, q) }, "$a to $b")

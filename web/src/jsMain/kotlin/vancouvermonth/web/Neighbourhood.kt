@@ -13,8 +13,8 @@ import kotlin.random.Random
 import vancouvermonth.text.Townsperson
 
 /**
- * One of the five places as a building the character walks to: its footprint on the grid, its height and colours,
- * the side its door is on, and where the place's person stands.
+ * One of the places as a building the character walks to: its footprint on the grid, its height and colours, the side
+ * its door is on, and where the place's person stands.
  */
 data class Venue(
     val place: Place,
@@ -59,12 +59,12 @@ data class Venue(
         }
 }
 
-/** The person at [place]: the one who offers the action a day there is spent on. */
-fun personAt(place: Place): Townsperson = Townsperson.entries.first { it.offers == actionAt(place) }
+/** The person at [place], who offers the action a day there is spent on. */
+fun personAt(place: Place): Townsperson = place.person
 
 /**
  * The bike shop: a small building whose door faces the street to the south, and its keeper by the door. It is not one
- * of the five places, as no day is spent there, but it matters as they do: it never folds, the camera keeps out of it,
+ * of the places, as no day is spent there, but it matters as they do: it never folds, the camera keeps out of it,
  * and a tap on it or on its keeper talks to the keeper.
  */
 data class Storefront(
@@ -107,7 +107,7 @@ data class Storefront(
 }
 
 /**
- * A box a tap stops at. [place] is set when it belongs to one of the five places, and [shop] when it is the bike shop
+ * A box a tap stops at. [place] is set when it belongs to one of the places, and [shop] when it is the bike shop
  * or its keeper. The camera stays out of it, unless it [folds]: one of the city's buildings, which fold down out of the
  * camera's way instead (see [Cutaway]).
  */
@@ -171,8 +171,9 @@ private const val PAST_THE_EDGE = 170.0
  * seawall round its shore; downtown and the West End are the real city blocks, taller in the business district and the
  * middle, low in the West End; False Creek lies to the south with its south shore past it, and the inlet to the north
  * with the mountains far across it. East of downtown the city goes on through East Vancouver into Burnaby: a low,
- * turned box on each real block, taller round the Burnaby town centre, and its parks as forest. The five places stand
- * where they were proposed, and the SkyTrain runs on its guideway from its tunnel by the station out to Burnaby. 내 방,
+ * turned box on each real block, taller round the Burnaby town centre, and its parks as forest. Downtown's places stand
+ * where they were proposed, more of each kind out past it ([venues]), and the SkyTrain runs on its guideway from its
+ * tunnel by the station out to Burnaby. 내 방,
  * with its garden, bench and campfire, stands where the room is ([HomeSite]): in the West End for a room in zone 1, in
  * Burnaby for the others. The walkable part is the map's grid of [COLUMNS] by [ROWS] squares, one square for 25 m of
  * the city, the town's own corner of it ([TOWN_COLUMNS] wide) just as it was; the land goes on past it into the haze.
@@ -207,6 +208,19 @@ object Neighbourhood {
         Venue(Place.COWORKING, 185, 37, 6, 5, 7.5, 0xBFD8C9, 0x4E7D6E, true, Spot(189.5, 42.5), pitched = false),
         // Among the towers of the business district, facing the inlet.
         Venue(Place.OFFICE, 150, 53, 7, 5, 14.0, 0xA9C7E3, 0x5A7590, false, Spot(155.5, 52.5), pitched = false),
+        // Out past downtown, west to east, each in its kind's look and colours, on a lot the city keeps clear, its
+        // square open to a main street, its lamps off the streets and the bus lines, a short walk from a station or a
+        // stop: in East Vancouver an office by the junction's station, a library by the east village's and a café by
+        // the small park's; in Burnaby a coworking space by the high street's stop, near zone 2's 내 방, a library by the
+        // big park's stop, an office across the guideway from the town centre's station, and a café by the slope's
+        // stop, beside zone 3's 내 방. Near a station, a low one's door faces away from its taller blocks.
+        Venue(Place.JUNCTION_OFFICE, 323, 46, 7, 5, 14.0, 0xA9C7E3, 0x5A7590, false, Spot(328.5, 45.5), pitched = false),
+        Venue(Place.EAST_VILLAGE_LIBRARY, 410, 53, 8, 5, 5.0, 0xEADCB9, 0x6E7F99, true, Spot(415.5, 58.5), pitched = true),
+        Venue(Place.SMALL_PARK_CAFE, 451, 50, 5, 4, 3.2, 0xF2C28B, 0x8A5A3A, true, Spot(455.5, 54.5), pitched = true),
+        Venue(Place.HIGH_STREET_COWORKING, 513, 51, 6, 5, 7.5, 0xBFD8C9, 0x4E7D6E, false, Spot(517.5, 50.5), pitched = false),
+        Venue(Place.BIG_PARK_LIBRARY, 534, 61, 8, 5, 5.0, 0xEADCB9, 0x6E7F99, true, Spot(539.5, 66.5), pitched = true),
+        Venue(Place.TOWN_CENTRE_OFFICE, 590, 2, 7, 5, 14.0, 0xA9C7E3, 0x5A7590, true, Spot(595.5, 7.5), pitched = false),
+        Venue(Place.SLOPE_CAFE, 577, 104, 5, 4, 3.2, 0xF2C28B, 0x8A5A3A, false, Spot(581.5, 103.5), pitched = true),
     )
 
     fun venue(place: Place): Venue = venues.first { it.place == place }
@@ -233,7 +247,7 @@ object Neighbourhood {
 
     /**
      * The bike shop, on the West End's wide street toward downtown, on the way from 내 방 to the business district: a
-     * block of the city cleared for it, as for the five places. Not a real shop or address.
+     * block of the city cleared for it, as for the places. Not a real shop or address.
      */
     val shop = Storefront(142, 87, 5, 3, 3.4, 0xE9C46A, 0x7A5233, Spot(146.5, 90.5))
 
@@ -310,7 +324,7 @@ object Neighbourhood {
     /** Where each blossom tree in the town stands; their petals drift down. */
     val blossoms: List<Spot>
 
-    /** The town corner's buildings as built: a lot each, after the five places and the station took their room. */
+    /** The town corner's buildings as built: a lot each, after the places and the station took their room. */
     val cityLots: List<Lot>
 
     /**
@@ -332,11 +346,11 @@ object Neighbourhood {
      */
     internal val open: Grid
 
-    /** What a tap stops at besides the five places, which [HomeSite.walls] adds: see [walls]. */
+    /** What a tap stops at besides the places, which [HomeSite.walls] adds: see [walls]. */
     internal val sharedWalls: List<Wall>
 
     /**
-     * What a tap stops at in zone 1's town: the buildings (the five places among them), the SkyTrain deck, the stations
+     * What a tap stops at in zone 1's town: the buildings (the places among them), the SkyTrain deck, the stations
      * and their roofs, the tunnel's mouth, the café's awning and the office's canopy. The camera stays out of all but
      * the city's buildings, which fold down out of its way instead ([foldables]). Another zone's are its
      * [HomeSite.walls].
@@ -346,7 +360,7 @@ object Neighbourhood {
 
     /**
      * The buildings that fold down out of the camera's way: the city's, and the low blocks past the grid's edges. The
-     * five places, the station, the guideway and the train, 내 방's garden and the people never do.
+     * places, the station, the guideway and the train, 내 방's garden and the people never do.
      */
     val foldables: List<Foldable>
 
@@ -753,26 +767,29 @@ object Neighbourhood {
             add(doorX - 0.45, 0.0, front + out, 0.9, 1.6, 0.06, DOOR)
             add(doorX - 0.55, 1.6, front + out - 0.01, 1.1, 0.12, 0.08, WOOD_DARK)
             addWindows(x, z, width, depth, venue.height, doorX, venue.doorFacesSouth)
-            when (venue.place) {
-                Place.CAFE -> {
+            // What marks the kind out, on the side the door is on: [ahead] is how far out from the front wall a thing
+            // [deep] squares deep starts.
+            val south = venue.doorFacesSouth
+            fun ahead(deep: Double, gap: Double = 0.0): Double = if (south) front + gap else front - gap - deep
+            when (venue.place.kind) {
+                PlaceKind.CAFE -> {
                     // An awning over the front in green and cream bands, and a small table outside. The awning stops
                     // short of the door's spot, so the character never stands under it.
                     for (band in 0 until (width * 2).toInt()) {
-                        add(x + band * 0.5, 2.0, z - 0.35, 0.5, 0.14, 0.35, if (band % 2 == 0) AWNING else AWNING_LIGHT)
+                        add(x + band * 0.5, 2.0, ahead(0.35), 0.5, 0.14, 0.35, if (band % 2 == 0) AWNING else AWNING_LIGHT)
                     }
-                    otherWalls.add(Block(x, 2.0, z - 0.35, width, 0.14, 0.35, AWNING))
-                    addSolid(x + 0.6, 0.0, z - 1.3, 0.6, 0.7, 0.6, WOOD)
+                    otherWalls.add(Block(x, 2.0, ahead(0.35), width, 0.14, 0.35, AWNING))
+                    addSolid(x + 0.6, 0.0, ahead(0.6, 0.7), 0.6, 0.7, 0.6, WOOD)
                 }
-                Place.LIBRARY -> add(x + 2.5, 0.0, z + depth, width - 5.0, 0.15, 0.4, STONE_LIGHT)
-                Place.COWORKING -> add(x + 0.4, 0.3, z + depth, width - 0.8, 0.18, 0.08, SIGN_GREEN)
-                Place.OFFICE -> {
+                PlaceKind.LIBRARY -> add(x + 2.5, 0.0, ahead(0.4), width - 5.0, 0.15, 0.4, STONE_LIGHT)
+                PlaceKind.COWORKING -> add(x + 0.4, 0.3, ahead(0.08), width - 0.8, 0.18, 0.08, SIGN_GREEN)
+                PlaceKind.OFFICE -> {
                     // A canopy over the door, short of the door's spot, as the café's awning is.
-                    val canopyZ = if (venue.doorFacesSouth) front else front - 0.35
-                    val canopy = Block(doorX - 1.2, 2.2, canopyZ, 2.4, 0.15, 0.35, CONCRETE)
+                    val canopy = Block(doorX - 1.2, 2.2, ahead(0.35), 2.4, 0.15, 0.35, CONCRETE)
                     blocks.add(canopy)
                     otherWalls.add(canopy)
                 }
-                Place.HOME -> add(x + 3.6, venue.height, z + 1.2, 0.6, 1.8, 0.6, BRICK_DARK)
+                PlaceKind.HOME -> add(x + 3.6, venue.height, z + 1.2, 0.6, 1.8, 0.6, BRICK_DARK)
             }
         }
 
@@ -990,14 +1007,15 @@ object Neighbourhood {
         }
 
         /**
-         * The city: a building on each real block, the five places' lots and the station's kept clear, and none under
-         * the guideway. Taller in the business district round 회사 and in the middle of downtown, mid-height by False
-         * Creek, low in the West End, the old streets to the east and across the creek.
+         * The city: a building on each real block, the places' lots and the station's kept clear, and none under the
+         * guideway. Taller in the business district round 회사 and in the middle of downtown, mid-height by False Creek,
+         * low in the West End, the old streets to the east and across the creek.
          */
         fun addCity() {
             val start = guideway.points.first()
             val entrances = TransitLines.stations.mapNotNull { it.entrance }.map { Lot(it.x - 1, it.z - 1, it.width + 2, it.depth + 2) }
-            val kept = venues.map { lotFor(it) } + shop.lot + entrances +
+            val (inTown, pastTown) = venues.partition { it.x < TOWN_COLUMNS }
+            val kept = inTown.map { lotFor(it) } + shop.lot + entrances +
                 Lot(floor(start.x).toInt() - 5, floor(start.z).toInt() - 4, STATION_LENGTH.toInt() + 8, 10) +
                 homes.values.filter { it != venue(Place.HOME) }.map { lotFor(it) }
             var lots = lotsOf(VancouverMapData.BLOCKS)
@@ -1021,7 +1039,7 @@ object Neighbourhood {
                 addBuilding(lot, height, colour)
             }
             // The corner's own buildings are kept too, where a wide block reaches back over the corner's edge.
-            addWideCity(kept + cityLots + TransitLines.keptForStops + Rides.keptForDocks)
+            addWideCity(kept + cityLots + TransitLines.keptForStops + Rides.keptForDocks, pastTown.map { lotFor(it) })
             plantYards()
         }
 
@@ -1030,10 +1048,10 @@ object Neighbourhood {
          * block is and a little smaller, so the streets between are wide enough to walk ([WIDE_SHRINK]): a cluster of
          * towers round the Burnaby town centre, a box of mid-rise on each block round the other stations, and everywhere
          * else detached houses, one on each lot ([addHouses]). None on a park or the water, under or beside the
-         * guideway, or on a main street; where [kept] keeps the ground clear, no building, and only the houses clear of
-         * it.
+         * guideway, or on a main street; where [kept] or one of the [places] out past downtown keeps the ground clear, no
+         * building, and only the houses clear of it.
          */
-        fun addWideCity(kept: List<Lot>) {
+        fun addWideCity(kept: List<Lot>, places: List<Lot>) {
             val streets = Samples(WideVancouver.streets + TransitLines.busLines.map { it.loop.points })
             val rail = Samples(listOf(guideway.points))
             val stations = WideVancouver.stations
@@ -1048,15 +1066,18 @@ object Neighbourhood {
                 val shape = TurnedBox(middle.x, middle.z, width, depth, lot.turn)
                 if (rail.anyWithin(shape, WIDE_RAIL_CLEAR) || streets.anyWithin(shape, WIDE_STREET_CLEAR)) continue
                 val inKept = kept.any { shape.overlaps(it, 0.5) }
+                val onPlace = places.any { shape.overlaps(it, 0.5) }
                 val fromCentre = distanceBetween(middle, centre)
                 val nearStation = stations.minOf { distanceBetween(it.spot, middle) }
                 val residential = fromCentre >= TOWN_CENTRE_REACH && nearStation >= STATION_REACH
-                if (inKept && !residential) continue
-                // Drawn for every block that stood before the houses came, so the wide map's other chances are as they were.
+                // Drawn for every block that stood before the houses and the places past downtown came, so the wide
+                // map's other chances are as they were.
                 val chance = if (inKept) 0.0 else wideRandom.nextDouble()
                 val pick = if (inKept) 0.0 else wideRandom.nextDouble()
+                if ((inKept || onPlace) && !residential) continue
                 if (residential) {
-                    addHouses(shape, kept.filter { inKept && shape.overlaps(it, 0.5) }, streets)
+                    val clear = if (inKept || onPlace) (kept + places).filter { shape.overlaps(it, 0.5) } else emptyList()
+                    addHouses(shape, clear, streets)
                     continue
                 }
                 var (height, colours) = when {
@@ -1258,7 +1279,7 @@ object Neighbourhood {
 
         /**
          * The park's forest, a tree every few squares, nearest 내 방 in full and farther ones simpler; trees on the
-         * small parks near the five places, some in blossom.
+         * small parks near the places, some in blossom.
          */
         fun addTrees() {
             val forest = mutableListOf<Spot>()
@@ -1284,7 +1305,8 @@ object Neighbourhood {
             val ways = Strolls.all().flatMap { it.stroll.legs }
             forest.removeAll { tree -> ways.any { (a, b) -> distanceToLine(tree, a, b) < CLEAR_OF_WAYS } }
             val streets = Samples(WideVancouver.streets + TransitLines.busLines.map { it.loop.points })
-            val clear = TransitLines.keptForStops + Rides.keptForDocks + homes.values.map { lotFor(it) }
+            val clear = TransitLines.keptForStops + Rides.keptForDocks + homes.values.map { lotFor(it) } +
+                venues.filter { it.x >= TOWN_COLUMNS }.map { lotFor(it) }
             wideForest.removeAll { tree ->
                 ways.any { (a, b) -> distanceToLine(tree, a, b) < CLEAR_OF_WAYS } || streets.within(tree, CLEAR_OF_STREETS) ||
                     clear.any { it.isNear(tree.x, tree.z, 1.0) }

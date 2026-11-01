@@ -1,30 +1,59 @@
 package vancouvermonth.web
 
 import vancouvermonth.core.Action
+import vancouvermonth.text.Townsperson
 
-/** The five buildings the character walks between, with the name each one shows in the town. */
-enum class Place(val label: String) {
-    HOME("내 방"),
-    CAFE("카페"),
-    LIBRARY("도서관"),
-    COWORKING("코워킹"),
-    OFFICE("회사"),
+/** What a place is, by the word it goes by, and the action taken there: sleep at 내 방, work at a café and so on. */
+enum class PlaceKind(val label: String, val action: Action) {
+    HOME("내 방", Action.REST),
+    CAFE("카페", Action.WORK),
+    LIBRARY("도서관", Action.STUDY_ENGLISH),
+    COWORKING("코워킹", Action.PRACTISE_CODING),
+    OFFICE("회사", Action.APPLY),
 }
 
-/** Where the character spends a day on [action]. */
-fun placeFor(action: Action): Place = when (action) {
-    Action.WORK -> Place.CAFE
-    Action.STUDY_ENGLISH -> Place.LIBRARY
-    Action.PRACTISE_CODING -> Place.COWORKING
-    Action.APPLY -> Place.OFFICE
-    Action.REST -> Place.HOME
+/**
+ * The buildings the character walks between, each with the name it shows in the town and the person who keeps it: 내 방,
+ * and round the map three cafés, three libraries, two coworking spaces and three offices, each of its [kind]. The first
+ * of each kind stands downtown; the others, west to east, in East Vancouver and Burnaby, each named for what is round
+ * it. Every name is invented, none a real shop, library or company.
+ */
+enum class Place(val kind: PlaceKind, val label: String, val person: Townsperson) {
+    HOME(PlaceKind.HOME, "내 방", Townsperson.GRANDMA),
+    CAFE(PlaceKind.CAFE, "물가 카페", Townsperson.HANA),
+    LIBRARY(PlaceKind.LIBRARY, "시내 도서관", Townsperson.LEO),
+    COWORKING(PlaceKind.COWORKING, "벽돌길 코워킹", Townsperson.SUJIN),
+    OFFICE(PlaceKind.OFFICE, "항구 회사", Townsperson.MARCUS),
+    JUNCTION_OFFICE(PlaceKind.OFFICE, "갈림길 회사", Townsperson.AISHA),
+    EAST_VILLAGE_LIBRARY(PlaceKind.LIBRARY, "동쪽 마을 도서관", Townsperson.ROSA),
+    SMALL_PARK_CAFE(PlaceKind.CAFE, "작은 공원 카페", Townsperson.SOPHIE),
+    HIGH_STREET_COWORKING(PlaceKind.COWORKING, "큰길 코워킹", Townsperson.NINA),
+    BIG_PARK_LIBRARY(PlaceKind.LIBRARY, "큰 공원 도서관", Townsperson.JUNHO),
+    TOWN_CENTRE_OFFICE(PlaceKind.OFFICE, "중심가 회사", Townsperson.KENJI),
+    SLOPE_CAFE(PlaceKind.CAFE, "비탈 카페", Townsperson.MATEO),
+    ;
+
+    /** Which of its kind it is, from 0, downtown's: what a kept month records for an action taken here. */
+    val number: Int
+        get() = entries.filter { it.kind == kind }.indexOf(this)
+
+    companion object {
+        /** Place [number] of [kind], from 0, downtown's; the first of the kind for a number it does not have. */
+        fun of(kind: PlaceKind, number: Int = 0): Place {
+            val all = entries.filter { it.kind == kind }
+            return all.getOrElse(number) { all.first() }
+        }
+    }
 }
 
-/** The action a day at [place] is spent on: the other way round from [placeFor]. */
-fun actionAt(place: Place): Action = Action.entries.first { placeFor(it) == place }
+/**
+ * Place [number] of the kind [action] is taken at, from 0, as a kept month records it ([Place.number]); by default the
+ * first, downtown's, where a game with no town to walk in takes it.
+ */
+fun placeFor(action: Action, number: Int = 0): Place = Place.of(PlaceKind.entries.first { it.action == action }, number)
 
-/** Interviews are at the office, where the applications went. */
-val INTERVIEW_PLACE: Place = Place.OFFICE
+/** The action a day at [place] is spent on: the action of its kind. */
+fun actionAt(place: Place): Action = place.kind.action
 
 /** A spot on the ground. x runs east and z runs south, one unit per grid square, as in Three.js. */
 data class Spot(val x: Double, val z: Double)
@@ -92,7 +121,8 @@ object TownMap {
         Building(Place.OFFICE, x = 14, z = 3, width = 2, depth = 2, height = 4.5, wall = 0x7FA8CF, roof = 0x3A5878),
     )
 
-    fun building(place: Place): Building = buildings.first { it.place == place }
+    /** The building of [place]'s kind: the picture has one of each. */
+    fun building(place: Place): Building = buildings.first { it.place.kind == place.kind }
 
     /** Every box to draw except the character, from the mountains at the back to the kerb at the front. */
     val blocks: List<Block> = buildList {
@@ -247,3 +277,6 @@ object TownMap {
     private const val HAIR = 0x2B2118
     private const val EYES = 0x1C1D1F
 }
+
+/** Interviews are at the office, where the applications went. */
+val INTERVIEW_PLACE: Place = Place.OFFICE

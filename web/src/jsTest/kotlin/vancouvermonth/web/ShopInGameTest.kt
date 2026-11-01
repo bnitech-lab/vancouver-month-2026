@@ -91,7 +91,7 @@ class ShopInGameTest {
         }
 
     /** The town reaches a shared [ride], and the player rides it to [place]. */
-    private fun rideShared(town: QuietTown, ride: Ride, place: String = "도서관") {
+    private fun rideShared(town: QuietTown, ride: Ride, place: String = Place.LIBRARY.label) {
         town.onRent(ride)
         rideTo(place).click()
     }
@@ -188,7 +188,7 @@ class ShopInGameTest {
         assertTrue(town.isCovered)
         // 30 squares to every place: $1 and $0.60 for every ten, $2.80, to the dollar.
         assertEquals(places.associate { it.first to "\$3" }, fares())
-        rideTo("도서관").click()
+        rideTo(Place.LIBRARY.label).click()
         assertEquals(Ride.SHARED_E_SCOOTER, town.riding)
         assertNull(rideCard())
         assertTrue(money(startBalance - 3) in text(".hud"))
@@ -218,22 +218,23 @@ class ShopInGameTest {
     @Test
     fun `each place's fare goes with its way, from the base up to the most, and the fare shown is the fare paid`() {
         val town = QuietTown()
-        val ways = mapOf("카페" to 10.0, "도서관" to 100.0, "코워킹" to 400.0, "회사" to 2_000.0)
+        val (cafe, library, coworking, office) = listOf(Place.CAFE, Place.LIBRARY, Place.COWORKING, Place.OFFICE).map { it.label }
+        val ways = mapOf(cafe to 10.0, library to 100.0, coworking to 400.0, office to 2_000.0)
         town.squaresTo = { spot -> ways[places.first { it.second == spot }.first] }
         open(town)
         startSeed1011(root)
         town.onRent(Ride.SHARED_BIKE)
         // A bike: $1 and $0.40 for every ten squares, at most $15; a place it cannot reach is left out.
-        assertEquals(mapOf("카페" to "\$1", "도서관" to "\$5", "코워킹" to "\$15", "회사" to "\$15"), fares())
+        assertEquals(mapOf(cafe to "\$1", library to "\$5", coworking to "\$15", office to "\$15"), fares())
         assertEquals("공유 자전거", text(".chooser .talk-name"))
         root.button(Transit.STOP).click()
         town.onRent(Ride.SHARED_E_SCOOTER)
         // An e-scooter: $1 and $0.60 for every ten, at most $20.
-        assertEquals(mapOf("카페" to "\$2", "도서관" to "\$7", "코워킹" to "\$20", "회사" to "\$20"), fares())
+        assertEquals(mapOf(cafe to "\$2", library to "\$7", coworking to "\$20", office to "\$20"), fares())
         for ((place, squares) in ways) {
             assertEquals("\$${SharedFare.E_SCOOTER.forDistance(squares)}", fares()[place], place)
         }
-        rideTo("도서관").click()
+        rideTo(Place.LIBRARY.label).click()
         assertTrue(money(startBalance - 7) in text(".hud"), text(".hud"))
         assertEquals(Riding.rented(Item.E_SCOOTER, 7), text(".hud-riding"))
         assertTrue(store.items[SaveSlot.KEY].orEmpty().endsWith("|q7"), store.items[SaveSlot.KEY])
@@ -252,7 +253,7 @@ class ShopInGameTest {
         // The town will not set off there after all: the button does nothing, and the card stays.
         town.onRent(Ride.SHARED_BIKE)
         town.canRideNow = false
-        rideTo("카페").click()
+        rideTo(Place.CAFE.label).click()
         assertNull(town.riding)
         assertNotNull(rideCard())
         // A talk that opens closes the card, and nothing is ridden.
@@ -307,17 +308,17 @@ class ShopInGameTest {
         val ride = Spend(Spending.SHARED_E_SCOOTER_RIDE, 4)
         val kept = record(*Array(28) { rest }, Spend(Spending.BIKE, 350), *Array(106) { ride })
         val town = QuietTown()
-        town.squaresTo = { spot -> if (spot == places.first { it.first == "카페" }.second) 10.0 else 100.0 }
+        town.squaresTo = { spot -> if (spot == places.first { it.first == Place.CAFE.label }.second) 10.0 else 100.0 }
         continued(kept, town)
         town.onRent(Ride.SHARED_BIKE)
         // A bike to the café is $1 and can be paid; a $5 ride to the library cannot.
-        assertFalse(rideTo("카페").disabled)
-        val library = rideTo("도서관")
+        assertFalse(rideTo(Place.CAFE.label).disabled)
+        val library = rideTo(Place.LIBRARY.label)
         assertTrue(library.disabled)
         assertTrue("타면 9월 생활비가 모자라요." in library.textContent.orEmpty(), library.textContent)
         library.click()
         assertNull(town.riding)
-        rideTo("카페").click()
+        rideTo(Place.CAFE.label).click()
         assertEquals(Ride.SHARED_BIKE, town.riding)
         assertTrue(money(40) in text(".hud"), text(".hud"))
     }

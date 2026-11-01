@@ -4,9 +4,9 @@ import kotlin.math.atan2
 import kotlin.math.sin
 
 /**
- * One of the five townspeople, who keeps to their [spot] so they are always found there, but is alive: they look
+ * One of the townspeople, who keeps to their [spot] so they are always found there, but is alive: they look
  * around while nobody is near, turn to face the player who comes close, and wave once as the player comes up to them.
- * [facing] is the way they rest, toward the street, and [phase] keeps the five from moving in step.
+ * [facing] is the way they rest, toward the street, and [phase] keeps them from moving in step.
  */
 class Greeter(val spot: Spot, val facing: Double, private val phase: Double) {
     /** The way they face as drawn. */

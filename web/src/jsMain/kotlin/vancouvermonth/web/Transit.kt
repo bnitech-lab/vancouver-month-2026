@@ -213,7 +213,7 @@ object TransitLines {
         get() = taxiStopsFor(1)
 
     /**
-     * Where a taxi goes for a room in [zone], by name: the five places (내 방 where that room is), the bike shop and the
+     * Where a taxi goes for a room in [zone], by name: the places (내 방 where that room is), the bike shop and the
      * stations, each at its door. The same names in the same order in every zone.
      */
     fun taxiStopsFor(zone: Int): List<Pair<String, Spot>> = taxiStopsByZone.getOrPut(zone) {

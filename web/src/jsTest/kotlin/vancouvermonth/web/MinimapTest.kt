@@ -298,7 +298,7 @@ class MinimapTest {
         minimap.measure()
         val cafe = Neighbourhood.venue(Place.CAFE).door
         minimap.draw(cafe.x, cafe.z, 0.0, cafe.x, cafe.z + 20.0, cafe.x, cafe.z, 0.8, marked = null)
-        assertEquals("지도: 카페 근처", minimap.element.getAttribute("aria-label"))
+        assertEquals("지도: ${Place.CAFE.label} 근처", minimap.element.getAttribute("aria-label"))
         assertEquals("img", minimap.element.getAttribute("role"))
         // Out on the wide map, at a station, that station's name.
         val fork = TransitLines.stations[3].door
