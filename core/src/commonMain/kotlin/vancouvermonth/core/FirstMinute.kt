@@ -36,8 +36,6 @@ class FirstMinute(
             guess = guess,
             guessGap = guessGap,
             pickedCheapest = pickedCheapest,
-            cheapestPoints = if (pickedCheapest) MAX_POINTS_EACH else 0,
-            guessPoints = maxOf(0, MAX_POINTS_EACH - guessGap),
             guessMoney = guessMoney(guessGap),
             balanceAfterFirstMonth = startingBalance - room.totalMonthlyCost,
         )
@@ -58,10 +56,6 @@ class FirstMinute(
 
         /** Keeps the month's luck apart from the luck that dealt the rooms. */
         private const val MONTH_DICE_SALT = 0x5EED
-
-        /** Points for picking the cheapest room, and the most a guess can earn: one point off per dollar missed. */
-        const val MAX_POINTS_EACH = 100
-        const val MAX_SCORE = MAX_POINTS_EACH * 2
 
         /** The most a guess can win: an exact guess wins all of it, and each dollar it misses by takes one off. */
         const val GUESS_REWARD = 100
@@ -89,15 +83,10 @@ data class Reveal(
     val guessGap: Int,
     /** True when no room was cheaper, ties included. */
     val pickedCheapest: Boolean,
-    val cheapestPoints: Int,
-    val guessPoints: Int,
     /** What the guess adds to the balance as the month starts: [FirstMinute.guessMoney] of [guessGap]. */
     val guessMoney: Int,
     val balanceAfterFirstMonth: Int,
 ) {
-    val score: Int
-        get() = cheapestPoints + guessPoints
-
     /** The balance September starts with: what the first month's total left, with the guess's money. */
     val balanceAtStart: Int
         get() = balanceAfterFirstMonth + guessMoney

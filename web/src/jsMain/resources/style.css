@@ -284,6 +284,12 @@ a:focus-visible {
   font-weight: 600;
 }
 
+.guess-rule {
+  margin-top: -4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
 .guess-row {
   display: flex;
   align-items: center;
@@ -373,17 +379,36 @@ a:focus-visible {
   border-top: 1px solid var(--line);
 }
 
-.plus {
+/* What the guess wins or loses as the month starts, large, with why under it. */
+.guess-money {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--line);
   font-weight: 700;
-  color: var(--accent);
+}
+
+.guess-money-amount {
+  font-size: 24px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.score {
-  padding: 8px 0;
-  border-top: 1px solid var(--line);
-  font-weight: 700;
+.guess-money.reward .guess-money-amount {
+  color: var(--accent);
+}
+
+.guess-money.penalty .guess-money-amount {
+  color: var(--warn);
+}
+
+.guess-why {
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--muted);
 }
 
 .left {

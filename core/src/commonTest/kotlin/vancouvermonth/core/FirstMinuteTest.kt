@@ -62,46 +62,15 @@ class FirstMinuteTest {
         assertTrue(game.reveal(0, 1_000).pickedCheapest)
         assertTrue(game.reveal(2, 1_000).pickedCheapest)
         assertFalse(game.reveal(1, 1_000).pickedCheapest)
-        assertEquals(200, game.reveal(0, 1_245).score)
-        assertEquals(200, game.reveal(2, 1_245).score)
-        assertEquals(0, game.reveal(1, 1_000).cheapestPoints)
+        // Either tied room, guessed exactly, wins the same; so does the dearer room guessed exactly.
+        assertEquals(100, game.reveal(0, 1_245).guessMoney)
+        assertEquals(100, game.reveal(2, 1_245).guessMoney)
+        assertEquals(100, game.reveal(1, 1_345).guessMoney)
     }
 
     @Test
     fun `a negative guess is refused`() {
         assertFailsWith<IllegalArgumentException> { FirstMinute(seed = 1).reveal(0, -1) }
-    }
-
-    @Test
-    fun `the cheapest room and an exact guess score the full 200`() {
-        val game = FirstMinute(seed = 4821)
-        val reveal = game.reveal(game.cheapestRoomIndex, game.lowestTotal)
-        assertEquals(100, reveal.cheapestPoints)
-        assertEquals(100, reveal.guessPoints)
-        assertEquals(FirstMinute.MAX_SCORE, reveal.score)
-    }
-
-    @Test
-    fun `a guess loses one point per dollar and never goes below zero`() {
-        val game = FirstMinute(seed = 4821)
-        val total = game.rooms[0].totalMonthlyCost
-        assertEquals(55, game.reveal(0, total + 45).guessPoints)
-        assertEquals(55, game.reveal(0, total - 45).guessPoints)
-        assertEquals(1, game.reveal(0, total + 99).guessPoints)
-        assertEquals(0, game.reveal(0, total + 100).guessPoints)
-        assertEquals(0, game.reveal(0, total + 101).guessPoints)
-        assertEquals(0, game.reveal(0, total + 900).guessPoints)
-    }
-
-    @Test
-    fun `a dearer room earns no points for the pick`() {
-        for (seed in 1..200) {
-            val game = FirstMinute(seed)
-            for (index in game.rooms.indices) {
-                val reveal = game.reveal(index, 0)
-                assertEquals(if (reveal.pickedCheapest) 100 else 0, reveal.cheapestPoints, "seed $seed, room $index")
-            }
-        }
     }
 
     @Test

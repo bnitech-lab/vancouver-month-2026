@@ -37,11 +37,16 @@ import vancouvermonth.text.endingLine
 import vancouvermonth.text.goalLine
 import vancouvermonth.text.greeting
 import vancouvermonth.text.guessLine
+import vancouvermonth.text.guessMoneyLabel
+import vancouvermonth.text.guessMoneyWhy
+import vancouvermonth.text.guessRuleLine
 import vancouvermonth.text.keyword
 import vancouvermonth.text.money
 import vancouvermonth.text.monthCostLine
 import vancouvermonth.text.monthStartLines
 import vancouvermonth.text.replacesKept
+import vancouvermonth.text.signedMoney
+import vancouvermonth.text.startBalanceLine
 import vancouvermonth.text.parseAmount
 import vancouvermonth.text.Passer
 import vancouvermonth.text.PatchNotes
@@ -266,10 +271,13 @@ class PhoneGame private constructor(
         val form = root.child("form", "card guess") as HTMLFormElement
         val label = form.child("label", text = "이 방의 한 달 총비용은 얼마일까요?") as HTMLLabelElement
         label.htmlFor = "guess"
+        // How the guess pays, said again where it is typed.
+        form.child("p", "guess-rule", guessRuleLine()).id = "guess-rule"
         val row = form.child("div", "guess-row")
         row.child("span", "dollar", "$")
         val input = row.child("input") as HTMLInputElement
         input.id = "guess"
+        input.setAttribute("aria-describedby", "guess-rule")
         // Text, not number, so "1,300" and "$1,300" reach the same parser the terminal uses in every browser.
         input.type = "text"
         input.setAttribute("inputmode", "numeric")
@@ -317,11 +325,17 @@ class PhoneGame private constructor(
             child("p", "total", money(room.totalMonthlyCost))
             child("p", "breakdown", breakdown(room))
             child("ul", "points") {
-                point(cheapestLine(game, reveal), reveal.cheapestPoints)
-                point(guessLine(reveal), reveal.guessPoints)
+                child("li", text = cheapestLine(game, reveal))
+                child("li", text = guessLine(reveal))
             }
-            child("p", "score", "방 고르기 점수 ${reveal.score} / ${FirstMinute.MAX_SCORE}")
-            child("p", "left", "첫 달을 내고 남은 잔고 ${money(reveal.balanceAfterFirstMonth)}")
+            // What the guess wins or loses as the month starts, why, and the balance September starts with.
+            val money = reveal.guessMoney
+            child("p", "guess-money ${if (money < 0) "penalty" else "reward"}") {
+                child("span", "guess-money-label", guessMoneyLabel(money))
+                child("span", "guess-money-amount", signedMoney(money))
+            }
+            child("p", "guess-why", guessMoneyWhy(reveal.guessGap, money))
+            child("p", "left", startBalanceLine(reveal.balanceAtStart))
             child("p", "month-cost", monthCostLine(game, reveal))
         }
         root.child("section", "card start") {
@@ -504,7 +518,7 @@ class PhoneGame private constructor(
                 child("p", "ending-word", "${Townsperson.GRANDMA.title}: $word")
             }
             child("div", "figures") {
-                figure("방 고르기 점수", "${reveal.score}/${FirstMinute.MAX_SCORE}")
+                figure(guessMoneyLabel(reveal.guessMoney), signedMoney(reveal.guessMoney))
                 figure("영어", "${month.english}/${Month.MAX_SKILL}")
                 figure("코딩", "${month.coding}/${Month.MAX_SKILL}")
             }
@@ -1326,10 +1340,3 @@ private fun HTMLElement.face(look: Look) {
 
 /** 0xRRGGBB as CSS writes it: "#rrggbb". */
 private fun css(colour: Int): String = "#" + colour.toString(16).padStart(6, '0')
-
-private fun HTMLElement.point(line: String, points: Int) {
-    child("li") {
-        child("span", text = line)
-        child("span", "plus", "+$points")
-    }
-}

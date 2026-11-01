@@ -5,6 +5,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -63,6 +64,9 @@ class PhoneGameTest {
 
     private fun tap(text: String) = button(text).click()
 
+    private fun text(selector: String): String =
+        assertNotNull(root.querySelector(selector), "No $selector in: $screen").textContent.orEmpty()
+
     private fun type(amount: String) {
         val input = root.querySelector("input") as HTMLInputElement
         input.value = amount
@@ -99,10 +103,13 @@ class PhoneGameTest {
         tap("총비용 확인하기")
         assertTrue("\$1,345" in screen)
         assertTrue("월세 \$970 + 공과금 \$180 + 교통 \$195" in screen)
-        assertTrue("총비용이 가장 싼 방은 3번이었어요 (\$1,165).+0" in screen)
-        assertTrue("내 짐작과 차이 \$45+55" in screen)
-        assertTrue("방 고르기 점수 55 / 200" in screen)
-        assertTrue("첫 달을 내고 남은 잔고 \$1,655" in screen)
+        assertEquals(
+            listOf("총비용이 가장 싼 방은 3번이었어요 (\$1,165).", "내 짐작과 차이 \$45"),
+            root.querySelectorAll(".reveal .points li").asList().map { it.textContent },
+        )
+        assertEquals("짐작 보상+\$55", root.querySelector(".reveal .guess-money")?.textContent)
+        assertTrue("9월을 시작하는 잔고 \$1,710" in screen)
+        assertFalse("점수" in screen, screen)
 
         tap("9월 2일 시작하기")
         assertTrue("오늘9월 2일" in screen)
@@ -156,6 +163,57 @@ class PhoneGameTest {
         tap("총비용 확인하기")
         val cheap = root.querySelector(".reveal .month-cost")?.textContent
         assertEquals("가장 싼 방이라 9월을 버틸 돈이 가장 많이 남아요.", cheap)
+    }
+
+    @Test
+    fun `a close guess shows its reward, why, and the balance it starts September with`() {
+        val game = FirstMinute(1011)
+        open(1011)
+        tap("1번 방")
+        val total = game.rooms[0].totalMonthlyCost
+        type("${total - 20}")
+        tap("총비용 확인하기")
+        val reward = assertNotNull(root.querySelector(".reveal .guess-money"))
+        assertTrue(reward.classList.contains("reward") && !reward.classList.contains("penalty"))
+        assertEquals("짐작 보상", text(".guess-money-label"))
+        assertEquals("+\$80", text(".guess-money-amount"))
+        assertEquals("\$100에서 틀린 만큼 빼고 받아요.", text(".reveal .guess-why"))
+        val start = FirstMinute.STARTING_BALANCE - total + 80
+        assertEquals("9월을 시작하는 잔고 ${money(start)}", text(".reveal .left"))
+        tap("시작하기")
+        assertTrue("잔고${money(start)}" in text(".topbar"), screen)
+    }
+
+    @Test
+    fun `a guess far off shows its penalty, why, and the balance it starts September with`() {
+        val game = FirstMinute(1011)
+        open(1011)
+        tap("3번 방")
+        type("${game.lowestTotal + 250}")
+        tap("총비용 확인하기")
+        val penalty = assertNotNull(root.querySelector(".reveal .guess-money"))
+        assertTrue(penalty.classList.contains("penalty"))
+        assertEquals("짐작 패널티", text(".guess-money-label"))
+        assertEquals("-\$150", text(".guess-money-amount"))
+        assertEquals("\$100보다 더 틀린 만큼 잃어요.", text(".reveal .guess-why"))
+        val start = FirstMinute.STARTING_BALANCE - game.lowestTotal - 150
+        assertEquals("9월을 시작하는 잔고 ${money(start)}", text(".reveal .left"))
+        // The order the reveal reads in: the total, the gap, the money, why, then the balance.
+        val order = listOf(".total", ".points", ".guess-money", ".guess-why", ".left").map { selector ->
+            root.querySelector(".reveal")!!.children.asList().indexOfFirst { it.matches(selector) }
+        }
+        assertEquals(order.sorted(), order)
+        tap("시작하기")
+        assertTrue("잔고${money(start)}" in text(".topbar"), screen)
+        tap("쉬기")
+        assertTrue("생활비 -\$40, 잔고 ${money(start - 40)}" in screen, screen)
+    }
+
+    @Test
+    fun `the guess's form says how the guess pays, and the field is described by it`() {
+        open(1011)
+        assertEquals("맞힐수록 최대 \$100을 더 받고, 틀린 만큼 잃어요(최대 \$300).", text(".guess .guess-rule"))
+        assertEquals("guess-rule", root.querySelector("#guess")?.getAttribute("aria-describedby"))
     }
 
     @Test
@@ -224,7 +282,8 @@ class PhoneGameTest {
         startMonth(room = 3, amount = "1165")
         while ("다시 하기" !in screen) tap("쉬기")
         assertTrue("9월이 끝났어요." in screen)
-        assertTrue("방 고르기 점수200/200" in screen)
+        assertTrue("짐작 보상+\$100" in text(".ending .figures"), screen)
+        assertFalse("점수" in screen, screen)
         assertTrue("판 번호 1011" in screen)
         assertFalse(playedAgain)
         tap("다시 하기")
@@ -335,7 +394,8 @@ class PhoneGameTest {
             type(typed)
             assertFalse(button("총비용 확인하기").disabled, typed)
             tap("총비용 확인하기")
-            assertTrue("내 짐작과 차이 \$45+55" in screen, typed)
+            assertTrue("내 짐작과 차이 \$45" in screen, typed)
+            assertEquals("+\$55", text(".guess-money-amount"), typed)
         }
     }
 
