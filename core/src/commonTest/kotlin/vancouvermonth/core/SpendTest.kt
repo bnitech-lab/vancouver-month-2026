@@ -18,11 +18,12 @@ class SpendTest {
 
     @Test
     fun `the prices are the plan's, and only a bike and an e-scooter are kept`() {
-        assertEquals(listOf(350, 550, 3, 4, 4, 4), Spending.entries.map { it.price })
+        assertEquals(listOf(350, 550, 1, 1, 4, 4), Spending.entries.map { it.price })
         assertEquals(Item.BIKE, Spending.BIKE.buys)
         assertEquals(Item.E_SCOOTER, Spending.E_SCOOTER.buys)
         for (kind in Spending.entries - Spending.BIKE - Spending.E_SCOOTER) assertNull(kind.buys, "$kind")
-        for (kind in Spending.entries - Spending.TAXI_RIDE) {
+        val byDistance = setOf(Spending.TAXI_RIDE, Spending.SHARED_BIKE_RIDE, Spending.SHARED_E_SCOOTER_RIDE)
+        for (kind in Spending.entries - byDistance) {
             assertEquals(kind.price, kind.most, "$kind")
             assertTrue(kind.costs(kind.price), "$kind")
             assertFalse(kind.costs(kind.price + 1), "$kind")
@@ -65,6 +66,47 @@ class SpendTest {
     }
 
     @Test
+    fun `a shared bike is $1 and $0·40 for every ten squares up to $15, an e-scooter $1 and $0·60 up to $20`() {
+        assertEquals(1, SharedFare.BIKE.forDistance(0.0))
+        assertEquals(1, SharedFare.BIKE.forDistance(12.0))
+        assertEquals(2, SharedFare.BIKE.forDistance(13.0))
+        assertEquals(2, SharedFare.BIKE.forDistance(25.0))
+        assertEquals(5, SharedFare.BIKE.forDistance(100.0))
+        assertEquals(15, SharedFare.BIKE.forDistance(350.0))
+        assertEquals(15, SharedFare.BIKE.forDistance(5_000.0))
+        assertEquals(1, SharedFare.E_SCOOTER.forDistance(0.0))
+        assertEquals(2, SharedFare.E_SCOOTER.forDistance(10.0))
+        assertEquals(7, SharedFare.E_SCOOTER.forDistance(100.0))
+        assertEquals(20, SharedFare.E_SCOOTER.forDistance(317.0))
+        assertEquals(20, SharedFare.E_SCOOTER.forDistance(5_000.0))
+        assertEquals(1, SharedFare.E_SCOOTER.forDistance(-5.0))
+        val kinds = listOf(
+            SharedFare.BIKE to Spending.SHARED_BIKE_RIDE,
+            SharedFare.E_SCOOTER to Spending.SHARED_E_SCOOTER_RIDE,
+        )
+        for ((fare, kind) in kinds) {
+            assertEquals(fare, SharedFare.of(kind))
+            assertEquals(fare.base, kind.price)
+            assertEquals(fare.most, kind.most)
+            var last = fare.base
+            for (squares in 0..800) {
+                val amount = fare.forDistance(squares.toDouble())
+                assertTrue(amount >= last && kind.costs(amount), "$kind, $squares squares: $amount")
+                last = amount
+            }
+            assertEquals(fare.most, last)
+            // The old flat fares, $3 and $4, are still fares the meter can show, so a month kept before still plays.
+            assertTrue(kind.costs(3) && kind.costs(4), "$kind")
+            assertFalse(kind.costs(0) || kind.costs(fare.most + 1), "$kind")
+        }
+        // An e-scooter costs more than a bike for the same way, past the base.
+        for (squares in listOf(50.0, 100.0, 200.0)) {
+            assertTrue(SharedFare.E_SCOOTER.forDistance(squares) > SharedFare.BIKE.forDistance(squares), "$squares")
+        }
+        assertNull(SharedFare.of(Spending.TAXI_RIDE))
+    }
+
+    @Test
     fun `any fare the taxi's meter can show is paid, and no other`() {
         val month = month()
         assertEquals(TaxiFare.BASE, Spending.TAXI_RIDE.price)
@@ -86,6 +128,12 @@ class SpendTest {
         val month = month(balance = living + 10)
         assertNull(month.spendBlockedBy(Spending.TAXI_RIDE, 10))
         assertEquals(SpendBlocked.LIVING_COST, month.spendBlockedBy(Spending.TAXI_RIDE, 11))
+        // A shared ride's fare by distance, the same: a short ride can be paid, a long one cannot.
+        assertNull(month.spendBlockedBy(Spending.SHARED_E_SCOOTER_RIDE, 10))
+        assertEquals(SpendBlocked.LIVING_COST, month.spendBlockedBy(Spending.SHARED_E_SCOOTER_RIDE, 11))
+        assertFalse(month.canSpend(Spending.SHARED_BIKE_RIDE, 15))
+        assertFailsWith<IllegalArgumentException> { month.spend(Spending.SHARED_BIKE_RIDE, 15) }
+        assertEquals(living + 10, month.balance)
         assertNull(month.spendBlockedBy(Spending.WATER_BUS_RIDE))
         month.spend(Spending.TAXI_RIDE, 7)
         assertEquals(SpendBlocked.LIVING_COST, month.spendBlockedBy(Spending.WATER_BUS_RIDE))
@@ -110,10 +158,11 @@ class SpendTest {
     fun `a ride's fare can be paid again and again, and keeps nothing`() {
         val month = month()
         repeat(5) {
-            assertEquals(Event.Spent(Spending.SHARED_E_SCOOTER_RIDE, 4), month.spend(Spending.SHARED_E_SCOOTER_RIDE))
+            assertEquals(Event.Spent(Spending.SHARED_E_SCOOTER_RIDE, 4), month.spend(Spending.SHARED_E_SCOOTER_RIDE, 4))
         }
         month.spend(Spending.SHARED_BIKE_RIDE, 3)
-        assertEquals(1_800 - 5 * 4 - 3, month.balance)
+        assertEquals(Event.Spent(Spending.SHARED_BIKE_RIDE, 1), month.spend(Spending.SHARED_BIKE_RIDE))
+        assertEquals(1_800 - 5 * 4 - 3 - 1, month.balance)
         assertEquals(emptySet(), month.owned)
     }
 

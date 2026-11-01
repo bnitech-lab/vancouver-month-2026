@@ -23,7 +23,7 @@ import vancouvermonth.text.PatchNotes
 
 /** A town to walk in whose nights last until the test says it is morning. */
 private class NightLongTown(val quiet: QuietTown = QuietTown()) : WalkableTown by quiet {
-    override fun endDay(place: Place) {}
+    override fun endDay() {}
 
     fun morning() = quiet.onMorning()
 }
@@ -332,8 +332,13 @@ class PatchNotesCardTest {
         assertNotNull(guideLink, "No link once the talk ended")
         press("Escape")
 
-        // The day is spent, and the night has not ended yet.
+        // An action leaves the link there; then the night's sleep, which has not ended yet.
         town.onPlace(Place.LIBRARY)
+        (root.querySelector(".talk .spend") as HTMLButtonElement).click()
+        helpButton().click()
+        assertNotNull(guideLink, "No link after an action")
+        press("Escape")
+        town.onPlace(Place.HOME)
         (root.querySelector(".talk .spend") as HTMLButtonElement).click()
         helpButton().click()
         assertNull(guideLink, "The notes could open during the change of day")

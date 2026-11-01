@@ -6,6 +6,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import vancouvermonth.core.Item
+import vancouvermonth.core.SharedFare
 import vancouvermonth.core.SpendBlocked
 import vancouvermonth.core.Spending
 
@@ -27,6 +28,8 @@ class ShopTest {
         }
         repeat(4) { add(Shop.smallTalk(it)) }
         add(Riding.GET_OFF)
+        add(Riding.NOWHERE)
+        for (fare in SharedFare.entries) add(Riding.where(fare))
         for (kind in listOf(Spending.SHARED_BIKE_RIDE, Spending.SHARED_E_SCOOTER_RIDE)) {
             for (blocked in SpendBlocked.entries) add(Riding.cannotRent(kind, blocked))
         }
@@ -83,6 +86,16 @@ class ShopTest {
             Riding.cannotRent(Spending.SHARED_BIKE_RIDE, SpendBlocked.LIVING_COST),
         )
         assertEquals("공유 퀵보드 타는 중 · -\$4", Riding.rented(Item.E_SCOOTER, 4))
+    }
+
+    @Test
+    fun `the card for a shared ride says the base, that the way adds to it, and the most`() {
+        assertEquals("공유 자전거", Riding.shared(Item.BIKE))
+        assertEquals("공유 퀵보드", Riding.shared(Item.E_SCOOTER))
+        assertEquals("어디로 갈까요? 기본 \$1에 거리만큼 더 나와요. 최대 \$15.", Riding.where(SharedFare.BIKE))
+        assertEquals("어디로 갈까요? 기본 \$1에 거리만큼 더 나와요. 최대 \$20.", Riding.where(SharedFare.E_SCOOTER))
+        // The shop's word on renting no longer names a flat fare.
+        assertTrue("거리만큼" in Shop.smallTalk(0), Shop.smallTalk(0))
     }
 
     @Test

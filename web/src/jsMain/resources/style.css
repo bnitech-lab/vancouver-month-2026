@@ -725,6 +725,14 @@ a:focus-visible {
   margin: 4px 0 0;
 }
 
+/* When nothing but sleep is left today: go home to sleep. */
+.actions .bedtime {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--warn);
+}
+
 .action {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -962,6 +970,17 @@ html:has(.walk-town) {
 .hud-note {
   font-size: 13px;
   color: var(--muted);
+}
+
+/* The time of day, first on the line of the day's figures. */
+.hud-time {
+  font-weight: 700;
+}
+
+/* At night, or with nothing left to do: go home to sleep. */
+.hud-note.hud-bedtime {
+  font-weight: 600;
+  color: var(--warn);
 }
 
 /* The day's skills on the left, the sound switch and the "?" on the right. */
