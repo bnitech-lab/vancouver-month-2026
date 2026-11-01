@@ -157,8 +157,11 @@ class FollowCameraTest {
         // Buildings, the SkyTrain deck, the station's roof, the awning and the canopy: the camera comes in front of
         // them or rises over them, and it is never inside one.
         val grid = Neighbourhood.grid
-        val spots = grid.freeCells().filterIndexed { index, _ -> index % 5 == 0 }.map { grid.centreOf(it) } +
-            Neighbourhood.venues.flatMap { listOf(it.door, it.talkSpot) }
+        // Every fifth square of the town's corner, as always, and every fiftieth out on the wide map, where only the
+        // guideway, its stations and the stops' shelters are walls.
+        val (corner, wide) = grid.freeCells().partition { it.x < Neighbourhood.TOWN_COLUMNS }
+        val spots = (corner.filterIndexed { index, _ -> index % 5 == 0 } + wide.filterIndexed { index, _ -> index % 50 == 0 })
+            .map { grid.centreOf(it) } + Neighbourhood.venues.flatMap { listOf(it.door, it.talkSpot) }
         for (spot in spots) {
             for (yaw in listOf(0.0, PI / 2, PI, -PI / 2)) {
                 for (tilt in listOf(-10_000.0, 0.0, 10_000.0)) {

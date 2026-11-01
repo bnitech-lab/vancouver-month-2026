@@ -131,8 +131,9 @@ class NeighbourhoodTest {
 
     @Test
     fun `the longest walk across the town is found in a blink`() {
-        // From the park's western tip to the far corner across False Creek: the way goes round the creek's head.
-        val free = town.freeCells()
+        // From the park's western tip to the far corner across False Creek: the way goes round the creek's head. The
+        // town's own corner of the wide map, as always; the wide map's longest walk is WideMapTest's.
+        val free = town.freeCells().filter { it.x < Neighbourhood.TOWN_COLUMNS }
         val west = town.centreOf(free.minBy { it.x })
         val far = town.centreOf(free.maxBy { it.x + it.z })
         // The best of three, so a pause of the browser's own in one of them does not count against the search.

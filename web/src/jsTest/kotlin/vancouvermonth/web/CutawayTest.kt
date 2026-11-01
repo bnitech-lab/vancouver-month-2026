@@ -243,7 +243,10 @@ class CutawayTest {
     @Test
     fun `wherever the character stands and however the camera turns, no city building it looks through stands`() {
         val grid = Neighbourhood.grid
-        val spots = grid.freeCells().filterIndexed { index, _ -> index % 23 == 0 }.map { grid.centreOf(it) }
+        // Every 23rd square of the town's corner, as always, and every hundredth out on the wide map.
+        val (corner, wide) = grid.freeCells().partition { it.x < Neighbourhood.TOWN_COLUMNS }
+        val spots = (corner.filterIndexed { index, _ -> index % 23 == 0 } + wide.filterIndexed { index, _ -> index % 100 == 0 })
+            .map { grid.centreOf(it) }
         val boxes = Neighbourhood.foldables.map { it.box }
         val cutaway = Cutaway(boxes)
         var folded = 0

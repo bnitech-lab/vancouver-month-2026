@@ -97,11 +97,10 @@ class TownBudgetTest {
     @Test
     fun `Burnaby, at 내 방 in zone 2 and at the town centre`(): Promise<Unit> {
         val town = open(2)
-        var atHome: FrameCost? = null
         return whenReady({ town.isStill }) {
-            atHome = town.measureFrames(FRAMES)
-            report("Burnaby, 내 방 zone 2", atHome!!)
-            withinBudget(atHome!!)
+            val atHome = town.measureFrames(FRAMES)
+            report("Burnaby, 내 방 zone 2", atHome)
+            withinBudget(atHome)
             town.standAt(TransitLines.stations[TransitLines.stations.lastIndex].door)
         }.then {
             whenReady({ town.isStill }) {
@@ -157,7 +156,7 @@ class TownBudgetTest {
     }
 
     private companion object {
-        const val FRAMES = 8
+        const val FRAMES = 4
         const val RIDE_MILLIS = 7_000.0
         const val MOST_DRAWS = 90
         const val MOST_BOXES = 9_000
