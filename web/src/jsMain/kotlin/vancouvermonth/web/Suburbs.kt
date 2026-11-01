@@ -72,6 +72,12 @@ object Suburbs {
     /** How far a roof reaches past the walls along the house's sides. */
     const val EAVE = 0.1
 
+    /**
+     * A block this far out or nearer is drawn far off as one low box a row, its houses in one colour; farther out, where
+     * the yards are wide, as a low box a house.
+     */
+    const val ROWS_UP_TO = 0.5
+
     /** How far out from [DOWNTOWN] [spot] is, from 0.0 by the town's corner to 1.0 at the far end of Burnaby. */
     fun share(spot: Spot): Double = ((distanceBetween(spot, DOWNTOWN) - NEAR) / (FAR - NEAR)).coerceIn(0.0, 1.0)
 
@@ -129,11 +135,17 @@ object Suburbs {
         for (front in fronts) {
             val inFront = min(setback, (across - depth) / 2)
             val acrossBy = front * (across / 2 - inFront - depth / 2)
+            // A row drawn far off as one box is one colour, so it keeps its colour as its houses come near.
+            var rowColour = -1
             for (lot in 0 until count) {
                 val alongBy = -along / 2 + end + width / 2 + lot * (width + inner)
                 val spot = spotAt(alongBy, acrossBy)
                 val wall = wallHeight(share) * (1 - WALL_SPREAD + 2 * WALL_SPREAD * chances.nextDouble())
-                val colour = walls[(chances.nextDouble() * walls.size).toInt().coerceAtMost(walls.size - 1)]
+                var colour = walls[(chances.nextDouble() * walls.size).toInt().coerceAtMost(walls.size - 1)]
+                if (share <= ROWS_UP_TO) {
+                    if (rowColour < 0) rowColour = colour
+                    colour = rowColour
+                }
                 val roof = ROOFS[(chances.nextDouble() * ROOFS.size).toInt().coerceAtMost(ROOFS.size - 1)]
                 val doorAt = (chances.nextDouble() - 0.5) * DOOR_SWAY * width
                 houses.add(House(TurnedBox(spot.x, spot.z, width, depth, turn), wall, colour, roof, front, doorAt))
