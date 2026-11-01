@@ -15,6 +15,8 @@ import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.asList
 import org.w3c.dom.events.Event
 import vancouvermonth.core.FirstMinute
+import vancouvermonth.save.MonthRecord
+import vancouvermonth.text.Continue
 import vancouvermonth.text.Transport
 
 /**
@@ -33,10 +35,11 @@ class BurnabyTownTest {
     }
 
     /**
-     * Plays seed 1011 from its room in [zone], with an exact guess, in a real town pinned to a phone's 375 by 812
-     * points; its life clock stands still, and a change of day takes [night] milliseconds.
+     * Opens seed 1011's game, keeping its month in [store] when there is one; its towns are real, their life clocks
+     * stand still, and a change of day takes [night] milliseconds.
      */
-    private fun startInZone(zone: Int, night: Double = 300.0): NeighbourhoodScene {
+    private fun openGame(night: Double, store: FakeStore? = null) {
+        root.innerHTML = ""
         val game = PhoneGame(root, 1011, playAgain = {}, makeWalkableTown = { homeZone ->
             val opened = assertNotNull(openWalkableTown(lessMotion = false, homeZone = homeZone), "No WebGL 2")
             (opened as NeighbourhoodScene).also {
@@ -45,8 +48,27 @@ class BurnabyTownTest {
                 town = it
             }
         })
+        if (store != null) game.slot = SaveSlot(Memory { store })
         game.talkSettleMillis = 0.0
         game.show()
+    }
+
+    /** Pins [town] to a phone's 375 by 812 points. */
+    private fun pinToPhone(town: NeighbourhoodScene) {
+        val element = town.element
+        element.style.setProperty("inset", "auto")
+        element.style.left = "0px"
+        element.style.top = "0px"
+        element.style.width = "375px"
+        element.style.height = "812px"
+    }
+
+    /**
+     * Plays seed 1011 from its room in [zone], with an exact guess, in a real town pinned to a phone's 375 by 812
+     * points; its life clock stands still, a change of day takes [night] milliseconds, and [store] keeps the month.
+     */
+    private fun startInZone(zone: Int, night: Double = 300.0, store: FakeStore? = null): NeighbourhoodScene {
+        openGame(night, store)
         passIntro(root)
         val first = FirstMinute(1011)
         val index = first.rooms.indexOfFirst { it.zone.number == zone }
@@ -56,14 +78,7 @@ class BurnabyTownTest {
         input.dispatchEvent(Event("input"))
         root.button("총비용 확인하기").click()
         root.button("시작하기").click()
-        val started = assertNotNull(town)
-        val element = started.element
-        element.style.setProperty("inset", "auto")
-        element.style.left = "0px"
-        element.style.top = "0px"
-        element.style.width = "375px"
-        element.style.height = "812px"
-        return started
+        return assertNotNull(town).also { pinToPhone(it) }
     }
 
     /** A step that waits: its name, when it is ready, and what it does. */
@@ -120,6 +135,38 @@ class BurnabyTownTest {
             },
             Step("the next morning", { !town.isChangingDay }) {
                 assertEquals(home.door, town.characterSpot)
+            },
+        )
+    }
+
+    @Test
+    fun `a month kept from a room in zone 2 goes on at 내 방 in Burnaby`(): Promise<Unit> {
+        val store = FakeStore()
+        val first = startInZone(2, store = store)
+        val home = Neighbourhood.home(2)
+        var again: NeighbourhoodScene? = null
+        return play(
+            Step("the first morning, then a day at 내 방", { first.isStill }) {
+                val name = root.querySelectorAll(".place-name").asList().map { it as HTMLElement }
+                    .first { it.textContent == Place.HOME.label }
+                name.click()
+                (root.querySelector(".talk .spend") as HTMLElement).click()
+            },
+            Step("the next morning, kept; the page opens again and goes on", { !first.isChangingDay }) {
+                val kept = assertNotNull(MonthRecord.decode(store.items[SaveSlot.KEY]), "nothing kept")
+                assertTrue(kept.days.isNotEmpty(), "the day was not kept")
+                first.close()
+                town = null
+                openGame(300.0, store)
+                root.button(Continue.CONTINUE).click()
+                again = assertNotNull(town, "no town on going on").also { pinToPhone(it) }
+                assertTrue(again !== first, "the same town")
+            },
+            Step("the kept month's morning", { again!!.isStill }) {
+                val town = again!!
+                assertEquals(2, town.homeZone)
+                assertEquals(home.door, town.characterSpot)
+                assertEquals("지도: 내 방 근처", town.minimapElement.getAttribute("aria-label"))
             },
         )
     }
