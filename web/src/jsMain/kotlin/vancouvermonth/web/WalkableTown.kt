@@ -458,7 +458,10 @@ internal class NeighbourhoodScene(
     internal var pageHidden: () -> Boolean = { document.asDynamic().hidden == true }
     private val lessMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
 
-    /** True when the phone asks for less motion now. A test may set it. */
+    /**
+     * True when the phone asks for less motion now: the one switch for the town's own life, the time passing, the night
+     * and the underground. A test may set it.
+     */
     internal var asksLessMotion: () -> Boolean = { lessMotion.matches }
 
     private val pace = FramePace(openedAt = window.performance.now())
@@ -1118,7 +1121,7 @@ internal class NeighbourhoodScene(
         // The player's own view comes back in the morning.
         if (viewBeforeRest == null) viewBeforeRest = Triple(view.yaw, view.pitch, view.distance)
         view.aim(FIRESIDE_TURN, FIRESIDE_TILT, FIRESIDE_DISTANCE)
-        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        if (asksLessMotion()) {
             // The phone asks for less motion, so the night passes at once.
             goHome(jump = true)
             morning()
@@ -1131,7 +1134,7 @@ internal class NeighbourhoodScene(
 
     override fun passTime(share: Double) {
         if (nightFell != null) return
-        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        if (asksLessMotion()) {
             showTime(share)
             return
         }

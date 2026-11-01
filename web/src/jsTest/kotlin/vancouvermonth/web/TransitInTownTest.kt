@@ -428,6 +428,20 @@ class TransitInTownTest {
     }
 
     @Test
+    fun `the town's one switch for less motion passes the time and the night at once, as the phone's does`() {
+        val town = opened()
+        town.asksLessMotion = { true }
+        var mornings = 0
+        town.onMorning = { mornings += 1 }
+        town.passTime(0.5)
+        assertFalse(town.isPassingTime, "the time was passing slowly")
+        assertEquals(0.5, town.timeShown)
+        town.endDay()
+        assertFalse(town.isChangingDay, "the night was falling slowly")
+        assertEquals(1, mornings)
+    }
+
+    @Test
     fun `내리기 lets the character out of the taxi on the street, where a tap walks it on`(): Promise<Unit> {
         val town = startInTown()
         val route = Neighbourhood.grid.route(Neighbourhood.venue(Place.HOME).door, Neighbourhood.shop.door)
