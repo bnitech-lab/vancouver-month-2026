@@ -74,7 +74,10 @@ class HomeSite private constructor(val zone: Int) {
     init {
         val person = Cell(floor(home.person.x).toInt(), floor(home.person.z).toInt())
         val standing = Neighbourhood.open.with(parts.footprints + person)
-        val walledIn = standing.cutOffFrom(standing.cellAt(home.door))
+        // Reached from 내 방's door, or the free square nearest it should the door's square ever be blocked, so the
+        // ground is never all walled in.
+        val door = standing.nearestFree(standing.cellAt(home.door)) ?: error("Zone $zone has no ground to walk on")
+        val walledIn = standing.cutOffFrom(door)
         pockets = walledIn.size
         pocketsInCorner = walledIn.count { it.x < Neighbourhood.TOWN_COLUMNS }
         grid = standing.with(walledIn)
