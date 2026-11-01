@@ -55,16 +55,20 @@ fetch_layer() {
             echo "$1: the server answered with an error" >&2
             exit 1
         fi
+        # Carry on from the last feature this page gave, while the server says there are more.
+        count=$(grep -o '"type" *: *"Feature"' "$file" | wc -l | tr -d ' ')
         grep -q '"exceededTransferLimit" *: *true' "$file" || break
+        [ "$count" -gt 0 ] || break
         page=$((page + 1))
-        offset=$((offset + 1000))
+        offset=$((offset + count))
     done
 }
 fetch_layer burnaby-boundary OpenData3/MapServer/12 OBJECTID "1=1"
 fetch_layer skytrain OpenData5/MapServer/11 NAME "1=1"
 fetch_layer skytrain-station OpenData5/MapServer/10 NAME "1=1"
-fetch_layer community-plan-areas OpenData1/MapServer/10 NAME "1=1"
-fetch_layer park-inventory OpenData1/MapServer/6 "NAME,CLASSIFICATION" "1=1" envelope
+# The plan areas by their OBJECTID only: the zones are picked by it.
+fetch_layer community-plan-areas OpenData1/MapServer/10 OBJECTID "1=1"
+fetch_layer park-inventory OpenData1/MapServer/6 NAME "1=1" envelope
 # Burnaby's main streets: its arterials and major collectors, about what Vancouver calls arterial and secondary arterial.
 fetch_layer street OpenData5/MapServer/8 STREETCLASS_desc \
     "STREETCLASS_desc IN ('Arterial Primary', 'Arterial Secondary', 'Major Collector Primary', 'Major Collector Secondary')" \
