@@ -130,6 +130,15 @@ class BurnabyTownTest {
                 assertTrue(town.trainStand > SkyTrainRun.STAND)
                 // Downtown is far off: 회사 is an arrow on the small map's edge.
                 assertTrue(Place.OFFICE in town.minimapPointsTo, "${town.minimapPointsTo}")
+                // Its name is lost in the haze: out of sight, out of the Tab order, and hidden from a screen reader.
+                val names = root.querySelectorAll(".place-name").asList().map { it as HTMLElement }
+                val office = names.first { it.textContent == Place.OFFICE.label }
+                assertTrue(office.classList.contains("behind"))
+                assertEquals(-1, office.tabIndex)
+                assertEquals("true", office.getAttribute("aria-hidden"))
+                val homeName = names.first { it.textContent == Place.HOME.label }
+                assertEquals(0, homeName.tabIndex)
+                assertNull(homeName.getAttribute("aria-hidden"))
                 town.walkFor(TransitLines.stations[7].door)
             },
             Step("walked toward the station, the day ends", { town.tripMillis == null && town.isStill }) {
