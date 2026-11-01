@@ -57,8 +57,9 @@ fun guessExamplesLine(): String = listOf(0, 100, 250).joinToString(", ") { gap -
     if (gap == 0) "딱 맞히면 $amount" else "${money(gap)} 틀리면 $amount"
 }
 
-/** One plain line under the guess's money: why a guess [gap] dollars off wins or loses [amount]. */
-fun guessMoneyWhy(gap: Int, amount: Int): String {
+/** One plain line under the guess's money: why a guess [gap] dollars off wins or loses what it does. */
+fun guessMoneyWhy(gap: Int): String {
+    val amount = FirstMinute.guessMoney(gap)
     val reward = money(FirstMinute.GUESS_REWARD)
     return when {
         gap == 0 -> "딱 맞혀서 ${reward}을 다 받아요."
@@ -72,7 +73,7 @@ fun guessMoneyWhy(gap: Int, amount: Int): String {
 /** The balance September starts with, after the first month's total and the guess's money. */
 fun startBalanceLine(balance: Int): String = "9월을 시작하는 잔고 ${money(balance)}"
 
-/** The month's goal, as the first screen, the month's start and the town's first guide all say it. */
+/** The month's goal, as the intro's story, the month's start and the "?" card on how to play all say it. */
 fun goalLine(): String = "목표: ${date(Month.LAST_DAY)}까지 취업 제안 받기"
 
 /**

@@ -157,7 +157,7 @@ h2 {
   font-variant-numeric: tabular-nums;
 }
 
-/* The arrival story, kept small so the rooms stay on a phone's first screen */
+/* The arrival story on the intro, kept small so how to play starts on a phone's first screen */
 
 .story {
   padding: 10px 14px;
@@ -397,11 +397,11 @@ a:focus-visible {
   white-space: nowrap;
 }
 
-.guess-money.reward .guess-money-amount {
+.guess-money-reward .guess-money-amount {
   color: var(--accent);
 }
 
-.guess-money.penalty .guess-money-amount {
+.guess-money-penalty .guess-money-amount {
   color: var(--warn);
 }
 
@@ -496,6 +496,11 @@ a:focus-visible {
   margin: 4px 0 12px;
   font-size: 14px;
   color: var(--muted);
+}
+
+/* On the intro the kept month's buttons are in the bar at the foot, so the card ends at the note. */
+.kept .kept-note {
+  margin-bottom: 0;
 }
 
 .kept-buttons {

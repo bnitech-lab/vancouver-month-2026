@@ -123,7 +123,7 @@ class TerminalGame(
     private fun showOpening(month: Month) {
         for (event in month.opening) {
             line("  " + eventLine(event, month))
-            if (event is Event.Guessed) line("  ${guessMoneyWhy(event.gap, event.amount)}")
+            if (event is Event.Guessed) line("  ${guessMoneyWhy(event.gap)}")
         }
         line()
     }

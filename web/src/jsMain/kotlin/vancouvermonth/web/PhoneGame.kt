@@ -175,7 +175,7 @@ class PhoneGame private constructor(
     /** The sound switch, and the sounds of a talk and of the change of day; null for a game with no sound. */
     internal var sound: Sound? = null
 
-    /** The card on how to play, shown the first time the town opens; null for none. */
+    /** The card on how to play, opened from the "?" in the town's top card; null for none. */
     internal var guide: FirstRunGuide? = null
 
     /** The update news, from a button by the title and at the button screen's foot; null for none. */
@@ -398,11 +398,11 @@ class PhoneGame private constructor(
             child("p", "month-cost", monthCostLine(game, reveal))
             // What the guess wins or loses as the month starts, why, and the balance September starts with.
             val money = reveal.guessMoney
-            child("p", "guess-money ${if (money < 0) "penalty" else "reward"}") {
+            child("p", "guess-money ${if (money < 0) "guess-money-penalty" else "guess-money-reward"}") {
                 child("span", "guess-money-label", guessMoneyLabel(money))
                 child("span", "guess-money-amount", signedMoney(money))
             }
-            child("p", "guess-why", guessMoneyWhy(reveal.guessGap, money))
+            child("p", "guess-why", guessMoneyWhy(reveal.guessGap))
             child("p", "left", startBalanceLine(reveal.balanceAtStart))
         }
         root.child("section", "card start") {

@@ -273,9 +273,7 @@ class KoreanTest {
 
     @Test
     fun `the plain line under the guess's money says why, at every edge of the rule`() {
-        val lines = listOf(0, 1, 45, 99, 100, 101, 250, 399, 400, 10_000).associateWith { gap ->
-            guessMoneyWhy(gap, FirstMinute.guessMoney(gap))
-        }
+        val lines = listOf(0, 1, 45, 99, 100, 101, 250, 399, 400, 10_000).associateWith { gap -> guessMoneyWhy(gap) }
         assertEquals("딱 맞혀서 \$100을 다 받아요.", lines[0])
         for (gap in listOf(1, 45, 99)) assertEquals("\$100에서 틀린 만큼 빼고 받아요.", lines[gap])
         assertEquals("\$100만큼 틀려서 받지도 잃지도 않아요.", lines[100])
