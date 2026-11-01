@@ -381,15 +381,15 @@ The page has a calm background tune of its own, made entirely in code with the W
 samples, nothing downloaded. It is written by rules, not copied from any game or song: a music-box melody in F major
 pentatonic over soft chords and a low note, at 70 beats a minute, in a loop of 16 bars shaped like a short song
 (A A' B A''). The theme comes from a fixed seed, and each pass through the loop changes a few notes a little, so it
-never repeats exactly. The player's own clock colours it: the whole tune by day (from 6:00), a softer, sparser and
-darker one in the evening (from 18:00), and at night (from 22:00) only a quiet bed of soft noise that rises and falls
-like the sea, under a few slow notes. A talk opens with a soft blip, a line types out with very quiet ticks (at most
+never repeats exactly. The clock colours it, the month's own while a month is played and the phone's on the screens
+around it: the whole tune by day (from 6:00), a softer, sparser and darker one in the evening (from 18:00), and at
+night (from 22:00) only a quiet bed of soft noise that rises and falls like the sea, under a few slow notes. A talk opens with a soft blip, a line types out with very quiet ticks (at most
 one every 110 ms), and the change of day rings a gentle chime.
 
 The town has sounds of its own, made from noise in code in the same way. On a rainy day a soft bed of rain plays under
 the tune, well below its loudest notes. The SkyTrain rumbles softly as it pulls out and comes in, louder the nearer it is
 to the camera and silent while it stands at the station. The campfire crackles quietly when the character is near it
-after dark, in the town's own night or late on the player's clock. They follow the same switch, fade and limiter as
+after dark, in the town's own evening and night. They follow the same switch, fade and limiter as
 the tune.
 
 Sound is off until the player turns it on with the switch in the town's top card, at the top of the button screen, and

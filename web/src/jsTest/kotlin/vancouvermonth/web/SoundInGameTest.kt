@@ -1,9 +1,11 @@
 package vancouvermonth.web
 
+import kotlin.js.Date
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.browser.document
 import org.w3c.dom.HTMLButtonElement
@@ -164,6 +166,26 @@ class SoundInGameTest {
         town.onPlace(Place.HOME)
         (root.querySelector(".talk .spend") as HTMLButtonElement).click()
         assertEquals(listOf("on", "blip", "blip", "chime"), speaker.asked.filter { it != "tick" })
+    }
+
+    @Test
+    fun `the tune keeps the month's own time while a month is played, and the phone's around it`() {
+        val game = PhoneGame(root, 1011, playAgain = {})
+        game.sound = sound
+        game.show()
+        assertNull(sound.gameHour(), "a month's hour on the intro")
+        val before = Date().getHours()
+        val hour = sound.hour()
+        assertTrue(hour == before || hour == Date().getHours(), "not the phone's hour: $hour")
+        startSeed1011(root)
+        assertEquals(8, sound.hour())
+        root.button("영어 공부").click()
+        assertEquals(14, sound.hour())
+        root.button("카페 알바").click()
+        assertEquals(23, sound.hour())
+        assertEquals(Mood.NIGHT, moodAt(sound.hour()))
+        root.button("자기").click()
+        assertEquals(8, sound.hour())
     }
 
     @Test

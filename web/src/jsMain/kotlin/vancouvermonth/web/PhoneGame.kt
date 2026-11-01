@@ -176,8 +176,15 @@ class PhoneGame private constructor(
     /** What takes the focus once the screen is drawn again: a talk that opened, or the day's log after an answer. */
     private var focusNext: String? = null
 
-    /** The sound switch, and the sounds of a talk and of the change of day; null for a game with no sound. */
+    /**
+     * The sound switch, and the sounds of a talk and of the change of day; null for a game with no sound. Its tune keeps
+     * the month's own time while a month is played.
+     */
     internal var sound: Sound? = null
+        set(value) {
+            field = value
+            value?.gameHour = { clockHour() }
+        }
 
     /** The card on how to play, opened from the "?" in the town's top card; null for none. */
     internal var guide: FirstRunGuide? = null
@@ -737,6 +744,9 @@ class PhoneGame private constructor(
         show()
         window.scrollTo(0.0, 0.0)
     }
+
+    /** The hour on the month's own clock while a month is played, or null around it. */
+    private fun clockHour(): Int? = month?.takeIf { !it.isOver }?.hour
 
     /** The ending has no town, so the town lets go of its drawing. */
     private fun closeTown() {
