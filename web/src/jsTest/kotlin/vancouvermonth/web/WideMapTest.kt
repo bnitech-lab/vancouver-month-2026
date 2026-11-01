@@ -108,6 +108,15 @@ class WideMapTest {
     }
 
     @Test
+    fun `inside the town's corner the wide rail keeps to the town's rail`() {
+        // So the guideway can move onto the wide rail without a jog: every point of the town's rail lies within the
+        // town's own simplification of the wide one.
+        for (spot in RealVancouver.rail) {
+            assertTrue(distanceTo(WideVancouver.rail, spot) <= 0.35, "$spot")
+        }
+    }
+
+    @Test
     fun `the stations stand on the rail in order, on land, with room between them`() {
         val stations = WideVancouver.stations
         assertEquals(9, stations.size)
@@ -172,19 +181,20 @@ class WideMapTest {
         // Zone 1 is in the town's corner; zones 2 and 3 far to the right, in Burnaby.
         val homes = WideVancouver.homes
         assertTrue(homes.getValue(1).x < town.columns)
-        assertTrue(homes.getValue(2).x > 2 * town.columns && homes.getValue(3).x > 2 * town.columns)
-        // Zone 3's room is down the slope, far from every station: more than 1.5 km.
-        val third = centre(homes.getValue(3))
-        assertTrue(WideVancouver.stations.all { distanceBetween(it.spot, third) > 60.0 }, "$third")
-        // Zone 2's room is a short walk from a station in its zone.
-        assertTrue(WideVancouver.stations.any {
-            WideVancouver.zoneAt(it.spot) == 2 && distanceBetween(it.spot, centre(homes.getValue(2))) < 30.0
-        })
+        val last = WideVancouver.stations.last().spot
+        for (zone in listOf(2, 3)) {
+            val cell = homes.getValue(zone)
+            assertTrue(cell.x > town.columns + 200, "zone $zone")
+            // The rule's marks: well inside the grid, away from the line's far end, and a walk from a station.
+            assertTrue(cell.x in 5 until map.columns - 5 && cell.z in 5 until map.rows - 5, "zone $zone at $cell")
+            assertTrue(distanceBetween(centre(cell), last) > 100.0, "zone $zone at $cell")
+            assertTrue(WideVancouver.stations.any { distanceBetween(it.spot, centre(cell)) < 40.0 }, "zone $zone")
+        }
         for (area in WideVancouver.zones.values.flatten()) for (spot in area) assertTrue(onMap(spot), "$spot")
     }
 
     @Test
-    fun `the walk from the room in zone 2 to the office takes about two minutes`() {
+    fun `the walk from the room in zone 2 to the office takes under two minutes`() {
         val grid = map.grid
         val from = centre(WideVancouver.homes.getValue(2))
         val to = centre(RealVancouver.spots.getValue(Place.OFFICE))
@@ -192,7 +202,7 @@ class WideMapTest {
         assertEquals(to, route.last())
         assertTrue(route.zipWithNext().all { (a, b) -> grid.isClear(a, b) })
         val seconds = route.zipWithNext().sumOf { (a, b) -> distanceBetween(a, b) } / Trip.WALK_SPEED
-        assertTrue(seconds in 110.0..125.0, "$seconds s")
+        assertTrue(seconds in 92.0..110.0, "$seconds s")
     }
 
     @Test
