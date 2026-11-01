@@ -128,7 +128,8 @@ private class TownScene(private val canvas: HTMLCanvasElement, context: Renderin
             val spot = TownCamera.framePoint(building.labelAnchor)
             val label = document.createElement("span") as HTMLElement
             label.className = "town-label"
-            label.textContent = building.place.label
+            // The picture has one building of each kind, so each goes by its kind's word.
+            label.textContent = building.place.kind.label
             label.style.left = "${spot.left * 100}%"
             label.style.top = "${spot.top * 100}%"
             element.appendChild(label)
@@ -152,9 +153,9 @@ private class TownScene(private val canvas: HTMLCanvasElement, context: Renderin
         askForFrame()
     }
 
-    /** Marks the name of the building where the day goes, and only that one. */
+    /** Marks the name of the building of the kind where the day goes, and only that one. */
     private fun highlight(place: Place) {
-        for ((labelPlace, label) in labels) label.classList.toggle("here", labelPlace == place)
+        for ((labelPlace, label) in labels) label.classList.toggle("here", labelPlace.kind == place.kind)
     }
 
     override fun close() {

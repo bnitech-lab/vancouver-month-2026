@@ -372,7 +372,7 @@ class TownLifeTest {
             for (x in listOf(puddle.x, puddle.x + puddle.width)) {
                 for (z in listOf(puddle.z, puddle.z + puddle.depth)) {
                     val cell = grid.cellAt(Spot(x, z))
-                    assertTrue(grid.isFree(cell) && RealVancouver.map.terrainAt(cell) == Terrain.LAND, "$puddle")
+                    assertTrue(grid.isFree(cell) && Neighbourhood.map.terrainAt(cell) == Terrain.LAND, "$puddle")
                 }
             }
             assertTrue(Neighbourhood.venues.any { distanceBetween(it.door, Spot(puddle.x, puddle.z)) < 5.0 })

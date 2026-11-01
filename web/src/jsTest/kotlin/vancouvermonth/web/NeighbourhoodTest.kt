@@ -53,7 +53,10 @@ class NeighbourhoodTest {
         assertEquals(Townsperson.LEO, personAt(Place.LIBRARY))
         assertEquals(Townsperson.SUJIN, personAt(Place.COWORKING))
         assertEquals(Townsperson.MARCUS, personAt(Place.OFFICE))
-        for (place in Place.entries) assertEquals(place, placeFor(actionAt(place)))
+        for (place in Place.entries) {
+            assertEquals(place, placeFor(actionAt(place), place.number))
+            assertEquals(actionAt(place), personAt(place).offers)
+        }
         assertEquals(Action.REST, actionAt(Place.HOME))
     }
 
@@ -76,7 +79,7 @@ class NeighbourhoodTest {
     }
 
     @Test
-    fun `the camera keeps out of the five buildings and the others`() {
+    fun `the camera keeps out of the places' buildings and the others`() {
         assertEquals(Place.entries.toSet(), Neighbourhood.walls.mapNotNull { it.place }.toSet())
         assertTrue(Neighbourhood.walls.count { it.place == null } > 0)
     }
@@ -182,8 +185,8 @@ class NeighbourhoodTest {
     }
 
     @Test
-    fun `the farthest walk between two places, along the streets, takes no more than 35 seconds`() {
-        val spots = venues.flatMap { listOf(it.door, it.talkSpot) }
+    fun `the farthest walk between two of downtown's places, along the streets, takes no more than 35 seconds`() {
+        val spots = venues.filter { it.x < Neighbourhood.TOWN_COLUMNS }.flatMap { listOf(it.door, it.talkSpot) }
         val seconds = spots.flatMapIndexed { index, a ->
             spots.drop(index + 1).map { b ->
                 town.route(a, b).zipWithNext { p, q -> hypot(q.x - p.x, q.z - p.z) }.sum() / Trip.WALK_SPEED
@@ -193,9 +196,9 @@ class NeighbourhoodTest {
     }
 
     @Test
-    fun `each place stands on open land near the square proposed for it on the real map`() {
+    fun `each of downtown's places stands on open land near the square proposed for it on the real map`() {
         val map = RealVancouver.map
-        for (venue in venues) {
+        for (venue in venues.filter { it.place in RealVancouver.spots }) {
             val proposed = RealVancouver.spots.getValue(venue.place)
             val middle = Spot(venue.x + venue.width / 2.0, venue.z + venue.depth / 2.0)
             assertTrue(distanceBetween(middle, map.grid.centreOf(proposed)) < 7.0, "${venue.place} at $middle")

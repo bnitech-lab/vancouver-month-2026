@@ -4,6 +4,7 @@ import kotlin.js.Date
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import vancouvermonth.core.TaxiFare
 
@@ -13,6 +14,10 @@ import vancouvermonth.core.TaxiFare
  */
 class HomeSiteTest {
     private fun length(route: List<Spot>): Double = route.zipWithNext { a, b -> distanceBetween(a, b) }.sum()
+
+    /** What a way square by square costs: 1 for a straight step, the square root of 2 for a slanted one. */
+    private fun cost(cells: List<Cell>): Double =
+        cells.zipWithNext { a, b -> if (a.x != b.x && a.z != b.z) kotlin.math.sqrt(2.0) else 1.0 }.sum()
 
     @Test
     fun `the town stands on the wide map, its corner as it always was`() {
@@ -139,14 +144,19 @@ class HomeSiteTest {
             val places = TransitLines.taxiStopsFor(zone)
             assertEquals(TransitLines.taxiStops.map { it.first }, places.map { it.first })
             assertEquals(site.home.door, places.first().second)
-            // One search for all of them finds the same ways as one search each, near enough.
-            val ways = site.grid.routes(site.home.door, places.map { it.second })
+            // One search for all of them finds ways as cheap as one search each, square by square: the two may pick
+            // different squares among ways of the same cost, which then straighten a little differently (zone 2's way
+            // to 큰 공원 도서관 by 4.4%), so it is the squares' cost that is the same, and straightening never lengthens it.
+            val targets = places.map { it.second }
+            val ways = site.grid.routes(site.home.door, targets)
+            val squares = site.grid.cellRoutes(site.home.door, targets)
             for ((index, way) in ways.withIndex()) {
                 val (name, spot) = places[index]
                 if (spot == site.home.door) continue
                 assertEquals(spot, way.last(), "zone $zone to $name")
-                val alone = length(site.grid.route(site.home.door, spot))
-                assertTrue(length(way) in alone * 0.97..alone * 1.03, "zone $zone to $name: ${length(way)} against $alone")
+                val alone = assertNotNull(site.grid.cellRoute(site.home.door, spot), "zone $zone to $name")
+                assertEquals(cost(alone), cost(squares[index]), 1e-9, "zone $zone to $name")
+                assertTrue(length(way) <= cost(squares[index]) + 1.5, "zone $zone to $name: ${length(way)}")
                 assertTrue(TaxiFare.forDistance(length(way)) < TaxiFare.MOST, "zone $zone to $name")
             }
         }

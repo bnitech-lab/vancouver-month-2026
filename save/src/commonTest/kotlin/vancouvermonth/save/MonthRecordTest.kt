@@ -64,6 +64,31 @@ class MonthRecordTest {
     }
 
     @Test
+    fun `where an action was taken is a digit after its letter, left out at the first place of its kind`() {
+        val elsewhere = listOf(Choice.Take(Action.WORK, 2), rest, english, Choice.Take(Action.PRACTISE_CODING, 1), rest)
+        val applied = MonthRecord(1011, null, 2, 1165, elsewhere).after(Choice.Take(Action.APPLY, 2))
+        assertEquals("4|1011||2|1165|W2REC1RA2", applied.encode())
+        assertEquals(applied, MonthRecord.decode(applied.encode()))
+        // The interview is held where the last application went: the first office before any went elsewhere.
+        assertEquals(2, applied.appliedAt)
+        assertEquals(0, MonthRecord(1011, null, 2, 1165, listOf(Choice.Take(Action.APPLY, 1), rest, apply)).appliedAt)
+        assertEquals(0, MonthRecord(1011, null, 2, 1165).appliedAt)
+        // A line written before the places came, with no digits, reads as every action at the first of its kind.
+        val old = assertNotNull(MonthRecord.decode("4|1011||2|1165|WECRAI"))
+        assertTrue(old.choices.all { it !is Choice.Take || it.at == 0 })
+        assertEquals(0, old.appliedAt)
+        // Where an action was taken changes nothing in the rules: the same month as at the first places.
+        val first = MonthRecord(1011, null, 2, 1165, elsewhere.map { (it as Choice.Take).copy(at = 0) })
+        val played = assertNotNull(MonthRecord(1011, null, 2, 1165, elsewhere).replay()).month
+        assertEquals(assertNotNull(first.replay()).month.state(), played.state())
+        assertEquals(4, played.day)
+        // No place after sleep or the interview, no 0 written out, one digit only.
+        for (text in listOf("4|1011||2|1165|R1", "4|1011||2|1165|I2", "4|1011||2|1165|A0", "4|1011||2|1165|A12")) {
+            assertNull(MonthRecord.decode(text), "Read as a record: $text")
+        }
+    }
+
+    @Test
     fun `a line this version did not write is not a record`() {
         val good = "4|1011||2|1165|ECRA"
         assertNotNull(MonthRecord.decode(good))

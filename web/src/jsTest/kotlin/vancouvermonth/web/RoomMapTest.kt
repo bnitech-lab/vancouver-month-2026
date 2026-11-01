@@ -159,24 +159,56 @@ class RoomMapTest {
     }
 
     @Test
-    fun `회사 and 카페 are named on the map, clear of every pin and of each other`() {
-        for (width in listOf(343, 288)) {
-            val holder = (document.createElement("div") as HTMLElement).also { it.style.width = "${width}px" }
+    fun `every 회사 and 카페 is named on the map, clear of every pin and of each other, at every phone width`() {
+        // Three offices and three cafés, downtown, in East Vancouver and in Burnaby.
+        assertEquals(6, RoomMap.NAMED.size)
+        assertEquals(setOf(PlaceKind.OFFICE, PlaceKind.CAFE), RoomMap.NAMED.map { it.kind }.toSet())
+        // A run deals one room in each zone, shuffled, so the pins stand at the same three doors and only their numbers
+        // and the order they are pushed apart in change: seed 1011, and two runs dealing the zones in other orders.
+        val orders = mutableMapOf<List<Int>, Int>()
+        for (seed in listOf(1011) + (1000..1100)) {
+            val zones = FirstMinute(seed).rooms.map { it.zone.number }
+            if (zones !in orders) orders[zones] = seed
+            if (orders.size == 3) break
+        }
+        assertEquals(3, orders.size)
+        for (seed in orders.values) {
+            val holder = (document.createElement("div") as HTMLElement)
             root.appendChild(holder)
-            val map = RoomMap(FirstMinute(1011).rooms, null, false) {}
+            val map = RoomMap(FirstMinute(seed).rooms, null, false) {}
             holder.appendChild(map.element)
-            map.paint()
-            assertTrue(map.painted)
-            assertEquals(RoomMap.NAMED.toSet(), map.names.keys, "Not both named at $width")
-            for ((place, box) in map.names) {
-                for (at in map.pins.indices) {
-                    val under = RoomMap.covers(box, map.pinLeft[at], map.pinTop[at], RoomMap.PIN / 2.0)
-                    assertFalse(under, "$place under pin ${at + 1} at $width")
+            // The column's width on every phone: 288 px on a 320-point one up to the page's widest, 448 px.
+            for (width in 288..448 step 4) {
+                holder.style.width = "${width}px"
+                map.paint()
+                assertTrue(map.painted)
+                assertEquals(RoomMap.NAMED.toSet(), map.names.keys, "seed $seed: not all named at $width")
+                for ((place, box) in map.names) {
+                    val inside = box[0] >= 0.0 && box[1] >= 0.0 && box[2] <= width && box[3] <= map.element.clientHeight
+                    assertTrue(inside, "seed $seed: $place off the map at $width")
+                    for (at in map.pins.indices) {
+                        val under = RoomMap.covers(box, map.pinLeft[at], map.pinTop[at], RoomMap.PIN / 2.0)
+                        assertFalse(under, "seed $seed: $place under pin ${at + 1} at $width")
+                    }
+                }
+                // A line to a moved name never leads into a pin: from a dot under one it starts at the pin's rim.
+                for ((place, start) in map.leaderStarts) {
+                    for (at in map.pins.indices) {
+                        val into = hypot(start[0] - map.pinLeft[at], start[1] - map.pinTop[at])
+                        assertTrue(into >= RoomMap.PIN / 2.0 - 0.01, "seed $seed: $place's line starts in pin ${at + 1} at $width")
+                    }
+                }
+                val boxes = map.names.entries.toList()
+                for ((index, a) in boxes.withIndex()) {
+                    for (b in boxes.drop(index + 1)) {
+                        val one = a.value
+                        val two = b.value
+                        val overlap = one[0] < two[2] && two[0] < one[2] && one[1] < two[3] && two[1] < one[3]
+                        assertFalse(overlap, "seed $seed: ${a.key} and ${b.key} overlap at $width")
+                    }
                 }
             }
-            val (office, cafe) = RoomMap.NAMED.map { map.names.getValue(it) }
-            val overlap = office[0] < cafe[2] && cafe[0] < office[2] && office[1] < cafe[3] && cafe[1] < office[3]
-            assertFalse(overlap, "회사 and 카페 overlap at $width")
+            map.close()
             holder.remove()
         }
     }

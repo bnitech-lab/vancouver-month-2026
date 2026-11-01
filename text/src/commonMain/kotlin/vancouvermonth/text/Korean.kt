@@ -293,6 +293,27 @@ fun todaysRunResult(run: TodaysRun, guessMoney: Int, ending: Ending, day: Int): 
     return "밴쿠버 한 달 · ${todaysRunName(run)} · ${guessMoneyLabel(guessMoney)} ${signedMoney(guessMoney)} · $result"
 }
 
+/**
+ * On the top card on an interview day, where to go: "오늘은 면접 날이에요. 항구 회사로 가세요." [office] is the name of
+ * the office applied at, followed by 로 or 으로 as its last syllable asks ([towardParticle]).
+ */
+fun interviewDayLine(office: String): String = "오늘은 면접 날이에요. $office${towardParticle(office)} 가세요."
+
+/**
+ * The particle for "to" after [word]: 으로 after a syllable ending in a consonant other than ㄹ (도서관으로), 로 after a
+ * vowel or ㄹ (회사로, 큰길로) and after anything but a Hangul syllable.
+ */
+fun towardParticle(word: String): String {
+    val last = word.lastOrNull() ?: return "로"
+    if (last !in '가'..'힣') return "로"
+    val final = (last - '가') % FINALS
+    return if (final == 0 || final == FINAL_RIEUL) "로" else "으로"
+}
+
+/** How many endings a Hangul syllable can have (none, then 27 consonants), and which of them is ㄹ. */
+private const val FINALS = 28
+private const val FINAL_RIEUL = 8
+
 fun stageName(stage: InterviewStage): String = when (stage) {
     InterviewStage.PHONE_SCREEN -> "1차 영어 면접"
     InterviewStage.TECHNICAL -> "2차 기술 면접"

@@ -14,7 +14,7 @@ import vancouvermonth.web.Neighbourhood.REACH
 internal class HomeParts(val blocks: List<Block>, val glowing: List<Block>, val footprints: List<Cell>)
 
 /**
- * The town as the player lives in it for a room in [zone]: the five places with 내 방 where the room is
+ * The town as the player lives in it for a room in [zone]: the places with 내 방 where the room is
  * ([Neighbourhood.homes]), its garden, bench and campfire with it and its neighbour at its door, and the ground to walk
  * on with them. Everything else is the same in every zone ([Neighbourhood]). Each zone's is made once, when first asked.
  */
@@ -22,7 +22,7 @@ class HomeSite private constructor(val zone: Int) {
     /** 내 방 for this zone. */
     val home: Venue = Neighbourhood.home(zone)
 
-    /** The five places, this zone's 내 방 among them, in [Neighbourhood.venues]' order. */
+    /** The places, this zone's 내 방 among them, in [Neighbourhood.venues]' order. */
     val venues: List<Venue> = Neighbourhood.venues.map { if (it.place == Place.HOME) home else it }
 
     fun venue(place: Place): Venue = venues.first { it.place == place }
@@ -56,7 +56,7 @@ class HomeSite private constructor(val zone: Int) {
     } + Wall(Block(Neighbourhood.shop.keeper.x - 0.4, 0.0, Neighbourhood.shop.keeper.z - 0.4, 0.8, 1.8, 0.8, 0), null, shop = true)
 
     /**
-     * What a tap stops at: the buildings (the five places among them), the SkyTrain deck, the stations and their roofs,
+     * What a tap stops at: the buildings (the places among them), the SkyTrain deck, the stations and their roofs,
      * the tunnel's mouth, the café's awning and the office's canopy, and the city's buildings, which fold down out of the
      * camera's way ([Neighbourhood.foldables]) where the camera stays out of the rest.
      */

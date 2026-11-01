@@ -46,6 +46,7 @@ import vancouvermonth.text.guessLine
 import vancouvermonth.text.guessMoneyLabel
 import vancouvermonth.text.guessMoneyWhy
 import vancouvermonth.text.guessRuleLine
+import vancouvermonth.text.interviewDayLine
 import vancouvermonth.text.keyword
 import vancouvermonth.text.money
 import vancouvermonth.text.monthCostLine
@@ -151,10 +152,12 @@ class PhoneGame private constructor(
 
     /**
      * Where to go, open over the town: on [choosing] from stop [choosingFrom] (-1 for a taxi from where the character
-     * stands), with each taxi fare worked out as it opened (null where no taxi goes). Null when it is closed.
+     * stands), with the way to each place a taxi goes and its fare worked out as it opened (null where no taxi goes),
+     * the card listing them nearest first. Null when it is closed.
      */
     private var choosing: Transport? = null
     private var choosingFrom = -1
+    private var taxiWays: List<Double?> = emptyList()
     private var taxiFares: List<Int?> = emptyList()
 
     /** What the ride under way cost, for the top card; null on the month's pass. */
@@ -166,6 +169,7 @@ class PhoneGame private constructor(
      * and what the shared ride under way cost, for the top card.
      */
     private var renting: Ride? = null
+    private var rideWays: List<Double?> = emptyList()
     private var rideFares: List<Int?> = emptyList()
     private var ridePaid: Int? = null
 
@@ -223,6 +227,10 @@ class PhoneGame private constructor(
     private var record: MonthRecord? = null
     private var kept: KeptMonth? = null
     private var keptRead = false
+
+    /** The office the last application went to, where an interview it booked is held: kept in the record. */
+    private val interviewPlace: Place
+        get() = placeFor(Action.APPLY, record?.appliedAt ?: 0)
 
     /**
      * True when the page took the kept month's run because its address named none: 새로 시작 then plays a new run, as
@@ -575,9 +583,13 @@ class PhoneGame private constructor(
         }
         // What was bought is the month's own; what was spent today goes into today's log, as if never closed.
         spentToday = offer.replayed.spentToday
-        // Who was met is not kept, but the people of the places where time was spent know the player by now.
+        // Who was met is not kept, but the people of the places where time was spent know the player by now: where each
+        // action was taken, and each interview at the office applied at before it.
+        var applied = placeFor(Action.APPLY)
         for (choice in record.choices) {
-            met += personAt(if (choice is Choice.Take) placeFor(choice.action) else INTERVIEW_PLACE)
+            val place = if (choice is Choice.Take) placeFor(choice.action, choice.at) else applied
+            if (choice is Choice.Take && choice.action == Action.APPLY) applied = place
+            met += personAt(place)
         }
         // In the town, the focus lands where a choice ends: on the last one's log, or on the top card at the start.
         focusNext = if (record.choices.isEmpty()) ".hud" else ".over-town .log"
@@ -638,7 +650,7 @@ class PhoneGame private constructor(
             if (month.hasInterviewToday) {
                 child("h2", text = "오늘은 면접 날이에요.")
                 button("primary", text = "면접 보기") {
-                    onclick = { spend(month, INTERVIEW_PLACE, Choice.AttendInterview) }
+                    onclick = { spend(month, interviewPlace, Choice.AttendInterview) }
                 }
             } else {
                 child("h2", text = "지금 할 일")
@@ -832,7 +844,9 @@ class PhoneGame private constructor(
             // A talk opens on foot: the character gets off whatever it rides.
             walkable?.getOff()
             val person = personAt(place)
-            talkLine = greeting(person, current, person !in met, lastEvents, weatherOf(current.day))
+            // On an interview day, the people of the other offices send the player on to the one applied at.
+            val elsewhere = place.kind == PlaceKind.OFFICE && place != interviewPlace
+            talkLine = greeting(person, current, person !in met, lastEvents, weatherOf(current.day), elsewhere)
             met.add(person)
             talkOpened = window.performance.now()
             focusNext = ".talk"
@@ -857,7 +871,7 @@ class PhoneGame private constructor(
             root.appendChild(town.element)
         }
         root.querySelector(".over-town")?.remove()
-        town.mark(if (month.hasInterviewToday) INTERVIEW_PLACE else null)
+        town.mark(if (month.hasInterviewToday) interviewPlace else null)
         town.isCovered = isTownCovered()
         town.weather = weatherOf(month.day)
         root.child("div", "over-town") {
@@ -889,7 +903,7 @@ class PhoneGame private constructor(
                 bedtimeLine(month)?.let { child("p", "hud-note hud-bedtime", it) }
                 val interview = month.interview
                 when {
-                    month.hasInterviewToday -> child("p", "hud-note", "오늘은 면접 날이에요. 회사로 가세요.")
+                    month.hasInterviewToday -> child("p", "hud-note", interviewDayLine(interviewPlace.label))
                     interview != null -> child(
                         "p",
                         "hud-note",
@@ -1000,17 +1014,17 @@ class PhoneGame private constructor(
 
     /**
      * The answer that takes the place's action: what it does and costs, or why it cannot be done now. At 내 방 it is the
-     * night's sleep, which waits for the character to arrive. On an interview day the office offers the interview
-     * instead.
+     * night's sleep, which waits for the character to arrive. On an interview day the office applied at offers the
+     * interview instead.
      */
     private fun HTMLElement.answer(month: Month, place: Place) {
         val interview = month.interview
-        if (month.hasInterviewToday && place == INTERVIEW_PLACE && interview != null) {
+        if (month.hasInterviewToday && place == interviewPlace && interview != null) {
             button("keyword spend") {
                 child("span", "action-name", "면접 보기")
                 val chance = percent(month.passChance(interview.stage))
                 child("span", "action-effect", "${stageName(interview.stage)} · 통과 확률 $chance")
-                onclick = { spend(month, INTERVIEW_PLACE, Choice.AttendInterview) }
+                onclick = { spend(month, place, Choice.AttendInterview) }
             }
             return
         }
@@ -1025,7 +1039,9 @@ class PhoneGame private constructor(
             if (blocked != null) child("span", "action-why", whyNot(blocked))
             if (onTheWay) child("span", "action-why", SLEEP_ON_ARRIVAL)
             onclick = {
-                if (action != Action.REST || walkable?.isHome != false) spend(month, place, Choice.Take(action))
+                // Kept with the place's number among its kind, so a month taken up again knows where it was.
+                val choice = Choice.Take(action, place.number)
+                if (action != Action.REST || walkable?.isHome != false) spend(month, place, choice)
             }
         }
     }
@@ -1183,9 +1199,8 @@ class PhoneGame private constructor(
         choosing = transport
         choosingFrom = from
         taxiFares = if (transport == Transport.TAXI) {
-            TransitLines.taxiStopsFor(town.homeZone).map { (_, spot) ->
-                town.taxiDistance(spot)?.let { TaxiFare.forDistance(it) }
-            }
+            taxiWays = TransitLines.taxiStopsFor(town.homeZone).map { (_, spot) -> town.taxiDistance(spot) }
+            taxiWays.map { way -> way?.let { TaxiFare.forDistance(it) } }
         } else {
             emptyList()
         }
@@ -1204,8 +1219,10 @@ class PhoneGame private constructor(
         val fromName = if (from >= 0) TransitLines.nameOf(Stop(transport, from)) else null
         val empty = if (transport == Transport.TAXI && taxiFares.all { it == null }) Transit.NOWHERE else null
         val stop = { choosing = null }
+        // A taxi's places nearest first; a line's stops in the order its vehicle comes to them.
+        val order = if (transport == Transport.TAXI) nearestFirst(taxiWays) else (0 until TransitLines.count(transport))
         whereTo(Transit.title(transport, fromName), Transit.where(transport), empty, stop) {
-            for (index in 0 until TransitLines.count(transport)) {
+            for (index in order) {
                 // A bus goes only along its own line.
                 if (index == from || !TransitLines.joins(transport, from, index)) continue
                 val fare = if (transport == Transport.TAXI) taxiFares.getOrNull(index) ?: continue else 0
@@ -1232,8 +1249,10 @@ class PhoneGame private constructor(
         val fare = SharedFare.of(kind) ?: return
         val empty = if (rideFares.all { it == null }) Riding.NOWHERE else null
         val stop = { renting = null }
+        val places = TransitLines.taxiStopsFor(town.homeZone)
         whereTo(Riding.shared(ride.vehicle.item), Riding.where(fare), empty, stop) {
-            for ((index, place) in TransitLines.taxiStopsFor(town.homeZone).withIndex()) {
+            for (index in nearestFirst(rideWays)) {
+                val place = places[index]
                 val amount = rideFares.getOrNull(index) ?: continue
                 val blocked = month.spendBlockedBy(kind, amount)
                 button("keyword go") {
@@ -1246,6 +1265,9 @@ class PhoneGame private constructor(
             }
         }
     }
+
+    /** The places' numbers, nearest first by [ways], the way to each in squares; those with no way go last. */
+    private fun nearestFirst(ways: List<Double?>): List<Int> = ways.indices.sortedBy { ways[it] ?: Double.MAX_VALUE }
 
     /**
      * A card over the town that asks where to go, as a talk opens: [title], the [line] under it, [empty] when there is
@@ -1406,9 +1428,8 @@ class PhoneGame private constructor(
         val kind = ride.fare ?: return
         val fare = SharedFare.of(kind) ?: return
         if (!town.canRide(ride)) return
-        val fares = TransitLines.taxiStopsFor(town.homeZone).map { (_, spot) ->
-            town.taxiDistance(spot)?.let { fare.forDistance(it) }
-        }
+        val ways = TransitLines.taxiStopsFor(town.homeZone).map { (_, spot) -> town.taxiDistance(spot) }
+        val fares = ways.map { way -> way?.let { fare.forDistance(it) } }
         val blocked = current.spendBlockedBy(kind, fares.filterNotNull().minOrNull() ?: fare.base)
         if (blocked != null) {
             rideNote = Riding.cannotRent(kind, blocked)
@@ -1418,6 +1439,7 @@ class PhoneGame private constructor(
         closeTalks()
         rideNote = null
         renting = ride
+        rideWays = ways
         rideFares = fares
         talkOpened = window.performance.now()
         focusNext = ".talk"

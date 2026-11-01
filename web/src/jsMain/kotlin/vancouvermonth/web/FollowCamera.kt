@@ -38,7 +38,7 @@ sealed interface Picked {
  * The camera behind and above the character, which the player turns by dragging and brings nearer or farther by
  * pinching. [yaw], [pitch] and [distance] are what the player asked for, already kept in their limits; the camera
  * moves toward them a little each frame, so it glides instead of jumping. It follows the character ([subject]) and
- * looks at it ([focus]). It never looks at the character through anything that matters: one of the five places, the
+ * looks at it ([focus]). It never looks at the character through anything that matters: one of the places, the
  * SkyTrain deck and station, or a canopy in the way pulls it in front, or lifts it over when that would bring it too
  * close. The city's buildings do not move it; they fold down out of its way instead ([Cutaway]).
  */
@@ -51,12 +51,12 @@ class FollowCamera(
     private val gathered = Gathered.of(walls, people)
 
     /**
-     * The box of every wall the camera keeps out of as six numbers, its low and high corners: the five places, the
+     * The box of every wall the camera keeps out of as six numbers, its low and high corners: the places, the
      * SkyTrain deck, stations and tunnel mouth, the awning and the canopy, never the city's buildings.
      */
     private val WALLS: DoubleArray = gathered.boxes
 
-    /** What a tap can land on besides the city's buildings, which fold: every other wall, and the five places' people. */
+    /** What a tap can land on besides the city's buildings, which fold: every other wall, and the places' people. */
     private val TAPPABLE: List<Wall> = gathered.tappable
 
     /**

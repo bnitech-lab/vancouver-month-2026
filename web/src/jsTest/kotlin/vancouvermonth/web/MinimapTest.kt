@@ -128,41 +128,57 @@ class MinimapTest {
     }
 
     @Test
-    fun `the whole map on a tap names all five places, none over another, in every zone`() {
+    fun `the whole map on a tap names every place by its kind, an interview day's office by its own name, none over another`() {
+        val offices = Place.entries.filter { it.kind == PlaceKind.OFFICE }
         for (zone in 1..3) {
             val minimap = Minimap(HomeSite.of(zone))
             val element = minimap.element
             minimap.isLarge = true
-            // As large as on a 375-point phone: four fifths of it.
-            element.style.width = "300px"
             document.body!!.appendChild(element)
             shown += element
-            minimap.measure()
-            val office = Neighbourhood.venue(Place.OFFICE).door
-            minimap.draw(office.x, office.z, 0.0, office.x, office.z + 20.0, office.x, office.z, 0.8, marked = null)
-            assertEquals(5, minimap.namesDrawn, "zone $zone")
-            val boxes = minimap.nameBoxes
-            for ((index, a) in boxes.withIndex()) {
-                assertTrue(a[0] >= 0.0 && a[1] >= 0.0 && a[2] <= element.clientWidth && a[3] <= element.clientHeight, "zone $zone: $a")
-                for (b in boxes.drop(index + 1)) {
-                    val apart = a[2] <= b[0] || b[2] <= a[0] || a[3] <= b[1] || b[3] <= a[1]
-                    assertTrue(apart, "zone $zone: $a over $b")
+            // Every width the larger map takes on a phone, four fifths of the screen up to 480 px, upright or turned.
+            for (width in 256..480 step 4) {
+                element.style.width = "${width}px"
+                minimap.measure()
+                val office = Neighbourhood.venue(Place.OFFICE).door
+                for (marked in listOf(null) + offices) {
+                    minimap.draw(office.x, office.z, 0.0, office.x, office.z + 20.0, office.x, office.z, 0.8, marked)
+                    assertEquals(0, minimap.namesLeftOut, "zone $zone at $width, $marked: a name found no clear spot")
+                    assertEquals(Place.entries.size, minimap.namesDrawn, "zone $zone at $width")
+                    val names = minimap.namesShown
+                    // 내 방 first, then the office of the day; every other place by its kind's word.
+                    assertEquals(Place.HOME.label, names[0])
+                    if (marked != null) assertEquals(marked.label, names[1])
+                    val words = Place.entries.map { if (it == marked) it.label else it.kind.label }
+                    assertEquals(words.sorted(), names.sorted(), "zone $zone, $marked")
+                    val boxes = minimap.nameBoxes
+                    for ((index, a) in boxes.withIndex()) {
+                        val inside = a[0] >= 0.0 && a[1] >= 0.0 && a[2] <= element.clientWidth && a[3] <= element.clientHeight
+                        assertTrue(inside, "zone $zone at $width, $marked: ${names[index]} at $a")
+                        for ((other, b) in boxes.withIndex().drop(index + 1)) {
+                            val apart = a[2] <= b[0] || b[2] <= a[0] || a[3] <= b[1] || b[3] <= a[1]
+                            assertTrue(apart, "zone $zone at $width, $marked: ${names[index]} $a over ${names[other]} $b")
+                        }
+                    }
                 }
             }
         }
     }
 
     @Test
-    fun `off the small map, 내 방 and 회사 show as arrows on its edge`() {
+    fun `off the small map, 내 방 and the nearest 회사, or an interview day's, show as arrows on its edge`() {
         val minimap = Minimap(HomeSite.of(2))
         document.body!!.appendChild(minimap.element)
         shown += minimap.element
         minimap.measure()
-        // At 내 방 in Burnaby, 회사 downtown is off the small map; 내 방 is on it.
+        // At 내 방 in Burnaby, the nearest 회사 is the town centre's, off the small map; 내 방 is on it.
         val home = Neighbourhood.home(2).door
         minimap.draw(home.x, home.z, 0.0, home.x, home.z + 20.0, home.x, home.z, 0.8, marked = null)
+        assertEquals(setOf(Place.TOWN_CENTRE_OFFICE), minimap.pointedTo)
+        // On an interview day downtown, that day's office instead, so no arrow leads to another office.
+        minimap.draw(home.x, home.z, 0.0, home.x, home.z + 20.0, home.x, home.z, 0.8, marked = Place.OFFICE)
         assertEquals(setOf(Place.OFFICE), minimap.pointedTo)
-        // Downtown, 내 방 in Burnaby is off it, and 회사 on it.
+        // Downtown, 내 방 in Burnaby is off it, and downtown's 회사 on it.
         val office = Neighbourhood.venue(Place.OFFICE).door
         minimap.draw(office.x, office.z, 0.0, office.x, office.z + 20.0, office.x, office.z, 0.8, marked = null)
         assertEquals(setOf(Place.HOME), minimap.pointedTo)
@@ -298,7 +314,7 @@ class MinimapTest {
         minimap.measure()
         val cafe = Neighbourhood.venue(Place.CAFE).door
         minimap.draw(cafe.x, cafe.z, 0.0, cafe.x, cafe.z + 20.0, cafe.x, cafe.z, 0.8, marked = null)
-        assertEquals("지도: 카페 근처", minimap.element.getAttribute("aria-label"))
+        assertEquals("지도: ${Place.CAFE.label} 근처", minimap.element.getAttribute("aria-label"))
         assertEquals("img", minimap.element.getAttribute("role"))
         // Out on the wide map, at a station, that station's name.
         val fork = TransitLines.stations[3].door

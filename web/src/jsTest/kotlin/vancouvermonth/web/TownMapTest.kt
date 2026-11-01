@@ -14,19 +14,45 @@ class TownMapTest {
         TownMap.character.maxOf { it.y + it.height } * TownMap.CHARACTER_SCALE + Walk.HOP_HEIGHT
 
     @Test
-    fun `each action goes to its own building, and an interview to the office`() {
+    fun `each action goes to its own kind of building, downtown's first, and any of its kind takes it`() {
         assertEquals(Place.CAFE, placeFor(Action.WORK))
         assertEquals(Place.LIBRARY, placeFor(Action.STUDY_ENGLISH))
         assertEquals(Place.COWORKING, placeFor(Action.PRACTISE_CODING))
         assertEquals(Place.OFFICE, placeFor(Action.APPLY))
         assertEquals(Place.HOME, placeFor(Action.REST))
-        assertEquals(Place.OFFICE, INTERVIEW_PLACE)
+        for (place in Place.entries) {
+            assertEquals(place, placeFor(actionAt(place), place.number))
+            assertEquals(place.kind.action, actionAt(place))
+        }
+        // Three cafés, three libraries, two coworking spaces, three offices, and 내 방; a number past them is the first.
+        assertEquals(listOf(1, 3, 3, 2, 3), PlaceKind.entries.map { kind -> Place.entries.count { it.kind == kind } })
+        assertEquals(Place.OFFICE, placeFor(Action.APPLY, 7))
+        assertEquals(Place.entries.size, Place.entries.map { it.label }.toSet().size)
     }
 
     @Test
-    fun `the town has one building for each place, west to east, with its name`() {
-        assertEquals(Place.entries, buildings.map { it.place })
-        assertEquals(listOf("내 방", "카페", "도서관", "코워킹", "회사"), buildings.map { it.place.label })
+    fun `each place keeps the number a kept month saves for it, numbered from 0 within its kind with none missing`() {
+        // Pinned: a month kept in a browser says "W2" or "A1", so these numbers never change.
+        val numbers = mapOf(
+            Place.HOME to 0, Place.CAFE to 0, Place.LIBRARY to 0, Place.COWORKING to 0, Place.OFFICE to 0,
+            Place.JUNCTION_OFFICE to 1, Place.EAST_VILLAGE_LIBRARY to 1, Place.SMALL_PARK_CAFE to 1,
+            Place.HIGH_STREET_COWORKING to 1, Place.BIG_PARK_LIBRARY to 2, Place.TOWN_CENTRE_OFFICE to 2,
+            Place.SLOPE_CAFE to 2,
+        )
+        assertEquals(Place.entries.toSet(), numbers.keys)
+        for ((place, number) in numbers) assertEquals(number, place.number, "$place")
+        for (kind in PlaceKind.entries) {
+            val kept = Place.entries.filter { it.kind == kind }.map { it.number }.sorted()
+            assertEquals((0 until kept.size).toList(), kept, "$kind")
+        }
+    }
+
+    @Test
+    fun `the picture has one building for each kind of place, west to east, with its kind's word`() {
+        assertEquals(PlaceKind.entries, buildings.map { it.place.kind })
+        assertEquals(listOf("내 방", "카페", "도서관", "코워킹", "회사"), buildings.map { it.place.kind.label })
+        // A place out past downtown walks to the picture's building of its kind.
+        assertEquals(TownMap.building(Place.OFFICE), TownMap.building(Place.TOWN_CENTRE_OFFICE))
     }
 
     @Test
@@ -93,10 +119,10 @@ class TownMapTest {
             // Each name is centred over its anchor and sits on it, as the CSS places it.
             val boxes = buildings.map { building ->
                 val anchor = TownCamera.framePoint(building.labelAnchor)
-                val width = widestName(building.place.label, font, padding)
+                val width = widestName(building.place.kind.label, font, padding)
                 val left = anchor.left * frameWidth - width / 2
                 val bottom = anchor.top * frameHeight
-                NameBox(building.place.label, left, left + width, bottom - font * LINE_HEIGHT, bottom)
+                NameBox(building.place.kind.label, left, left + width, bottom - font * LINE_HEIGHT, bottom)
             }
             for (box in boxes) {
                 assertTrue(box.left >= 0 && box.right <= frameWidth && box.top >= 0, "$box is cut at $screen points")

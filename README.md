@@ -6,7 +6,7 @@ the money runs out.
 1. **September 1st: pick a room.** You have just arrived with $3,000, and the goal is a job offer by September 30th,
    so first you need a room for the month. Its total is paid now and again on October 1st, so a cheaper room needs
    fewer café shifts and leaves more days for the job hunt. Three rooms stand as numbered pins on the whole map, with
-   회사 and 카페 named on it; a pin shows its room's rent, transit zone and whether utilities are included, next to a
+   every 회사 and 카페 named on it; a pin shows its room's rent, transit zone and whether utilities are included, next to a
    price board (in the terminal, the three are a list). Pick the room you think is cheapest in total, guess what it really
    costs a month, and see the real total. The guess moves money as the month starts: $100 less the dollars it missed
    by, never below -$300 (exact +$100, $100 off $0, $250 off -$150, $400 off or more -$300). One more line says how
@@ -20,8 +20,9 @@ the money runs out.
    the next morning. Sleeping early, with stamina left, is allowed and costs nothing more. Every day costs living money,
    paid at night.
 3. **Interviews.** An application may book a phone screen (passed on English), and passing it books a technical
-   interview (passed on coding). On an interview day the interview comes first (2 stamina), and the rest of the day is
-   free. Passing both is a job offer and ends the game. Applications close after the 27th, so both interviews always
+   interview (passed on coding), both at the 회사 the application went to. On an interview day the interview comes first
+   (2 stamina), and the rest of the day is free. Passing both is a job offer and ends the game. Applications close after
+   the 27th, so both interviews always
    fit in September.
 4. **The end.** No offer by the 30th means October's total for the same room is due: you either can pay it or you
    cannot. What is left after the first room, even after the largest penalty for the guess, always covers
@@ -161,8 +162,10 @@ different runs.
 ### Continuing a month
 
 The phone screen keeps the month in progress in the browser's `localStorage`: a short record of the run (its seed, or
-today's run and its date), the room picked, the guess, every action, interview and night's sleep in order, and in its
-place between them each spend in the town (what, and how much). A day is everything up to its sleep, so the days need no
+today's run and its date), the room picked, the guess, every action, interview and night's sleep in order, each action
+with the place of its kind it was taken at (a digit after its letter, none for downtown's), and in its place between
+them each spend in the town (what, and how much). The last application's place is where its interview is held. A day is
+everything up to its sleep, so the days need no
 mark of their own. Nothing more is needed, since the same seed and the same choices always play out the same way. The
 record is written when the month starts, after every action, interview, sleep and spend, and emptied at any ending.
 Continued, a month keeps what was bought, the day's time and stamina, and what was spent since the last action still
@@ -182,7 +185,8 @@ and where the browser refuses storage there is no card and nothing is kept.
 A test replays a few kept lines to months written down by hand, so a change to the rules fails it until
 `MonthRecord.VERSION` goes up, which drops the older lines rather than continuing them into a different month. It is 4
 since a day began to hold several actions until the night's sleep (v0.17): a month kept before that, one letter a day,
-would play out as another month.
+would play out as another month. The places' digits (v0.20) needed no new version: a line without them took every
+action downtown, where every place then stood, and goes on so, its interview at downtown's 회사.
 
 ### The 3D town
 
@@ -196,10 +200,18 @@ downtown's towers along the real street grid, the seawall round the shore, False
 the inlet with the mountains far across it; then, east of downtown, East Vancouver and Burnaby: detached houses on each
 real block, each with a pitched roof, a front door to the street and a lawn, a tree in some yards, smaller and lower
 with wider yards between them the farther from downtown; mid-rise round the SkyTrain stations, towers round the Burnaby
-town centre, and their parks as forest, about two minutes on foot from downtown. The five places stand in the
-neighbourhoods that suit them: the 카페 by the seawall on False Creek, the 도서관 in the middle of downtown, 코워킹 in the old
-brick streets at the east end, the 회사 tower in the business district by the inlet, and 내 방 (the room picked on September
-1st) with its garden where the room is: in the West End for a room in zone 1, in Burnaby for zones 2 and 3, each morning
+town centre, and their parks as forest, about two minutes on foot from downtown. There are three cafés, three
+libraries, two coworking spaces and three offices, each named for what is round it, each kind with its own look (a
+café's green and cream awning, a library's steps, a coworking space's green sign, an office tower's canopy and its bands
+of glass round each storey), and the same
+action at any place of a kind. Downtown has one of each in the neighbourhoods that suit them: 물가 카페 by the seawall on
+False Creek, 시내 도서관 in the middle of downtown, 벽돌길 코워킹 in the old brick streets at the east end and 항구 회사, a
+tower in the business district by the inlet. East Vancouver has 갈림길 회사 by the junction's station, 동쪽 마을 도서관
+and 작은 공원 카페 by theirs; Burnaby has 큰길 코워킹 by the high street's stop near zone 2's 내 방, 큰 공원 도서관 by the big
+park's stop, 중심가 회사 across the guideway from the town centre's station and 비탈 카페 by the slope's stop beside zone 3's 내
+방, so a room in
+any zone has each kind within a short ride. 내 방 (the room picked on September 1st) stands with its garden where the
+room is: in the West End for a room in zone 1, in Burnaby for zones 2 and 3, each morning
 starting at its door. The SkyTrain runs on its guideway out of its tunnel by the station, along False Creek and out
 through East Vancouver to Burnaby. Each place's name floats over it, and so does the bike shop's (see below); no other
 building has a name. Only the ground and buildings near the camera are drawn; the far city is left to the haze. The
@@ -214,11 +226,14 @@ A small map sits in the top right corner, just under the day's figures and the d
 roughly where the character is. It lies with real north up, as a paper map of the city does, and never turns; a small N
 with an arrow at its top says so. (The town itself is the real city turned 44.7 degrees, so downtown's streets run along
 it; the map turns that back.) It shows the ground round the character, 100 squares (2.5 km) across, the character in its
-middle, and follows it: the land, the water, the parks and the seawall, the city's blocks faintly, the five places (내 방
-a red square, the others dots, 회사 green on an interview day as its name is), the camera's view as a pale wedge, and
-the character as a gold arrow pointing the way it faces. 내 방 and 회사, when off the small map, show as small arrows on
-its edge pointing the way to them. It is drawn again only when the character or the camera moves. A tap shows the whole
-map larger, about four fifths of the screen wide with the places' names; a tap or Escape brings the small one back, and
+middle, and follows it: the land, the water, the parks and the seawall, the city's blocks faintly, the places (내 방
+a red square, the others dots, the 회사 of an interview day green as its name is), the camera's view as a pale wedge,
+and the character as a gold arrow pointing the way it faces. 내 방 and the 회사 nearest the character (on an interview
+day, that day's 회사 instead), when off the small map, show as small arrows on its edge pointing the way to them. It is
+drawn again only when the
+character or the camera moves. A tap shows the whole map larger, about four fifths of the screen wide with the places
+named by their kind (카페, 도서관, 코워킹, 회사, and 내 방) and an interview day's 회사 by its own name; a tap or Escape brings the
+small one back, and
 a talk or the guide closes it. It is a picture: a screen reader hears only which place or station the character is
 nearest, as in "지도: 내 방 근처", or, more than 40 squares from any of them, which way the nearest is, as in
 "지도: 큰 공원역 쪽".
@@ -240,7 +255,7 @@ nearest, as in "지도: 내 방 근처", or, more than 40 squares from any of th
 The city's buildings never get in the way. One that stands between the camera and the character, or fills the view
 just in front of the camera, folds down in a quarter of a second to a low outline of its footprint in its own colour,
 and rises again once clear; a tap meant for the ground behind a folded one lands there. So downtown the camera keeps the
-distance and the turn the player gave it. Only the five places, the SkyTrain's deck, its station and the station's
+distance and the turn the player gave it. Only the places, the SkyTrain's deck, its station and the station's
 roof, the tunnel's mouth, the café's awning and the office's canopy still pull it in front or lift it over; where one of
 them stands right behind the character, it first looks along the nearest street. A building the camera would come
 inside folds at once, and the near view widens with the view, so nothing out of sight folds. As the character reaches a place the camera comes round to the street side of
@@ -249,17 +264,22 @@ A tap on the water walks to the near shore. A talk ignores taps for a moment aft
 it cannot also answer it. While a day changes into the next, the town takes no taps, drags, pinches or names, and no
 talk opens, until the morning.
 
-Each place has one person, all invented: 하나 at the 카페, 레오 at the 도서관, 수진 at 코워킹, 마커스 at the 회사 desk and
-the neighbour grandmother by the bench at 내 방. A talk shows their name, a small face drawn from their colours, and a
+Each place has its own person, all invented: downtown 하나 at the 카페, 레오 at the 도서관, 수진 at 코워킹 and 마커스 at
+the 회사 desk; out past it 아이샤, 켄지 at the other offices' desks, 로사 and 준호 at the libraries, 소피 and 마테오 at the
+cafés and 니나 at Burnaby's coworking space; and the neighbour grandmother by the bench at 내 방. People of a kind dress
+alike (an apron, glasses and a book, a badge, a collar and tie). A talk shows their name, a small face drawn from their
+colours, and a
 line typed one letter at a time (a tap shows all of it) that fits the day: a first meeting, low energy, money running
 short, an interview booked or failed, the night, the first or the last week, and so on. The answers are the place's
 action with its effect and its stamina (알바하기, 영어 공부, 코딩 연습, 지원서 넣기, and at 내 방 자기, which is there
 any time) or the reason it cannot be done now (too little stamina, an application already in today, and so on),
-이야기 for small talk, and 그만. On an interview day only 회사 offers 면접 보기, first thing, and its name is marked.
+이야기 for small talk, and 그만. On an interview day only the 회사 applied at offers 면접 보기, first thing, its name is
+marked and the top card names it ("오늘은 면접 날이에요. 중심가 회사로 가세요."); at the other offices the desk sends the
+player on there.
 
 Money can be spent in the town without spending stamina or time. On the West End's wide street toward downtown, on the way from
 내 방 to the business district, stands a bike shop (자전거 가게), kept by 벤, invented like everyone else, with a bike on
-show beside it. It is not one of the five places, as no day is spent there, but it matters as they do: its name floats
+show beside it. It is not one of the places, as no day is spent there, but it matters as they do: its name floats
 over it, it never folds and the camera keeps out of it. His talk offers 자전거 사기 ($350), 퀵보드 사기 ($550), 이야기 and
 그만. Buying takes the price off the balance and nothing else: the date stays, the keeper says how to get on it, and the
 button then shows it owned, or why it cannot be bought: 잔고가 모자라요., or 이걸 사면 9월 생활비가 모자라요. when what would
@@ -270,7 +290,8 @@ bike goes about 9 units a second and an e-scooter 11, against 3.6 on foot (a dou
 the same streets, never over the water, the rider pedalling on the saddle or standing on the deck, and the camera keeps
 up. Shared bikes stand two to a dock near the West End's 내 방, 도서관, 카페 and the station, and in Burnaby near 내 방 in
 zones 2 and 3 and the two stations of the town centre, and shared e-scooters on four street corners, all in an invented purple. A tap on one walks up to it, and a card like the taxi's
-lists every place a taxi goes with the fare there, by the way along the streets from where it stands: a bike $1 and
+lists every place a taxi goes with the fare there, nearest first, by the way along the streets from where it stands: a
+bike $1 and
 $0.40 for every ten squares (250 m), at most $15, an e-scooter $1 and $0.60, at most $20, to the dollar as the taxi's
 meter is (across downtown a few dollars, out to Burnaby the most). A place whose fare would leave too little for
 September's living cost is greyed out and says why; when even the cheapest one is, the top card says so instead of the
@@ -310,7 +331,8 @@ past 버나비 큰길 (by 내 방 in zone 2) and 큰 공원 옆 to 비탈 마을
 sign, and a tap on one offers the other stops of its line, a bus taking the character there the shorter way round. Both are free with the month's pass, which the room's
 total already pays. A water bus crosses False Creek between three docks (카페 앞 by the café, 남쪽 기슭 on the far shore,
 크릭 끝 near its head) for $4 a ride, the character standing on its open deck. 택시 부르기 on the top card, whenever the
-character is on foot and no talk is open, lists the five places, the bike shop and the nine stations with each fare: $4 and $1.50 for every ten squares
+character is on foot and no talk is open, lists every place, the bike shop and the nine stations, nearest first, with
+each fare: $4 and $1.50 for every ten squares
 along the streets up to 160 squares and $0.70 for every ten past that, to the dollar (downtown to Burnaby is about $45;
 the meter stops at $60); a taxi appears where the
 character stands and drives there fast, faster still on a long ride (up to 24 squares a second, so Burnaby to downtown
@@ -328,7 +350,7 @@ The town lives on its own. Four more people, invented too (올리버, 미나, �
 seawall, a West End street near 내 방, the big park's edge and the square in front of the station. One stops when the
 character stands right in their way. A tap on one opens a short word of small talk with only 그만, which spends no day;
 they stop and face the character until it ends, and say something new each time that day. They are not obstacles, so the
-character's walks go through them. In the evening they fade out on their way home and they come back at dawn. The five
+character's walks go through them. In the evening they fade out on their way home and they come back at dawn. The people
 at the places stay where they are, so they are always found there, but they look about, turn to face the character when
 it comes near, and wave as it comes up. The SkyTrain stands at the station, pulls out east along the line, its cars
 turning with the guideway, and comes back from the west every 32 seconds, slowing into the station, with its windows lit
@@ -370,7 +392,10 @@ nobody has touched the town for 20 seconds or while a talk covers it; the sun's 
 of those frames. It draws nothing while the page is hidden. It draws at most two pixels per point however sharp the
 phone, and boxes of a kind together: the buildings, trees and the rest that stand still and cast shadows in one draw for
 each 40-unit tile of the town, so a tile out of the camera's sight or the sun's shadow box is not drawn at all; the
-ground, the sea and the glowing windows in one draw each; all five townspeople in one, all four passersby in another,
+ground, the sea and the glowing windows in one draw each (each place out past downtown its windows and lamps in one of
+its
+own, drawn only near it); downtown's townspeople in one, East Vancouver's and Burnaby's in one each, drawn only near
+them, all four passersby in another,
 the train's cars in two, and all the rain in one, moved on the same beat as the rest of the town's life. If the phone
 starts asking for less motion during the month, the town's own life stands still, the rain with it.
 
@@ -394,14 +419,15 @@ on the platform and the camera), `FollowCamera`
 (which of the city's buildings fold down out of the camera's way, and how far), `Minimap` (where the grid lies on the
 small map turned north up, and which place is nearest), `DayLight` (the light
 through the day's hours and through a night's sleep, when the passersby are out, and how each weather greys it), `Passersby` (their loops, and
-stopping for the character), `Greeter` (the five turning and waving), `TownLife` (the train's round and how loud it
+stopping for the character), `Greeter` (the townspeople turning and waving), `TownLife` (the train's round and how loud
+it
 rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, all worked out from the time) and
 `FramePace` (which frames are drawn). The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`, and
 `Passersby.kt` for the passersby's), and so are each day's weather (`Weather.kt`) and the bike shop's and riding's
 words (`Shop.kt`), and the SkyTrain's, the bus's, the water bus's and the taxi's (`Transit.kt`). `WalkableTown` draws
 all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about 925 KB
-(about 278 KB gzipped), under the 1 MiB aim: the maps' rows, long lines and the wide map's blocks are packed small (the map tool's README
+`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about 942 KB
+(about 283 KB gzipped), under the 1 MiB aim: the maps' rows, long lines and the wide map's blocks are packed small (the map tool's README
 says how), and Kotlin writes the page as ES2015, with JavaScript classes. `TownBudgetTest` measures what a frame costs downtown (by day and at night),
 in East Vancouver, in Burnaby (by day and at night), on a walk, on the train, under downtown and with the camera turning
 (so the near houses are written again each frame), the sun's shadows counted too, and keeps it within a phone's budget.
@@ -435,14 +461,15 @@ remembered.
 How to play is said on the intro (see below) and again on a card the "?" in the town's top card opens: tap the ground
 to walk and twice to dash, drag to look around and pinch to zoom, tap a person or a building to talk (an action takes
 stamina and time), sleep at 내 방 once the stamina is spent, tap a station, stop or dock to ride, buy or rent a bike or
-call a taxi, and find yourself on the small map. The
+call a taxi, find yourself on the small map, and that the cafés, libraries, coworking spaces and offices stand in
+several neighbourhoods, the same work at any of a kind. The
 card ends with the month's goal, in the words the month's start uses; 닫기 or Escape closes it. It never opens by
 itself, since the intro has just said the same. The button screen has no card, since its buttons say what they do.
 
 ### The intro
 
 The page opens on an intro: the title with the version, 업데이트 소식 and the sound switch; the arrival story (September
-1st, $3,000, the goal, a room first); how to play, in the same seven lines as the "?" card; how the guess pays, in one
+1st, $3,000, the goal, a room first); how to play, in the same eight lines as the "?" card; how the guess pays, in one
 line ("맞힐수록 최대 $100을 더 받고, $100보다 더 틀리면 그만큼 잃어요(최대 $300).") with three worked examples; and the
 map's credit.
 시작하기 sits in a bar held at the foot of the screen, so it is in sight on a 375 x 812 or 320 x 568 phone and on one
@@ -459,13 +486,14 @@ is the switch, `FirstRunGuide.kt` the card and `Memory.kt` the storage that may 
 ### Choosing the room on the map
 
 The rooms are chosen on the whole wide map, north up, as the small map shows it larger: its ground, the stations, stops
-and docks, the places as dots with 회사 and 카페 named, and a pin for each room at the door 내 방 has in that room's zone
-(the West End for zone 1, Burnaby for zones 2 and 3), so the player sees how far each room is from 회사 (where the
-applications and interviews are) and 카페 (where the shifts are). A pin carries
+and docks, the places as dots with every 회사 and 카페 named by its kind, and a pin for each room at the door 내 방 has in
+that room's zone (the West End for zone 1, Burnaby for zones 2 and 3), so the player sees how far each room is from the
+offices (where the applications and interviews are) and the cafés (where the shifts are). A pin carries
 the room's number; a tap on it picks the room and shows its card under the map (rent, zone, utilities), the guess and
 the real total following as before, and the picked pin stays filled in. The pins are buttons, 44 points across, reached
 with Tab in the rooms' order, each heard by a screen reader as its room in full ("1번 방, 월세 $1,070, 교통 1구역,
-웨스트엔드, 공과금 포함", the area standing in for the map); 회사's and 카페's names are placed where they cover no pin.
+웨스트엔드, 공과금 포함", the area standing in for the map); the offices' and cafés' names are placed where they cover no
+pin and no other name.
 Pins closer than a finger on a narrow map are pushed apart, with a line back to their doors. The map is a 2D canvas, so it is the same on the button screen; where a browser
 cannot draw one, the rooms are the list of buttons they were before. Nothing of the town is made until the month starts.
 `RoomMap` draws it, with the small map's painting (`Minimap`). The map's ground, and the city's layout it is painted

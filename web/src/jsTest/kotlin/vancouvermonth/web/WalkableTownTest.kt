@@ -248,9 +248,11 @@ class WalkableTownTest {
 
     /**
      * Opens 내 방's talk with the character at its door, where a night's sleep can start, as a walk home leaves it: the
-     * way home from downtown is too long for a test to walk every night.
+     * way home from downtown is too long for a test to walk every night. A talk already open is closed first, so 내 방's
+     * opens again with the character at the door, even when it was 내 방's, opened from afar.
      */
     private fun talkAtHome(town: NeighbourhoodScene) {
+        if (root.querySelector(".talk") != null) tap("그만")
         town.standAt(Neighbourhood.venue(Place.HOME).door)
         talkTo(Place.HOME)
     }
@@ -349,14 +351,15 @@ class WalkableTownTest {
     }
 
     @Test
-    fun `the town fills the screen, with the five names, the shop's, and the day's figures over it, and no day buttons`() {
+    fun `the town fills the screen, with the places' names, the shop's, and the day's figures over it, and no day buttons`() {
         startInTown(phone = false)
         val town = root.querySelector(".walk-town") as HTMLElement
         val frame = town.getBoundingClientRect()
         assertEquals(window.innerWidth.toDouble(), frame.width)
         assertEquals(window.innerHeight.toDouble(), frame.height)
         val names = town.querySelectorAll(".place-name").asList().map { it.textContent }
-        assertEquals(listOf("내 방", "카페", "도서관", "코워킹", "회사", "자전거 가게"), names)
+        assertEquals(Place.entries.map { it.label } + "자전거 가게", names)
+        assertEquals(listOf("내 방", "물가 카페", "시내 도서관", "벽돌길 코워킹", "항구 회사"), names.take(5))
         assertEquals("three.js r169", town.querySelector("canvas")?.getAttribute("data-engine"))
         assertTrue("오늘9월 2일" in screen && "잔고\$1,935" in screen && "10월 총비용\$1,165" in screen, screen)
         assertTrue("아침 8시 · 체력 5/5 · 영어 1/10 · 코딩 3/10" in screen, screen)
@@ -760,7 +763,8 @@ class WalkableTownTest {
                     talkTo(Place.OFFICE)
                     assertEquals("면접 보기", spendButton().querySelector(".action-name")?.textContent)
                     assertFalse(spendButton().disabled)
-                    assertEquals("회사", root.querySelector(".place-name.here")?.textContent)
+                    assertEquals(Place.OFFICE.label, root.querySelector(".place-name.here")?.textContent)
+                    assertTrue("오늘은 면접 날이에요. 항구 회사로 가세요." in screen, screen)
                     spendButton().click()
                     assertTrue("1차 영어 면접 통과!" in screen || "1차 영어 면접에서 떨어졌어요." in screen, screen)
                     resolve(Unit)
@@ -817,13 +821,18 @@ class WalkableTownTest {
                     return
                 }
                 val action = cycle[step % cycle.size]
-                if ("오늘은 면접 날이에요" in screen) {
-                    talkTo(Place.OFFICE)
-                } else {
-                    talkTo(placeFor(action))
-                    if (spendButton().disabled) talkAtHome(town)
+                // Sleep straight at the door: how far the character has walked meanwhile goes by the clock, so 내 방's
+                // talk opened from afar may not yet offer 자기.
+                when {
+                    "오늘은 면접 날이에요" in screen -> talkTo(Place.OFFICE)
+                    action == Action.REST -> talkAtHome(town)
+                    else -> {
+                        talkTo(placeFor(action))
+                        if (spendButton().disabled) talkAtHome(town)
+                    }
                 }
                 val sleep = "자기" in spendButton().textContent.orEmpty()
+                if (sleep) assertFalse(spendButton().disabled, "step $step: 자기 not offered at the door")
                 view = Triple(town.cameraTurn, town.cameraTilt, town.cameraDistance)
                 spendButton().click()
                 step++
@@ -1737,7 +1746,7 @@ class WalkableTownTest {
                 assertEquals(FollowCamera.START_DISTANCE, town.cameraReach, 1e-6)
                 assertEquals(FollowCamera.START_YAW, town.cameraEyeTurn, 1e-6)
                 assertTrue(Neighbourhood.foldables.indices.any { town.isFolded(it) }, "nothing folded downtown")
-                assertEquals("지도: 도서관 근처", town.minimapElement.getAttribute("aria-label"))
+                assertEquals("지도: ${Place.LIBRARY.label} 근처", town.minimapElement.getAttribute("aria-label"))
             },
         )
     }

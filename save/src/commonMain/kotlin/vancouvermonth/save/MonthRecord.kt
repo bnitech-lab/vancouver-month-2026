@@ -13,7 +13,23 @@ sealed interface Move
 
 /** What the player did with some of a day's time: an action, the interview that fell on it, or the night's sleep. */
 sealed interface Choice : Move {
-    data class Take(val action: Action) : Choice
+    /**
+     * [action], taken [at] one of the places of its kind, counted from 0: the town has several cafés, libraries,
+     * coworking spaces and offices, the first of each downtown, and a game with one of each takes them all at 0. An
+     * application's [at] is the office its interview is held at. Sleep is always at 0, at 내 방. A record cannot know
+     * how many places of a kind the game has, so any digit reads: the game takes a number it has no place for as the
+     * first of the kind, downtown's, and the rules never depend on it.
+     */
+    data class Take(val action: Action, val at: Int = 0) : Choice {
+        init {
+            require(at in 0..MOST_AT && (at == 0 || action != Action.REST)) { "No place $at for $action" }
+        }
+
+        companion object {
+            /** The highest place number a record keeps: one digit. */
+            const val MOST_AT = 9
+        }
+    }
 
     data object AttendInterview : Choice
 }
@@ -56,9 +72,16 @@ data class MonthRecord(
     fun after(move: Move): MonthRecord = copy(moves = moves + move)
 
     /**
-     * "4|1011||2|1165|Eb350Wq4RC": the version, the seed, today's run's date or nothing, the room, the guess, and the
-     * moves: a capital letter for each choice (R for a night's sleep), and a small letter with its amount for each
-     * spend.
+     * Where the last application went, as its [Choice.Take.at] has it: the office an interview it booked is held at.
+     * While an interview is booked no other application goes in, so it is always the one that booked it. 0 before any.
+     */
+    val appliedAt: Int
+        get() = choices.filterIsInstance<Choice.Take>().lastOrNull { it.action == Action.APPLY }?.at ?: 0
+
+    /**
+     * "4|1011||2|1165|Eb350W2q4RA1": the version, the seed, today's run's date or nothing, the room, the guess, and the
+     * moves: a capital letter for each choice (R for a night's sleep), followed by the place's number when it was not
+     * the first of its kind ([Choice.Take.at]), and a small letter with its amount for each spend.
      */
     fun encode(): String =
         listOf(VERSION, seed, today ?: "", room, guess, moves.joinToString("") { textOf(it) }).joinToString(SEPARATOR)
@@ -100,6 +123,9 @@ data class MonthRecord(
          * 3: the guess's money is added as the month starts, so a version 2 line would start with another balance.
          * 4: a day holds several actions until the night's sleep (R), each costing stamina, so a version 3 line, one
          * letter a day, would play out as another month.
+         * The place an action was taken at, a digit after its letter, came later without a new version: a line without
+         * one took every action at the first place of its kind, downtown, where every place then stood, and plays out
+         * as before.
          */
         const val VERSION = 4
 
@@ -130,11 +156,18 @@ data class MonthRecord(
         private val SPEND_LETTERS = Spending.entries.associateBy { letterOf(it) }
 
         private fun textOf(move: Move): String = when (move) {
-            is Choice -> LETTERS.entries.first { it.value == move }.key.toString()
+            is Choice -> {
+                val place = (move as? Choice.Take)?.at ?: 0
+                val first = if (move is Choice.Take) move.copy(at = 0) else move
+                LETTERS.entries.first { it.value == first }.key + if (place == 0) "" else "$place"
+            }
             is Spend -> letterOf(move.kind) + move.amount.toString()
         }
 
-        /** The moves [text] holds, or null when a part is not one: an unknown letter, or a spend with no amount. */
+        /**
+         * The moves [text] holds, or null when a part is not one: an unknown letter, a spend with no amount, or a place's
+         * number after sleep or the interview.
+         */
         private fun movesOf(text: String): List<Move>? {
             val moves = mutableListOf<Move>()
             var at = 0
@@ -143,7 +176,14 @@ data class MonthRecord(
                 at += 1
                 val day = LETTERS[letter]
                 if (day != null) {
-                    moves += day
+                    val number = text.getOrNull(at)?.takeIf { it in '0'..'9' }?.minus('0')
+                    if (number == null) {
+                        moves += day
+                        continue
+                    }
+                    if (day !is Choice.Take || day.action == Action.REST) return null
+                    moves += day.copy(at = number)
+                    at += 1
                     continue
                 }
                 val kind = SPEND_LETTERS[letter] ?: return null

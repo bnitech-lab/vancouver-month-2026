@@ -416,7 +416,27 @@ internal class NeighbourhoodScene(
     private val greeterParts = site.venues.map { Figures.townsperson(personAt(it.place)) }
     private val greeterFigures = greeterParts.map { FigureBoxes(it) }
 
-    /** The bike shop's keeper, who looks about and greets the player as the five places' people do. */
+    /**
+     * Which draw of [folkDraws] each place's person is in: 0, the town's own, for downtown's places and 내 방; 1 for the
+     * places out in East Vancouver and 2 for those in Burnaby, each left out from far off as the city round them is.
+     */
+    private val folkDrawOf = IntArray(site.venues.size) { index ->
+        val venue = site.venues[index]
+        when {
+            venue.place == Place.HOME || venue.x < Neighbourhood.TOWN_COLUMNS -> 0
+            venue.x < CITY_LINE -> 1
+            else -> 2
+        }
+    }
+
+    /** Where the next person goes in each of [folkDraws] as they are placed: worked out again each step of life. */
+    private val folkFirst = IntArray(FOLK_DRAWS)
+
+    /** The lots of the places out past downtown, whose own boxes are drawn apart from the city round them. */
+    private val placeLots = site.venues.filter { it.x >= Neighbourhood.TOWN_COLUMNS && it.place != Place.HOME }
+        .map { Neighbourhood.lotFor(it) }
+
+    /** The bike shop's keeper, who looks about and greets the player as the places' people do. */
     private val keeper = Greeter(Neighbourhood.shop.keeper, Neighbourhood.shop.facing, phase = greeters.size * 1.3)
     private val keeperFigure = FigureBoxes(Figures.keeper)
     private val passersby = Strolls.all()
@@ -430,6 +450,7 @@ internal class NeighbourhoodScene(
     /** The passersby fade out together in the evening and back in at dawn, so they share a material that can fade. */
     private val passerbyMaterial = MeshToonMaterial(json("gradientMap" to shades, "transparent" to true))
     private lateinit var townsfolk: InstancedMesh
+    private val folkDraws = mutableListOf<InstancedMesh>()
     private lateinit var passerbyBoxes: InstancedMesh
     private lateinit var wetPasserbyBoxes: InstancedMesh
 
@@ -832,9 +853,13 @@ internal class NeighbourhoodScene(
         }
         tiled(stillBlocks, material)
         addHouseDetail()
-        // The glass of the wide map's towers and 내 방 out there in a draw of their own, left out from far off.
+        // The glass of the wide map's towers and 내 방 out there in a draw of their own, left out from far off; and each
+        // place out past downtown, its windows and lamps, in one of its own, so it is drawn only near it.
         val (corner, wide) = glowingBlocks.indices.partition { glowingBlocks[it].x < Neighbourhood.TOWN_COLUMNS }
-        for ((draw, members) in listOf(corner, wide).withIndex()) {
+        val byPlace = wide.groupBy { index -> placeLotOf(glowingBlocks[index]) }
+        val ofPlaces = placeLots.indices.mapNotNull { byPlace[it] }
+        val draws = listOf(corner) + listOfNotNull(byPlace[-1]) + ofPlaces
+        for ((draw, members) in draws.withIndex()) {
             if (members.isEmpty()) continue
             for ((slot, index) in members.withIndex()) {
                 glowDrawOf[index] = glowDraws.size
@@ -844,8 +869,16 @@ internal class NeighbourhoodScene(
             val mesh = boxes(panes, glowMaterial)
             scene.add(mesh)
             glowDraws.add(mesh)
-            if (draw == 1) far(mesh, panes)
+            // A place's windows are small: they go with the low city round it, however tall the place.
+            if (draw > 0) far(mesh, panes, low = draw >= draws.size - ofPlaces.size)
         }
+    }
+
+    /** Which of [placeLots] [block]'s middle stands in, or -1 for none. */
+    private fun placeLotOf(block: Block): Int {
+        val x = block.x + block.width / 2
+        val z = block.z + block.depth / 2
+        return placeLots.indexOfFirst { it.isNear(x, z, 0.0) }
     }
 
     /**
@@ -945,8 +978,11 @@ internal class NeighbourhoodScene(
         mesh.instanceMatrix.needsUpdate = true
     }
 
-    /** Notes [mesh], drawing [blocks], as one to leave out when it is far from the camera ([leaveOutFar]). */
-    private fun far(mesh: InstancedMesh, blocks: List<Block>) {
+    /**
+     * Notes [mesh], drawing [blocks], as one to leave out when it is far from the camera ([leaveOutFar]): as a low draw,
+     * however tall its boxes, when [low].
+     */
+    private fun far(mesh: InstancedMesh, blocks: List<Block>, low: Boolean = false) {
         var west = Double.MAX_VALUE
         var east = -Double.MAX_VALUE
         var north = Double.MAX_VALUE
@@ -972,7 +1008,7 @@ internal class NeighbourhoodScene(
         farX[index] = (west + east) / 2
         farZ[index] = (north + south) / 2
         farRadius[index] = hypot(east - west, south - north) / 2
-        farReach[index] = if (tallest > TALL) FollowCamera.FAR_PLANE else -1.0
+        farReach[index] = if (tallest > TALL && !low) FollowCamera.FAR_PLANE else -1.0
     }
 
     /**
@@ -1009,7 +1045,9 @@ internal class NeighbourhoodScene(
             val tile = members.map { blocks[it] }
             val mesh = boxes(tile, material).also { scene.add(it) }
             tiles.add(mesh)
-            far(mesh, tile)
+            // A place out past downtown, however tall, keeps its tile in view no farther than the city round it does.
+            val city = tile.filter { placeLotOf(it) < 0 }
+            far(mesh, tile, low = city.isNotEmpty() && city.none { it.y + it.height > TALL })
         }
     }
 
@@ -1064,7 +1102,15 @@ internal class NeighbourhoodScene(
      * passersby in another, every box placed again each frame of the town's life.
      */
     private fun addPeople() {
-        townsfolk = figures(greeterParts + listOf(Figures.keeper), material)
+        townsfolk = figures(greeterParts.filterIndexed { index, _ -> folkDrawOf[index] == 0 } + listOf(Figures.keeper), material)
+        folkDraws.add(townsfolk)
+        for (draw in 1 until FOLK_DRAWS) {
+            val members = site.venues.indices.filter { folkDrawOf[it] == draw }
+            val mesh = figures(members.map { greeterParts[it] }, material)
+            folkDraws.add(mesh)
+            // Left out from far off by where its people stand, a little round each.
+            far(mesh, members.map { site.venues[it].person }.map { Block(it.x - 1.0, 0.0, it.z - 1.0, 2.0, 2.0, 2.0, 0) })
+        }
         passerbyBoxes = figures(passerbyParts, passerbyMaterial)
         wetPasserbyBoxes = figures(wetPasserbyParts, passerbyMaterial)
         wetPasserbyBoxes.visible = false
@@ -2506,14 +2552,17 @@ internal class NeighbourhoodScene(
         val millis = (now - lifeNow).coerceIn(0.0, MAX_LIFE_STEP_MILLIS)
         lifeNow = now
         val player = if (sitting) site.benchSeat else spot
-        var first = 0
+        folkFirst.fill(0)
         for (index in greeters.indices) {
             val pose = greeters[index].step(now, millis, player)
-            greeterFigures[index].write(pose, townsfolk.instanceMatrix.array, first)
-            first += greeterFigures[index].count
+            val draw = folkDrawOf[index]
+            // A draw left out far off is not written: its people stand where they were until it is near again.
+            val mesh = folkDraws[draw]
+            if (mesh.visible) greeterFigures[index].write(pose, mesh.instanceMatrix.array, folkFirst[draw])
+            folkFirst[draw] += greeterFigures[index].count
         }
-        keeperFigure.write(keeper.step(now, millis, player), townsfolk.instanceMatrix.array, first)
-        townsfolk.instanceMatrix.needsUpdate = true
+        keeperFigure.write(keeper.step(now, millis, player), townsfolk.instanceMatrix.array, folkFirst[0])
+        for (draw in folkDraws) if (draw.visible) draw.instanceMatrix.needsUpdate = true
         val out = if (nightFell == null) {
             DayLight.outdoorsAt(shownShare)
         } else {
@@ -2957,7 +3006,8 @@ internal class NeighbourhoodScene(
         label.classList.toggle("under", under)
         label.tabIndex = if (shown) 0 else -1
         if (shown) label.removeAttribute("aria-hidden") else label.setAttribute("aria-hidden", "true")
-        if (point != null) {
+        // A hidden name is not moved: it is placed again when it shows.
+        if (shown && point != null) {
             val left = point.left * width
             val top = point.top * height
             label.style.transform = "translate(${left}px, ${top}px) translate(-50%, -100%)"
@@ -3013,6 +3063,12 @@ internal class NeighbourhoodScene(
 
         /** How wide a tile of the town's still boxes is: each tile is one draw, left out when out of sight. */
         const val TILE = 40.0
+
+        /** The draws of the places' people: the town's own, East Vancouver's and Burnaby's. */
+        private const val FOLK_DRAWS = 3
+
+        /** About where Burnaby begins on the wide map, at the city line: the people east of it share a draw. */
+        private const val CITY_LINE = 490.0
 
         /** The tile of a still box no tile draws: a suburban house's walls, drawn near the camera instead. */
         const val NOT_TILED = -1
