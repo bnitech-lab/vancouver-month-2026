@@ -41,6 +41,17 @@ class HomeSiteTest {
     }
 
     @Test
+    fun `at the corner's edge, no building of the wide map stands in one of the corner's`() {
+        val turned = Neighbourhood.foldables.map { Neighbourhood.blocks[it.body] }.filter { it.turn != 0.0 && it.z >= 0 }
+        val nearEdge = turned.filter { it.x < Neighbourhood.TOWN_COLUMNS + 10 }
+        assertTrue(nearEdge.isNotEmpty())
+        for (body in nearEdge) {
+            val shape = TurnedBox(body.x + body.width / 2, body.z + body.depth / 2, body.width, body.depth, body.turn)
+            for (lot in Neighbourhood.cityLots) assertFalse(shape.overlaps(lot, 0.0), "$body on the corner's $lot")
+        }
+    }
+
+    @Test
     fun `내 방 stands in its room's zone, on open ground every station can reach`() {
         for (zone in 1..3) {
             val site = HomeSite.of(zone)

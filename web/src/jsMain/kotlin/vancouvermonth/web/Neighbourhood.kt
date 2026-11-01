@@ -999,7 +999,8 @@ object Neighbourhood {
                 if (rail.any { lot.isNear(it.x, it.z, 4.0) }) height = min(height, DECK_HEIGHT - 1.5)
                 addBuilding(lot, height, colour)
             }
-            addWideCity(kept + TransitLines.keptForStops + Rides.keptForDocks)
+            // The corner's own buildings are kept too, where a wide block reaches back over the corner's edge.
+            addWideCity(kept + cityLots + TransitLines.keptForStops + Rides.keptForDocks)
         }
 
         /**
