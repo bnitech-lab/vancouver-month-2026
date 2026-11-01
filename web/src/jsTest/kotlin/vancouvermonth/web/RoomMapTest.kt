@@ -174,6 +174,34 @@ class RoomMapTest {
     }
 
     @Test
+    fun `when the page changes size the map is painted again at its new width, until its screen goes`() {
+        val holder = (document.createElement("div") as HTMLElement).also { it.style.width = "448px" }
+        root.appendChild(holder)
+        val map = RoomMap(FirstMinute(1011).rooms, null, false) {}
+        holder.appendChild(map.element)
+        map.draw()
+        map.paint()
+        val canvas = map.element.querySelector("canvas") as HTMLCanvasElement
+        val wide = canvas.width
+        // Turned upright: narrower, and the names placed again clear of the pins.
+        holder.style.width = "343px"
+        window.dispatchEvent(Event("resize"))
+        assertTrue(canvas.width < wide, "Not painted again: ${canvas.width} after $wide")
+        for ((place, box) in map.names) {
+            for (at in map.pins.indices) {
+                assertFalse(RoomMap.covers(box, map.pinLeft[at], map.pinTop[at], RoomMap.PIN / 2.0), "$place under pin")
+            }
+        }
+        // Once its screen has gone, it is not painted again.
+        map.close()
+        val narrow = canvas.width
+        holder.style.width = "288px"
+        window.dispatchEvent(Event("resize"))
+        assertEquals(narrow, canvas.width)
+        holder.remove()
+    }
+
+    @Test
     fun `pins that would overlap on a narrow map are pushed apart and stay on it`() {
         val holder = (document.createElement("div") as HTMLElement).also { it.style.width = "160px" }
         root.appendChild(holder)

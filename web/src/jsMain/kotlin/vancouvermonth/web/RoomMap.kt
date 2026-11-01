@@ -10,6 +10,8 @@ import org.w3c.dom.CanvasRenderingContext2D
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLElement
+import org.w3c.dom.Window
+import org.w3c.dom.events.Event
 import vancouvermonth.core.Room
 import vancouvermonth.text.money
 import vancouvermonth.text.utilitiesLabel
@@ -63,6 +65,14 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
      */
     private var shownAt = window.performance.now()
 
+    /**
+     * Paints the map again when its page changes size (a phone turned, a window resized or zoomed) while it is up, so
+     * the picture stays sharp and the names stay clear of the pins; the page it listens to, and the width last painted.
+     */
+    private val onResize: (Event) -> Unit = { if (!closed && element.clientWidth.toDouble() != paintedWidth) paint() }
+    private var listeningTo: Window? = null
+    private var paintedWidth = 0.0
+
     init {
         element.className = "room-map"
         element.setAttribute("role", "group")
@@ -103,7 +113,12 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
      * so the screen answers at once and the picture follows ([paint]).
      */
     fun draw() {
-        shownAt = (element.ownerDocument?.defaultView ?: window).performance.now()
+        val page = element.ownerDocument?.defaultView ?: window
+        shownAt = page.performance.now()
+        if (listeningTo == null) {
+            page.addEventListener("resize", onResize)
+            listeningTo = page
+        }
         place(measured())
         // In the frame the screen first shows, then straight after it is drawn.
         window.requestAnimationFrame { window.setTimeout({ if (!closed) paint() }, 0) }
@@ -119,6 +134,7 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
         val c = context ?: return
         if (element.clientWidth == 0 || element.clientHeight == 0) return
         painted = true
+        paintedWidth = element.clientWidth.toDouble()
         val width = map.width
         val height = map.height
         val ratio = min(window.devicePixelRatio, 2.0)
@@ -169,9 +185,11 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
         }
     }
 
-    /** Lets the map go with its screen: a paint still waiting does nothing. */
+    /** Lets the map go with its screen: a paint still waiting does nothing, and it stops listening to the page. */
     fun close() {
         closed = true
+        listeningTo?.removeEventListener("resize", onResize)
+        listeningTo = null
     }
 
     /** The whole map at the size it has on the page; before the page lays it out, a 375-point phone's width. */
