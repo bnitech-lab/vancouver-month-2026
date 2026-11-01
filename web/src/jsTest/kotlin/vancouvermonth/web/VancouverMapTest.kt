@@ -52,6 +52,18 @@ class VancouverMapTest {
     }
 
     @Test
+    fun `packed numbers are read as changes from the item before, and a broken packing is refused`() {
+        // The changes 0, 1, -1, 15, 16 and -16 are A, C, D, e, gB and hB, so the numbers run 0, 1, 0, 15, 31, 15.
+        assertEquals(listOf(0, 1, 0, 15, 31, 15), unpackNumbers("ACDegBhB", 1).map { it.single() })
+        assertEquals(listOf(listOf(1, 2), listOf(1, 18)), unpackNumbers("CEAgB", 2).map { it.toList() })
+        assertEquals(emptyList(), unpackNumbers("", 5))
+        assertEquals(listOf(Spot(1.0, 2.5), Spot(-3.0, 4.0)), unpackPoints("UyBxCe"))
+        assertFailsWith<IllegalArgumentException> { unpackNumbers("C,E", 2) }
+        assertFailsWith<IllegalArgumentException> { unpackNumbers("CEA", 2) }
+        assertFailsWith<IllegalArgumentException> { unpackNumbers("Cg", 1) }
+    }
+
+    @Test
     fun `water lies north, west and south of the peninsula`() {
         // The inlet, north of the office towers and the old brick streets.
         for (place in listOf(Place.OFFICE, Place.COWORKING)) {
