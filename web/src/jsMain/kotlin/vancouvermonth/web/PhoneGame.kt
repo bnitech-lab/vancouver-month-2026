@@ -122,8 +122,7 @@ class PhoneGame private constructor(
     private var walkable: WalkableTown? = null
     private var playedInTown = false
 
-    /** The day of the last action, interview or sleep, and what it brought, as the month told it and as written. */
-    private var lastDay = 0
+    /** What the last action, interview or sleep brought, as the month told it and as written. */
     private var lastEvents: List<Event> = emptyList()
     private var lastLines: List<String> = emptyList()
 
@@ -557,8 +556,6 @@ class PhoneGame private constructor(
         reveal = offer.replayed.reveal
         if (record.choices.isNotEmpty()) {
             lastEvents = offer.replayed.lastEvents
-            // A night's sleep was the day before's last choice; anything else was today's.
-            lastDay = if (lastEvents.any { it is Event.Rested }) month.day - 1 else month.day
             lastLines = dayLog(lastEvents, month)
         }
         // What was bought is the month's own; what was spent today goes into today's log, as if never closed.
@@ -697,7 +694,8 @@ class PhoneGame private constructor(
         if (lastLines.isEmpty()) return
         parent.child("section", "card log") {
             setAttribute("aria-live", "polite")
-            child("h2", text = "${date(lastDay)}에 있었던 일")
+            // What the last choice brought, not the whole day: a day holds several.
+            child("h2", text = JUST_NOW)
             child("ul") { lastLines.forEach { child("li", text = it) } }
         }
     }
@@ -712,7 +710,6 @@ class PhoneGame private constructor(
         // Nothing is done while the character travels: it gets out at its stop first.
         if (walkable?.travelling != null) return
         val sleep = choice == Choice.Take(Action.REST)
-        lastDay = month.day
         lastEvents = spentToday + month.play(choice)
         lastLines = dayLog(lastEvents, month)
         spentToday = emptyList()
@@ -1367,6 +1364,9 @@ class PhoneGame private constructor(
     }
 
     private companion object {
+        /** Over the log of what the last action, interview or sleep brought. */
+        const val JUST_NOW = "방금 있었던 일"
+
         /** How long each letter of a person's line takes to appear. */
         const val TYPE_MILLIS = 35
 

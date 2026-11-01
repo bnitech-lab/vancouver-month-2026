@@ -131,7 +131,7 @@ class PhoneGameTest {
         assertTrue("지금아침 8시" in screen, screen)
 
         tap("영어 공부")
-        assertTrue("9월 2일에 있었던 일" in screen)
+        assertTrue("방금 있었던 일" in screen)
         assertEquals("polite", root.querySelector(".log")?.getAttribute("aria-live"))
         assertTrue("영어 공부를 했어요. 레벨업까지 3번" in screen)
         // The day goes on, at two in the afternoon, and no living cost is paid until the night's sleep.

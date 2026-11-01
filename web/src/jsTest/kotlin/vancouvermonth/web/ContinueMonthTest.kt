@@ -191,7 +191,7 @@ class ContinueMonthTest {
         // The same sky as before the reload: the weather comes from the run and the day alone.
         assertEquals(sky, again.weather)
         assertEquals(" 날씨 ${weatherWord(sky)}", text(".hud .weather"))
-        assertTrue("${date(month.day)}에 있었던 일" in text(".over-town .log"))
+        assertTrue("방금 있었던 일" in text(".over-town .log"))
         assertNull(root.querySelector(".guide-card"), "The guide opened again")
         assertSame(root.querySelector(".over-town .log"), document.activeElement, "The focus is not on the log")
     }
@@ -301,7 +301,7 @@ class ContinueMonthTest {
         val month = played(Action.STUDY_ENGLISH, Action.REST)
         assertEquals(continueFrom(month.day, month.balance), text(".kept-from"))
         root.button(Continue.CONTINUE).click()
-        assertTrue("${date(Month.FIRST_DAY)}에 있었던 일" in text(".over-town .log"))
+        assertTrue("방금 있었던 일" in text(".over-town .log"))
         assertTrue(date(month.day) in text(".hud"))
         // The new town is in the morning: it takes a tap, and a talk opens.
         again.onPlace(Place.CAFE)
@@ -395,7 +395,7 @@ class ContinueMonthTest {
             game.show()
             startSeed1011(root)
             root.button("영어 공부").click()
-            assertTrue("${date(Month.FIRST_DAY)}에 있었던 일" in text(".log"))
+            assertTrue("방금 있었던 일" in text(".log"))
 
             root.innerHTML = ""
             val again = PhoneGame(root, 1011, playAgain = {})

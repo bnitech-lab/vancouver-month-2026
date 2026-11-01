@@ -594,7 +594,7 @@ class WalkableTownTest {
         month.take(Action.STUDY_ENGLISH)
         assertTrue("오늘9월 2일" in screen, screen)
         assertTrue("잔고${money(month.balance)}" in screen, screen)
-        assertTrue("9월 2일에 있었던 일" in screen && "영어 공부를 했어요. 레벨업까지 3번" in screen, screen)
+        assertTrue("방금 있었던 일" in screen && "영어 공부를 했어요. 레벨업까지 3번" in screen, screen)
         assertTrue("오후 2시 · 체력 3/5 · 영어 1/10 · 코딩 3/10" in screen, screen)
         assertNull(root.querySelector(".talk"), "the talk closes when the action is taken")
     }
