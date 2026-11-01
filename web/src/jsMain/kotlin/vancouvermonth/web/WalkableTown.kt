@@ -1175,7 +1175,9 @@ internal class NeighbourhoodScene(
             val there = route.zipWithNext { a, b -> distanceBetween(a, b) }.sum()
             // After dropping the character, the taxi turns back down the street it came along.
             val back = alongFor(route.reversed(), Journey.GOING_ON)
-            Journey(transport, RailLine(route + back.drop(1)), there, route.last(), Journey.TAXI_SPEED, Journey.TAXI_RAMP)
+            // A long ride goes faster at its quickest, as the train does.
+            val cruise = Journey.taxiCruise(there)
+            Journey(transport, RailLine(route + back.drop(1)), there, route.last(), cruise, Journey.taxiRamp(cruise))
         }
     }
 

@@ -177,6 +177,24 @@ class TransitTest {
     }
 
     @Test
+    fun `a taxi goes as fast as ever downtown, and quicker out to Burnaby, about 20 seconds from zone 3 to 회사`() {
+        // Between any two of the stops in the town's own corner, the top speed a taxi always had.
+        val corner = TransitLines.taxiStops.map { it.second }.filter { it.x < Neighbourhood.TOWN_COLUMNS }
+        var longest = 0.0
+        for (from in corner) for (to in corner) longest = maxOf(longest, length(town.route(from, to)))
+        assertEquals(Journey.TAXI_SPEED, Journey.taxiCruise(longest), "$longest squares")
+        assertEquals(Journey.TAXI_RAMP, Journey.taxiRamp(Journey.TAXI_SPEED))
+        // From zone 3's 내 방 to 회사, the longest ride a taxi takes: faster, no faster than its top, and about 20 s.
+        val site = HomeSite.of(3)
+        val far = length(site.grid.route(site.home.door, Neighbourhood.venue(Place.OFFICE).door))
+        val cruise = Journey.taxiCruise(far)
+        val ride = Glide(far, cruise, Journey.taxiRamp(cruise))
+        println("A taxi from zone 3 to 회사: $far squares at up to $cruise a second, ${ride.millis} ms")
+        assertTrue(cruise > Journey.TAXI_SPEED && cruise <= Journey.TAXI_TOP, "$cruise")
+        assertTrue(ride.millis < 25_000.0, "${ride.millis} ms")
+    }
+
+    @Test
     fun `on the water bus the character stands on the open deck, clear of the cabin, its roof and its windows`() {
         // The character's footprint, a little wider than it is drawn, ahead of the boat's middle.
         val half = 0.3
