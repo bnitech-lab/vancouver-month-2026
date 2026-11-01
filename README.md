@@ -175,17 +175,19 @@ downtown's towers along the real street grid, the seawall round the shore, False
 the inlet with the mountains far across it; then, east of downtown, East Vancouver and Burnaby: detached houses on each
 real block, each with a pitched roof, a front door to the street and a lawn, a tree in some yards, smaller and lower
 with wider yards between them the farther from downtown; mid-rise round the SkyTrain stations, towers round the Burnaby
-town centre, and their parks as forest, about two minutes on foot from downtown. The five places stand in the neighbourhoods that suit them: the 카페 by the seawall on False Creek, the 도서관 in
-the middle of downtown, 코워킹 in the old brick streets at the east end, the 회사 tower in the business district by the
-inlet, and 내 방 (the room picked on September 1st) with its garden where the room is: in the West End for a room in
-zone 1, in Burnaby for zones 2 and 3, each morning starting at its door. The SkyTrain runs on its guideway out of its
-tunnel by the station, along False Creek and out through East Vancouver to Burnaby. Each place's name floats over it,
-and so does the bike shop's (see below); no other building has a name. Only the ground and buildings near the camera
-are drawn; the far city is left to the haze. The houses stand one by one only within 75 squares of the camera and in its
-view, their roofs growing on over the last 12 squares as it comes near; farther off, each row of houses is one low box.
-The character walks through the yards between houses. The day's figures
-sit thinly over the top of the screen, and a name that would sit under them or the day's log hides there. The month's
-first view looks over 내 방, toward downtown from the West End, high enough to show four of the buildings and their names.
+town centre, and their parks as forest, about two minutes on foot from downtown. The five places stand in the
+neighbourhoods that suit them: the 카페 by the seawall on False Creek, the 도서관 in the middle of downtown, 코워킹 in the old
+brick streets at the east end, the 회사 tower in the business district by the inlet, and 내 방 (the room picked on September
+1st) with its garden where the room is: in the West End for a room in zone 1, in Burnaby for zones 2 and 3, each morning
+starting at its door. The SkyTrain runs on its guideway out of its tunnel by the station, along False Creek and out
+through East Vancouver to Burnaby. Each place's name floats over it, and so does the bike shop's (see below); no other
+building has a name. Only the ground and buildings near the camera are drawn; the far city is left to the haze. The
+houses stand one by one only within 75 squares of the camera and in its view, and round the character; farther off, each
+row of houses is one low box (out where the yards are wide, each house is), and a house coming near grows out of it, its
+yard opening and its roof and door growing on over the last 12 squares. Where the yards between houses are wide, mostly
+in Burnaby, the character walks through them. The day's figures sit thinly over the top of the screen, and a name that
+would sit under them or the day's log hides there. The month's first view looks over 내 방, toward downtown from the West
+End, high enough to show four of the buildings and their names.
 
 A small map sits in the top right corner, just under the day's figures and the day's log, so the player always knows
 roughly where the character is. It lies with real north up, as a paper map of the city does, and never turns; a small N
@@ -346,8 +348,9 @@ rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, al
 words (`Shop.kt`), and the SkyTrain's, the bus's, the water bus's and the taxi's (`Transit.kt`). `WalkableTown` draws
 all of it, and
 `Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about 998 KB
-(about 284 KB gzipped). `TownBudgetTest` measures what a frame costs downtown, in East Vancouver, in Burnaby, on a walk
-and on the train, and keeps it within a phone's budget.
+(about 284 KB gzipped). `TownBudgetTest` measures what a frame costs downtown, in East Vancouver, in Burnaby, on a walk,
+on the train and with the camera turning (so the near houses are written again each frame), the sun's shadows counted
+too, and keeps it within a phone's budget.
 
 ### Sound and the guide
 
