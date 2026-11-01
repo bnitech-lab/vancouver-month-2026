@@ -19,60 +19,145 @@ class MonthTest {
 
     private fun month(balance: Int = 1_800, lucky: Boolean = true) = Month(room, balance, FixedDice(lucky))
 
+    /** Takes [actions] in order, all on the same day. */
+    private fun Month.takeAll(vararg actions: Action) = actions.flatMap { take(it) }
+
     @Test
-    fun `work pays, costs energy, and the day's living cost comes off`() {
+    fun `the costs, the day's stamina and its clock are the plan's`() {
+        assertEquals(5, Month.MAX_ENERGY)
+        assertEquals(listOf(3, 2, 2, 1, 0), Action.entries.map { Month.cost(it) })
+        assertEquals(2, Month.INTERVIEW_COST)
+        assertEquals(8, Month.DAY_STARTS_AT)
+        assertEquals(23, Month.NIGHT_AT)
         val month = month()
-        month.take(Action.WORK)
-        assertEquals(1_800 + Month.WORK_PAY - Month.DAILY_LIVING_COST, month.balance)
-        assertEquals(Month.MAX_ENERGY - 1, month.energy)
-        assertEquals(Month.FIRST_DAY + 1, month.day)
+        assertEquals(listOf(Month.MAX_ENERGY, 0, 8), listOf(month.energy, month.energySpent, month.hour))
+        assertEquals(0.0, month.dayShare)
+        assertFalse(month.isNight)
     }
 
     @Test
-    fun `study raises a skill one step at a time and stops at the top`() {
-        val month = month(balance = 5_000)
-        val levels = mutableListOf<Int>()
-        while (!month.isOver) {
-            if (month.energy == 0) {
-                month.take(Action.REST)
-            } else {
-                val event = month.take(Action.STUDY_ENGLISH).first() as Event.SkillUp
-                levels += event.level
-            }
+    fun `work pays and costs stamina and time, and the day goes on`() {
+        val month = month()
+        assertEquals(listOf(Event.Earned(Month.WORK_PAY)), month.take(Action.WORK))
+        assertEquals(1_800 + Month.WORK_PAY, month.balance, "no living cost until the night's sleep")
+        assertEquals(Month.MAX_ENERGY - Month.WORK_COST, month.energy)
+        assertEquals(Month.FIRST_DAY, month.day)
+        assertEquals(8 + 3 * Month.HOURS_PER_ENERGY, month.hour)
+        assertEquals(0.6, month.dayShare)
+    }
+
+    @Test
+    fun `a day holds several actions while stamina lasts, and then it is night`() {
+        val month = month()
+        val hours = mutableListOf(month.hour)
+        for (action in listOf(Action.STUDY_ENGLISH, Action.APPLY, Action.PRACTISE_CODING)) {
+            month.take(action)
+            hours += month.hour
         }
-        assertEquals((Month.START_ENGLISH + 1..Month.MAX_SKILL).toList(), levels.take(Month.MAX_SKILL - Month.START_ENGLISH))
-        assertTrue(levels.size > Month.MAX_SKILL - Month.START_ENGLISH, "the month should outlast the climb")
-        assertEquals(Month.MAX_SKILL, month.english)
-    }
-
-    @Test
-    fun `rest gives energy back but never above the top`() {
-        val month = month()
-        month.take(Action.REST)
-        assertEquals(Month.MAX_ENERGY, month.energy)
-        month.take(Action.WORK)
-        month.take(Action.WORK)
-        month.take(Action.WORK)
-        month.take(Action.REST)
-        assertEquals(Month.MAX_ENERGY - 3 + Month.REST_GAIN, month.energy)
-    }
-
-    @Test
-    fun `without energy only rest is allowed`() {
-        val month = month()
-        repeat(Month.MAX_ENERGY) { month.take(Action.WORK) }
+        assertEquals(listOf(8, 14, 17, 23), hours)
+        assertEquals(Month.FIRST_DAY, month.day)
         assertEquals(0, month.energy)
-        for (action in Action.entries) assertEquals(action == Action.REST, month.canTake(action), "$action")
+        assertTrue(month.isNight)
+        assertEquals(1.0, month.dayShare)
+        assertEquals(1_800, month.balance)
+    }
+
+    @Test
+    fun `sleep ends the day, the living cost comes off, and the next morning starts with full stamina`() {
+        val month = month()
+        month.takeAll(Action.WORK, Action.STUDY_ENGLISH)
+        val night = month.take(Action.REST)
+        assertEquals(listOf(Event.Rested(Month.MAX_ENERGY), Event.LivingCost(Month.DAILY_LIVING_COST)), night)
+        assertEquals(Month.FIRST_DAY + 1, month.day)
+        assertEquals(Month.MAX_ENERGY, month.energy)
+        assertEquals(Month.DAY_STARTS_AT, month.hour)
+        assertEquals(1_800 + Month.WORK_PAY - Month.DAILY_LIVING_COST, month.balance)
+    }
+
+    @Test
+    fun `sleeping early with stamina left is allowed and costs nothing more`() {
+        val early = month()
+        early.take(Action.STUDY_ENGLISH)
+        assertTrue(early.canTake(Action.REST))
+        early.take(Action.REST)
+        val late = month()
+        late.takeAll(Action.STUDY_ENGLISH, Action.PRACTISE_CODING, Action.APPLY)
+        late.take(Action.REST)
+        for (month in listOf(early, late)) {
+            assertEquals(Month.FIRST_DAY + 1, month.day)
+            assertEquals(Month.MAX_ENERGY, month.energy)
+            assertEquals(1_800 - Month.DAILY_LIVING_COST, month.balance)
+        }
+    }
+
+    @Test
+    fun `study raises a skill a level every few studies, and stops at the top`() {
+        val month = month(balance = 5_000)
+        val events = mutableListOf<Event>()
+        while (!month.isOver) {
+            val study = month.canTake(Action.STUDY_ENGLISH)
+            if (study) events += month.take(Action.STUDY_ENGLISH) else month.take(Action.REST)
+        }
+        val ups = events.filterIsInstance<Event.SkillUp>()
+        assertEquals((Month.START_ENGLISH + 1..Month.MAX_SKILL).map { Event.SkillUp(Skill.ENGLISH, it) }, ups)
+        // Before each level, the studies toward it count down what is left.
+        val toLevelTwo = events.take(Month.STEPS_PER_LEVEL)
+        assertEquals(
+            (Month.STEPS_PER_LEVEL - 1 downTo 1).map { Event.Studied(Skill.ENGLISH, Month.START_ENGLISH, it) } +
+                Event.SkillUp(Skill.ENGLISH, Month.START_ENGLISH + 1),
+            toLevelTwo,
+        )
+        assertEquals(Event.Studied(Skill.ENGLISH, Month.MAX_SKILL, 0), events.last(), "the month should outlast it")
+        assertEquals(Month.MAX_SKILL, month.english)
+        assertEquals(0, month.stepsLeft(Skill.ENGLISH))
+    }
+
+    @Test
+    fun `progress toward a level is kept across days`() {
+        val month = month()
+        month.take(Action.PRACTISE_CODING)
+        month.take(Action.REST)
+        assertEquals(1, month.codingProgress)
+        assertEquals(Month.STEPS_PER_LEVEL - 1, month.stepsLeft(Skill.CODING))
+        repeat(Month.STEPS_PER_LEVEL - 1) {
+            if (!month.canTake(Action.PRACTISE_CODING)) month.take(Action.REST)
+            month.take(Action.PRACTISE_CODING)
+        }
+        assertEquals(Month.START_CODING + 1, month.coding)
+        assertEquals(0, month.codingProgress)
+        assertEquals(Month.START_ENGLISH, month.english)
+    }
+
+    @Test
+    fun `without stamina it is night, and only sleep is allowed`() {
+        val month = month()
+        month.takeAll(Action.WORK, Action.STUDY_ENGLISH)
+        assertEquals(0, month.energy)
+        for (action in Action.entries) {
+            assertEquals(if (action == Action.REST) null else Blocked.NO_ENERGY, month.blockedBy(action), "$action")
+        }
         assertFailsWith<IllegalArgumentException> { month.take(Action.WORK) }
     }
 
     @Test
-    fun `without energy every action but rest is blocked for lack of energy`() {
+    fun `an action costing more than the stamina left is blocked as too little, and a cheaper one is not`() {
         val month = month()
-        repeat(Month.MAX_ENERGY) { month.take(Action.WORK) }
-        for (action in Action.entries) {
-            assertEquals(if (action == Action.REST) null else Blocked.NO_ENERGY, month.blockedBy(action), "$action")
-        }
+        month.takeAll(Action.STUDY_ENGLISH, Action.PRACTISE_CODING)
+        assertEquals(1, month.energy)
+        assertEquals(Blocked.LOW_ENERGY, month.blockedBy(Action.WORK))
+        assertEquals(Blocked.LOW_ENERGY, month.blockedBy(Action.STUDY_ENGLISH))
+        assertEquals(Blocked.LOW_ENERGY, month.blockedBy(Action.PRACTISE_CODING))
+        assertNull(month.blockedBy(Action.APPLY))
+        assertNull(month.blockedBy(Action.REST))
+    }
+
+    @Test
+    fun `one application a day`() {
+        val month = month(lucky = false)
+        month.take(Action.APPLY)
+        assertEquals(Blocked.APPLIED_TODAY, month.blockedBy(Action.APPLY))
+        month.take(Action.REST)
+        assertNull(month.blockedBy(Action.APPLY))
     }
 
     @Test
@@ -92,12 +177,22 @@ class MonthTest {
     }
 
     @Test
-    fun `an interview day blocks every action, rest included`() {
+    fun `on an interview day the interview comes first, and then the rest of the day is free`() {
         val month = month(lucky = true)
         month.take(Action.APPLY)
         month.take(Action.REST)
+        month.take(Action.REST)
         assertTrue(month.hasInterviewToday)
         for (action in Action.entries) assertEquals(Blocked.INTERVIEW_TODAY, month.blockedBy(action), "$action")
+        month.attendInterview()
+        assertFalse(month.hasInterviewToday)
+        assertEquals(Month.MAX_ENERGY - Month.INTERVIEW_COST, month.energy)
+        assertEquals(8 + Month.INTERVIEW_COST * Month.HOURS_PER_ENERGY, month.hour)
+        assertEquals(Month.FIRST_DAY + 2, month.day, "the day goes on after the interview")
+        assertTrue(month.canTake(Action.WORK))
+        assertTrue(month.canTake(Action.REST))
+        month.take(Action.WORK)
+        assertTrue(month.isNight)
     }
 
     @Test
@@ -118,10 +213,11 @@ class MonthTest {
     }
 
     @Test
-    fun `an unlucky application books nothing`() {
+    fun `an unlucky application books nothing, and the next day can try again`() {
         val month = month(lucky = false)
-        assertEquals(Event.Applied(null), month.take(Action.APPLY).first())
+        assertEquals(listOf(Event.Applied(null)), month.take(Action.APPLY))
         assertNull(month.interview)
+        month.take(Action.REST)
         assertTrue(month.canTake(Action.APPLY))
     }
 
@@ -130,13 +226,16 @@ class MonthTest {
         val month = month(lucky = true)
         month.take(Action.APPLY)
         month.take(Action.REST)
+        month.take(Action.REST)
         assertTrue(month.hasInterviewToday)
         assertFalse(month.canTake(Action.REST))
 
-        val first = month.attendInterview().first() as Event.InterviewHeld
+        val held = month.attendInterview()
+        val first = held.single() as Event.InterviewHeld
         assertTrue(first.passed)
         assertEquals(InterviewStage.TECHNICAL, first.next?.stage)
 
+        month.take(Action.REST)
         month.take(Action.REST)
         val balanceBefore = month.balance
         val second = month.attendInterview()
@@ -163,8 +262,10 @@ class MonthTest {
         month.take(Action.REST)
         assertFalse(month.canStillApplyThisMonth)
 
+        month.take(Action.REST)
         month.attendInterview()
         assertEquals(Interview(InterviewStage.TECHNICAL, Month.LAST_DAY), month.interview)
+        month.take(Action.REST)
         month.attendInterview()
         assertEquals(Ending.OFFER, month.ending)
     }
@@ -195,6 +296,7 @@ class MonthTest {
             override fun daysLater(range: IntRange): Int = range.first
         })
         month.take(Action.APPLY)
+        month.take(Action.REST)
         month.take(Action.REST)
         val held = month.attendInterview().first() as Event.InterviewHeld
         assertFalse(held.passed)
@@ -252,7 +354,7 @@ class MonthTest {
         val month = month(balance = 50_000)
         while (month.coding < Month.MAX_SKILL || month.english < Month.MAX_SKILL) {
             when {
-                month.energy == 0 -> month.take(Action.REST)
+                month.energy < Month.STUDY_COST -> month.take(Action.REST)
                 month.coding < Month.MAX_SKILL -> month.take(Action.PRACTISE_CODING)
                 else -> month.take(Action.STUDY_ENGLISH)
             }
