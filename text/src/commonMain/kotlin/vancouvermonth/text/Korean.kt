@@ -146,6 +146,7 @@ fun whyNot(blocked: Blocked): String = when (blocked) {
     Blocked.INTERVIEW_TODAY -> "오늘은 면접부터 봐요."
     Blocked.NO_ENERGY -> "체력이 없어요. 내 방에 가서 자요."
     Blocked.LOW_ENERGY -> "체력이 모자라요."
+    Blocked.SKILL_MAXED -> "이미 최고 레벨이에요."
     Blocked.INTERVIEW_BOOKED -> "면접이 잡혀 있어요."
     Blocked.APPLIED_TODAY -> "지원서는 하루에 한 번이에요."
     Blocked.APPLICATIONS_CLOSED -> "지금 지원하면 9월 안에 면접을 다 볼 수 없어요."
@@ -186,8 +187,7 @@ fun bedtimeLine(month: Month): String? = when {
 fun eventLine(event: Event, month: Month): String = when (event) {
     is Event.Earned -> "카페에서 일했어요. +${money(event.amount)}"
     is Event.SkillUp -> "${skillName(event.skill)} 실력이 올랐어요. ${skillName(event.skill)} ${event.level}/${Month.MAX_SKILL}"
-    is Event.Studied -> studied(event.skill) + " " +
-        if (event.stepsLeft == 0) "이미 최고 레벨이에요." else stepsLine(event.stepsLeft)
+    is Event.Studied -> "${studied(event.skill)} ${stepsLine(event.stepsLeft)}"
     is Event.Applied -> applied(event.interview)
     // The month's last night has no morning after it, so it promises no stamina.
     is Event.Rested -> if (month.isOver) "내 방에서 푹 잤어요." else "내 방에서 푹 잤어요. 체력 ${event.energy}/${Month.MAX_ENERGY}"

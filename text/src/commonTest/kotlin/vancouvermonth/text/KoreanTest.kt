@@ -242,6 +242,7 @@ class KoreanTest {
         assertEquals("오늘은 면접부터 봐요.", whyNot(Blocked.INTERVIEW_TODAY))
         assertEquals("체력이 없어요. 내 방에 가서 자요.", whyNot(Blocked.NO_ENERGY))
         assertEquals("체력이 모자라요.", whyNot(Blocked.LOW_ENERGY))
+        assertEquals("이미 최고 레벨이에요.", whyNot(Blocked.SKILL_MAXED))
         assertEquals("면접이 잡혀 있어요.", whyNot(Blocked.INTERVIEW_BOOKED))
         assertEquals("지원서는 하루에 한 번이에요.", whyNot(Blocked.APPLIED_TODAY))
         assertEquals("지금 지원하면 9월 안에 면접을 다 볼 수 없어요.", whyNot(Blocked.APPLICATIONS_CLOSED))
@@ -284,7 +285,6 @@ class KoreanTest {
         assertEquals("영어 실력이 올랐어요. 영어 2/10", eventLine(Event.SkillUp(Skill.ENGLISH, 2), month))
         assertEquals("영어 공부를 했어요. 레벨업까지 3번", eventLine(Event.Studied(Skill.ENGLISH, 1, 3), month))
         assertEquals("코딩 연습을 했어요. 레벨업까지 1번", eventLine(Event.Studied(Skill.CODING, 3, 1), month))
-        assertEquals("코딩 연습을 했어요. 이미 최고 레벨이에요.", eventLine(Event.Studied(Skill.CODING, 10, 0), month))
         assertEquals("지원서를 냈지만 아직 연락이 없어요.", eventLine(Event.Applied(null), month))
         assertEquals(
             "연락이 왔어요! 1차 영어 면접이 9월 6일에 잡혔어요.",

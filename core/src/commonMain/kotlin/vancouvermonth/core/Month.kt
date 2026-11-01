@@ -41,6 +41,9 @@ enum class Blocked {
     /** Some stamina is left, but less than the action costs. */
     LOW_ENERGY,
 
+    /** The skill this study raises is already at the top level: studying it again would only spend stamina. */
+    SKILL_MAXED,
+
     /** An application is already in progress. */
     INTERVIEW_BOOKED,
 
@@ -117,10 +120,7 @@ sealed interface Event {
     /** A study that raised [skill] to [level]. */
     data class SkillUp(val skill: Skill, val level: Int) : Event
 
-    /**
-     * A study that did not raise [skill]'s [level] yet: [stepsLeft] more studies raise it, or 0 when it is already at
-     * the top.
-     */
+    /** A study that did not raise [skill]'s [level] yet: [stepsLeft] more studies raise it. */
     data class Studied(val skill: Skill, val level: Int, val stepsLeft: Int) : Event
     data class Applied(val interview: Interview?) : Event
     /** A night's sleep at 내 방, which ends the day: the next morning starts with [energy] stamina. */
@@ -265,6 +265,8 @@ class Month(
         isOver -> Blocked.MONTH_OVER
         hasInterviewToday -> Blocked.INTERVIEW_TODAY
         action == Action.REST -> null
+        action == Action.STUDY_ENGLISH && english >= MAX_SKILL -> Blocked.SKILL_MAXED
+        action == Action.PRACTISE_CODING && coding >= MAX_SKILL -> Blocked.SKILL_MAXED
         energy == 0 -> Blocked.NO_ENERGY
         energy < cost(action) -> Blocked.LOW_ENERGY
         action == Action.APPLY && interview != null -> Blocked.INTERVIEW_BOOKED
@@ -303,9 +305,11 @@ class Month(
         return listOf(event)
     }
 
-    /** One study of [skill]: a step toward its next level, and the level itself every [STEPS_PER_LEVEL] steps. */
+    /**
+     * One study of [skill], below the top level ([Blocked.SKILL_MAXED] keeps it there): a step toward its next level,
+     * and the level itself every [STEPS_PER_LEVEL] steps.
+     */
     private fun study(skill: Skill): Event {
-        if (level(skill) >= MAX_SKILL) return Event.Studied(skill, MAX_SKILL, 0)
         val steps = progress(skill) + 1
         val levelUp = steps == STEPS_PER_LEVEL
         val progress = if (levelUp) 0 else steps

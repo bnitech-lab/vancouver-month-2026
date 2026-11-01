@@ -91,7 +91,7 @@ class MonthTest {
     }
 
     @Test
-    fun `study raises a skill a level every few studies, and stops at the top`() {
+    fun `study raises a skill a level every few studies, and at the top it is blocked with a reason`() {
         val month = month(balance = 5_000)
         val events = mutableListOf<Event>()
         while (!month.isOver) {
@@ -107,9 +107,29 @@ class MonthTest {
                 Event.SkillUp(Skill.ENGLISH, Month.START_ENGLISH + 1),
             toLevelTwo,
         )
-        assertEquals(Event.Studied(Skill.ENGLISH, Month.MAX_SKILL, 0), events.last(), "the month should outlast it")
+        assertEquals(Event.SkillUp(Skill.ENGLISH, Month.MAX_SKILL), events.last(), "the month should outlast the climb")
         assertEquals(Month.MAX_SKILL, month.english)
         assertEquals(0, month.stepsLeft(Skill.ENGLISH))
+    }
+
+    @Test
+    fun `a skill at the top level cannot be studied again, so no stamina goes for nothing`() {
+        val month = month(balance = 50_000)
+        while (month.coding < Month.MAX_SKILL) {
+            if (month.energy < Month.STUDY_COST) month.take(Action.REST) else month.take(Action.PRACTISE_CODING)
+        }
+        month.take(Action.REST)
+        assertEquals(Blocked.SKILL_MAXED, month.blockedBy(Action.PRACTISE_CODING))
+        assertFalse(month.canTake(Action.PRACTISE_CODING))
+        assertFailsWith<IllegalArgumentException> { month.take(Action.PRACTISE_CODING) }
+        assertEquals(Month.MAX_ENERGY, month.energy)
+        // English, below the top, is studied as before.
+        assertNull(month.blockedBy(Action.STUDY_ENGLISH))
+        // The reason holds late in the day too, ahead of the stamina left.
+        month.take(Action.STUDY_ENGLISH)
+        month.take(Action.STUDY_ENGLISH)
+        assertEquals(Blocked.SKILL_MAXED, month.blockedBy(Action.PRACTISE_CODING))
+        assertEquals(Blocked.LOW_ENERGY, month.blockedBy(Action.STUDY_ENGLISH))
     }
 
     @Test
