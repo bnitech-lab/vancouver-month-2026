@@ -1,6 +1,8 @@
 package vancouvermonth.web
 
+import kotlin.js.Promise
 import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.roundToInt
 import kotlin.test.AfterTest
@@ -23,7 +25,6 @@ import org.w3c.dom.asList
 import org.w3c.dom.events.Event
 import org.w3c.dom.events.MouseEvent
 import org.w3c.dom.events.MouseEventInit
-import kotlin.js.Promise
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.save.MonthRecord
 import vancouvermonth.text.Continue
@@ -101,7 +102,13 @@ class RoomMapTest {
         val whole = MinimapProjection(box.width, box.height)
         rooms.forEachIndexed { index, room ->
             val door = HomeSite.of(room.zone.number).home.door
-            assertEquals(door, Neighbourhood.home(room.zone.number).door)
+            // Zone 1's is the town's own 내 방's door; the others' stand on the wide map's room square for the zone.
+            if (room.zone.number == 1) {
+                assertEquals(Neighbourhood.venue(Place.HOME).door, door)
+            } else {
+                val square = Cell(floor(door.x).toInt(), floor(door.z).toInt())
+                assertEquals(WideVancouver.homes.getValue(room.zone.number), square, "Zone ${room.zone.number}'s door")
+            }
             val pin = pins[index].getBoundingClientRect()
             val left = pin.left + pin.width / 2 - box.left
             val top = pin.top + pin.height / 2 - box.top
@@ -440,9 +447,21 @@ class RoomMapTest {
             open(into = app)
             val page = app.ownerDocument!!
             assertTrue(takesFinger(app.button(Intro.START), width, height), "시작하기 is covered at $width")
+            // Read down the intro, then 시작하기: the rooms open at the top of the page.
+            val view = page.defaultView!!
+            view.scrollTo(0.0, 300.0)
+            assertTrue(view.scrollY > 0.0, "The intro does not scroll at $width x $height")
             passIntro(app)
-            page.defaultView!!.scrollTo(0.0, 0.0)
+            assertEquals(0.0, view.scrollY, "The rooms did not open at the top at $width x $height")
             val map = assertNotNull(app.querySelector(".room-map") as? HTMLElement)
+            // On the screen, top to bottom: what to do, the map, the price board, the guess.
+            val todo = app.querySelector("section.card")!!.getBoundingClientRect()
+            val board = app.querySelector(".board")!!.getBoundingClientRect()
+            val guess = app.querySelector(".guess")!!.getBoundingClientRect()
+            assertEquals("할 일", app.querySelector("section.card h2")?.textContent)
+            assertTrue(todo.bottom <= map.getBoundingClientRect().top, "할 일 is not above the map at $width")
+            assertTrue(map.getBoundingClientRect().bottom < board.top, "요금표 is not under the map at $width")
+            assertTrue(board.bottom < guess.top, "The guess is not under 요금표 at $width")
             // The whole map is on a 375 x 812 phone's first screen, right after 시작하기.
             val bottom = map.getBoundingClientRect().bottom
             if (width == 375) assertTrue(bottom <= height, "The map ends at $bottom, below the first screen")

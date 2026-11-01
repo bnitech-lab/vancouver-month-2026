@@ -325,11 +325,11 @@ class PhoneGame private constructor(
         }
     }
 
-    /** Leaves the intro for the rooms, from the top of the page. */
+    /** Leaves the intro for the rooms, from the top of the page the game is on. */
     private fun toRooms() {
         introPassed = true
         show()
-        window.scrollTo(0.0, 0.0)
+        (root.ownerDocument?.defaultView ?: window).scrollTo(0.0, 0.0)
     }
 
     private fun showRooms() {
