@@ -191,6 +191,13 @@ class RoomMapTest {
                         assertFalse(under, "seed $seed: $place under pin ${at + 1} at $width")
                     }
                 }
+                // A line to a moved name never leads into a pin: from a dot under one it starts at the pin's rim.
+                for ((place, start) in map.leaderStarts) {
+                    for (at in map.pins.indices) {
+                        val into = hypot(start[0] - map.pinLeft[at], start[1] - map.pinTop[at])
+                        assertTrue(into >= RoomMap.PIN / 2.0 - 0.01, "seed $seed: $place's line starts in pin ${at + 1} at $width")
+                    }
+                }
                 val boxes = map.names.entries.toList()
                 for ((index, a) in boxes.withIndex()) {
                     for (b in boxes.drop(index + 1)) {

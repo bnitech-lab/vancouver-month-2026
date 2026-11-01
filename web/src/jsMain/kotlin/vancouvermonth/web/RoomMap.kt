@@ -51,6 +51,9 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
     /** Where each named place's name went at the last [paint]: its box's left, top, right and bottom, in CSS pixels. */
     val names = mutableMapOf<Place, DoubleArray>()
 
+    /** Where each line from a place to its moved name starts at the last [paint], in CSS pixels. For tests. */
+    val leaderStarts = mutableMapOf<Place, DoubleArray>()
+
     /** True once the map has been painted ([paint]). For tests. */
     var painted = false
         private set
@@ -168,6 +171,7 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
         // Every 회사 and 카페 by its kind, placed as the town's whole map places names: over the dot, or else the first
         // spot round it that covers no pin and no other name, with a short line back to the dot.
         names.clear()
+        leaderStarts.clear()
         val lift = Minimap.BIG_DOT * scale + 3
         for (place in NAMED) {
             val venue = Neighbourhood.venue(place)
@@ -181,10 +185,31 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
             } ?: continue
             val left = dotLeft + Minimap.NAME_SPOTS_X[spot]
             val top = dotTop + Minimap.NAME_SPOTS_Y[spot] - lift
-            if (spot > 0) Minimap.leader(c, dotLeft, dotTop, left, top)
+            if (spot > 0) {
+                // A dot under a room's pin (비탈 카페 beside zone 3's 내 방) is hidden: its line starts at the pin's rim,
+                // so the name reads as by that room rather than leading into the pin.
+                val start = rimOfPinOver(dotLeft, dotTop, left, top - Minimap.NAME_HEIGHT / 2)
+                    ?: doubleArrayOf(dotLeft, dotTop)
+                Minimap.leader(c, start[0], start[1], left, top)
+                leaderStarts[place] = start
+            }
             names[place] = nameBox(left, top, wide)
             Minimap.name(c, place.kind.label, left, top)
         }
+    }
+
+    /**
+     * Where the line from a dot at [dotLeft], [dotTop] toward [towardLeft], [towardTop] leaves the pin the dot lies
+     * under, or null when no pin covers it.
+     */
+    private fun rimOfPinOver(dotLeft: Double, dotTop: Double, towardLeft: Double, towardTop: Double): DoubleArray? {
+        val radius = PIN / 2.0
+        val at = pinLeft.indices.firstOrNull { hypot(pinLeft[it] - dotLeft, pinTop[it] - dotTop) < radius } ?: return null
+        val across = towardLeft - pinLeft[at]
+        val down = towardTop - pinTop[at]
+        val apart = hypot(across, down)
+        if (apart <= radius) return null
+        return doubleArrayOf(pinLeft[at] + across / apart * radius, pinTop[at] + down / apart * radius)
     }
 
     /** Lets the map go with its screen: a paint still waiting does nothing, and it stops listening to the page. */
