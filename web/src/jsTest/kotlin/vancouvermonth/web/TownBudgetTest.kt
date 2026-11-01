@@ -169,7 +169,9 @@ class TownBudgetTest {
                 assertTrue(cost.draws <= UNDERGROUND_DRAWS, "${cost.draws} draws")
             }
         }.then {
-            whenReady({ town.isUnderground && town.undergroundShown.eye.x > UndergroundRide.HALL_EAST }) {
+            // Out in the tunnel, or just short of it: the camera is there for most of a second, and a slow test browser
+            // may draw only a few frames in that time.
+            whenReady({ town.isUnderground && town.undergroundShown.eye.x > UndergroundRide.HALL_EAST - 2.0 }) {
                 val cost = town.measureFrames(FRAMES)
                 report("under downtown, in the tunnel", cost)
                 withinBudget(cost)
