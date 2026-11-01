@@ -285,6 +285,8 @@ class CutawayTest {
                     val toHead = Point(head.x - eye.x, head.y - eye.y, head.z - eye.z)
                     val length = sqrt(toHead.x * toHead.x + toHead.y * toHead.y + toHead.z * toHead.z)
                     val way = Point(toHead.x / length, toHead.y / length, toHead.z / length)
+                    // Every building in the way is among those near, so none far off folds.
+                    assertEquals(cutaway.foldingCount, near.count { cutaway.isFolding(it) }, "$spot, turn $yaw: one far off folds")
                     for (index in near) {
                         val box = boxes[index]
                         val shape = shapes[index]

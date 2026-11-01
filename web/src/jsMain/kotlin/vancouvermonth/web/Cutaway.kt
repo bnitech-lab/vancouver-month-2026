@@ -103,6 +103,10 @@ class Cutaway(buildings: List<Block>, shapes: List<Block> = buildings) {
     /** True when building [index] is folded down, or folding: it stands in the way. */
     fun isFolding(index: Int): Boolean = wanted[index]
 
+    /** How many buildings stand in the way now, all over the town, as [isFolding] says of each. For tests. */
+    internal var foldingCount = 0
+        private set
+
     /** How far building [index] is folded as drawn, eased: 0.0 standing, 1.0 down to its plinth. */
     fun foldOf(index: Int): Double {
         val share = folded[index]
@@ -155,6 +159,7 @@ class Cutaway(buildings: List<Block>, shapes: List<Block> = buildings) {
         // With the eye inside it, or nearly, a building still standing even in part folds at once.
         val snap = inWay && folded[index] < 1.0 && holdsEye(index, eyeX, eyeY, eyeZ)
         if (inWay == wanted[index] && !snap) return
+        if (inWay != wanted[index]) foldingCount += if (inWay) 1 else -1
         wanted[index] = inWay
         if (snap) snaps[index] = true
         if (!isListed[index]) {
