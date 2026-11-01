@@ -20,7 +20,8 @@ package vancouvermonth.web
  * south shore. Turned so the downtown street grid runs along x and z (real north points up and to the left),
  * and shrunk so the farthest walk between two of the five places takes about 25 seconds on bare ground (along
  * the streets between the blocks, a little more).
- * Points are "x,z" pairs in grid units, with x east along the columns and z south down the rows.
+ * Points are in grid units, with x east along the columns and z south down the rows; short lines are written
+ * "x,z x,z", long ones packed as [unpackPoints] reads them.
  */
 internal object VancouverMapData {
     const val COLUMNS = 246

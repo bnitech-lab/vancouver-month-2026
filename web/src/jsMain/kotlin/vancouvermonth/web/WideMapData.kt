@@ -35,7 +35,8 @@ package vancouvermonth.web
  * south-west Burnaby, to past the Burnaby town centre and its big park. The same turn and scale as
  * [VancouverMapData]: the town's map is this map's top-left corner, square for square, so every square of the
  * town has the same column and row in both. Real north points up and to the left, so the map's right is real
- * south-east, the way the Expo Line runs. Points are "x,z" pairs in grid units, as in [VancouverMapData].
+ * south-east, the way the Expo Line runs. Points are in grid units, written "x,z" or packed, as in
+ * [VancouverMapData].
  */
 internal object WideMapData {
     const val COLUMNS = 680
