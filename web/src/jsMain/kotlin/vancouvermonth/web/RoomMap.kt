@@ -76,7 +76,7 @@ internal class RoomMap(rooms: List<Room>, picked: Int?, locked: Boolean, onPick:
     init {
         element.className = "room-map"
         element.setAttribute("role", "group")
-        element.setAttribute("aria-label", "방 세 곳이 있는 지도")
+        element.setAttribute("aria-label", "방 ${rooms.size}곳이 있는 지도")
         // Where it sits and its shape are set here, as for the small map, so it keeps them whatever else is on the
         // page; how it looks is in the page's style.
         element.style.position = "relative"

@@ -96,6 +96,7 @@ class RoomMapTest {
         val map = assertNotNull(root.querySelector(".rooms .room-map") as? HTMLElement, "No map of the rooms")
         assertNull(root.querySelector("button.room"), "The list of rooms is still there")
         assertEquals("group", map.getAttribute("role"))
+        assertEquals("방 3곳이 있는 지도", map.getAttribute("aria-label"))
         val pins = pins()
         assertEquals(3, pins.size)
         val box = map.getBoundingClientRect()
@@ -178,6 +179,12 @@ class RoomMapTest {
             assertFalse(overlap, "회사 and 카페 overlap at $width")
             holder.remove()
         }
+    }
+
+    @Test
+    fun `the map says how many rooms it holds, from the rooms it is given`() {
+        val two = FirstMinute(1011).rooms.take(2)
+        assertEquals("방 2곳이 있는 지도", RoomMap(two, null, false) {}.element.getAttribute("aria-label"))
     }
 
     @Test
