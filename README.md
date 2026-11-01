@@ -267,8 +267,8 @@ the guideway, and the character steps out at the station chosen. A long ride goe
 about 18 seconds on the move. Under downtown the town gives way to the station's platform and the tunnel, drawn on
 their own in eight draws (`Underground.kt`): getting on at 다운타운역, the character waits at the platform's edge under
 the station's sign, the train comes in out of the tunnel, opens its doors, takes the character and pulls out, with the
-camera behind it; in the tunnel the lamps on its walls go by and the mouth's daylight comes up ahead, and the camera cuts
-to the town as the train comes out of the mouth at 터널 입구역. The other way, the camera follows the train in from the
+camera behind it; in the tunnel the lamps on its walls go by and the mouth comes up ahead, in the sky's colour by day
+or by night, and the camera cuts to the town as the train comes out of the mouth at 터널 입구역. The other way, the camera follows the train in from the
 mouth, and at the platform the doors open and the character steps out and walks off before the street door. The camera
 is never still for more than a moment down there, the rumble is heard where it rides, the small map's arrow goes with
 the train under the streets, and no name floats over the platform. With less motion the lamps are left out and the
