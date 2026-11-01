@@ -215,6 +215,15 @@ internal class NeighbourhoodScene(
     /** The town as lived in for the room's zone: 내 방 where the room is, and the ground to walk on with it. */
     private val site = HomeSite.of(homeZone)
 
+    /**
+     * Where a taxi goes from this zone, and its way from where the character stands to each place, worked out once
+     * while it stands there: all of them in one search over the ground, as the wide map's ways are long. Set before
+     * the town is built, so nothing that builds it can find them unset.
+     */
+    private val taxiStops = TransitLines.taxiStopsFor(homeZone)
+    private var taxiFrom: Spot? = null
+    private val taxiWays = mutableMapOf<Spot, List<Spot>?>()
+
     /** Every box that stands still: the town's, then 내 방's; and every glowing one, likewise. */
     private val stillBlocks = Neighbourhood.blocks + site.blocks
     private val glowingBlocks = Neighbourhood.glowing + site.glowing
@@ -1074,14 +1083,6 @@ internal class NeighbourhoodScene(
 
     override val travelling: Transport?
         get() = journey?.transport
-
-    /**
-     * The taxi's way from where the character stands to each place, worked out once while it stands there: all of the
-     * places a taxi goes in one search over the ground, as the wide map's ways are long.
-     */
-    private var taxiFrom: Spot? = null
-    private val taxiWays = mutableMapOf<Spot, List<Spot>?>()
-    private val taxiStops = TransitLines.taxiStopsFor(homeZone)
 
     /** The way along the streets from where the character stands to [to], or null when it cannot get there. */
     private fun taxiWay(to: Spot): List<Spot>? {
