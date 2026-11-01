@@ -16,7 +16,7 @@ class GuideTest {
     }
 
     @Test
-    fun `how to play says how to walk, dash, look about, talk, spend the day, ride and find the way, in seven lines`() {
+    fun `how to play says how to walk, dash, look about, talk, spend the day, ride, find the way and the places, in eight lines`() {
         assertEquals(8, Guide.LINES.size)
         assertTrue("땅을 누르면" in Guide.LINES[0] && "두 번 누르면" in Guide.LINES[0])
         assertTrue("끌면" in Guide.LINES[1] && "벌리면" in Guide.LINES[1] && "모으면" in Guide.LINES[1])
