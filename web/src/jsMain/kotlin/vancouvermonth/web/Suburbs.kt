@@ -12,7 +12,8 @@ import kotlin.random.Random
  * A detached house on one of the wide map's residential blocks ([Suburbs]): its footprint ([shape]), turned as its
  * block is with its width along the street, how tall its walls are, its colours, the side its door is on and how far
  * along the front, and where its walls are in [Neighbourhood.blocks] and it is in [Neighbourhood.foldables]. It is
- * drawn, walls, roof and door, only near the camera ([HouseDetail]); farther off its row is one low box.
+ * drawn, walls, roof and door, only near the camera ([HouseDetail]); farther off its row is one low box, or it is one
+ * itself out where the yards are wide.
  */
 class House(
     val shape: TurnedBox,
@@ -25,6 +26,14 @@ class House(
     val doorAt: Double,
     val body: Int = -1,
     val foldable: Int = -1,
+    /**
+     * Its share of its row's low box far off: how far along its width that share's middle is from the house's, how
+     * wide it is, and the box's height. Coming near, the house grows from that share into itself, so the yards open
+     * gradually ([HouseDetail]).
+     */
+    val slotShift: Double = 0.0,
+    val slotWidth: Double = shape.width,
+    val farWall: Double = wall,
 ) {
     /** How far the ridge stands above the walls: the roof is pitched at 45 degrees over the house and its eaves. */
     val ridge: Double

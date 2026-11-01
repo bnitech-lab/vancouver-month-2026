@@ -12,8 +12,8 @@ import org.khronos.webgl.set
  * The suburbs' houses as drawn near the camera ([Neighbourhood.yards]): each house's walls, pitched roof and door, and
  * each block's lawn and yard trees. Far off, each row of houses is one low box (or each house, out where the yards are
  * wide), which the town always draws; within [REACH] of the camera and in its view, a block's houses stand one by one
- * instead ([shown]), their roofs and doors growing on over the last [GROW] as the camera comes nearer, and the lawns
- * reach on to [LAWN_REACH]. A house folds out
+ * instead ([shown]), each growing out of its share of its row's low box, the yards opening and its roof and door
+ * growing on, over the last [GROW] as the camera comes nearer; the lawns reach on to [LAWN_REACH]. A house folds out
  * of the camera's way as the city's buildings do, its roof sinking with its walls. [fill] writes them into [numbers]
  * (sixteen for each box, as a draw of many boxes keeps them) and [colours], the nearest blocks first and never more than
  * [CAPACITY] boxes, making nothing new.
@@ -131,19 +131,26 @@ internal class HouseDetail(private val yards: List<Yard>, private val numbers: F
             val fold = foldOf(house.foldable)
             val cosine = cos(shape.turn)
             val sine = sin(shape.turn)
+            // At the edge of reach the house is its share of its row's low box, which it grows out of into itself as the
+            // camera comes near, the yards opening on either side.
+            val width = house.slotWidth + (shape.width - house.slotWidth) * grown
+            val shift = house.slotShift * (1 - grown)
+            val x = shape.x + shift * cosine
+            val z = shape.z - shift * sine
+            val tall = house.farWall + (house.wall - house.farWall) * grown
             // The walls as the cutaway draws them, and the roof on top of them, as much smaller as they are folded.
-            val walls = if (house.wall > Cutaway.PLINTH) house.wall - (house.wall - Cutaway.PLINTH) * fold else house.wall
-            put(shape.x, walls / 2, shape.z, shape.width, walls, shape.depth, cosine, sine, 0.0, house.colour)
+            val walls = if (tall > Cutaway.PLINTH) tall - (tall - Cutaway.PLINTH) * fold else tall
+            put(x, walls / 2, z, width, walls, shape.depth, cosine, sine, 0.0, house.colour)
             val size = grown * (1 - fold)
             if (size <= 0.0) continue
             // A box turned 45 degrees about the ridge, its middle at the eaves, so its lower half stays inside the walls.
-            val span = (shape.width + 2 * Suburbs.EAVE) / SQRT_TWO * size
-            put(shape.x, walls, shape.z, span, span, shape.depth - 0.02, cosine, sine, ROOF_PITCH, house.roof)
+            val span = (width + 2 * Suburbs.EAVE) / SQRT_TWO * size
+            put(x, walls, z, span, span, shape.depth - 0.02, cosine, sine, ROOF_PITCH, house.roof)
             // The door, on the front, as tall as the walls let it be.
             val door = kotlin.math.min(DOOR_HEIGHT, house.wall * DOOR_SHARE) * grown * walls / house.wall
             val out = house.front * (shape.depth / 2 + DOOR_DEPTH / 2)
-            val doorX = shape.x + house.doorAt * cosine + out * sine
-            val doorZ = shape.z - house.doorAt * sine + out * cosine
+            val doorX = x + house.doorAt * cosine + out * sine
+            val doorZ = z - house.doorAt * sine + out * cosine
             put(doorX, door / 2, doorZ, DOOR_WIDTH, door, DOOR_DEPTH, cosine, sine, 0.0, DOOR)
         }
         return true

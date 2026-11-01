@@ -103,6 +103,29 @@ class HouseDetailTest {
     }
 
     @Test
+    fun `at the edge of reach a row's houses are its low box, and coming near they grow into themselves`() {
+        val yard = Neighbourhood.yards.first { yard -> yard.rows == 1 && yard.houses.size == 2 && yard.houses.all { it.slotShift != 0.0 } }
+        val row = Neighbourhood.blocks[yard.firstRow]
+        val detail = HouseDetail(listOf(yard), numbers)
+        // Looking across the row from just inside reach: each house's walls are its share, the shares as wide as the box.
+        val turn = yard.houses[0].shape.turn
+        val far = HouseDetail.REACH - 0.01
+        val eye = Point(yard.middle.x + sin(turn) * far, 8.0, yard.middle.z + cos(turn) * far)
+        detail.fillFor(eye, yard.middle)
+        assertTrue(detail.shown[0])
+        val walls = (0 until detail.count).filter { abs(numbers[it * 16 + 5] - 0.035f) > 1e-3 && abs(numbers[it * 16 + 1]) < 1e-6 }
+            .filter { detail.colours[it] == yard.houses[0].colour }
+        assertEquals(2, walls.size)
+        val widths = walls.map { hypot(numbers[it * 16].toDouble(), numbers[it * 16 + 2].toDouble()) }
+        assertEquals(row.width, widths.sum(), 0.01)
+        for (at in walls) assertEquals(row.height, numbers[at * 16 + 5].toDouble(), 0.01)
+        // Close by, each is its own width, the yard between them open.
+        detail.fillFor(Point(yard.middle.x + sin(turn) * 20.0, 8.0, yard.middle.z + cos(turn) * 20.0), yard.middle)
+        val near = (0 until detail.count).filter { abs(numbers[it * 16 + 1]) < 1e-6 && detail.colours[it] == yard.houses[0].colour }
+        for (at in near) assertEquals(yard.houses[0].shape.width, hypot(numbers[at * 16].toDouble(), numbers[at * 16 + 2].toDouble()), 1e-3)
+    }
+
+    @Test
     fun `a block drawn one by one stays so a little past reach, so one at the edge does not flicker`() {
         val yards = listOf(yardAt(500.0, 50.0, count = 1))
         val house = yards[0].houses[0]

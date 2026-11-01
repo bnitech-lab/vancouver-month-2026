@@ -3,10 +3,12 @@ package vancouvermonth.web
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 import kotlin.random.Random
 import vancouvermonth.text.Townsperson
 
@@ -1092,6 +1094,8 @@ object Neighbourhood {
                 housesNear.getOrPut(houseBucket(house.shape.x, house.shape.z)) { mutableListOf() }.add(house.shape)
             }
             val firstRow = blocks.size
+            // Each house's share of its row's low box: from halfway to the house before it to halfway to the next.
+            val slots = mutableMapOf<House, Triple<Double, Double, Double>>()
             for (front in standing.map { it.front }.distinct()) {
                 val row = standing.filter { it.front == front }
                 if (share <= Suburbs.ROWS_UP_TO && row.size == plan.houses.count { it.front == front }) {
@@ -1099,7 +1103,14 @@ object Neighbourhood {
                     val last = row.last().shape
                     val length = hypot(last.x - first.x, last.z - first.z) + first.width
                     val far = TurnedBox((first.x + last.x) / 2, (first.z + last.z) / 2, length, first.depth, first.turn)
-                    blocks.add(far.block(0.0, row.sumOf { it.wall } / row.size, row.first().colour))
+                    val farWall = row.sumOf { it.wall } / row.size
+                    blocks.add(far.block(0.0, farWall, row.first().colour))
+                    val along = row.map { (it.shape.x - first.x) * cos(first.turn) - (it.shape.z - first.z) * sin(first.turn) }
+                    for ((at, house) in row.withIndex()) {
+                        val from = if (at == 0) along[at] - first.width / 2 else (along[at - 1] + along[at]) / 2
+                        val to = if (at == row.lastIndex) along[at] + first.width / 2 else (along[at] + along[at + 1]) / 2
+                        slots[house] = Triple((from + to) / 2 - along[at], to - from, farWall)
+                    }
                 } else {
                     for (house in row) blocks.add(house.shape.block(0.0, house.wall, house.colour))
                 }
@@ -1114,7 +1125,11 @@ object Neighbourhood {
                 claim(house.shape, box, marks = kept.isNotEmpty())
                 // However thin, it blocks the square its middle is on.
                 turnedFootprints.add(Cell(floor(house.shape.x).toInt(), floor(house.shape.z).toInt()))
-                House(house.shape, house.wall, house.colour, house.roof, house.front, house.doorAt, body, foldable)
+                val (shift, width, farWall) = slots[house] ?: Triple(0.0, house.shape.width, house.wall)
+                House(
+                    house.shape, house.wall, house.colour, house.roof, house.front, house.doorAt, body, foldable,
+                    shift, width, farWall,
+                )
             }
             if (kept.isEmpty()) claim(block, block.bounds(0.0, 0), marks = true, blocking = false)
             val trees = if (kept.isEmpty()) plan.trees else emptyList()

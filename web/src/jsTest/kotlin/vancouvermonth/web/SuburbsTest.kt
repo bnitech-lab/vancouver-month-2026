@@ -191,6 +191,26 @@ class SuburbsTest {
                 assertTrue(rowOf, "${house.shape.x}, ${house.shape.z} has no low box far off")
             }
         }
+        // In a row drawn as one box, each house's share of it runs from halfway to the house before to halfway to the
+        // next: the shares fill the box end to end, as tall as it, so a house coming near grows out of it seamlessly.
+        var shared = 0
+        for (yard in yards) {
+            for (row in yard.houses.groupBy { it.front }.values) {
+                if (row.all { it.slotWidth == it.shape.width && it.slotShift == 0.0 && it.farWall == it.wall }) continue
+                shared++
+                val first = row.first().shape
+                val last = row.last().shape
+                val length = distanceBetween(Spot(first.x, first.z), Spot(last.x, last.z)) + first.width
+                assertEquals(length, row.sumOf { it.slotWidth }, 1e-9)
+                assertTrue(row.all { it.farWall == row.sumOf { house -> house.wall } / row.size })
+                for ((a, b) in row.zipWithNext()) {
+                    // Where a's share ends, from a's middle, is where b's begins, from b's middle and then on to a's.
+                    val apart = distanceBetween(Spot(a.shape.x, a.shape.z), Spot(b.shape.x, b.shape.z))
+                    assertEquals(a.slotShift + a.slotWidth / 2, apart + b.slotShift - b.slotWidth / 2, 1e-9)
+                }
+            }
+        }
+        assertTrue(shared > 300, "only $shared rows shared out")
         // Up to halfway out, about one for each block, as the city had before the houses; farther out, one a house, so
         // the wide yards show from far off too.
         val (near, far) = yards.partition { Suburbs.share(it.middle) <= Suburbs.ROWS_UP_TO }
