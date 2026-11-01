@@ -1056,7 +1056,7 @@ object Neighbourhood {
                 val chance = if (inKept) 0.0 else wideRandom.nextDouble()
                 val pick = if (inKept) 0.0 else wideRandom.nextDouble()
                 if (residential) {
-                    addHouses(shape, kept.filter { inKept && shape.overlaps(it, 0.5) })
+                    addHouses(shape, kept.filter { inKept && shape.overlaps(it, 0.5) }, streets)
                     continue
                 }
                 var (height, colours) = when {
@@ -1070,18 +1070,27 @@ object Neighbourhood {
         }
 
         /**
-         * A residential block split into lots, a detached house on each ([Suburbs.layOut]): each house folding as the
-         * city's buildings do and blocking only the squares it stands on, so the yards between are walked through; a
-         * yard tree's trunk blocks its square. Far off, each row of houses is one low box, as long as the row and as
-         * tall as its houses on the whole, out to [Suburbs.ROWS_UP_TO]; farther out, where the yards are wide enough to
-         * see, and on a row a house is missing from, it is a box for each house. A house on a park, on
-         * the water, in the town's corner or on a lot in [kept] is left out, and a block that reaches such a lot has no
-         * lawn or trees. The small map shows the block as it did.
+         * A residential block split into lots, a detached house on each ([Suburbs.layOut]), a single row's doors to
+         * a main street beside it ([streets]) if there is one: each house folding as the city's buildings do and
+         * blocking only the squares it stands on, so a yard wide enough is walked through; a yard tree's trunk blocks
+         * its square. Far off, each row of houses is one low box, as long as the row and as tall as its houses on the
+         * whole, out to [Suburbs.ROWS_UP_TO]; farther out, where the yards are wide enough to see, and on a row a house
+         * is missing from, it is a box for each house. A house on a park, on the water, in the town's corner or on a
+         * lot in [kept] is left out, and a block that reaches such a lot has no lawn or trees. The small map shows the
+         * block as it did.
          */
-        fun addHouses(block: TurnedBox, kept: List<Lot>) {
+        fun addHouses(block: TurnedBox, kept: List<Lot>, streets: Samples) {
             val walls = if (block.x < BOUNDARY_X) WEST_END_COLOURS else LOW_COLOURS
             val share = Suburbs.share(Spot(block.x, block.z))
-            val plan = Suburbs.layOut(block, share, walls, houseRandom)
+            // A single row's doors face a main street if one runs along the block, and never a park or the water.
+            val plan = Suburbs.layOut(block, share, walls, houseRandom) { spot ->
+                val terrain = map.terrainAt(floor(spot.x).toInt(), floor(spot.z).toInt())
+                when {
+                    terrain == Terrain.PARK || terrain == Terrain.WATER -> -1
+                    streets.within(spot, MAIN_STREET_NEAR) -> 1
+                    else -> 0
+                }
+            }
             val standing = plan.houses.filter { house ->
                 house.shape.x > TOWN_COLUMNS && kept.none { house.shape.overlaps(it, 0.5) } &&
                     Suburbs.cornersOf(house.shape).all { (x, z) ->
@@ -1434,6 +1443,9 @@ object Neighbourhood {
     private const val BEYOND_STEP = 9
     private const val BEYOND_BLOCK = 5
     private const val BEYOND_ROWS = 3
+
+    /** A single row of houses faces a main street whose middle is this near the ground past its side. */
+    private const val MAIN_STREET_NEAR = 2.0
 
     /** The houses are kept in buckets this many squares wide while laid out, and kept this far apart at least. */
     private const val HOUSE_BUCKET = 8.0

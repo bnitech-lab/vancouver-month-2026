@@ -106,9 +106,11 @@ object Suburbs {
     /**
      * Splits [block] (a residential block, already brought in from its streets) into lots at [share] of the way out
      * from downtown, a house on each in one of [walls], and plants a tree or two in its widest yards, all by [chances].
-     * The houses' indices are left unset, for the town to set as it builds them.
+     * A single row faces the side whose ground [outside] likes better (a main street over a side street, either over a
+     * park or the water), by chance when it likes both the same. The houses' indices are left unset, for the town to set
+     * as it builds them.
      */
-    fun layOut(block: TurnedBox, share: Double, walls: List<Int>, chances: Random): Yard {
+    fun layOut(block: TurnedBox, share: Double, walls: List<Int>, chances: Random, outside: (Spot) -> Int = { 0 }): Yard {
         val lawn = block.block(0.0, LAWN_HEIGHT, LAWN)
         // Lots run along the block's long side, so each house's width is along the street and its depth across it.
         val lengthwise = block.width >= block.depth
@@ -138,7 +140,10 @@ object Suburbs {
         val fronts = if (across >= 2 * (depth + setback) + BACK_TO_BACK) {
             listOf(1.0, -1.0)
         } else {
-            listOf(if (chances.nextBoolean()) 1.0 else -1.0)
+            val byChance = if (chances.nextBoolean()) 1.0 else -1.0
+            val ahead = outside(spotAt(0.0, across / 2 + OUTSIDE))
+            val behind = outside(spotAt(0.0, -across / 2 - OUTSIDE))
+            listOf(if (ahead == behind) byChance else if (ahead > behind) 1.0 else -1.0)
         }
         val houses = mutableListOf<House>()
         for (front in fronts) {
@@ -219,6 +224,9 @@ object Suburbs {
     /** A house keeps this far in from its block's edges; none is narrower or shallower than [LEAST]. */
     private const val MARGIN = 0.1
     private const val LEAST = 0.8
+
+    /** How far past a block's long side the ground its single row faces is looked at. */
+    private const val OUTSIDE = 1.0
 
     /** The room between two rows of houses back to back. */
     private const val BACK_TO_BACK = 0.3

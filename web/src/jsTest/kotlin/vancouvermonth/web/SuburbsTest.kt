@@ -243,6 +243,35 @@ class SuburbsTest {
     }
 
     @Test
+    fun `a single row's doors face a main street beside it, and never a park or the water when the street side is land`() {
+        val streets = Samples(WideVancouver.streets + TransitLines.busLines.map { it.loop.points })
+        var toStreet = 0
+        for (yard in yards) {
+            val fronts = yard.houses.map { it.front }.distinct()
+            if (fronts.size != 1) continue
+            val house = yard.houses[0]
+            val across = minOf(yard.block.width, yard.block.depth) / 2 + 1.0
+            fun outside(side: Double) = Spot(
+                yard.block.x + sin(house.shape.turn) * side * across,
+                yard.block.z + cos(house.shape.turn) * side * across,
+            )
+            fun kind(spot: Spot): Int {
+                val terrain = Neighbourhood.map.terrainAt(floor(spot.x).toInt(), floor(spot.z).toInt())
+                return when {
+                    terrain == Terrain.PARK || terrain == Terrain.WATER -> -1
+                    streets.within(spot, 2.0) -> 1
+                    else -> 0
+                }
+            }
+            val ahead = kind(outside(house.front))
+            val behind = kind(outside(-house.front))
+            assertTrue(ahead >= behind, "doors at ${house.shape.x}, ${house.shape.z} face the worse side")
+            if (ahead == 1 && behind < 1) toStreet++
+        }
+        assertTrue(toStreet > 50, "only $toStreet rows face a main street")
+    }
+
+    @Test
     fun `a block is laid out the same every time, and a narrow one holds a single house or none`() {
         val block = TurnedBox(300.0, 50.0, 3.5, 1.9, 0.78)
         val one = Suburbs.layOut(block, 0.1, listOf(0xEEEEEE), Random(5))
@@ -280,7 +309,10 @@ class SuburbsTest {
         camera.jumpTo(head)
         val wall = kotlin.test.assertNotNull(camera.screenPoint(Point(shape.x, house.wall / 2, shape.z)))
         val picked = camera.pick(wall.left, wall.top, cutaway = cutaway) as Picked.OnGround
-        assertTrue(shape.distanceTo(picked.spot.x, picked.spot.z) < 0.05, "${picked.spot} is not at the house")
+        // At its wall, or at the wall of a house standing in front of it on the way.
+        val at = houses.minBy { it.shape.distanceTo(picked.spot.x, picked.spot.z) }
+        assertTrue(at.shape.distanceTo(picked.spot.x, picked.spot.z) < 0.05, "${picked.spot} is not at a house")
+        assertTrue(distanceBetween(picked.spot, Spot(shape.x, shape.z)) < out + 18, "${picked.spot} is past the house")
     }
 
     @Test
