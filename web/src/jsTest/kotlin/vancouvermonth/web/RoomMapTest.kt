@@ -350,6 +350,26 @@ class RoomMapTest {
     }
 
     @Test
+    fun `a pick on a phone scrolled down keeps the page where it was`() {
+        // 375 x 812 scrolled to the price board with pins 2 and 3 still in sight, and a small phone scrolled further.
+        for ((phoneSize, offset) in listOf((375 to 812) to 250.0, (320 to 568) to 400.0)) {
+            val (width, height) = phoneSize
+            val app = phone(width, height)
+            open(into = app)
+            passIntro(app)
+            val view = app.ownerDocument!!.defaultView!!
+            view.scrollTo(0.0, offset)
+            assertEquals(offset, view.scrollY, "The rooms are too short to scroll to $offset at $width")
+            val before = pins(app)[2].getBoundingClientRect().top
+            pins(app)[2].click()
+            assertEquals("true", pins(app)[2].getAttribute("aria-pressed"))
+            assertEquals(offset, view.scrollY, "The pick moved the page at $width x $height")
+            val after = pins(app)[2].getBoundingClientRect().top
+            assertTrue(abs(after - before) <= 1.0, "Pin 3 moved from $before to $after at $width x $height")
+        }
+    }
+
+    @Test
     fun `laid out as published, the whole map is on a phone's first screen and every pin and 시작하기 takes a finger`() {
         for ((width, height) in listOf(375 to 812, 320 to 568)) {
             val app = phone(width, height)

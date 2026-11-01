@@ -329,8 +329,6 @@ class PhoneGame private constructor(
                 }
             }
         }
-        // Drawn once on the page, at the width it takes there.
-        map?.draw()
         // The prices right before the guess, where the player adds rent, utilities and the pass.
         root.child("section", "card") {
             child("h2", text = "요금표")
@@ -343,6 +341,9 @@ class PhoneGame private constructor(
         }
         showGuess()
         reveal?.let { showReveal(it) }
+        // Drawn at the width it takes on the page, measured only once the whole screen is there: measured any earlier,
+        // the page would be shorter than where the player has scrolled to, and the browser would pull it back up.
+        map?.draw()
     }
 
     /** Picks room [index] and draws the screen again, the focus kept on its pin for a keyboard. */
