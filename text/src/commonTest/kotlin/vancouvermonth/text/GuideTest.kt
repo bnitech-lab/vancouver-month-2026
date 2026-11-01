@@ -35,6 +35,17 @@ class GuideTest {
     }
 
     @Test
+    fun `the Burnaby map credit is its licence's own default statement, word for word, naming British Columbia`() {
+        // The Open Government Licence - Burnaby keeps the provincial licence's default statement: it says British
+        // Columbia, not Burnaby, and that is what the licence asks for (checked on its page on 2026-10-31).
+        val statement = "Contains information licensed under the Open Government Licence \u2013 British Columbia."
+        assertEquals(statement, Guide.BURNABY_MAP_CREDIT)
+        assertEquals("City of Burnaby", Guide.BURNABY_MAP_SOURCE)
+        assertEquals("Open Government Licence \u2013 Burnaby", Guide.BURNABY_MAP_LICENCE)
+        assertEquals("https://data.burnaby.ca/pages/open-government-licence", Guide.BURNABY_MAP_LICENCE_URL)
+    }
+
+    @Test
     fun `the sound switch says what a tap does`() {
         assertEquals("소리 켜기", soundLabel(on = false))
         assertEquals("소리 끄기", soundLabel(on = true))
