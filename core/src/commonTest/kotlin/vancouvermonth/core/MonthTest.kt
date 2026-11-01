@@ -349,18 +349,35 @@ class MonthTest {
         assertTrue(FirstMinute.STARTING_BALANCE - dearest - FirstMinute.GUESS_PENALTY >= livingCost, "dearest $dearest")
     }
 
-    @Test
-    fun `chances never go above the cap`() {
+    /** A month that studies only [skill], two studies a day, until it reaches the top level. */
+    private fun studiedToTheTop(skill: Skill): Month {
         val month = month(balance = 50_000)
-        while (month.coding < Month.MAX_SKILL || month.english < Month.MAX_SKILL) {
-            when {
-                month.energy < Month.STUDY_COST -> month.take(Action.REST)
-                month.coding < Month.MAX_SKILL -> month.take(Action.PRACTISE_CODING)
-                else -> month.take(Action.STUDY_ENGLISH)
-            }
-            if (month.isOver) break
+        val study = if (skill == Skill.ENGLISH) Action.STUDY_ENGLISH else Action.PRACTISE_CODING
+        while (month.level(skill) < Month.MAX_SKILL) {
+            if (month.energy < Month.STUDY_COST) month.take(Action.REST) else month.take(study)
+            check(!month.isOver) { "The month ended before $skill reached the top" }
         }
-        assertTrue(month.applyChance <= Month.MAX_CHANCE)
-        for (stage in InterviewStage.entries) assertTrue(month.passChance(stage) <= Month.MAX_CHANCE)
+        return month
+    }
+
+    @Test
+    fun `at the top level every chance stays well short of certain, so the chances need no cap`() {
+        val coder = studiedToTheTop(Skill.CODING)
+        assertEquals(Month.MAX_SKILL, coder.coding)
+        assertEquals(0.55, coder.applyChance, 1e-9)
+        assertEquals(0.55, coder.passChance(InterviewStage.TECHNICAL), 1e-9)
+        val speaker = studiedToTheTop(Skill.ENGLISH)
+        assertEquals(Month.MAX_SKILL, speaker.english)
+        assertEquals(0.75, speaker.passChance(InterviewStage.PHONE_SCREEN), 1e-9)
+        // Every level's chance, the top's included, is a real chance: above nothing, below certain.
+        for (level in 0..Month.MAX_SKILL) {
+            for (chance in listOf(
+                Month.APPLY_BASE + Month.APPLY_PER_CODING * level,
+                Month.PHONE_SCREEN_BASE + Month.PHONE_SCREEN_PER_ENGLISH * level,
+                Month.TECHNICAL_BASE + Month.TECHNICAL_PER_CODING * level,
+            )) {
+                assertTrue(chance > 0.0 && chance <= 0.75 + 1e-9, "level $level: $chance")
+            }
+        }
     }
 }

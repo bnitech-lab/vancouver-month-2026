@@ -243,13 +243,16 @@ class Month(
     val moneyTight: Boolean
         get() = balanceForecast < room.totalMonthlyCost
 
-    /** Chance that an application turns into a phone screen. A better coding level makes a better résumé. */
+    /**
+     * Chance that an application turns into a phone screen. A better coding level makes a better résumé. Even at the
+     * top level it stays well short of certain, as the interviews' chances do, so no cap is needed.
+     */
     val applyChance: Double
-        get() = min(MAX_CHANCE, APPLY_BASE + APPLY_PER_CODING * coding)
+        get() = APPLY_BASE + APPLY_PER_CODING * coding
 
     fun passChance(stage: InterviewStage): Double = when (stage) {
-        InterviewStage.PHONE_SCREEN -> min(MAX_CHANCE, PHONE_SCREEN_BASE + PHONE_SCREEN_PER_ENGLISH * english)
-        InterviewStage.TECHNICAL -> min(MAX_CHANCE, TECHNICAL_BASE + TECHNICAL_PER_CODING * coding)
+        InterviewStage.PHONE_SCREEN -> PHONE_SCREEN_BASE + PHONE_SCREEN_PER_ENGLISH * english
+        InterviewStage.TECHNICAL -> TECHNICAL_BASE + TECHNICAL_PER_CODING * coding
     }
 
     /** False from the day an application could no longer get both interviews done by the 30th. */
@@ -423,7 +426,6 @@ class Month(
         /** The hour it is when the day's stamina is gone: night. */
         const val NIGHT_AT = DAY_STARTS_AT + MAX_ENERGY * HOURS_PER_ENERGY
 
-        const val MAX_CHANCE = 0.9
         const val APPLY_BASE = 0.15
         const val APPLY_PER_CODING = 0.04
         const val PHONE_SCREEN_BASE = 0.05
