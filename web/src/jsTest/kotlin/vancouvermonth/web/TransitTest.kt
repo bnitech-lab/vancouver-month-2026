@@ -97,10 +97,12 @@ class TransitTest {
         for (line in TransitLines.busLines) {
             val loop = line.loop
             assertEquals(loop.points.first(), loop.points.last())
+            // Downtown's loop keeps to the streets; Burnaby's main streets pass along the edges of its parks.
+            val ground = if (line === TransitLines.busLines[0]) setOf(Terrain.LAND) else setOf(Terrain.LAND, Terrain.PARK)
             for (spot in samples(loop)) {
                 val cell = town.cellAt(spot)
                 assertTrue(town.isFree(cell), "the bus runs over $cell at $spot")
-                assertTrue(map.terrainAt(cell) == Terrain.LAND || map.terrainAt(cell) == Terrain.PARK, "off the streets at $spot")
+                assertTrue(map.terrainAt(cell) in ground, "off the streets at $spot")
                 for (city in Neighbourhood.cityLots) assertFalse(city.isNear(spot.x, spot.z, 0.0), "into a building at $spot")
             }
             assertEquals(line.stops.sortedBy { it.along }, line.stops)
