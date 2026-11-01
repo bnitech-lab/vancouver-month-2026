@@ -172,15 +172,18 @@ street lamps and a campfire. The town is real Vancouver and south-west Burnaby, 
 (see Map data below), one square for 25 m, so the farthest walk between two of the downtown places is about half a
 minute: the downtown peninsula with the big park at its tip as a forest of round trees, the West End's low blocks and
 downtown's towers along the real street grid, the seawall round the shore, False Creek with its south shore past it, and
-the inlet with the mountains far across it; then, east of downtown, East Vancouver and Burnaby as a low, turned box on
-each real block (taller round the Burnaby town centre) with their parks as forest, about two minutes on foot from
-downtown. The five places stand in the neighbourhoods that suit them: the 카페 by the seawall on False Creek, the 도서관 in
+the inlet with the mountains far across it; then, east of downtown, East Vancouver and Burnaby: detached houses on each
+real block, each with a pitched roof, a front door to the street and a lawn, a tree in some yards, smaller and lower
+with wider yards between them the farther from downtown; mid-rise round the SkyTrain stations, towers round the Burnaby
+town centre, and their parks as forest, about two minutes on foot from downtown. The five places stand in the neighbourhoods that suit them: the 카페 by the seawall on False Creek, the 도서관 in
 the middle of downtown, 코워킹 in the old brick streets at the east end, the 회사 tower in the business district by the
 inlet, and 내 방 (the room picked on September 1st) with its garden where the room is: in the West End for a room in
 zone 1, in Burnaby for zones 2 and 3, each morning starting at its door. The SkyTrain runs on its guideway out of its
 tunnel by the station, along False Creek and out through East Vancouver to Burnaby. Each place's name floats over it,
 and so does the bike shop's (see below); no other building has a name. Only the ground and buildings near the camera
-are drawn; the far city is left to the haze. The day's figures
+are drawn; the far city is left to the haze. The houses stand one by one only within 75 squares of the camera and in its
+view, their roofs growing on over the last 12 squares as it comes near; farther off, each row of houses is one low box.
+The character walks through the yards between houses. The day's figures
 sit thinly over the top of the screen, and a name that would sit under them or the day's log hides there. The month's
 first view looks over 내 방, toward downtown from the West End, high enough to show four of the buildings and their names.
 
@@ -323,7 +326,9 @@ is no town and the game plays with buttons, as before. If Three.js fails, the bu
 console. Tests force each of these.
 
 The town's rules are plain Kotlin with tests: `Neighbourhood` (the layout on the wide map, the people, which place a
-spot belongs to), `HomeSite` (the town for each zone's room: where 내 방 stands, and the ground to walk on with it),
+spot belongs to), `HomeSite` (the town for each zone's room: where 내 방 stands, and the ground to walk on with it), `Suburbs` (each
+residential block split into lots, a house on each, by how far it is from downtown), `HouseDetail` (which houses stand
+one by one near the camera, and their roofs, doors, lawns and trees),
 `VancouverMap` and `WideMap` (the maps' squares and lines, read from the generated `VancouverMapData` and
 `WideMapData`), `RailLine`
 (the guideway the train follows), `Grid` (the A* search for the way around things), `Trip` (a walk or a dash, and the
@@ -340,8 +345,8 @@ rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, al
 `Passersby.kt` for the passersby's), and so are each day's weather (`Weather.kt`) and the bike shop's and riding's
 words (`Shop.kt`), and the SkyTrain's, the bus's, the water bus's and the taxi's (`Transit.kt`). `WalkableTown` draws
 all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about 975 KB
-(about 275 KB gzipped). `TownBudgetTest` measures what a frame costs downtown, in East Vancouver, in Burnaby, on a walk
+`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about 998 KB
+(about 284 KB gzipped). `TownBudgetTest` measures what a frame costs downtown, in East Vancouver, in Burnaby, on a walk
 and on the train, and keeps it within a phone's budget.
 
 ### Sound and the guide
