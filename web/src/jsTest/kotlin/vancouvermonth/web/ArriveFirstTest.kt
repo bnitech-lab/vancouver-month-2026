@@ -596,6 +596,77 @@ class ArriveFirstTest {
                 assertNotNull(talk(), "no talk on arrival: $screen")
                 assertFalse(answer().disabled, answer().textContent)
             },
+            Step("on the bike again, off it on the way: the walk goes on, with its line", { true }) {
+                root.button("그만").click()
+                root.button("자전거 타기").click()
+                town.standAt(Spot(cafe.door.x - 6.0, cafe.door.z - 2.0))
+                tapName(Place.CAFE)
+                root.button(Riding.GET_OFF).click()
+                assertNull(town.riding)
+                assertEquals("물가 카페로 가는 중", going())
+                assertEquals(cafe.talkSpot, town.markerSpot)
+            },
+            Step("arrived on foot, with the talk open", { town.isStill }) {
+                assertNull(going())
+                assertNotNull(talk(), "no talk on arrival: $screen")
+            },
+        )
+    }
+
+    @Test
+    fun `a name tapped within reach on the walk sent there keeps the talk for the walk's end`(): Promise<Unit> {
+        val town = open(zone = 1)
+        val home = Neighbourhood.venue(Place.HOME)
+        return play(
+            Step("set off for 내 방 from eight squares east of its door", { town.isStill }) {
+                town.standAt(Spot(home.door.x + 8.0, home.door.z))
+                tapName(Place.HOME)
+                assertEquals("내 방으로 가는 중", going())
+            },
+            // Walking goes by the clock: a very slow frame may carry it past the door, and then only its end is left.
+            Step("within reach of the door, on the way, the name again", { town.isAt(Place.HOME) || town.tripMillis == null }) {
+                if (town.tripMillis != null) {
+                    tapName(Place.HOME)
+                    assertNull(talk(), "the talk opened before the walk's end: $screen")
+                    assertEquals("내 방으로 가는 중", going())
+                }
+            },
+            Step("arrived", { town.isStill }) {
+                assertNotNull(talk(), "no talk at the walk's end: $screen")
+            },
+        )
+    }
+
+    @Test
+    fun `a stop or a shared one taking over the walk takes its line away`(): Promise<Unit> {
+        val town = open(zone = 1)
+        val stop = Stop(Transport.BUS, 4)
+        val scooter = Rides.shared.first { it.vehicle == Vehicle.E_SCOOTER }
+        return play(
+            Step("stand at the stop by 내 방, looking at it", { town.isStill }) {
+                town.standAt(TransitLines.waitAt(stop))
+                town.aimCamera(0.0, 0.55, 9.0)
+            },
+            Step("set off for a far name, then tap the stop", { town.isStill }) {
+                tapName(Place.CAFE)
+                assertEquals("물가 카페로 가는 중", going())
+                val box = TransitLines.tapBoxes[TransitLines.tapStops.indexOf(stop)]
+                tapScreen(town, onScreen(town, Point(box.x + box.width / 2, box.y + 1.2, box.z + box.depth / 2)))
+                assertNull(going(), "still on the way: $screen")
+                assertNotNull(root.querySelector(".chooser"), "no card at the stop: $screen")
+                root.button(Transit.STOP).click()
+            },
+            Step("a few steps from a shared e-scooter, looking at it", { town.isStill }) {
+                town.standAt(Spot(scooter.spot.x + 3.5, scooter.spot.z + 0.4))
+                town.aimCamera(PI / 2, 0.6, 10.0)
+            },
+            Step("set off for a far name, then tap the e-scooter", { town.isStill }) {
+                tapName(Place.CAFE)
+                assertEquals("물가 카페로 가는 중", going())
+                tapScreen(town, onScreen(town, Point(scooter.spot.x, 0.5, scooter.spot.z)))
+                assertNull(going(), "still on the way: $screen")
+                assertEquals(scooter.spot, town.markerSpot)
+            },
         )
     }
 

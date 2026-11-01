@@ -1122,6 +1122,22 @@ class WalkableTownTest {
     }
 
     @Test
+    fun `a tap on a passerby takes over a walk sent to a far name, and its line goes`(): Promise<Unit> {
+        val town = startInTown()
+        return play(
+            Step("look along her street", { town.isStill }) { lookAlongMinasStreet(town) },
+            Step("set off for the café, then tap 미나", { town.isStill }) {
+                val mina = minaOn(town)
+                tapName(Place.CAFE)
+                assertEquals("물가 카페로 가는 중", root.querySelector(".hud-going")?.textContent)
+                tapScreen(town, mina)
+                assertEquals("미나", talkWith())
+                assertNull(root.querySelector(".hud-going"), "still on the way: $screen")
+            },
+        )
+    }
+
+    @Test
     fun `while the day changes, a tap on a passerby opens nothing`(): Promise<Unit> {
         val town = startInTown()
         return play(
