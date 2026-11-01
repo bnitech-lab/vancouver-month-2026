@@ -1,5 +1,6 @@
 package vancouvermonth.web
 
+import kotlin.js.Date
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -122,6 +123,23 @@ class HomeSiteTest {
         // Burnaby to downtown is about two days' living money, not the meter's most.
         val far = length(HomeSite.of(3).grid.route(Neighbourhood.home(3).door, Neighbourhood.venue(Place.OFFICE).door))
         assertTrue(TaxiFare.forDistance(far) in 40..55, "${TaxiFare.forDistance(far)} for $far squares")
+    }
+
+    @Test
+    fun `the taxi's fares from the farthest 내 방 are worked out in a blink`() {
+        // Zone 3's 내 방, the farthest from downtown: every place a taxi goes, found and straightened, as the taxi's card
+        // asks for them when it opens.
+        val site = HomeSite.of(3)
+        val places = TransitLines.taxiStopsFor(3).map { it.second }
+        // The best of three, so a pause of the browser's own in one of them does not count against the search.
+        val millis = (1..3).minOf {
+            val start = Date().getTime()
+            site.grid.routes(site.home.door, places)
+            Date().getTime() - start
+        }
+        println("The taxi's ways from zone 3's 내 방: $millis ms")
+        // About 50 ms on the laptop the town was built on; the bound leaves room for a slower machine.
+        assertTrue(millis < 300, "took $millis ms")
     }
 
     @Test
