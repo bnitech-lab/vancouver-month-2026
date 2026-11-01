@@ -260,8 +260,10 @@ internal class NeighbourhoodScene(
 
     /**
      * Each draw of the town that may be left out when far from the camera: where its middle is, how far its boxes reach
-     * from it, and whether it holds anything tall. The haze hides low boxes long before the far plane, so those are
-     * left out from [LOW_REACH] on, tall ones only from [FollowCamera.FAR_PLANE].
+     * from it, and whether it holds anything tall. The haze is linear, so a low box still shows some of its own colour
+     * until the haze's far end: a low draw is left out only once its nearest box is [LOW_FOG] of the way into the haze
+     * as it is now (about 214 squares on a clear day, nearer in the rain), where it shows a tenth of its colour at
+     * most; a tall one, which shows over the haze longer, only at the far plane. A reach below 0 marks a low draw.
      */
     private val farMeshes = mutableListOf<InstancedMesh>()
     private var farX = DoubleArray(0)
@@ -733,7 +735,7 @@ internal class NeighbourhoodScene(
         farX[index] = (west + east) / 2
         farZ[index] = (north + south) / 2
         farRadius[index] = hypot(east - west, south - north) / 2
-        farReach[index] = if (tallest > TALL) FollowCamera.FAR_PLANE else LOW_REACH
+        farReach[index] = if (tallest > TALL) FollowCamera.FAR_PLANE else -1.0
     }
 
     /**
@@ -741,9 +743,11 @@ internal class NeighbourhoodScene(
      * can be seen, and draws the rest. It makes nothing new, as it runs every frame.
      */
     private fun leaveOutFar(eyeX: Double, eyeZ: Double) {
+        val lowReach = haze.near + LOW_FOG * (haze.far - haze.near)
         for (index in farMeshes.indices) {
             val away = hypot(farX[index] - eyeX, farZ[index] - eyeZ) - farRadius[index]
-            farMeshes[index].visible = away < farReach[index]
+            val reach = if (farReach[index] < 0) lowReach else farReach[index]
+            farMeshes[index].visible = away < reach
         }
     }
 
@@ -2614,9 +2618,9 @@ internal class NeighbourhoodScene(
         /** A place's name farther than this from the camera's eye is hidden, its place deep in the haze. */
         const val NAMES_REACH = 170.0
 
-        /** A draw with nothing taller than this is left out [LOW_REACH] from the camera, deep in the haze. */
+        /** A draw with nothing taller than this is low: it is left out [LOW_FOG] of the way into the haze. */
         const val TALL = 6.5
-        const val LOW_REACH = 130.0
+        const val LOW_FOG = 0.9
 
         /** How far a bike goes for one turn of its pedals, and how far the legs swing with them, in radians. */
         const val PEDAL_LENGTH = 1.8
