@@ -15,13 +15,18 @@ import vancouvermonth.text.cheapestLine
 import vancouvermonth.text.date
 import vancouvermonth.text.endingLine
 import vancouvermonth.text.eventLine
+import vancouvermonth.text.Intro
 import vancouvermonth.text.guessLine
+import vancouvermonth.text.guessMoneyLabel
+import vancouvermonth.text.guessMoneyWhy
+import vancouvermonth.text.guessRuleLine
 import vancouvermonth.text.money
 import vancouvermonth.text.monthCostLine
 import vancouvermonth.text.monthStartLines
 import vancouvermonth.text.parseAmount
 import vancouvermonth.text.passPrices
 import vancouvermonth.text.percent
+import vancouvermonth.text.signedMoney
 import vancouvermonth.text.stageName
 import vancouvermonth.text.todaysRunName
 import vancouvermonth.text.todaysRunResult
@@ -31,7 +36,8 @@ import vancouvermonth.text.whyNot
 import vancouvermonth.text.whyTotalLines
 
 /**
- * Plays one run as text: the room on September 1st, then one action a day until the month ends.
+ * Plays one run as text: the room and the guess at its total on September 1st, the guess's money as the month starts,
+ * then one action a day until the month ends.
  * Input and output are passed in, so a test can play a whole run.
  * [input] returns null when the input ends (Ctrl+D), which ends the game.
  */
@@ -56,6 +62,7 @@ class TerminalGame(
         val reveal = showReveal(game, roomIndex, guess)
 
         val month = game.startMonth(roomIndex, guess)
+        showOpening(month)
         showMonthStart(month)
         while (!month.isOver) {
             showDay(month)
@@ -92,6 +99,10 @@ class TerminalGame(
         line()
         game.rooms.forEachIndexed { index, room -> line("  ${index + 1}) ${describe(room)}") }
         line()
+        // "방값 짐작: " takes 11 columns.
+        line("방값 짐작: ${Intro.GUESS_WHAT}")
+        line("           ${guessRuleLine()}")
+        line()
     }
 
     private fun showReveal(game: FirstMinute, roomIndex: Int, guess: Int): Reveal {
@@ -101,14 +112,20 @@ class TerminalGame(
         line("  한 달 총비용  ${money(room.totalMonthlyCost)}")
         line("  ${breakdown(room)}")
         line()
-        line("  ${cheapestLine(game, reveal)}   +${reveal.cheapestPoints}")
-        line("  ${guessLine(reveal)}   +${reveal.guessPoints}")
-        line("  방 고르기 점수 ${reveal.score} / ${FirstMinute.MAX_SCORE}")
-        line()
-        line("  첫 달을 내고 남은 잔고 ${money(reveal.balanceAfterFirstMonth)}")
+        line("  ${cheapestLine(game, reveal)}")
+        line("  ${guessLine(reveal)}")
         line("  ${monthCostLine(game, reveal)}")
         line()
         return reveal
+    }
+
+    /** The guess's money as the month starts, from the month's opening event, and why it is that much. */
+    private fun showOpening(month: Month) {
+        for (event in month.opening) {
+            line("  " + eventLine(event, month))
+            if (event is Event.Guessed) line("  ${guessMoneyWhy(event.gap, event.amount)}")
+        }
+        line()
     }
 
     private fun showMonthStart(month: Month) {
@@ -138,12 +155,13 @@ class TerminalGame(
     private fun showEnding(month: Month, reveal: Reveal, today: TodaysRun?) {
         val ending = checkNotNull(month.ending) { "The month is not over" }
         line(endingLine(ending, month.day, month.room.totalMonthlyCost, month.balance))
-        line("  방 고르기 점수 ${reveal.score}/${FirstMinute.MAX_SCORE} · 영어 ${month.english}/${Month.MAX_SKILL} · 코딩 ${month.coding}/${Month.MAX_SKILL}")
+        val guess = "${guessMoneyLabel(reveal.guessMoney)} ${signedMoney(reveal.guessMoney)}"
+        line("  $guess · 영어 ${month.english}/${Month.MAX_SKILL} · 코딩 ${month.coding}/${Month.MAX_SKILL}")
         line()
         if (today != null) {
             // Not indented, so selecting the whole line copies nothing but the result.
             line("결과 한 줄 (복사해서 붙여 넣으세요)")
-            line(todaysRunResult(today, reveal.score, ending, month.day))
+            line(todaysRunResult(today, reveal.guessMoney, ending, month.day))
             line()
         }
     }

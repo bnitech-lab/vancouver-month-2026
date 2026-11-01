@@ -508,7 +508,7 @@ class PhoneGame private constructor(
                 figure("영어", "${month.english}/${Month.MAX_SKILL}")
                 figure("코딩", "${month.coding}/${Month.MAX_SKILL}")
             }
-            if (today != null) result(todaysRunResult(today, reveal.score, ending, month.day))
+            if (today != null) result(todaysRunResult(today, reveal.guessMoney, ending, month.day))
             child("div", "ending-buttons") {
                 button("primary", text = "다시 하기") {
                     onclick = { playAgain() }

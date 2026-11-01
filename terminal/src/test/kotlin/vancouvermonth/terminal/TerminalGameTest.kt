@@ -79,7 +79,8 @@ class TerminalGameTest {
         assertTrue("10월 30일 오늘의 판" in lines)
         val label = lines.indexOf("결과 한 줄 (복사해서 붙여 넣으세요)")
         assertTrue(label >= 0, "no result label in: $screen")
-        assertEquals("밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 200/200 · 10월 총비용 모자람", lines[label + 1])
+        assertEquals("밴쿠버 한 달 · 10월 30일 오늘의 판 · 짐작 보상 +\$100 · 10월 총비용 모자람", lines[label + 1])
+        assertTrue("  짐작 보상 +\$100 · 영어 1/10 · 코딩 3/10" in lines, screen.toString())
     }
 
     @Test
@@ -159,13 +160,47 @@ class TerminalGameTest {
     }
 
     @Test
-    fun `the reveal shows the points and the score`() {
+    fun `an exact guess wins $100 as the month starts, and the reveal has no score`() {
         val game = FirstMinute(4821)
         val cheapest = game.cheapestRoomIndex
         val (_, screen) = playWith(4821, "${cheapest + 1}", "${game.lowestTotal}", "n")
-        assertTrue("총비용이 가장 싼 방을 골랐어요.   +100" in screen)
-        assertTrue("짐작이 정확해요.   +100" in screen)
-        assertTrue("방 고르기 점수 200 / 200" in screen)
+        val lines = screen.lines()
+        val start = FirstMinute.STARTING_BALANCE - game.lowestTotal + 100
+        assertTrue("  총비용이 가장 싼 방을 골랐어요." in lines, screen)
+        assertTrue("  짐작이 정확해요." in lines, screen)
+        assertTrue("  짐작 보상 +\$100, 잔고 ${money(start)}" in lines, screen)
+        assertTrue("  딱 맞혀서 \$100을 다 받아요." in lines, screen)
+        assertTrue("  잔고 ${money(start)} · 10월 1일에 낼 총비용 ${money(game.lowestTotal)}" in lines, screen)
+        assertFalse("점수" in screen, screen)
+        // The money line comes after the reveal and before the month's start.
+        val money = lines.indexOf("  짐작 보상 +\$100, 잔고 ${money(start)}")
+        assertTrue(lines.indexOf("  짐작이 정확해요.") < money && money < lines.indexOf("9월 한 달이 시작돼요."))
+    }
+
+    @Test
+    fun `a guess far off loses money as the month starts, and the month plays on from there`() {
+        val game = FirstMinute(1011)
+        val total = game.lowestTotal
+        val (_, screen) = playWith(1011, "${game.cheapestRoomIndex + 1}", "${total + 250}", "5")
+        val start = FirstMinute.STARTING_BALANCE - total - 150
+        val lines = screen.lines()
+        assertTrue("  내 짐작과 차이 \$250" in lines, screen)
+        assertTrue("  짐작 패널티 -\$150, 잔고 ${money(start)}" in lines, screen)
+        assertTrue("  \$100보다 더 틀린 만큼 잃어요." in lines, screen)
+        assertTrue("  생활비 -\$40, 잔고 ${money(start - 40)}" in lines, screen)
+        val (_, worst) = playWith(1011, "${game.cheapestRoomIndex + 1}", "0", "n")
+        assertTrue("  짐작 패널티 -\$300, 잔고 ${money(FirstMinute.STARTING_BALANCE - total - 300)}" in worst.lines())
+        assertTrue("  많이 틀렸지만 잃는 돈은 \$300까지예요." in worst.lines())
+    }
+
+    @Test
+    fun `the first screen says how the guess pays before asking for it`() {
+        val (_, screen) = playWith(4821)
+        val lines = screen.lines()
+        val rule = lines.indexOf("           맞힐수록 최대 \$100을 더 받고, 틀린 만큼 잃어요(최대 \$300).")
+        assertTrue(rule > lines.indexOfFirst { it.startsWith("  3) ") }, screen)
+        assertEquals("방값 짐작: 방을 고른 뒤 그 방의 한 달 총비용을 짐작해 적어요.", lines[rule - 1])
+        assertTrue(rule < lines.indexOfFirst { it.startsWith("어느 방?") }, screen)
     }
 
     @Test
@@ -181,7 +216,7 @@ class TerminalGameTest {
             input = { if (answers.hasNext()) answers.next() else null },
             output = { screen.append(it) },
         ).play(FirstMinute(seed = 0, rooms = rooms))
-        assertTrue("총비용이 가장 싼 방은 1번, 3번이었어요 (\$1,245).   +0" in screen)
+        assertTrue("  총비용이 가장 싼 방은 1번, 3번이었어요 (\$1,245)." in screen.lines())
     }
 
     @Test

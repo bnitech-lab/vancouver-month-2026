@@ -288,7 +288,7 @@ class PhoneGameTest {
     fun `today's run ends with its result line and a copy button`() {
         restThrough(TodaysRun(2026, 10, 30))
         assertEquals(
-            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 200/200 · 10월 총비용 모자람",
+            "밴쿠버 한 달 · 10월 30일 오늘의 판 · 짐작 보상 +\$100 · 10월 총비용 모자람",
             root.querySelector(".result-line")?.textContent,
         )
         assertFalse(button("결과 복사").disabled)
@@ -312,7 +312,7 @@ class PhoneGameTest {
     @Test
     fun `the copy fallback selects the whole line`() {
         val line = document.createElement("p") as HTMLElement
-        line.textContent = "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 170/200 · 9월 17일 취업 제안"
+        line.textContent = "밴쿠버 한 달 · 10월 30일 오늘의 판 · 짐작 보상 +\$70 · 9월 17일 취업 제안"
         root.appendChild(line)
         assertTrue(selectAll(line))
         assertEquals(line.textContent, getSelection().toString())

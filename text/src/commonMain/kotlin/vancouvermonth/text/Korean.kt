@@ -45,6 +45,31 @@ fun cheapestLine(game: FirstMinute, reveal: Reveal): String =
 fun guessLine(reveal: Reveal): String =
     if (reveal.guessGap == 0) "짐작이 정확해요." else "내 짐작과 차이 ${money(reveal.guessGap)}"
 
+/** How the guess pays, in Dawn's words: "맞힐수록 최대 $100을 더 받고, 틀린 만큼 잃어요(최대 $300)." */
+fun guessRuleLine(): String =
+    "맞힐수록 최대 ${money(FirstMinute.GUESS_REWARD)}을 더 받고, 틀린 만큼 잃어요(최대 ${money(FirstMinute.GUESS_PENALTY)})."
+
+/** The rule worked out for three guesses, from core: "딱 맞히면 +$100, $100 틀리면 $0, $250 틀리면 -$150". */
+fun guessExamplesLine(): String = listOf(0, 100, 250).joinToString(", ") { gap ->
+    val amount = signedMoney(FirstMinute.guessMoney(gap))
+    if (gap == 0) "딱 맞히면 $amount" else "${money(gap)} 틀리면 $amount"
+}
+
+/** One plain line under the guess's money: why a guess [gap] dollars off wins or loses [amount]. */
+fun guessMoneyWhy(gap: Int, amount: Int): String {
+    val reward = money(FirstMinute.GUESS_REWARD)
+    return when {
+        gap == 0 -> "딱 맞혀서 ${reward}을 다 받아요."
+        amount > 0 -> "${reward}에서 틀린 만큼 빼고 받아요."
+        amount == 0 -> "${reward}만큼 틀려서 받지도 잃지도 않아요."
+        amount > -FirstMinute.GUESS_PENALTY -> "${reward}보다 더 틀린 만큼 잃어요."
+        else -> "많이 틀렸지만 잃는 돈은 ${money(FirstMinute.GUESS_PENALTY)}까지예요."
+    }
+}
+
+/** The balance September starts with, after the first month's total and the guess's money. */
+fun startBalanceLine(balance: Int): String = "9월을 시작하는 잔고 ${money(balance)}"
+
 /** The month's goal, as the first screen, the month's start and the town's first guide all say it. */
 fun goalLine(): String = "목표: ${date(Month.LAST_DAY)}까지 취업 제안 받기"
 
@@ -199,15 +224,16 @@ fun todaysRunName(run: TodaysRun): String = "${run.month}월 ${run.day}일 오�
 
 /**
  * Today's run as one line to paste anywhere, with no run number, no link and nothing about the player:
- * "밴쿠버 한 달 · 10월 30일 오늘의 판 · 방 고르기 155/200 · 9월 19일 취업 제안". [day] is the day the month ended on.
+ * "밴쿠버 한 달 · 10월 30일 오늘의 판 · 짐작 보상 +$55 · 9월 19일 취업 제안". [guessMoney] is what the guess won or
+ * lost, and [day] the day the month ended on.
  */
-fun todaysRunResult(run: TodaysRun, score: Int, ending: Ending, day: Int): String {
+fun todaysRunResult(run: TodaysRun, guessMoney: Int, ending: Ending, day: Int): String {
     val result = when (ending) {
         Ending.OFFER -> "${date(day)} 취업 제안"
         Ending.SURVIVED -> "9월을 버팀"
         Ending.CANNOT_PAY_RENT -> "10월 총비용 모자람"
     }
-    return "밴쿠버 한 달 · ${todaysRunName(run)} · 방 고르기 $score/${FirstMinute.MAX_SCORE} · $result"
+    return "밴쿠버 한 달 · ${todaysRunName(run)} · ${guessMoneyLabel(guessMoney)} ${signedMoney(guessMoney)} · $result"
 }
 
 fun stageName(stage: InterviewStage): String = when (stage) {

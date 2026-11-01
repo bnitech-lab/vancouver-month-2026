@@ -9,16 +9,24 @@ fun soundLabel(on: Boolean): String = if (on) "소리 끄기" else "소리 켜�
  */
 fun minimapLabel(nearest: String): String = "지도: $nearest 근처"
 
-/** The card that shows how to play the first time the town opens, and the button that opens it again. */
+/**
+ * How to play: on the intro, the page's first screen, and on the card the "?" in the town opens, with the button that
+ * opens it.
+ */
 object Guide {
     const val TITLE = "마을에서 지내는 법"
 
-    /** How to get about and how a day is spent, one short line each. The goal comes after them, from [goalLine]. */
+    /**
+     * How to get about, how a day is spent, the rides and the small map, one short line each. On the card the goal
+     * comes after them, from [goalLine].
+     */
     val LINES = listOf(
-        "땅을 누르면 걸어요.",
-        "두 번 누르면 빨리 가요.",
-        "화면을 끌면 둘러보고, 두 손가락을 오므리고 펴면 멀리·가까이 봐요.",
+        "땅을 누르면 걷고, 두 번 누르면 빨리 가요.",
+        "화면을 끌면 둘러보고, 두 손가락으로 멀리·가까이 봐요.",
         "사람이나 건물을 누르면 말을 걸어요. 일 하나를 고르면 하루가 끝나요.",
+        "스카이트레인 역, 버스 정류장, 수상버스 선착장을 누르면 타요.",
+        "자전거는 가게에서 사거나 빌려 타고, 택시는 위 카드에서 불러요.",
+        "오른쪽 위 작은 지도에 내가 있는 곳이 보여요.",
     )
 
     const val START = "시작"
