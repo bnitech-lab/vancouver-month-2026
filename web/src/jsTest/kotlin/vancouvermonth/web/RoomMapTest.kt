@@ -207,7 +207,7 @@ class RoomMapTest {
         open()
         passIntro(root)
         assertNull(root.querySelector(".room-card"))
-        assertEquals("핀을 누르면 그 방의 월세와 교통 구역이 나와요.", text(".room-map-hint"))
+        assertEquals("핀을 누르면 그 방의 월세, 교통 구역, 공과금이 나와요.", text(".room-map-hint"))
         assertEquals("방을 먼저 고르세요.", text(".guess .hint"))
         val rooms = FirstMinute(1011).rooms
         pins()[1].click()

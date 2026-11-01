@@ -352,7 +352,7 @@ class PhoneGame private constructor(
                 appendChild(map.element)
                 val index = picked
                 if (index == null) {
-                    child("p", "room-map-hint", "핀을 누르면 그 방의 월세와 교통 구역이 나와요.")
+                    child("p", "room-map-hint", "핀을 누르면 그 방의 월세, 교통 구역, 공과금이 나와요.")
                 } else {
                     roomCard(index)
                 }
