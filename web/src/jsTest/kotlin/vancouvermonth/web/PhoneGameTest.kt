@@ -16,9 +16,12 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.asList
 import org.w3c.dom.events.Event
+import vancouvermonth.core.Action
 import vancouvermonth.core.FirstMinute
 import vancouvermonth.core.Month
 import vancouvermonth.core.TodaysRun
+import vancouvermonth.save.Choice
+import vancouvermonth.save.MonthRecord
 import vancouvermonth.text.Weather
 import vancouvermonth.text.arrivalLines
 import vancouvermonth.text.goalLine
@@ -331,6 +334,52 @@ class PhoneGameTest {
         assertEquals(42, seedFrom("?lang=ko&seed=42"))
         assertNull(seedFrom(""))
         assertNull(seedFrom("?seed=abc"))
+    }
+
+    @Test
+    fun `a seed is ASCII digits with optional spaces around them, and nothing else`() {
+        // A plus in an address reads as a space; an encoded plus stays a plus, which is no digit.
+        assertEquals(42, seedFrom("?seed=+42"))
+        assertEquals(42, seedFrom("?seed=42"))
+        assertEquals(7, seedFrom("?seed=007"))
+        for (query in listOf(
+            "?seed=%2B42",
+            "?seed=5.0",
+            "?seed=99999999999",
+            "?seed=%EF%BC%94%EF%BC%92",
+            "?seed=%D9%A4%D9%A2",
+            "?seed=4%202",
+        )) {
+            assertNull(seedFrom(query), query)
+        }
+    }
+
+    @Test
+    fun `a seed of 0 with today's run falls through to today's run, and a zero-padded seed keeps its address`() {
+        val now = Date(2026, 9, 30)
+        val today = TodaysRun(2026, 10, 30)
+        assertEquals(Opening(today.seed, today, "?today=2026-10-30"), openingFor("?seed=0&today", now, 4321))
+        assertEquals(Opening(7, null, null), openingFor("?seed=007", now, 4321))
+        assertEquals(Opening(7, null, "?seed=7", atRooms = true), openingFor("?seed=007&start", now, 4321))
+    }
+
+    @Test
+    fun `a seed in an address counts only from 1 to 999999, and the spaces around it do not matter`() {
+        assertEquals(1, seedFrom("?seed=1"))
+        assertEquals(999_999, seedFrom("?seed=999999"))
+        assertEquals(1011, seedFrom("?seed=%201011%20"))
+        for (query in listOf("?seed=0", "?seed=-5", "?seed=1000000", "?seed=2147483647", "?seed=abc", "?seed=")) {
+            assertNull(seedFrom(query), query)
+        }
+    }
+
+    @Test
+    fun `an address with a seed out of range opens as one with no seed`() {
+        val now = Date(2026, 9, 30)
+        assertEquals(Opening(4321, null, "?seed=4321"), openingFor("?seed=0", now, 4321))
+        assertEquals(Opening(4321, null, "?seed=4321"), openingFor("?seed=1000000&start", now, 4321))
+        val kept = MonthRecord(1011, null, 2, 1165, listOf(Choice.Take(Action.REST)))
+        assertEquals(Opening(1011, null, "?seed=1011", fromKept = true), openingFor("?seed=-5", now, 4321, kept))
     }
 
     @Test

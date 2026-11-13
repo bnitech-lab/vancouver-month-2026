@@ -27,4 +27,12 @@ class ContinueTest {
         assertTrue(Continue.NEW in Continue.NOTE && "지워져요" in Continue.NOTE)
         for (line in listOf(Continue.TITLE, Continue.NOTE)) assertTrue(line.length <= 24, "Too long for a phone: $line")
     }
+
+    @Test
+    fun `the notice for a month that could not be kept says why and what comes next, in at most two lines of a card`() {
+        assertEquals("게임이 바뀌어서 하던 한 달은 이어 갈 수 없어요. 새 한 달을 시작해요.", Continue.DROPPED)
+        assertEquals(41, Continue.DROPPED.length)
+        // A card's column on a 320 px phone is 288 px wide and the note is 14 px text: about 22 characters a line.
+        assertTrue(Continue.DROPPED.length <= 44, "Too long for two lines of a card: ${Continue.DROPPED}")
+    }
 }

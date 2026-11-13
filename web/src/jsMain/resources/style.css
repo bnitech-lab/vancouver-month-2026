@@ -562,6 +562,13 @@ a:focus-visible {
   gap: 8px;
 }
 
+/* On the rooms screen: the month kept before could not be continued and was dropped. */
+.dropped-note {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
 /* On another run's start card: starting it drops the kept month. */
 .start .replaces {
   margin: -4px 0 12px;

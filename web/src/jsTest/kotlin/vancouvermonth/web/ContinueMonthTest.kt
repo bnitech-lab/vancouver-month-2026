@@ -465,7 +465,7 @@ class ContinueMonthTest {
     }
 
     @Test
-    fun `a kept line that does not read or does not replay is dropped without a word`() {
+    fun `a kept line that does not read or does not replay is dropped and not offered`() {
         // A bad letter, another version (the first, from before money could be spent, the second, from before the
         // guess moved money, and the third, from when a day held one action), an interview on a day without one, a
         // room that is not there, a bike bought twice, and work after the day's stamina is gone.

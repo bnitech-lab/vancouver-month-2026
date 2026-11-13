@@ -42,10 +42,11 @@ fun main(args: Array<String>) {
 
 private fun newSeed(): Int = Random.nextInt(1_000, 10_000)
 
+/** The number after `--seed`, when it is a whole number in [TodaysRun.SHARED_SEEDS] as on the phone page. */
 fun parseSeed(args: Array<String>): Int? {
     val joined = args.joinToString(" ").replace("=", " ").split(" ").filter { it.isNotBlank() }
     val at = joined.indexOf("--seed")
-    return if (at >= 0) joined.getOrNull(at + 1)?.toIntOrNull() else null
+    return if (at >= 0) joined.getOrNull(at + 1)?.toIntOrNull()?.takeIf { it in TodaysRun.SHARED_SEEDS } else null
 }
 
 /**
