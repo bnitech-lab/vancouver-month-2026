@@ -83,7 +83,7 @@ fun openingFor(query: String, now: Date, newSeed: Int, kept: MonthRecord? = null
 /** The run numbers an address may name. The game's own are 1,000 to 9,999. */
 private val SEEDS = 1..999_999
 
-/** The seed in a query such as "?seed=1011", or null when there is none, or it is not a whole number from 1 to 999,999. */
+/** The seed in a query such as "?seed=1011", or null: there is none, or it is not a whole number in [SEEDS]. */
 fun seedFrom(query: String): Int? = URLSearchParams(query).get("seed")?.trim()?.toIntOrNull()?.takeIf { it in SEEDS }
 
 /**
