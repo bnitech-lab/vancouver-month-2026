@@ -211,6 +211,12 @@ object DayLight {
     /** How brightly the windows and lamps glow by day in the rain. */
     const val RAIN_GLOW = 0.22
 
+    /**
+     * How bright the glow is when the suburbs' houses put their lights on: toward 20:00 on a fine day, a little before
+     * [EVENING]'s, so they are off through the afternoon. In the rain they are on all day, as the towers' glass glows.
+     */
+    const val HOUSE_LIGHTS_ON = 0.4
+
     /** How near the haze starts and how far it hides everything under [weather]'s sky: nearer in the rain. */
     fun haze(weather: Weather): Pair<Double, Double> = when (weather) {
         Weather.SUNNY -> Neighbourhood.HAZE_NEAR to Neighbourhood.HAZE_FAR

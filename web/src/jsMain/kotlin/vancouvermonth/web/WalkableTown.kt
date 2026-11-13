@@ -386,9 +386,12 @@ internal class NeighbourhoodScene(
     private val glowDrawOf = IntArray(glowingBlocks.size)
     private val glowSlotOf = IntArray(glowingBlocks.size)
 
-    /** Which of [Neighbourhood.glowing] are a suburban house's window, and the draws of them, left out by day. */
+    /**
+     * Which of [Neighbourhood.glowing] are a suburban house's window, and the draws of them, drawn only once the lights
+     * are on ([lightsOn]).
+     */
     private val houseGlass = Neighbourhood.houseGlass.toSet()
-    private val nightOnly = mutableSetOf<InstancedMesh>()
+    private val nightOnly = mutableListOf<InstancedMesh>()
 
     /**
      * Each draw of the town that may be left out when far from the camera: where its middle is, how far its boxes reach
@@ -402,6 +405,7 @@ internal class NeighbourhoodScene(
     private var farZ = DoubleArray(0)
     private var farRadius = DoubleArray(0)
     private var farReach = DoubleArray(0)
+    private var farNightOnly = BooleanArray(0)
 
     /** The city's buildings that fold down out of the camera's way, and where the camera and character last were. */
     private val cutaway =
@@ -923,8 +927,9 @@ internal class NeighbourhoodScene(
         addHouseDetail()
         // The glass of the wide map's towers and 내 방 out there in a draw of their own, left out from far off; and each
         // place out past downtown, its windows and lamps, in one of its own, so it is drawn only near it.
-        val (corner, outer) = glowingBlocks.indices.partition { glowingBlocks[it].x < Neighbourhood.TOWN_COLUMNS }
-        val (windows, wide) = outer.partition { it in houseGlass }
+        // The houses' windows first: one just west of the corner's edge belongs with its house, not the corner.
+        val (windows, rest) = glowingBlocks.indices.partition { it in houseGlass }
+        val (corner, wide) = rest.partition { glowingBlocks[it].x < Neighbourhood.TOWN_COLUMNS }
         val byPlace = wide.groupBy { index -> placeLotOf(glowingBlocks[index]) }
         val ofPlaces = placeLots.indices.mapNotNull { byPlace[it] }
         val draws = listOf(corner) + listOfNotNull(byPlace[-1]) + ofPlaces
@@ -935,8 +940,8 @@ internal class NeighbourhoodScene(
             // A place's windows are small: they go with the low city round it, however tall the place.
             if (draw > 0) far(mesh, panes, low = draw >= draws.size - ofPlaces.size)
         }
-        // The suburban houses' windows, a draw for each wide tile of them (few draws, as the frame's draws are
-        // budgeted), drawn only after dark and only near the camera.
+        // The suburban houses' windows, a draw for each tile of them, drawn only once the lights are on and only near
+        // the camera.
         val byTile = windows.groupBy { index ->
             val pane = glowingBlocks[index]
             val column = floor((pane.x + pane.width / 2) / WINDOW_TILE).toInt()
@@ -950,6 +955,7 @@ internal class NeighbourhoodScene(
             nightOnly.add(mesh)
             far(mesh, members.map { glowingBlocks[it] }, low = true)
             farReach[farMeshes.lastIndex] = WINDOW_REACH
+            farNightOnly[farMeshes.lastIndex] = true
         }
     }
 
@@ -1096,6 +1102,7 @@ internal class NeighbourhoodScene(
         farZ = farZ.copyOf(index + 1)
         farRadius = farRadius.copyOf(index + 1)
         farReach = farReach.copyOf(index + 1)
+        farNightOnly = farNightOnly.copyOf(index + 1)
         farX[index] = (west + east) / 2
         farZ[index] = (north + south) / 2
         farRadius[index] = hypot(east - west, south - north) / 2
@@ -1108,12 +1115,20 @@ internal class NeighbourhoodScene(
      */
     private fun leaveOutFar(eyeX: Double, eyeZ: Double) {
         val lowReach = haze.near + LOW_FOG * (haze.far - haze.near)
+        val lit = lightsOn
         for (index in farMeshes.indices) {
             val away = hypot(farX[index] - eyeX, farZ[index] - eyeZ) - farRadius[index]
             val reach = if (farReach[index] < 0) lowReach else farReach[index]
-            farMeshes[index].visible = away < reach && (glowLevel > 0.0 || farMeshes[index] !in nightOnly)
+            farMeshes[index].visible = away < reach && (lit || !farNightOnly[index])
         }
     }
+
+    /**
+     * True once the houses' lights are on: toward evening ([DayLight.HOUSE_LIGHTS_ON]), and all day in the rain, when
+     * the towers' glass glows too.
+     */
+    private val lightsOn: Boolean
+        get() = shownWeather == Weather.RAINY || glowLevel >= DayLight.HOUSE_LIGHTS_ON
 
     /**
      * One draw for each tile of [blocks], [TILE] units square by where each box's middle is, noting for each box which
@@ -2063,9 +2078,16 @@ internal class NeighbourhoodScene(
     internal val houseDetailBoxes: Int
         get() = casterDetails.count + details.count
 
-    /** How many suburban house windows are drawn now: none by day. For tests. */
+    /** How many suburban house windows are in draws not left out now: none until the lights are on. For tests. */
     internal val houseWindowsDrawn: Int
         get() = nightOnly.sumOf { if (it.visible) it.count else 0 }
+
+    /** How tall pane [index] of [Neighbourhood.glowing] is drawn now, and how high its middle is. For tests. */
+    internal fun drawnPane(index: Int): Pair<Double, Double> {
+        val numbers = glowDraws[glowDrawOf[index]].instanceMatrix.array
+        val at = glowSlotOf[index] * 16
+        return numbers[at + 5].toDouble() to numbers[at + 13].toDouble()
+    }
 
     /** How many times the near houses have been written. For tests. */
     internal var houseDetailWrites = 0
@@ -2607,6 +2629,7 @@ internal class NeighbourhoodScene(
             if (isHouse[building.body]) {
                 detailStale = true
                 if (building.glassNorth >= 0) shrinkPane(building.glassNorth, height / full)
+                if (building.glassSouth >= 0) shrinkPane(building.glassSouth, height / full)
                 continue
             }
             standBox(building.body, body.y, height)
@@ -3197,11 +3220,17 @@ internal class NeighbourhoodScene(
         /** How wide a tile of the town's still boxes is: each tile is one draw, left out when out of sight. */
         const val TILE = 40.0
 
-        /** The side of a tile of suburban windows, which are small and many: a few draws, not one for each tile. */
-        private const val WINDOW_TILE = 2 * TILE
+        /**
+         * The side of a tile of suburban windows: as small as the town's tiles, so with [WINDOW_REACH] only the windows
+         * round the camera are drawn, each tile a draw.
+         */
+        private const val WINDOW_TILE = TILE
 
-        /** Windows are drawn this far from the camera, where the houses are drawn one by one. */
-        private const val WINDOW_REACH = 60.0
+        /**
+         * A tile of windows is drawn while its nearest edge is within this of the camera; past [HouseDetail.REACH] they
+         * sit on the rows' low boxes.
+         */
+        private const val WINDOW_REACH = 40.0
 
         /** The draws of the places' people: the town's own, East Vancouver's and Burnaby's. */
         private const val FOLK_DRAWS = 3
