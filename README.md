@@ -604,7 +604,7 @@ script. The code that makes and reads the data is MIT. How to fetch the data aga
 
 The same tool also makes the wide map, `WideMapData.kt`: the town's map carried on east through East Vancouver into
 south-west Burnaby, with the Expo Line and its stations, the main streets, the city blocks and the zones a room can
-be in. The town's map is its top-left corner, square for square. The town does not use it yet. Besides more of the
+be in. The town's map is its top-left corner, square for square. The town stands on it (`Neighbourhood`). Besides more of the
 City of Vancouver's open data (Rapid transit stations, Public streets), it uses the City of Burnaby's open datasets
 Burnaby Boundary, District Lot, Legal Block, Park Inventory, SkyTrain, SkyTrain Station, Street and Community Plan
 Area Boundaries, fetched on 2026-10-31 (Vancouver time) from [data.burnaby.ca](https://data.burnaby.ca), credit

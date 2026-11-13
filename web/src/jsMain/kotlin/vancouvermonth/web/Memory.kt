@@ -9,9 +9,9 @@ internal external interface KeyValueStore {
 }
 
 /**
- * What the page remembers between visits: whether the sound was on, whether the guide was seen, and the month in
- * progress. Where the browser refuses its storage (a private window, or blocked site data), reading or writing throws;
- * then nothing is remembered and the page goes on as on a first visit.
+ * What the page remembers between visits: whether the sound was on, the patch notes version last opened, and the month
+ * in progress with where the character stood. Where the browser refuses its storage (a private window, or blocked site
+ * data), reading or writing throws; then nothing is remembered and the page goes on as on a first visit.
  */
 internal class Memory(private val store: () -> KeyValueStore?) {
     fun read(key: String): String? = try {
