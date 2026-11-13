@@ -408,9 +408,8 @@ of those frames. It draws nothing while the page is hidden. It draws at most two
 phone, and boxes of a kind together: the buildings, trees and the rest that stand still and cast shadows in one draw for
 each 40-unit tile of the town, so a tile out of the camera's sight or the sun's shadow box is not drawn at all; the
 ground, the sea and the glowing windows in one draw each (each place out past downtown its windows and lamps in one of
-its
-own, drawn only near it, and the suburbs' house windows in one for each 40-unit tile, drawn only once their lights are on
-and only while the tile's edge is within 40 units of the camera); downtown's townspeople in one, East Vancouver's and
+its own, drawn only near it, and the suburbs' house windows in one for each 40-unit tile, drawn only once their
+lights are on and only while the tile is within about 40 units of the camera); downtown's townspeople in one, East Vancouver's and
 Burnaby's in one each, drawn only near
 them, all four passersby in another,
 the train's cars in two, and all the rain in one, moved on the same beat as the rest of the town's life. If the phone
@@ -442,10 +441,9 @@ rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, al
 `FramePace` (which frames are drawn). The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`, and
 `Passersby.kt` for the passersby's), and so are each day's weather (`Weather.kt`) and the bike shop's and riding's
 words (`Shop.kt`), and the SkyTrain's, the bus's, the water bus's and the taxi's (`Transit.kt`). `WalkableTown` draws
-all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about 949 KB
-(about 286 KB gzipped), under the 1 MiB aim: the maps' rows, long lines and the wide map's blocks are packed small (the map tool's README
-says how), and Kotlin writes the page as ES2015, with JavaScript classes. `TownBudgetTest` measures what a frame costs downtown (by day and at night),
+all of it, and `Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps
+included, is about 949 KB (about 286 KB gzipped), under the 1 MiB aim: the maps' rows, long lines and the wide map's
+blocks are packed small (the map tool's README says how), and Kotlin writes the page as ES2015, with JavaScript classes. `TownBudgetTest` measures what a frame costs downtown (by day and at night),
 in East Vancouver (by day and at night), at downtown's east end (by day and at night), in Burnaby (by day, at night and
 on a rainy morning), on a walk, on the train, under downtown and with the camera turning
 (so the near houses are written again each frame), the sun's shadows counted too, and keeps it within a phone's budget.

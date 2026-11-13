@@ -149,6 +149,16 @@ class TownBudgetTest {
     }
 
     @Test
+    fun `Burnaby on a sunny evening, at 20 00, already draws some of the houses' windows`(): Promise<Unit> {
+        val town = open(2)
+        town.showTime(0.8)
+        return whenReady({ town.isStill }) {
+            town.measureFrames(FRAMES)
+            assertTrue(town.houseWindowsDrawn > 0, "no windows lit at 20:00")
+        }
+    }
+
+    @Test
     fun `Burnaby on a rainy morning lights the houses' windows, as it does the towers' glass`(): Promise<Unit> {
         val town = open(2)
         town.weather = Weather.RAINY
