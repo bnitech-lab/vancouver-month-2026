@@ -65,7 +65,7 @@ Never point an arrow the other way, and never put layout or browser APIs in `cor
    (such as how far a character has walked) deciding a result. Drive the clock from the test.
 9. **Issues labelled `for-dawn` belong to the owner.** Never fix them; give hints in a comment only.
 10. **Never commit or push to `main`.** Branch `vancouver-month-2026/claude/<topic>`, open a PR, wait for CI to be
-    green. Do not merge unless the owner says so.
+    green. A development agent never merges; the session that coordinates the work merges after its checks.
 11. **Commits:** `[claude] <type>: <description>`, small, one concern each, ending with the same
     `Co-Authored-By` trailer lines as the recent commits in `git log`. Use no em dash anywhere (code, docs,
     patch notes, commit messages).
