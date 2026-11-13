@@ -380,6 +380,7 @@ class PhoneGame private constructor(
 
     private fun showRooms() {
         showTitle()
+        if (slot?.droppedThisOpening == true) root.child("p", "dropped-note", Continue.DROPPED)
         root.child("section", "card") {
             child("h2", text = "할 일")
             child("p", "lead", "한 달 총비용이 가장 싼 방을 고르세요.")

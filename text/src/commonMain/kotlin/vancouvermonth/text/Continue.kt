@@ -8,6 +8,9 @@ object Continue {
     const val CONTINUE = "이어하기"
     const val NEW = "새로 시작"
     const val NOTE = "새로 시작하면 하던 한 달은 지워져요."
+
+    /** Once, on the rooms screen, after a kept month had to be dropped because it can no longer be continued. */
+    const val DROPPED = "게임이 바뀌어서 하던 한 달은 이어 갈 수 없어요. 새 한 달을 시작해요."
 }
 
 /**

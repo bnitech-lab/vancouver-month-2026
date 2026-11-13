@@ -27,4 +27,11 @@ class ContinueTest {
         assertTrue(Continue.NEW in Continue.NOTE && "지워져요" in Continue.NOTE)
         for (line in listOf(Continue.TITLE, Continue.NOTE)) assertTrue(line.length <= 24, "Too long for a phone: $line")
     }
+
+    @Test
+    fun `the notice for a month that could not be kept says why and what comes next, in one line of a card`() {
+        assertEquals("게임이 바뀌어서 하던 한 달은 이어 갈 수 없어요. 새 한 달을 시작해요.", Continue.DROPPED)
+        assertTrue(Continue.DROPPED.length <= 44, "Too long for two lines of a card: ${Continue.DROPPED}")
+        assertTrue('\u2014' !in Continue.DROPPED)
+    }
 }

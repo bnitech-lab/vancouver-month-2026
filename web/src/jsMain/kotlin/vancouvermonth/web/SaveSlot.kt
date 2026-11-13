@@ -45,26 +45,40 @@ internal class SaveSlot(
         return Spot(x, z)
     }
 
+    /**
+     * True when [keptFor] dropped a month that could not be continued during this opening of the page: the page tells
+     * the player on the rooms screen. Kept in memory only, so the next opening, whose slot is empty, says nothing.
+     */
+    var droppedThisOpening = false
+        private set
+
     fun forgetSpot() = memory.write(SPOT_KEY, "")
 
     /**
      * The month kept for the run of [seed] (and of [today], for today's run), replayed, or null. A month kept for
      * another run is left for that run, until a new month takes the slot. A kept line that is not a record, or a
-     * record of this run that does not replay, is dropped, so a line that cannot be continued never blocks the page.
+     * record of this run that does not replay, is dropped, so a line that cannot be continued never blocks the page,
+     * and that is noted for [droppedThisOpening]. A month kept for another run is not dropped, and not noted.
      */
     fun keptFor(seed: Int, today: TodaysRun?): KeptMonth? {
         val text = memory.read(KEY)
         if (text.isNullOrEmpty()) return null
         val record = MonthRecord.decode(text) ?: run {
-            clear()
+            drop()
             return null
         }
         if (record.seed != seed || record.today != today) return null
         val replayed = replayed(record) ?: run {
-            clear()
+            drop()
             return null
         }
         return KeptMonth(record, replayed)
+    }
+
+    /** Empties the slot for a month that cannot be continued, and notes it for [droppedThisOpening]. */
+    private fun drop() {
+        clear()
+        droppedThisOpening = true
     }
 
     /**

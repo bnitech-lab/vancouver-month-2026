@@ -31,7 +31,8 @@ the money runs out.
 ## Play
 
 In a browser, on a phone or a computer: **https://bnitech-lab.github.io/vancouver-month-2026/** (the phone
-screen with the 3D town; add `?seed=1011` to replay a run, or `?today` for today's run).
+screen with the 3D town; add `?seed=1011` to replay a run, or `?today` for today's run). A run number in the
+address is a whole number from 1 to 999,999; anything else is read as no number at all.
 
 What changed in each version is in [PATCH_NOTES.md](PATCH_NOTES.md), in Korean, the same notes the game shows under
 업데이트 소식.
@@ -184,8 +185,9 @@ through the same rules (the guess's money included) and goes straight to that da
 month's run, and there 새로 시작 plays a new run instead, straight to its rooms. There is one
 slot: a page opened for another run leaves the kept month alone, its start card says that starting will drop the month
 kept on that day, and starting takes its place. Two tabs share the slot too, so the day last played in either is the one
-kept. A record that cannot be read or replayed (another version, or a day the rules refuse) is dropped without a word,
-and where the browser refuses storage there is no card and nothing is kept.
+kept. A record that cannot be read or replayed (another version, or a day the rules refuse) is dropped, and the rooms
+screen says so once (the page remembers that only while it is open, so a reload does not repeat it). Where the browser
+refuses storage there is no card, no notice and nothing is kept.
 
 A test replays a few kept lines to months written down by hand, so a change to the rules fails it until
 `MonthRecord.VERSION` goes up, which drops the older lines rather than continuing them into a different month. It is 4
