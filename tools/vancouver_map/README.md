@@ -8,7 +8,7 @@ line the mountains stand behind, the city blocks and small parks, and a proposed
 
 It also writes `web/src/jsMain/kotlin/vancouvermonth/web/WideMapData.kt`, the wide map: the town's map carried on east
 through East Vancouver into south-west Burnaby, past the Burnaby town centre and its big park. `WideMap.kt` reads it.
-Nothing draws it yet; the town will move onto it next.
+The town stands on it (`Neighbourhood.kt`), its corner being the town's own map, square for square.
 
 ## Rebuild
 

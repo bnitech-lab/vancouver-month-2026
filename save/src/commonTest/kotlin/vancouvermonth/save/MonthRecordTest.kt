@@ -89,6 +89,33 @@ class MonthRecordTest {
     }
 
     @Test
+    fun `the letters and digits of a kept line read as each action at each place number in use`() {
+        // Pins the line's letters and digits only. Which place a number means is pinned in web's NeighbourhoodTest.
+        // The town has cafes 0..2, libraries 0..2, coworking spaces 0..1 and offices 0..2; sleep is at 0.
+        val inUse = mapOf(
+            Action.WORK to listOf("W", "W1", "W2"),
+            Action.STUDY_ENGLISH to listOf("E", "E1", "E2"),
+            Action.PRACTISE_CODING to listOf("C", "C1"),
+            Action.APPLY to listOf("A", "A1", "A2"),
+        )
+        for ((action, texts) in inUse) {
+            for ((number, text) in texts.withIndex()) {
+                val line = "4|1011||2|1165|$text"
+                val record = assertNotNull(MonthRecord.decode(line), line)
+                assertEquals(listOf(Choice.Take(action, number)), record.choices, line)
+                assertEquals(line, record.encode())
+            }
+        }
+        // Sleep is only ever at 0, and a line that gives it a place is not one this version wrote.
+        assertEquals("4|1011||2|1165|R", MonthRecord(1011, null, 2, 1165, listOf(rest)).encode())
+        assertNull(MonthRecord.decode("4|1011||2|1165|R2"))
+        // A month kept with every place in use replays to the same month as one kept at the first places.
+        val saved = assertNotNull(MonthRecord.decode("4|1011||2|1165|W1E2RC1A2RW2"))
+        val atFirst = assertNotNull(MonthRecord.decode("4|1011||2|1165|WERCARW"))
+        assertEquals(assertNotNull(atFirst.replay()).month.state(), assertNotNull(saved.replay()).month.state())
+    }
+
+    @Test
     fun `a line this version did not write is not a record`() {
         val good = "4|1011||2|1165|ECRA"
         assertNotNull(MonthRecord.decode(good))

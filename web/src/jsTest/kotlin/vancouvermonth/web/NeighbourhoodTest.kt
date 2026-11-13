@@ -47,6 +47,26 @@ class NeighbourhoodTest {
     }
 
     @Test
+    fun `each place keeps the kind and the number that players' kept months already hold`() {
+        // Written out by hand and keyed by name. A new place adds one line; no line here ever changes or goes.
+        val kept = mapOf(
+            "HOME" to (PlaceKind.HOME to 0),
+            "CAFE" to (PlaceKind.CAFE to 0),
+            "LIBRARY" to (PlaceKind.LIBRARY to 0),
+            "COWORKING" to (PlaceKind.COWORKING to 0),
+            "OFFICE" to (PlaceKind.OFFICE to 0),
+            "JUNCTION_OFFICE" to (PlaceKind.OFFICE to 1),
+            "EAST_VILLAGE_LIBRARY" to (PlaceKind.LIBRARY to 1),
+            "SMALL_PARK_CAFE" to (PlaceKind.CAFE to 1),
+            "HIGH_STREET_COWORKING" to (PlaceKind.COWORKING to 1),
+            "BIG_PARK_LIBRARY" to (PlaceKind.LIBRARY to 2),
+            "TOWN_CENTRE_OFFICE" to (PlaceKind.OFFICE to 2),
+            "SLOPE_CAFE" to (PlaceKind.CAFE to 2),
+        )
+        assertEquals(kept, Place.entries.associate { it.name to (it.kind to it.number) })
+    }
+
+    @Test
     fun `each place's person offers the action spent there`() {
         assertEquals(Townsperson.GRANDMA, personAt(Place.HOME))
         assertEquals(Townsperson.HANA, personAt(Place.CAFE))
