@@ -480,6 +480,33 @@ class RoomMapTest {
     }
 
     @Test
+    fun `with the dropped-month notice above 할 일, the rooms still lay out on a small phone`() {
+        for ((width, height) in listOf(375 to 812, 320 to 568)) {
+            // The line that reads but does not replay is dropped on each opening, so it is kept again for the next.
+            store.items[SaveSlot.KEY] = "4|1011||2|1165|EWW"
+            val app = phone(width, height)
+            open(into = app)
+            passIntro(app)
+            val page = app.ownerDocument!!
+            val notice = assertNotNull(app.querySelector(".dropped-note") as? HTMLElement, "No notice at $width")
+            assertEquals(Continue.DROPPED, notice.textContent)
+            val map = assertNotNull(app.querySelector(".room-map") as? HTMLElement)
+            val todo = app.querySelector("section.card")!!.getBoundingClientRect()
+            assertTrue(notice.getBoundingClientRect().bottom <= todo.top, "The notice is not above 할 일 at $width")
+            // The notice is two lines at most, and the map begins on the first screen, with the whole of it on a
+            // 375 x 812 phone's, as it is without the notice.
+            assertTrue(notice.getBoundingClientRect().height <= 2 * 14 * 1.6, "The notice is over two lines at $width")
+            assertTrue(map.getBoundingClientRect().top < height, "The map starts below the first screen at $width")
+            if (width == 375) assertTrue(map.getBoundingClientRect().bottom <= height, "The map is cut off at $width")
+            assertTrue(page.documentElement!!.scrollWidth <= width, "The rooms scroll sideways at $width x $height")
+            for ((index, pin) in pins(app).withIndex()) {
+                assertTrue(takesFinger(pin, width, height), "Pin ${index + 1} is covered or small at $width x $height")
+            }
+        }
+        window.scrollTo(0.0, 0.0)
+    }
+
+    @Test
     fun `laid out as published, the whole map is on a phone's first screen and every pin and 시작하기 takes a finger`() {
         for ((width, height) in listOf(375 to 812, 320 to 568)) {
             val app = phone(width, height)

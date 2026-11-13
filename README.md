@@ -32,7 +32,8 @@ the money runs out.
 
 In a browser, on a phone or a computer: **https://bnitech-lab.github.io/vancouver-month-2026/** (the phone
 screen with the 3D town; add `?seed=1011` to replay a run, or `?today` for today's run). A run number in the
-address is a whole number from 1 to 999,999; anything else is read as no number at all.
+address is a whole number from 1 to 999,999 written in ASCII digits (spaces around it are fine); anything else is
+read as no number at all. The terminal's `--seed` takes the same numbers.
 
 What changed in each version is in [PATCH_NOTES.md](PATCH_NOTES.md), in Korean, the same notes the game shows under
 업데이트 소식.
@@ -154,7 +155,7 @@ refused, and so is a date that does not exist.
 On the phone screen, tap `오늘의 판` on any ending screen, or open the page with `?today`. The page reads the
 browser's date and writes it into the address (`?today=2026-10-30`), so a reload or a shared link replays that
 date's run, even on another day. The ending shows the line with a `결과 복사` button; where the browser does not
-allow copying, the line is selected for copying by hand. `?seed` wins over `?today`.
+allow copying, the line is selected for copying by hand. A `?seed` in range wins over `?today`.
 
 The date is each player's own, so near midnight two time zones can be on different runs. The line names the
 month and day but not the year, so the same date in two different years reads the same, although those are two

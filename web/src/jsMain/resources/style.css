@@ -566,7 +566,7 @@ a:focus-visible {
 .dropped-note {
   margin: 0 0 12px;
   font-size: 14px;
-  color: var(--warn);
+  color: var(--muted);
 }
 
 /* On another run's start card: starting it drops the kept month. */

@@ -61,10 +61,10 @@ Never point an arrow the other way, and never put layout or browser APIs in `cor
    that `CURRENT` is the newest. Lines are short, friendly Korean for players: no PR numbers, file names or
    tools; at most 72 columns a line and 32 for a headline, where a Hangul syllable counts 2 (`PatchNotesTest`).
 6. **The save record.** When the shape of `MonthRecord` or what a record means changes, bump `MonthRecord.VERSION`
-   and drop old lines without a crash: a record that cannot be read or replayed is dropped (`SaveSlot.keptFor`), and
-   the player is told once on the rooms screen; the note that it was dropped lives in the page's memory, never in
-   storage. Do not key
-   saved data to enum order. The replay test must still pass against the hand-written months.
+   and drop old lines without a crash: a record that cannot be read or replayed, for whatever run, is dropped
+   (`SaveSlot.keptFor`), and the player is told once on the rooms screen; the note that it was dropped lives in the
+   page's memory, never in storage. Do not key saved data to enum order. The replay test must still pass against the
+   hand-written months.
 7. **Page size and frame budget.** The page's script stays under 1 MiB (CI checks it; the README states the current
    size, update it when it moves). The draw budgets are in `web/src/jsTest/.../TownBudgetTest.kt`; keep them green
    and re-run them when something is drawn each frame.
