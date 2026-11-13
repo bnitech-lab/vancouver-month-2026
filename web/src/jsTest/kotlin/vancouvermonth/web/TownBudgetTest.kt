@@ -12,6 +12,7 @@ import kotlinx.browser.document
 import kotlinx.browser.window
 import org.w3c.dom.HTMLElement
 import vancouvermonth.text.Transport
+import vancouvermonth.text.Weather
 
 /**
  * What a frame of the town costs on a phone, drawn for real on SwiftShader at a phone's size: downtown as it always
@@ -115,6 +116,58 @@ class TownBudgetTest {
             withinBudget(cost)
             assertEquals(DayLight.NIGHT, town.lightShown)
             assertTrue(town.houseDetailBoxes > 0, "no houses drawn near 내 방 at night")
+            assertTrue(town.houseWindowsDrawn > 0, "no house window lit near 내 방 at night")
+        }
+    }
+
+    @Test
+    fun `Burnaby by day, among the houses, draws none of their windows`(): Promise<Unit> {
+        val town = open(2)
+        town.showTime(0.0)
+        return whenReady({ town.isStill }) {
+            town.measureFrames(FRAMES)
+            assertTrue(town.houseDetailBoxes > 0, "no houses drawn near 내 방 by day")
+            assertEquals(0, town.houseWindowsDrawn)
+        }
+    }
+
+    @Test
+    fun `Burnaby on a sunny afternoon, at 15 00 and at 18 30, draws none of the houses' windows yet`(): Promise<Unit> {
+        val town = open(2)
+        town.showTime(0.5)
+        return whenReady({ town.isStill }) {
+            town.measureFrames(FRAMES)
+            assertTrue(town.houseDetailBoxes > 0, "no houses drawn near 내 방 at 15:00")
+            assertEquals(0, town.houseWindowsDrawn, "windows lit at 15:00")
+            town.showTime(0.7)
+        }.then {
+            whenReady({ town.isStill }) {
+                town.measureFrames(FRAMES)
+                assertEquals(0, town.houseWindowsDrawn, "windows lit at 18:30")
+            }
+        }.then { }
+    }
+
+    @Test
+    fun `Burnaby on a sunny evening, at 20 00, already draws some of the houses' windows`(): Promise<Unit> {
+        val town = open(2)
+        town.showTime(0.8)
+        return whenReady({ town.isStill }) {
+            town.measureFrames(FRAMES)
+            assertTrue(town.houseWindowsDrawn > 0, "no windows lit at 20:00")
+        }
+    }
+
+    @Test
+    fun `Burnaby on a rainy morning lights the houses' windows, as it does the towers' glass`(): Promise<Unit> {
+        val town = open(2)
+        town.weather = Weather.RAINY
+        town.showTime(0.0)
+        return whenReady({ town.isStill }) {
+            val cost = town.measureFrames(FRAMES)
+            report("Burnaby on a rainy morning", cost)
+            withinBudget(cost)
+            assertTrue(town.houseWindowsDrawn > 0, "no house window lit in the rain by day")
         }
     }
 
@@ -126,6 +179,19 @@ class TownBudgetTest {
             val cost = town.measureFrames(FRAMES)
             report("East Vancouver", cost)
             withinBudget(cost)
+        }
+    }
+
+    @Test
+    fun `East Vancouver at night, its houses' windows lit, at the station by the junction`(): Promise<Unit> {
+        val town = open(1)
+        town.showTime(1.0)
+        town.standAt(TransitLines.stations[3].door)
+        return whenReady({ town.isStill }) {
+            val cost = town.measureFrames(FRAMES)
+            report("East Vancouver at night", cost)
+            withinBudget(cost)
+            assertTrue(town.houseWindowsDrawn > 0, "no house window lit in East Vancouver at night")
         }
     }
 
@@ -185,6 +251,19 @@ class TownBudgetTest {
         return whenReady({ town.isStill }) {
             val cost = town.measureFrames(FRAMES)
             report("downtown's east end, looking east", cost)
+            withinBudget(cost)
+        }
+    }
+
+    @Test
+    fun `downtown's east end at night, looking east, costs what the day does`(): Promise<Unit> {
+        val town = open(1)
+        town.showTime(1.0)
+        town.standAt(TransitLines.stations[1].door)
+        town.aimCamera(-PI / 2, 0.45, 21.0)
+        return whenReady({ town.isStill }) {
+            val cost = town.measureFrames(FRAMES)
+            report("downtown's east end at night", cost)
             withinBudget(cost)
         }
     }
@@ -258,7 +337,8 @@ class TownBudgetTest {
         const val RIDE_MILLIS = 7_000.0
         /**
          * The busiest frame measured, downtown's east end looking east, takes 48 draws and 4,131 boxes; the budget is that
-         * and about a sixth more, so a frame much dearer than today's fails.
+         * and about a sixth more, so a frame much dearer than today's fails. Since the suburbs' windows light at night,
+         * the busiest is East Vancouver at night, 51 draws and 4,661 boxes, still within it.
          */
         const val MOST_DRAWS = 56
         const val MOST_BOXES = 4_800
