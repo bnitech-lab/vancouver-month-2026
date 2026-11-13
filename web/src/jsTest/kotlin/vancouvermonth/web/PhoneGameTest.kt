@@ -337,6 +337,33 @@ class PhoneGameTest {
     }
 
     @Test
+    fun `a seed is ASCII digits with optional spaces around them, and nothing else`() {
+        // A plus in an address reads as a space; an encoded plus stays a plus, which is no digit.
+        assertEquals(42, seedFrom("?seed=+42"))
+        assertEquals(42, seedFrom("?seed=42"))
+        assertEquals(7, seedFrom("?seed=007"))
+        for (query in listOf(
+            "?seed=%2B42",
+            "?seed=5.0",
+            "?seed=99999999999",
+            "?seed=%EF%BC%94%EF%BC%92",
+            "?seed=%D9%A4%D9%A2",
+            "?seed=4%202",
+        )) {
+            assertNull(seedFrom(query), query)
+        }
+    }
+
+    @Test
+    fun `a seed of 0 with today's run falls through to today's run, and a zero-padded seed keeps its address`() {
+        val now = Date(2026, 9, 30)
+        val today = TodaysRun(2026, 10, 30)
+        assertEquals(Opening(today.seed, today, "?today=2026-10-30"), openingFor("?seed=0&today", now, 4321))
+        assertEquals(Opening(7, null, null), openingFor("?seed=007", now, 4321))
+        assertEquals(Opening(7, null, "?seed=7", atRooms = true), openingFor("?seed=007&start", now, 4321))
+    }
+
+    @Test
     fun `a seed in an address counts only from 1 to 999999, and the spaces around it do not matter`() {
         assertEquals(1, seedFrom("?seed=1"))
         assertEquals(999_999, seedFrom("?seed=999999"))

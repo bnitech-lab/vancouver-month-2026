@@ -80,11 +80,14 @@ fun openingFor(query: String, now: Date, newSeed: Int, kept: MonthRecord? = null
     return Opening(newSeed, null, "?seed=$newSeed")
 }
 
-/** The run numbers an address may name. The game's own are 1,000 to 9,999. */
-private val SEEDS = 1..999_999
-
-/** The seed in a query such as "?seed=1011", or null: there is none, or it is not a whole number in [SEEDS]. */
-fun seedFrom(query: String): Int? = URLSearchParams(query).get("seed")?.trim()?.toIntOrNull()?.takeIf { it in SEEDS }
+/**
+ * The seed in a query such as "?seed=1011", or null: there is none, or it is not ASCII digits (with spaces around
+ * them allowed) naming a number in [TodaysRun.SHARED_SEEDS]. A plus sign is no digit; a plus typed in an address
+ * reads as a space, so "?seed=+42" is 42 and "?seed=%2B42" is none.
+ */
+fun seedFrom(query: String): Int? = URLSearchParams(query).get("seed")?.trim()
+    ?.takeIf { text -> text.isNotEmpty() && text.all { it in '0'..'9' } }
+    ?.toIntOrNull()?.takeIf { it in TodaysRun.SHARED_SEEDS }
 
 /**
  * Today's run from a query such as "?today" or "?today=2026-10-30", or null when the query has no "today".
