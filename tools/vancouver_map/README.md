@@ -3,8 +3,7 @@
 `build_map.py` turns City of Vancouver open data into
 `web/src/jsMain/kotlin/vancouvermonth/web/VancouverMapData.kt`: the peninsula's outline as a grid of squares (water,
 land, park, shore), the simplified shoreline, the big park's outline, the rail on its guideway along False Creek, the
-line the mountains stand behind, the city blocks and small parks, and a proposed square for each of the five places the game began with (`SPOTS` in
-`build_map.py`; the game now has twelve, on the wide map).
+line the mountains stand behind, the city blocks and small parks, and a proposed square for each of the five places.
 `VancouverMap.kt` reads it, and `Neighbourhood.kt` builds the town on it.
 
 It also writes `web/src/jsMain/kotlin/vancouvermonth/web/WideMapData.kt`, the wide map: the town's map carried on east
@@ -42,9 +41,9 @@ give a slightly different map; the SHA-1 of each file used is written at the top
    outlines of Downtown and the West End: 44.7 degrees, so real north points up and to the left.
 3. The area is the big park at the peninsula's tip, downtown, False Creek and a strip of its south shore, with water
    above the park and the head of False Creek on the right.
-4. The scale is the finest, in half-metre steps, at which the farthest walk between two of the five first places takes no
+4. The scale is the finest, in half-metre steps, at which the farthest walk between two of the five places takes no
    more than 25 seconds at the game's walking speed (3.6 squares a second), measured with the same A* and
-   straightening as `Grid.route`. With those five proposed spots it is 25 m a square, and the grid is 246 by 155.
+   straightening as `Grid.route`. With the five proposed spots it is 25 m a square, and the grid is 246 by 155.
 5. Each square takes what lies under its centre: water, land, or the park. Ponds under 4 squares become land, specks
    of land the character could never reach become water, and every land square beside the water becomes shore.
 6. Lines are simplified with Douglas-Peucker to within 0.35 of a square.
@@ -55,7 +54,7 @@ give a slightly different map; the SHA-1 of each file used is written at the top
    square wide runs between any two blocks side by side; two may still meet at a corner. A block whose middle lies in
    one of the City's parks is a small park, not buildings.
 
-The five first spots are rough points in a neighbourhood, chosen by its character, never an address or a business: 내 방 in
+The five spots are rough points in a neighbourhood, chosen by its character, never an address or a business: 내 방 in
 the West End's residential streets, 카페 by the seawall on False Creek's north shore, 도서관 in the civic blocks in the
 middle of downtown, 코워킹 in the old brick warehouse streets at the east end, 회사 among the office towers near the
 inlet. The rail is the Expo Line from where it leaves its tunnel near the stadiums, east along False Creek. The
