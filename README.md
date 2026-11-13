@@ -387,7 +387,10 @@ An answer that takes an action leaves the character where it is, and the time it
 seconds: the sky, the sun, the lamps and the windows move little by little from the time before to the time after, from
 a soft morning (8:00) through a bright day (14:00) and a warm late afternoon (17:00) to a golden evening (20:00) and the
 night (23:00), with the lamps and windows coming on toward evening and the passersby going home; a rainy day greys every
-one of those hours. What happened goes over the top of the screen, and the top card shows the time and the stamina left.
+one of those hours. Toward 20:00 about half of the suburbs' houses put their lights on, the same houses every run: a
+window on the front beside the door, and one in the middle of the back unless another row's backs stand close behind;
+in the rain they are lit all day, as the towers' glass is. They are drawn only round the camera. What happened goes
+over the top of the screen, and the top card shows the time and the stamina left.
 With nothing but sleep left (no stamina, or too little for anything still open), a line there says to go home to sleep;
 the character walks, rides or takes a taxi home as by day. Sleep starts only with the character at 내 방: a tap on its
 name from afar walks home first, and were its talk open before then, 자기 would wait with "내 방에 도착하면 잘 수 있어요."
@@ -408,8 +411,9 @@ of those frames. It draws nothing while the page is hidden. It draws at most two
 phone, and boxes of a kind together: the buildings, trees and the rest that stand still and cast shadows in one draw for
 each 40-unit tile of the town, so a tile out of the camera's sight or the sun's shadow box is not drawn at all; the
 ground, the sea and the glowing windows in one draw each (each place out past downtown its windows and lamps in one of
-its
-own, drawn only near it); downtown's townspeople in one, East Vancouver's and Burnaby's in one each, drawn only near
+its own, drawn only near it, and the suburbs' house windows in one for each 40-unit tile, drawn only once their
+lights are on and only while the tile is within about 40 units of the camera); downtown's townspeople in one, East Vancouver's and
+Burnaby's in one each, drawn only near
 them, all four passersby in another,
 the train's cars in two, and all the rain in one, moved on the same beat as the rest of the town's life. If the phone
 starts asking for less motion during the month, the town's own life stands still, the rain with it.
@@ -440,11 +444,11 @@ rumbles, the fire's flicker and crackle, the glints, petals, clouds and rain, al
 `FramePace` (which frames are drawn). The people's lines and the rule that picks them are in `text` (`Townsfolk.kt`, and
 `Passersby.kt` for the passersby's), and so are each day's weather (`Weather.kt`) and the bike shop's and riding's
 words (`Shop.kt`), and the SkyTrain's, the bus's, the water bus's and the taxi's (`Transit.kt`). `WalkableTown` draws
-all of it, and
-`Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps included, is about 946 KB
-(about 284 KB gzipped), under the 1 MiB aim: the maps' rows, long lines and the wide map's blocks are packed small (the map tool's README
-says how), and Kotlin writes the page as ES2015, with JavaScript classes. `TownBudgetTest` measures what a frame costs downtown (by day and at night),
-in East Vancouver, in Burnaby (by day and at night), on a walk, on the train, under downtown and with the camera turning
+all of it, and `Three.kt` declares only the parts of Three.js in use. The page's script, Three.js and the maps
+included, is about 949 KB (about 286 KB gzipped), under the 1 MiB aim: the maps' rows, long lines and the wide map's
+blocks are packed small (the map tool's README says how), and Kotlin writes the page as ES2015, with JavaScript classes. `TownBudgetTest` measures what a frame costs downtown (by day and at night),
+in East Vancouver (by day and at night), at downtown's east end (by day and at night), in Burnaby (by day, at night and
+on a rainy morning), on a walk, on the train, under downtown and with the camera turning
 (so the near houses are written again each frame), the sun's shadows counted too, and keeps it within a phone's budget.
 
 ### Sound and the guide

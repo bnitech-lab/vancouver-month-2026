@@ -1,7 +1,10 @@
 package vancouvermonth.web
 
 import kotlin.js.Date
+import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.sin
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -280,5 +283,68 @@ class NeighbourhoodTest {
             val streetSide = if (venue.doorFacesSouth) anchor.z > middle else anchor.z < middle
             assertTrue(streetSide, "${venue.place}")
         }
+    }
+
+    @Test
+    fun `about half of the suburban houses have lit windows, front and back, the same houses every time`() {
+        val houses = Neighbourhood.houses
+        val glass = Neighbourhood.houseGlass
+        assertEquals(glass.size, glass.toSet().size)
+        // Golden: the share of lit houses and the number of panes on today's map, and a few houses fixed by hand, so a
+        // change to the choice or to its 32-bit sum (Math.imul in the browser) fails here.
+        val lit = houses.filter { Neighbourhood.foldables[it.foldable].glassNorth >= 0 }
+        assertEquals(LIT_HOUSES, lit.size, "${lit.size} lit with ${glass.size} panes, of ${houses.size} houses")
+        assertEquals(LIT_PANES, glass.size)
+        assertTrue(lit.size * 100 in houses.size * 40..houses.size * 60, "${lit.size} lit of ${houses.size} houses")
+        assertTrue(Neighbourhood.windowLit(TurnedBox(612.25, 140.5, 1.2, 1.0, 0.3)))
+        assertFalse(Neighbourhood.windowLit(TurnedBox(700.0, -20.5, 1.2, 1.0, 0.3)))
+        assertTrue(Neighbourhood.windowLit(TurnedBox(-3.5, 88.0, 1.2, 1.0, 0.0)))
+        assertFalse(Neighbourhood.windowLit(TurnedBox(-3.75, 88.0, 1.2, 1.0, 0.0)))
+        // Every pane belongs to exactly one house, held by its foldable: the front one north, the back one south.
+        val held = Neighbourhood.foldables.flatMap { listOf(it.glassNorth, it.glassSouth) }.filter { it in glass }
+        assertEquals(glass.toSet(), held.toSet())
+        assertEquals(glass.size, held.size)
+        var backs = 0
+        for (house in lit) {
+            val shape = house.shape
+            val building = Neighbourhood.foldables[house.foldable]
+            assertTrue(Neighbourhood.windowLit(shape), "house at ${shape.x}, ${shape.z} is lit but not chosen")
+            for ((index, side) in listOf(building.glassNorth to house.front, building.glassSouth to -house.front)) {
+                if (index < 0) continue
+                val pane = Neighbourhood.glowing[index]
+                val dx = pane.x + pane.width / 2 - shape.x
+                val dz = pane.z + pane.depth / 2 - shape.z
+                val along = dx * cos(shape.turn) - dz * sin(shape.turn)
+                val across = dx * sin(shape.turn) + dz * cos(shape.turn)
+                // Flat against the wall on its own side, the front's beside the door and clear of it.
+                assertEquals(side * (shape.depth / 2 + Neighbourhood.PANE_OUT), across, 1e-9, "a pane off its wall")
+                assertEquals(shape.turn, pane.turn)
+                assertTrue(abs(along) + pane.width / 2 <= shape.width / 2, "a pane past its wall's end")
+                assertEquals(house.wall * Neighbourhood.PANE_BOTTOM, pane.y, 1e-9)
+                assertEquals(house.wall * Neighbourhood.PANE_HEIGHT, pane.height, 1e-9)
+                if (side == house.front) {
+                    if (house.doorAt != 0.0) assertTrue(along * house.doorAt < 0, "a window on the door's side")
+                    val doorFrom = house.doorAt - HouseDetail.DOOR_WIDTH / 2
+                    val doorTo = house.doorAt + HouseDetail.DOOR_WIDTH / 2
+                    val clear = along + pane.width / 2 <= doorFrom || along - pane.width / 2 >= doorTo
+                    assertTrue(clear, "a window over the door: $along wide ${pane.width}, door at ${house.doorAt}")
+                } else {
+                    backs++
+                    assertEquals(0.0, along, 1e-9)
+                }
+            }
+        }
+        assertTrue(backs > lit.size / 2, "only $backs back windows on ${lit.size} lit houses")
+        // Unlit houses hold no pane.
+        for (house in houses.filter { !Neighbourhood.windowLit(it.shape) }) {
+            assertEquals(-1, Neighbourhood.foldables[house.foldable].glassNorth)
+            assertEquals(-1, Neighbourhood.foldables[house.foldable].glassSouth)
+        }
+    }
+
+    private companion object {
+        /** On today's map: how many houses are lit, and how many panes they show. */
+        const val LIT_HOUSES = 1_618
+        const val LIT_PANES = 3_204
     }
 }

@@ -281,4 +281,87 @@ class HouseDetailTest {
             check()
         }
     }
+
+    @Test
+    fun `a lit house folding out of the camera's way folds its windows with it, and they stand again as it rises`():
+        Promise<Unit> {
+        // A lit house with a window front and back, the character on the street before it, and a turn of the camera
+        // from which the house stands between them, worked out with the town's own camera and folding rule.
+        val foldables = Neighbourhood.foldables
+        val cutaway = Cutaway(foldables.map { it.box }, foldables.map { Neighbourhood.blocks[it.body] })
+        var found: Triple<House, Spot, Double>? = null
+        for (house in Neighbourhood.houses) {
+            val building = foldables[house.foldable]
+            if (building.glassNorth < 0 || building.glassSouth < 0) continue
+            val shape = house.shape
+            val out = shape.depth / 2 + 2.0
+            val outX = sin(shape.turn) * house.front
+            val outZ = cos(shape.turn) * house.front
+            val spot = Spot(shape.x + outX * out, shape.z + outZ * out)
+            val behind = kotlin.math.atan2(-outX, -outZ)
+            val focus = Point(spot.x, 1.0, spot.z)
+            val camera = FollowCamera(focus)
+            camera.aspect = 375.0 / 812
+            camera.aim(behind, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+            camera.jumpTo(focus)
+            cutaway.aim(camera.eye.x, camera.eye.y, camera.eye.z, spot.x, 1.6, spot.z)
+            if (!cutaway.isFolding(house.foldable)) continue
+            found = Triple(house, spot, behind)
+            break
+        }
+        val (house, spot, behind) = assertNotNull(found, "no lit house folds with the camera behind it")
+        val building = foldables[house.foldable]
+        val full = Neighbourhood.blocks[building.body].height
+        val panes = listOf(building.glassNorth, building.glassSouth)
+        val opened = assertNotNull(openWalkableTown(lessMotion = false), "No WebGL 2") as NeighbourhoodScene
+        opened.lifeClock = { 0.0 }
+        val element = opened.element
+        element.style.setProperty("inset", "auto")
+        element.style.left = "0px"
+        element.style.top = "0px"
+        element.style.width = "375px"
+        element.style.height = "812px"
+        document.body!!.appendChild(element)
+        town = opened
+        opened.standAt(spot)
+        opened.aimCamera(behind, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+        var folded = false
+        return Promise { resolve, reject ->
+            fun check() {
+                try {
+                    if (!opened.isStill) {
+                        window.setTimeout({ check() }, 20)
+                        return
+                    }
+                    if (!folded) {
+                        assertTrue(opened.isFolded(house.foldable), "the lit house in the way stands")
+                        // Each pane as much smaller as the walls, its top under the folded walls' top.
+                        val shrink = Cutaway.PLINTH / full
+                        for (index in panes) {
+                            val pane = Neighbourhood.glowing[index]
+                            val (height, middle) = opened.drawnPane(index)
+                            assertEquals(pane.height * shrink, height, 1e-4)
+                            assertTrue(middle + height / 2 < Cutaway.PLINTH, "a folded window over its walls")
+                        }
+                        folded = true
+                        // The camera out on the street, the house behind the character: it rises.
+                        opened.aimCamera(behind + PI, FollowCamera.START_PITCH, FollowCamera.START_DISTANCE)
+                        window.setTimeout({ check() }, 20)
+                        return
+                    }
+                    assertFalse(opened.isFolded(house.foldable), "the house stays folded with the camera before it")
+                    for (index in panes) {
+                        val pane = Neighbourhood.glowing[index]
+                        val (height, middle) = opened.drawnPane(index)
+                        assertEquals(pane.height, height, 1e-4)
+                        assertEquals(pane.y + pane.height / 2, middle, 1e-4)
+                    }
+                    resolve(Unit)
+                } catch (error: Throwable) {
+                    reject(error)
+                }
+            }
+            check()
+        }
+    }
 }
