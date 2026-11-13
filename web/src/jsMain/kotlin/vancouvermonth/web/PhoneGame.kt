@@ -1095,8 +1095,10 @@ class PhoneGame private constructor(
             } else if (away) {
                 child("span", "action-why", if (action == Action.REST) SLEEP_ON_ARRIVAL else DO_ON_ARRIVAL)
             }
-            // Kept with the place's number among its kind, so a month taken up again knows where it was.
-            onclick = { spend(month, place, Choice.Take(action, place.number)) }
+            // Kept with the place's number among its kind, so a month taken up again knows where it was. Sleep is
+            // always kept at 0, whichever home it is taken at, as a record has no place for it.
+            val at = if (action == Action.REST) 0 else place.number
+            onclick = { spend(month, place, Choice.Take(action, at)) }
         }
     }
 
