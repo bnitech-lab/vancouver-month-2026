@@ -298,6 +298,12 @@ object Neighbourhood {
     )
     val trainCarWindows: List<Block> = listOf(Block(-0.95, DECK_HEIGHT + 0.8, -0.49, 1.9, 0.35, 0.98, WINDOW))
 
+    /** True when the house [shape] has a lit window: about one in four, by where it stands and nothing else. */
+    fun windowLit(shape: TurnedBox): Boolean {
+        val mixed = floor(shape.x * 16).toInt() * 73_856_093 xor floor(shape.z * 16).toInt() * 19_349_663
+        return (mixed * -1_640_531_535 ushr 16) and 3 == 0
+    }
+
     /** The place whose door or person [spot] is within [REACH] of in zone 1's town, or null ([HomeSite.placeAt]). */
     fun placeAt(spot: Spot): Place? = HomeSite.of(1).placeAt(spot)
 
@@ -317,6 +323,9 @@ object Neighbourhood {
     val corner: List<Block>
     val groundTiles: List<List<Block>>
     val glowing: List<Block>
+
+    /** Which of [glowing] are a suburban house's window: not drawn by day, as a tower's glass is. */
+    val houseGlass: List<Int>
 
     /** The campfire's flames, which flicker: measured from the middle of the fire, [FLAME_BASE] above the ground. */
     val flames: List<Block>
@@ -398,6 +407,7 @@ object Neighbourhood {
         corner = town.corner
         groundTiles = town.groundTiles
         glowing = town.glowing
+        houseGlass = town.houseGlass
         flames = town.flames
         blossoms = town.blossoms
         cityLots = town.cityLots
@@ -518,6 +528,7 @@ object Neighbourhood {
         val corner = mutableListOf<Block>()
         val groundTiles = mutableListOf<List<Block>>()
         val glowing = mutableListOf<Block>()
+        val houseGlass = mutableListOf<Int>()
         val flames = mutableListOf<Block>()
         val blossoms = mutableListOf<Spot>()
         val footprints = mutableListOf<Block>()
@@ -1186,7 +1197,8 @@ object Neighbourhood {
                 blocks.add(house.shape.block(0.0, house.wall, house.colour))
                 val foldable = foldables.size
                 val box = house.shape.bounds(house.wall + house.ridge, house.colour)
-                foldables.add(Foldable(box, body, roof = -1, glassNorth = -1, glassSouth = -1))
+                val glass = if (windowLit(house.shape)) addHouseWindow(house) else -1
+                foldables.add(Foldable(box, body, roof = -1, glassNorth = glass, glassSouth = -1))
                 claim(house.shape, box, marks = kept.isNotEmpty())
                 // However thin, it blocks the square its middle is on.
                 turnedFootprints.add(Cell(floor(house.shape.x).toInt(), floor(house.shape.z).toInt()))
@@ -1199,6 +1211,21 @@ object Neighbourhood {
             if (kept.isEmpty()) claim(block, block.bounds(0.0, 0), marks = true, blocking = false)
             val trees = if (kept.isEmpty()) plan.trees else emptyList()
             yards.add(Yard(block, if (kept.isEmpty()) plan.lawn else null, trees, houses, firstRow, rows))
+        }
+
+        /** A window on [house]'s front, to the side of its door the door is not on; its index in [glowing]. */
+        private fun addHouseWindow(house: House): Int {
+            val shape = house.shape
+            val cosine = cos(shape.turn)
+            val sine = sin(shape.turn)
+            val along = (if (house.doorAt > 0) -0.25 else 0.25) * shape.width
+            val out = house.front * (shape.depth / 2 + 0.025)
+            val pane = TurnedBox(
+                shape.x + along * cosine + out * sine, shape.z - along * sine + out * cosine, shape.width * 0.3, 0.05, shape.turn,
+            )
+            houseGlass.add(glowing.size)
+            glowing.add(pane.block(house.wall * 0.3, house.wall * 0.35, WINDOW))
+            return glowing.size - 1
         }
 
         /** The houses laid out so far near [shape]: in its bucket and the eight round it. */

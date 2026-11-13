@@ -244,7 +244,7 @@ class CutawayTest {
             }
             val roof = if (building.roof < 0) ridges[building.body] ?: 0.0 else Neighbourhood.blocks[building.roof].height
             assertEquals(building.box.height, body.height + roof, 1e-9)
-            if (building.glassNorth < 0) continue
+            if (building.glassNorth < 0 || building.glassNorth in Neighbourhood.houseGlass) continue
             assertEquals(body.height - 1.6, Neighbourhood.glowing[building.glassNorth].height, 1e-9)
             assertEquals(building.glassNorth + 1, building.glassSouth)
         }

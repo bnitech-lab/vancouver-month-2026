@@ -261,4 +261,29 @@ class NeighbourhoodTest {
             assertTrue(streetSide, "${venue.place}")
         }
     }
+
+    @Test
+    fun `about one in four of the suburban houses have a lit window on their front, the same houses every time`() {
+        val houses = Neighbourhood.houses
+        val glass = Neighbourhood.houseGlass
+        assertTrue(glass.isNotEmpty(), "no suburban window glows")
+        assertEquals(glass.size, glass.toSet().size)
+        assertTrue(glass.size * 100 in houses.size * 15..houses.size * 35, "${glass.size} windows on ${houses.size} houses")
+        // Each house with a window has exactly one, held by its foldable, and it sits flat against the front wall.
+        val lit = Neighbourhood.foldables.filter { it.glassNorth >= 0 && it.glassNorth in glass }
+        assertEquals(glass.size, lit.size)
+        assertEquals(glass.toSet(), lit.map { it.glassNorth }.toSet())
+        for (house in houses.filter { Neighbourhood.foldables[it.foldable].glassNorth >= 0 }) {
+            val pane = Neighbourhood.glowing[Neighbourhood.foldables[house.foldable].glassNorth]
+            val apart = house.shape.distanceTo(pane.x + pane.width / 2, pane.z + pane.depth / 2)
+            assertTrue(apart > 0.01 && apart < 0.04, "a window $apart from its house")
+            assertTrue(pane.y > 0.0 && pane.y + pane.height < house.wall, "a window outside its walls")
+            assertTrue(pane.turn == house.shape.turn)
+        }
+        // The choice depends on the house alone, not on how many were laid out before it.
+        for (house in houses) {
+            val glows = Neighbourhood.foldables[house.foldable].glassNorth >= 0
+            assertEquals(glows, Neighbourhood.windowLit(house.shape), "house at ${house.shape.x}, ${house.shape.z}")
+        }
+    }
 }

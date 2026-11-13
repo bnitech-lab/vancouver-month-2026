@@ -115,6 +115,18 @@ class TownBudgetTest {
             withinBudget(cost)
             assertEquals(DayLight.NIGHT, town.lightShown)
             assertTrue(town.houseDetailBoxes > 0, "no houses drawn near 내 방 at night")
+            assertTrue(town.houseWindowsDrawn > 0, "no house window lit near 내 방 at night")
+        }
+    }
+
+    @Test
+    fun `Burnaby by day, among the houses, draws none of their windows`(): Promise<Unit> {
+        val town = open(2)
+        town.showTime(0.0)
+        return whenReady({ town.isStill }) {
+            town.measureFrames(FRAMES)
+            assertTrue(town.houseDetailBoxes > 0, "no houses drawn near 내 방 by day")
+            assertEquals(0, town.houseWindowsDrawn)
         }
     }
 
@@ -126,6 +138,19 @@ class TownBudgetTest {
             val cost = town.measureFrames(FRAMES)
             report("East Vancouver", cost)
             withinBudget(cost)
+        }
+    }
+
+    @Test
+    fun `East Vancouver at night, its houses' windows lit, at the station by the junction`(): Promise<Unit> {
+        val town = open(1)
+        town.showTime(1.0)
+        town.standAt(TransitLines.stations[3].door)
+        return whenReady({ town.isStill }) {
+            val cost = town.measureFrames(FRAMES)
+            report("East Vancouver at night", cost)
+            withinBudget(cost)
+            assertTrue(town.houseWindowsDrawn > 0, "no house window lit in East Vancouver at night")
         }
     }
 
@@ -185,6 +210,19 @@ class TownBudgetTest {
         return whenReady({ town.isStill }) {
             val cost = town.measureFrames(FRAMES)
             report("downtown's east end, looking east", cost)
+            withinBudget(cost)
+        }
+    }
+
+    @Test
+    fun `downtown's east end at night, looking east, costs what the day does`(): Promise<Unit> {
+        val town = open(1)
+        town.showTime(1.0)
+        town.standAt(TransitLines.stations[1].door)
+        town.aimCamera(-PI / 2, 0.45, 21.0)
+        return whenReady({ town.isStill }) {
+            val cost = town.measureFrames(FRAMES)
+            report("downtown's east end at night", cost)
             withinBudget(cost)
         }
     }
