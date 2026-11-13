@@ -32,10 +32,23 @@ class PatchNote(
  */
 object PatchNotes {
     /** The newest version, shown by the title; it is [ALL]'s first entry. */
-    const val CURRENT = "0.21"
+    const val CURRENT = "0.22"
 
     /** Every update, newest first. */
     val ALL: List<PatchNote> = listOf(
+        PatchNote(
+            version = "0.22",
+            date = "2026-11-13",
+            headline = "밤이면 주택가에 불이 켜져요",
+            added = listOf(
+                "저녁 8시쯤부터 주택가 집 절반쯤에 불이 켜져요.",
+                "가까이 가야 창이 보여요.",
+                "비 오는 날은 낮에도 집에 불이 켜져 있어요.",
+            ),
+            improved = listOf(
+                "하던 한 달을 이어 갈 수 없게 되면 방 고르는 화면에서 알려 줘요.",
+            ),
+        ),
         PatchNote(
             version = "0.21",
             date = "2026-11-01",
