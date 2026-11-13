@@ -1,5 +1,6 @@
 package vancouvermonth.web
 
+import kotlin.js.Date
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -59,10 +60,51 @@ class DroppedSaveNoticeTest {
             assertFalse(shown, "Shown on the intro, not the rooms: $what")
             passIntro(root)
             assertTrue(shown, "Not told: $what")
+            assertEquals("", store.items[SaveSlot.KEY], "Not dropped: $what")
             // A reload before anything else: told once, so not again.
             openAtRooms()
             assertFalse(shown, "Told twice: $what")
         }
+        // No new browser storage key holds the note: only the two the month itself uses.
+        assertTrue(store.items.keys.all { it == SaveSlot.KEY || it == SaveSlot.SPOT_KEY }, "${store.items.keys}")
+    }
+
+    @Test
+    fun `a line that reads but does not replay is dropped and told whatever run the page opens for`() {
+        for (seed in listOf(1011, 2022)) {
+            store.items.clear()
+            store.items[SaveSlot.KEY] = "4|1011||2|1165|EWW"
+            openAtRooms(seed = seed)
+            assertTrue(shown, "Not told on the page for $seed")
+            assertEquals("", store.items[SaveSlot.KEY], "Not dropped on the page for $seed")
+        }
+    }
+
+    @Test
+    fun `a bare address, which gets a new run number, still tells a line that does not replay`() {
+        store.items[SaveSlot.KEY] = "4|1011||2|1165|EWW"
+        val slot = SaveSlot(Memory { store })
+        val opening = openingFor("", Date(2026, 9, 30), 4321, slot.continuable())
+        assertEquals(4321, opening.seed)
+        root.innerHTML = ""
+        val game = PhoneGame(root, opening.seed, playAgain = {})
+        game.slot = slot
+        game.guide = FirstRunGuide().also { guides += it }
+        game.show()
+        passIntro(root)
+        assertTrue(shown)
+        assertEquals("", store.items[SaveSlot.KEY])
+    }
+
+    @Test
+    fun `storage that reads but refuses to write is not told, since the line would be told again every time`() {
+        val stuck = object : KeyValueStore {
+            override fun getItem(key: String): String? = "garbage"
+
+            override fun setItem(key: String, value: String) {}
+        }
+        openAtRooms(storage = stuck)
+        assertFalse(shown)
     }
 
     @Test
@@ -133,11 +175,5 @@ class DroppedSaveNoticeTest {
         root.button(Continue.NEW).click()
         openAtRooms()
         assertFalse(shown)
-    }
-
-    private class RefusingStore : KeyValueStore {
-        override fun getItem(key: String): String? = error("Refused")
-
-        override fun setItem(key: String, value: String) = error("Refused")
     }
 }

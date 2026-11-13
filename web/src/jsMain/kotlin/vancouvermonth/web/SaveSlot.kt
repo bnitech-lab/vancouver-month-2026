@@ -55,10 +55,11 @@ internal class SaveSlot(
     fun forgetSpot() = memory.write(SPOT_KEY, "")
 
     /**
-     * The month kept for the run of [seed] (and of [today], for today's run), replayed, or null. A month kept for
-     * another run is left for that run, until a new month takes the slot. A kept line that is not a record, or a
-     * record of this run that does not replay, is dropped, so a line that cannot be continued never blocks the page,
-     * and that is noted for [droppedThisOpening]. A month kept for another run is not dropped, and not noted.
+     * The month kept for the run of [seed] (and of [today], for today's run), replayed, or null. A kept line that is
+     * not a record, or a record that does not replay, whatever run it is for (the replay depends on the record alone,
+     * so no page could continue it), is dropped, so a line that cannot be continued never blocks the page, and that is
+     * noted for [droppedThisOpening]. A month that replays for another run is left for that run, until a new month
+     * takes the slot: it is neither dropped nor noted.
      */
     fun keptFor(seed: Int, today: TodaysRun?): KeptMonth? {
         val text = memory.read(KEY)
@@ -67,18 +68,21 @@ internal class SaveSlot(
             drop()
             return null
         }
-        if (record.seed != seed || record.today != today) return null
         val replayed = replayed(record) ?: run {
             drop()
             return null
         }
+        if (record.seed != seed || record.today != today) return null
         return KeptMonth(record, replayed)
     }
 
-    /** Empties the slot for a month that cannot be continued, and notes it for [droppedThisOpening]. */
+    /**
+     * Empties the slot for a month that cannot be continued, and notes it for [droppedThisOpening], but only when the
+     * slot reads empty afterwards: storage that refuses to write would keep the line, and the notice would repeat.
+     */
     private fun drop() {
         clear()
-        droppedThisOpening = true
+        droppedThisOpening = memory.read(KEY).isNullOrEmpty()
     }
 
     /**
