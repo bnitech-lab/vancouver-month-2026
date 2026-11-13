@@ -32,6 +32,12 @@ data class TodaysRun(val year: Int, val month: Int, val day: Int) {
         /** Every run number a run can have, today's or not. */
         val SEEDS = 1_000..9_999
 
+        /**
+         * The run numbers a shared link or the terminal may name. The game itself deals only [SEEDS]; the wider range
+         * keeps the smaller numbers older links and notes already use.
+         */
+        val SHARED_SEEDS = 1..999_999
+
         /** The years today's run covers, so a year always has four digits. */
         val YEARS = 2000..2099
 

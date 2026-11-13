@@ -283,4 +283,13 @@ class TerminalGameTest {
         assertEquals(4821, parseSeed(arrayOf("--seed=4821")))
         assertNull(parseSeed(arrayOf()))
     }
+
+    @Test
+    fun `a seed counts only from 1 to 999999, as in the phone page's address`() {
+        assertEquals(1, parseSeed(arrayOf("--seed", "1")))
+        assertEquals(999_999, parseSeed(arrayOf("--seed=999999")))
+        for (value in listOf("0", "-5", "1000000", "2147483647", "abc", "5.0")) {
+            assertNull(parseSeed(arrayOf("--seed", value)), value)
+        }
+    }
 }

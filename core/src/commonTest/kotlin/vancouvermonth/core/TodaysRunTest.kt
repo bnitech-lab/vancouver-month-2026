@@ -55,6 +55,13 @@ class TodaysRunTest {
     }
 
     @Test
+    fun `the run numbers a shared link or the terminal may name hold every number the game deals`() {
+        assertEquals(1..999_999, TodaysRun.SHARED_SEEDS)
+        assertTrue(TodaysRun.SEEDS.first in TodaysRun.SHARED_SEEDS && TodaysRun.SEEDS.last in TodaysRun.SHARED_SEEDS)
+        assertTrue(0 !in TodaysRun.SHARED_SEEDS && 1_000_000 !in TodaysRun.SHARED_SEEDS)
+    }
+
+    @Test
     fun `a date that is not on the calendar is refused`() {
         assertFailsWith<IllegalArgumentException> { TodaysRun(2026, 13, 1) }
         assertFailsWith<IllegalArgumentException> { TodaysRun(2026, 0, 1) }
