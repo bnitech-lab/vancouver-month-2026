@@ -7,7 +7,8 @@ says how to change it without breaking it.
 
 - A small turn-based game in Kotlin Multiplatform: one month in a made-up Vancouver, one job offer to land.
 - The rules live in `core` and run the same on the JVM (terminal) and in the browser (phone page).
-- Every merge to `main` deploys to GitHub Pages, so `main` is always what players see. Keep it releasable.
+- A merge to `main` publishes to GitHub Pages (while the repository variable `PAGES_ENABLED` is `true`, as it is
+  now), so `main` is what players see. Keep it releasable.
 
 ## Commands
 
@@ -30,7 +31,7 @@ CI (`.github/workflows/web.yml`) runs `./gradlew test :web:jsBrowserDistribution
 
 | Module | Owns | Depends on |
 |---|---|---|
-| `core` | The rules: rooms, guess money, the month, interviews, endings; `Dice` is the only luck | none (stdlib) |
+| `core` | The rules: rooms, guess money, the month, interviews, endings; `Dice` carries a month's luck; rooms are dealt from the seed | none (stdlib) |
 | `save` | The month in progress as a short record (`MonthRecord`), replayed through core to rebuild it | `core` |
 | `text` | Korean wording both screens share, patch notes (`PatchNotes.kt`), typed amounts. No layout | `core` |
 | `terminal` | The text screen (JVM only) | `core`, `text` |
@@ -41,11 +42,13 @@ Never point an arrow the other way, and never put layout or browser APIs in `cor
 
 ## Rules for every change
 
-1. **Everything is invented.** Every number, name, place and person is made up; use no real person, address,
-   business, brand or transit station name. This repository is public. Why: the game must be safe to publish.
-   The map's shapes come from open data under its licence; only the names are invented.
-2. **Rules stay in `core` and stay deterministic.** The same seed and choices give the same result, and all luck goes
-   through `Dice`. No wall clock or `Random` in rules. Why: replays, today's run and saves depend on it.
+1. **People, businesses and numbers are invented.** Real city, district and water names (Vancouver, East Vancouver,
+   Burnaby, False Creek) and the SkyTrain may appear, as they already do. Every person, business, address, brand,
+   station name and number is made up. This repository is public. Why: the game must be safe to publish.
+   The map's shapes come from open data under its licence.
+2. **Rules stay in `core` and stay deterministic.** The same seed and choices give the same result. Luck in a
+   month goes through `Dice`; anything else random (the room deal) takes a seeded `Random(seed)`. No wall clock and
+   no unseeded `Random` in `core`. Why: replays, today's run and saves depend on it.
 3. **A rule change re-runs the balance bot** (`BalanceTest`, in `core`) and the README states the new rates.
    Why: the month's tightness is the design.
 4. **Other layers must not re-derive a rule.** If `text`, `web` or `terminal` needs to know why something is
@@ -53,7 +56,9 @@ Never point an arrow the other way, and never put layout or browser APIs in `cor
 5. **A change players can see adds a patch note and a version.** Edit `PatchNotes.kt` in `text/src/commonMain/`:
    add a `PatchNote` at the top of `PatchNotes.ALL` and set `CURRENT` to the same version. Then regenerate the file with
    `UPDATE_PATCH_NOTES=1 ./gradlew :text:jvmTest --tests '*PatchNotesFileTest*' --rerun` and commit `PATCH_NOTES.md`
-   with it (a test fails if they differ). Lines are short, friendly Korean for players: no PR numbers, file names or
+   with it (a test fails if they differ). Give the note the day it merges in Vancouver (`2026-11-01` form) and at
+   least one line under `added`, `improved`, `fixed` or `known`; `PatchNotesTest` checks the order, the dates and
+   that `CURRENT` is the newest. Lines are short, friendly Korean for players: no PR numbers, file names or
    tools; at most 72 columns a line and 32 for a headline, where a Hangul syllable counts 2 (`PatchNotesTest`).
 6. **The save record.** When the shape of `MonthRecord` or what a record means changes, bump `MonthRecord.VERSION`
    and drop old lines without a crash: a record that cannot be read or replayed is dropped silently. Do not key
@@ -96,7 +101,7 @@ Each of these was raised on more than one PR. Check your change against them bef
 - **A double tap or tap during the night can spend a day or open the wrong thing.** New buttons over the canvas
   need the same guards as the canvas (dash, 400 ms talk guard, input blocked while the day changes). (PR 10, 12, 33)
 - **Rule logic copied outside `core`** (reasons for a refusal, a forecast, date validity). (PR 6, 7, 10)
-- **Stale numbers in the README** (page size, test counts, rates) after a change moved them. (PR 13, 20, 27, 32)
+- **Stale numbers in the README** (page size, balance rates) after a change moved them. (PR 13, 20, 27, 32)
 - **Licence and attribution for data and libraries** must keep the statement and the link, on the page and in the
   notice files. (PR 8, 17, 25)
 - **Ties and edges in the rules:** two rooms tied for cheapest, amounts at the boundary, bad input to core. Test the
@@ -106,7 +111,8 @@ Each of these was raised on more than one PR. Check your change against them bef
 
 - No formatter or linter runs in CI. Follow the code around you: Kotlin style, 4-space indent, KDoc on non-obvious
   things, comments that say why.
-- Keep new lines to 120 columns (the README keeps to it too; older code has some longer lines, leave them alone).
+- Keep new lines to 120 columns (tables excepted). Older code and README lines that run longer are left alone
+  unless you are editing them.
 - Patch note limits are enforced by `PatchNotesTest` (72 and 32 columns, Hangul counted as 2).
 - No em dash (U+2014) in any file or commit message; an en dash in a date range is fine.
 - This is a public repository: no local paths, mail addresses or personal details in files, tests, fixtures or commit
