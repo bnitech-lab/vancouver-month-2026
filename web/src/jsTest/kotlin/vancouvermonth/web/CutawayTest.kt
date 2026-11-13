@@ -244,7 +244,16 @@ class CutawayTest {
             }
             val roof = if (building.roof < 0) ridges[building.body] ?: 0.0 else Neighbourhood.blocks[building.roof].height
             assertEquals(building.box.height, body.height + roof, 1e-9)
-            if (building.glassNorth < 0 || building.glassNorth in Neighbourhood.houseGlass) continue
+            if (building.glassNorth < 0) continue
+            if (building.body in ridges) {
+                // A lit house: its front window, and its back one if it has one, as tall as a share of its walls.
+                for (pane in listOf(building.glassNorth, building.glassSouth).filter { it >= 0 }) {
+                    assertTrue(pane in Neighbourhood.houseGlass, "$body")
+                    assertEquals(body.height * Neighbourhood.PANE_HEIGHT, Neighbourhood.glowing[pane].height, 1e-9)
+                }
+                continue
+            }
+            assertFalse(building.glassNorth in Neighbourhood.houseGlass, "$body")
             assertEquals(body.height - 1.6, Neighbourhood.glowing[building.glassNorth].height, 1e-9)
             assertEquals(building.glassNorth + 1, building.glassSouth)
         }

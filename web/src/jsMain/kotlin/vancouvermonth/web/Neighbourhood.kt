@@ -117,7 +117,9 @@ data class Wall(val box: Block, val place: Place?, val folds: Boolean = false, v
  * One of the city's buildings, or a low block past the grid's edge: none of the places the month is about, so it folds
  * down out of the camera's way rather than push the camera in. [box] is the whole building, roof included. [body] and
  * [roof] are where its walls and the plant room on its roof are in [Neighbourhood.blocks], and [glassNorth] and
- * [glassSouth] where its glass is in [Neighbourhood.glowing]; -1 for a part it does not have.
+ * [glassSouth] where its glass is in [Neighbourhood.glowing]; -1 for a part it does not have. A suburban house's are
+ * its lit windows instead, whichever way they face: [glassNorth] its front's, [glassSouth] its back's, and they are not
+ * next to each other in [Neighbourhood.glowing] as a tower's two are.
  */
 data class Foldable(val box: Block, val body: Int, val roof: Int, val glassNorth: Int, val glassSouth: Int)
 
@@ -298,11 +300,29 @@ object Neighbourhood {
     )
     val trainCarWindows: List<Block> = listOf(Block(-0.95, DECK_HEIGHT + 0.8, -0.49, 1.9, 0.35, 0.98, WINDOW))
 
-    /** True when the house [shape] has a lit window: about one in four, by where it stands and nothing else. */
+    /**
+     * True when the house [shape] has its windows lit at night: about one in two, by where it stands and nothing else,
+     * so the same houses every run and no draw of the layout's random numbers. The top bit of a Fibonacci hash.
+     */
     fun windowLit(shape: TurnedBox): Boolean {
         val mixed = floor(shape.x * 16).toInt() * 73_856_093 xor floor(shape.z * 16).toInt() * 19_349_663
-        return (mixed * -1_640_531_535 ushr 16) and 3 == 0
+        return mixed * -1_640_531_535 ushr 31 == 0
     }
+
+    /**
+     * A lit house's windows: [PANE_HEIGHT] of its walls tall from [PANE_BOTTOM] of them up, [PANE_OUT] out from the
+     * wall, [PANE_WIDTH] of its width wide (the front one less where the door leaves less), [PANE_GAP] clear of the
+     * door and of the wall's ends. A front with less than [LEAST_PANE] free beside the door has no window, and nor
+     * does the house; a back within [BACK_SEEN] of the back of another row has none, as nobody sees it.
+     */
+    const val PANE_BOTTOM = 0.25
+    const val PANE_HEIGHT = 0.45
+    const val PANE_OUT = 0.025
+    const val PANE_DEPTH = 0.05
+    const val PANE_WIDTH = 0.35
+    const val PANE_GAP = 0.05
+    const val LEAST_PANE = 0.2
+    const val BACK_SEEN = 1.0
 
     /** The place whose door or person [spot] is within [REACH] of in zone 1's town, or null ([HomeSite.placeAt]). */
     fun placeAt(spot: Spot): Place? = HomeSite.of(1).placeAt(spot)
@@ -324,7 +344,7 @@ object Neighbourhood {
     val groundTiles: List<List<Block>>
     val glowing: List<Block>
 
-    /** Which of [glowing] are a suburban house's window: not drawn by day, as a tower's glass is. */
+    /** Which of [glowing] are a suburban house's window: drawn only once the lights are on, near the camera. */
     val houseGlass: List<Int>
 
     /** The campfire's flames, which flicker: measured from the middle of the fire, [FLAME_BASE] above the ground. */
@@ -1197,8 +1217,14 @@ object Neighbourhood {
                 blocks.add(house.shape.block(0.0, house.wall, house.colour))
                 val foldable = foldables.size
                 val box = house.shape.bounds(house.wall + house.ridge, house.colour)
-                val glass = if (windowLit(house.shape)) addHouseWindow(house) else -1
-                foldables.add(Foldable(box, body, roof = -1, glassNorth = glass, glassSouth = -1))
+                val front = if (windowLit(house.shape)) addFrontWindow(house) else -1
+                // A lit house's back is lit too, in the middle of its back wall, where that wall is seen.
+                val back = if (front >= 0 && backSeen(house, standing)) {
+                    addPane(house, -house.front, 0.0, house.shape.width * PANE_WIDTH)
+                } else {
+                    -1
+                }
+                foldables.add(Foldable(box, body, roof = -1, glassNorth = front, glassSouth = back))
                 claim(house.shape, box, marks = kept.isNotEmpty())
                 // However thin, it blocks the square its middle is on.
                 turnedFootprints.add(Cell(floor(house.shape.x).toInt(), floor(house.shape.z).toInt()))
@@ -1213,18 +1239,44 @@ object Neighbourhood {
             yards.add(Yard(block, if (kept.isEmpty()) plan.lawn else null, trees, houses, firstRow, rows))
         }
 
-        /** A window on [house]'s front, to the side of its door the door is not on; its index in [glowing]. */
-        private fun addHouseWindow(house: House): Int {
+        /**
+         * A window on [house]'s front, in the run of wall beside its door on the side the door is not on, clear of the
+         * door; its index in [glowing], or -1 where that run is too short for one.
+         */
+        private fun addFrontWindow(house: House): Int {
+            val side = if (house.doorAt > 0) -1.0 else 1.0
+            // The door's edge on the window's side, and the wall's end, each from the middle.
+            val inner = max(0.0, house.doorAt * side + HouseDetail.DOOR_WIDTH / 2) + PANE_GAP
+            val outer = house.shape.width / 2 - PANE_GAP
+            if (outer - inner < LEAST_PANE) return -1
+            val width = min(house.shape.width * PANE_WIDTH, outer - inner)
+            return addPane(house, house.front, side * (inner + outer) / 2, width)
+        }
+
+        /**
+         * True when [house]'s back is seen: no house of [others] in another row stands back to back with it, its
+         * back wall within [BACK_SEEN] of theirs.
+         */
+        private fun backSeen(house: House, others: List<House>): Boolean {
+            val shape = house.shape
+            return others.none { other ->
+                val across = (other.shape.x - shape.x) * sin(shape.turn) + (other.shape.z - shape.z) * cos(shape.turn)
+                other.front != house.front && across * house.front < 0 &&
+                    abs(across) - (shape.depth + other.shape.depth) / 2 < BACK_SEEN
+            }
+        }
+
+        /** A pane on [house]'s wall on [side] (its front's way or the other), [along] from the middle; its index. */
+        private fun addPane(house: House, side: Double, along: Double, width: Double): Int {
             val shape = house.shape
             val cosine = cos(shape.turn)
             val sine = sin(shape.turn)
-            val along = (if (house.doorAt > 0) -0.25 else 0.25) * shape.width
-            val out = house.front * (shape.depth / 2 + 0.025)
+            val out = side * (shape.depth / 2 + PANE_OUT)
             val x = shape.x + along * cosine + out * sine
             val z = shape.z - along * sine + out * cosine
-            val pane = TurnedBox(x, z, shape.width * 0.3, 0.05, shape.turn)
+            val pane = TurnedBox(x, z, width, PANE_DEPTH, shape.turn)
             houseGlass.add(glowing.size)
-            glowing.add(pane.block(house.wall * 0.3, house.wall * 0.35, WINDOW))
+            glowing.add(pane.block(house.wall * PANE_BOTTOM, house.wall * PANE_HEIGHT, WINDOW))
             return glowing.size - 1
         }
 

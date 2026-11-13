@@ -347,7 +347,8 @@ internal class HouseDetail(
 
         private const val SQRT_TWO = 1.4142135623730951
         private const val ROOF_PITCH = PI / 4
-        private const val DOOR_WIDTH = 0.34
+        /** How wide a house's door is; its windows keep clear of it ([Neighbourhood.addHouses]). */
+        const val DOOR_WIDTH = 0.34
         private const val DOOR_HEIGHT = 0.75
         private const val DOOR_SHARE = 0.5
         private const val DOOR_DEPTH = 0.04
