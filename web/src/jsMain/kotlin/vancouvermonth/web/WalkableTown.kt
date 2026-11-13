@@ -935,11 +935,12 @@ internal class NeighbourhoodScene(
             // A place's windows are small: they go with the low city round it, however tall the place.
             if (draw > 0) far(mesh, panes, low = draw >= draws.size - ofPlaces.size)
         }
-        // The suburban houses' windows, a draw for each wide tile of them (few draws, as the frame's draws are budgeted),
-        // drawn only after dark and only near the camera.
+        // The suburban houses' windows, a draw for each wide tile of them (few draws, as the frame's draws are
+        // budgeted), drawn only after dark and only near the camera.
         val byTile = windows.groupBy { index ->
             val pane = glowingBlocks[index]
-            floor((pane.x + pane.width / 2) / WINDOW_TILE).toInt() to floor((pane.z + pane.depth / 2) / WINDOW_TILE).toInt()
+            val column = floor((pane.x + pane.width / 2) / WINDOW_TILE).toInt()
+            column to floor((pane.z + pane.depth / 2) / WINDOW_TILE).toInt()
         }
         for (members in byTile.values) {
             val mesh = glowDraw(members)

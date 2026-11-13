@@ -1220,9 +1220,9 @@ object Neighbourhood {
             val sine = sin(shape.turn)
             val along = (if (house.doorAt > 0) -0.25 else 0.25) * shape.width
             val out = house.front * (shape.depth / 2 + 0.025)
-            val pane = TurnedBox(
-                shape.x + along * cosine + out * sine, shape.z - along * sine + out * cosine, shape.width * 0.3, 0.05, shape.turn,
-            )
+            val x = shape.x + along * cosine + out * sine
+            val z = shape.z - along * sine + out * cosine
+            val pane = TurnedBox(x, z, shape.width * 0.3, 0.05, shape.turn)
             houseGlass.add(glowing.size)
             glowing.add(pane.block(house.wall * 0.3, house.wall * 0.35, WINDOW))
             return glowing.size - 1
