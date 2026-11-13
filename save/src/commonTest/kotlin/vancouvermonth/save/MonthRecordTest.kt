@@ -89,9 +89,9 @@ class MonthRecordTest {
     }
 
     @Test
-    fun `the place numbers the town has today are pinned to the lines players already have saved`() {
-        // Written out by hand, not read from the town: a number or letter changed in the record breaks a saved month.
-        // The town (web's Place) has cafes 0..2, libraries 0..2, coworking spaces 0..1 and offices 0..2, and sleeps at 0.
+    fun `the letters and digits of a kept line read as each action at each place number in use`() {
+        // Pins the line's letters and digits only. Which place a number means is pinned in web's NeighbourhoodTest.
+        // The town has cafes 0..2, libraries 0..2, coworking spaces 0..1 and offices 0..2; sleep is at 0.
         val inUse = mapOf(
             Action.WORK to listOf("W", "W1", "W2"),
             Action.STUDY_ENGLISH to listOf("E", "E1", "E2"),

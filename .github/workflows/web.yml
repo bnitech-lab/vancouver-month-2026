@@ -14,7 +14,8 @@ permissions:
 
 concurrency:
   group: web-${{ github.ref }}
-  # Only a pull request's older run is cancelled; a run on main finishes, so quick merges all publish.
+  # A pull request's older run is cancelled. On main the running deploy finishes; GitHub keeps only the newest
+  # waiting run (an older waiting one is cancelled), and it publishes after, so main always ends up published.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -47,7 +48,9 @@ jobs:
           test "$size" -le 1048576
       - name: Say so when main is not published
         if: github.event_name == 'push' && vars.PAGES_ENABLED != 'true'
-        run: echo "Warning: not published, because the repository variable PAGES_ENABLED is not set to true." >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo "Warning: not published, PAGES_ENABLED is not true." >> "$GITHUB_STEP_SUMMARY"
+          echo "::warning::Not published: PAGES_ENABLED is not true."
       - name: Keep the built page for publishing
         if: github.event_name == 'push' && vars.PAGES_ENABLED == 'true'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
